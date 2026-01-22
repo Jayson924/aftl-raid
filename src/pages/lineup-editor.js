@@ -406,6 +406,22 @@ export const LineupEditorPage = {
       </div>
     `;
 
+    // Add remove button to slot (not inside slot-content)
+    let removeBtn = slotElement.querySelector('.slot-remove-btn');
+    if (!removeBtn) {
+      removeBtn = document.createElement('button');
+      removeBtn.className = 'slot-remove-btn';
+      removeBtn.title = 'Remove player';
+      removeBtn.innerHTML = '×';
+      slotElement.appendChild(removeBtn);
+    }
+
+    // Add event listener for remove button
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.removePlayerFromSlot(slotIndex);
+    };
+
     const backgroundStyle = this.getEquipmentBackground(player);
     if (backgroundStyle) {
       slotElement.style.cssText = backgroundStyle;
@@ -423,6 +439,12 @@ export const LineupEditorPage = {
     const slotContent = slotElement.querySelector('.slot-content');
 
     slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';
+
+    // Remove the remove button
+    const removeBtn = slotElement.querySelector('.slot-remove-btn');
+    if (removeBtn) {
+      removeBtn.remove();
+    }
 
     slotElement.style.cssText = '';
 
@@ -453,6 +475,11 @@ export const LineupEditorPage = {
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       slotElement.querySelector('.slot-content').innerHTML = '<div class="empty-slot">Drop or click</div>';
+      // Remove any remove buttons
+      const removeBtn = slotElement.querySelector('.slot-remove-btn');
+      if (removeBtn) {
+        removeBtn.remove();
+      }
       slotElement.style.cssText = '';
     });
 
@@ -552,6 +579,11 @@ export const LineupEditorPage = {
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       slotElement.querySelector('.slot-content').innerHTML = '<div class="empty-slot">Drop or click</div>';
+      // Remove any remove buttons
+      const removeBtn = slotElement.querySelector('.slot-remove-btn');
+      if (removeBtn) {
+        removeBtn.remove();
+      }
       slotElement.style.cssText = '';
     });
 
