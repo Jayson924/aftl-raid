@@ -102,10 +102,10 @@ function showLoginModal() {
 
     if (authService.authenticate(password)) {
       document.body.removeChild(modalElement);
-      toast.success('Login successful!');
+      toast.success('Welcome po');
       renderNavigation();
     } else {
-      toast.error('Incorrect password');
+      toast.error('hoy bawal ka dito, ano ka, barlito?');
       document.getElementById('admin-password').value = '';
       document.getElementById('admin-password').focus();
     }

@@ -379,10 +379,10 @@ export const PlayersPage = {
       try {
         await dataService.deletePlayer(player.name);
         document.body.removeChild(modalElement);
-        toast.success(`Character "${player.name}" deleted successfully!`);
+        toast.success(`${player.name} deleted! Wala na!!`);
         this.loadPlayers();
       } catch (error) {
-        toast.error(`Error deleting player: ${error.message}`);
+        toast.error(`Anong ginawa mo? Error: ${error.message}`);
       }
     });
 
@@ -405,10 +405,10 @@ export const PlayersPage = {
 
     try {
       await dataService.togglePlayerCompleted(playerName);
-      toast.success(`Updated status for "${playerName}"`);
+      toast.success(`Updated ${playerName}`);
       this.loadPlayers();
     } catch (error) {
-      toast.error(`Error toggling player status: ${error.message}`);
+      toast.error(`??? Hala ano yan error: ${error.message}`);
     }
   }
 };

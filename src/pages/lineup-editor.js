@@ -59,7 +59,7 @@ export const LineupEditorPage = {
             </div>
 
             <div class="available-players">
-              <h3>Available Characters <span style="font-size: 0.85rem; color: #888; font-weight: normal;">(Drag & drop or click slots)</span></h3>
+              <h3>Available Characters <span style="font-size: 0.85rem; color: #888; font-weight: normal;">(Drag & drop, double click, click slots)</span></h3>
               <div class="player-filter">
                 <input type="text" id="player-search" placeholder="Search characters...">
                 <select id="class-filter">
@@ -453,7 +453,7 @@ export const LineupEditorPage = {
 
   async clearLineup() {
     const confirmed = await modal.confirm(
-      'Are you sure you want to clear all slots? This will remove all characters from the lineup.',
+      'Clear confirmation.',
       {
         title: 'Clear Lineup',
         confirmText: 'Clear All',
@@ -488,14 +488,14 @@ export const LineupEditorPage = {
 
   async saveLineup() {
     if (!this.currentLineup.name) {
-      toast.warning('Please enter a lineup name');
+      toast.warning('Lineup name po');
       return;
     }
 
     const filledSlots = this.currentLineup.players.filter(p => p).length;
 
     if (filledSlots === 0) {
-      toast.warning('Please add at least one character to the lineup');
+      toast.warning('??? Save mo na walang tao?');
       return;
     }
 
@@ -522,7 +522,7 @@ export const LineupEditorPage = {
           status: this.currentLineup.status,
           players
         }, this.currentLineup.name);
-        toast.success(`Lineup "${this.currentLineup.name}" updated successfully!`);
+        toast.success(`${this.currentLineup.name} updated!`);
       } else {
         // Add new lineup
         await dataService.addLineup({
@@ -530,7 +530,7 @@ export const LineupEditorPage = {
           status: this.currentLineup.status,
           players
         });
-        toast.success(`Lineup "${this.currentLineup.name}" saved successfully!`);
+        toast.success(`${this.currentLineup.name} saved!`);
       }
 
       this.loadExistingLineups(); // Refresh the lineup list
@@ -538,7 +538,7 @@ export const LineupEditorPage = {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Lineup';
     } catch (error) {
-      toast.error(`Error saving lineup: ${error.message}`);
+      toast.error(`Error dong: ${error.message}`);
       const saveBtn = document.getElementById('save-lineup-btn');
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Lineup';
@@ -547,7 +547,7 @@ export const LineupEditorPage = {
 
   async deleteLineup(lineupName) {
     const confirmed = await modal.confirm(
-      `Are you sure you want to delete the lineup "${lineupName}"?`,
+      `Delete lineup ${lineupName}?`,
       {
         title: 'Delete Lineup',
         confirmText: 'Delete',
@@ -560,10 +560,10 @@ export const LineupEditorPage = {
 
     try {
       await dataService.deleteLineup(lineupName);
-      toast.success(`Lineup "${lineupName}" deleted successfully!`);
+      toast.success(`GG ${lineupName} deleted!`);
       this.loadExistingLineups(); // Refresh the lineup list
     } catch (error) {
-      toast.error(`Error deleting lineup: ${error.message}`);
+      toast.error(`HOY ano yan bat may error: ${error.message}`);
     }
   },
 
@@ -612,6 +612,26 @@ export const LineupEditorPage = {
 
       card.addEventListener('dragend', (e) => {
         card.classList.remove('dragging');
+      });
+
+      card.addEventListener('dblclick', (e) => {
+        const playerName = card.dataset.playerName;
+
+        // Find first empty slot
+        let firstEmptySlot = -1;
+        for (let i = 0; i < 8; i++) {
+          if (!this.currentLineup.players[i]) {
+            firstEmptySlot = i;
+            break;
+          }
+        }
+
+        if (firstEmptySlot !== -1) {
+          this.assignPlayerToSlot(firstEmptySlot, playerName);
+          toast.success(`Added ${playerName} to slot ${firstEmptySlot + 1}`);
+        } else {
+          toast.warning('Full na po!');
+        }
       });
     });
   },
