@@ -64,7 +64,7 @@ export const LineupsPage = {
       const readyLineups = lineups.filter(l => l.status === 'ready');
 
       if (readyLineups.length === 0) {
-        listElement.innerHTML = '<div class="empty-state">No ready lineups yet. Create one from the Lineup Editor!</div>';
+        listElement.innerHTML = '<div class="empty-state">No lineups ready. GG talaga Barlito effect!</div>';
         return;
       }
 
