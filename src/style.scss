@@ -1,0 +1,1364 @@
+// Variables
+$primary-color: #f4c430;
+$primary-hover: #ffdb58;
+$secondary-color: #6c757d;
+$success-color: #28a745;
+$danger-color: #dc3545;
+$warning-color: #ff9800;
+$background-dark: #242424;
+$background-light: #ffffff;
+$text-dark: #213547;
+$text-light: rgba(255, 255, 255, 0.87);
+$text-muted: #888;
+$border-color: #ddd;
+$border-radius: 8px;
+$transition: all 0.3s ease;
+$primary-dark: #c9a12a;
+
+// Reset and base styles
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: $text-light;
+  background-color: $background-dark;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+// Navigation
+.main-nav {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem 2rem;
+
+  .nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .app-title {
+    margin: 0;
+    font-size: 1.5rem;
+    color: $primary-color;
+    text-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+    font-weight: 700;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+  }
+
+  .nav-link {
+    color: $text-light;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: $border-radius;
+    transition: $transition;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    &.active {
+      background-color: $primary-color;
+      color: #1a1a1a;
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+    }
+  }
+
+  .nav-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+}
+
+// Buttons
+.btn {
+  border-radius: $border-radius;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: $transition;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.btn-primary {
+  background-color: $primary-color;
+  color: #1a1a1a;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(244, 196, 48, 0.3);
+
+  &:hover {
+    background-color: $primary-hover;
+    box-shadow: 0 0 16px rgba(244, 196, 48, 0.5);
+    transform: translateY(-1px);
+  }
+}
+
+.btn-secondary {
+  background-color: $secondary-color;
+  color: white;
+}
+
+.btn-danger {
+  background-color: $danger-color;
+  color: white;
+
+  &:hover {
+    background-color: darken($danger-color, 10%);
+  }
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: $border-radius;
+  transition: $transition;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+// Page layouts
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+
+  h1 {
+    margin: 0;
+  }
+}
+
+// Lineups Page
+.lineups-page {
+  .lineups-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .lineup-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: $border-radius;
+    padding: 1.5rem;
+
+    h3 {
+      margin: 0 0 1rem 0;
+      color: $primary-color;
+      text-shadow: 0 0 8px rgba(244, 196, 48, 0.3);
+    }
+
+    .lineup-players {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .player-slot {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: $transition;
+      position: relative;
+      overflow: hidden;
+
+      &.empty {
+        opacity: 0.5;
+      }
+
+      .slot-number {
+        background-color: $primary-color;
+        color: #1a1a1a;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        font-weight: bold;
+        box-shadow: 0 0 8px rgba(244, 196, 48, 0.4);
+        flex-shrink: 0;
+        z-index: 1;
+      }
+
+      .player-name {
+        z-index: 1;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      .player-slot-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        flex: 1;
+        z-index: 1;
+
+        .player-name {
+          font-weight: 600;
+        }
+
+        .player-role {
+          font-size: 0.85rem;
+          color: $text-muted;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .player-equipment-compact {
+          display: flex;
+          gap: 0.5rem;
+          font-size: 0.8rem;
+        }
+      }
+    }
+  }
+
+  .setup-message {
+    text-align: center;
+    padding: 3rem;
+
+    h2 {
+      margin-bottom: 1rem;
+    }
+  }
+}
+
+// Players Page
+.players-page {
+  .players-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: $border-radius;
+    overflow: hidden;
+
+    thead {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    th {
+      font-weight: 600;
+    }
+
+    tbody tr {
+      transition: $transition;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+
+      &.completed {
+        opacity: 0.7;
+        background-color: rgba(40, 167, 69, 0.1);
+      }
+    }
+
+    .player-name {
+      font-weight: 600;
+      color: $primary-color;
+    }
+
+    .notes {
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+
+      &.completed {
+        background-color: $success-color;
+        color: white;
+      }
+
+      &.pending {
+        background-color: $warning-color;
+        color: $text-dark;
+      }
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+}
+
+// Lineup Editor Page
+.lineup-editor-page {
+  .editor-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .lineup-info {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+  }
+
+  .editor-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+  }
+
+  .lineup-slots {
+    h3 {
+      margin-top: 0;
+    }
+
+    .slots-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .slot {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      padding: 1rem;
+      cursor: pointer;
+      transition: $transition;
+      position: relative;
+      overflow: hidden;
+
+      &:hover {
+        border-color: $primary-color;
+        background-color: rgba(244, 196, 48, 0.1);
+      }
+
+      &.drag-over {
+        border-color: $success-color;
+        background-color: rgba(40, 167, 69, 0.2);
+        border-style: dashed;
+        transform: scale(1.02);
+      }
+
+      .slot-number {
+        display: inline-block;
+        background-color: $primary-color;
+        color: #1a1a1a;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 28px;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+        position: relative;
+        z-index: 1;
+      }
+
+      .slot-content {
+        position: relative;
+        z-index: 1;
+
+        .empty-slot {
+          color: $text-muted;
+          font-style: italic;
+        }
+
+        .assigned-player {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+
+          .player-name {
+            font-weight: 600;
+            color: $primary-color;
+            text-shadow: 0 0 8px rgba(244, 196, 48, 0.3), 0 1px 2px rgba(0, 0, 0, 0.3);
+          }
+
+          .player-role {
+            font-size: 0.9rem;
+            color: $text-muted;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          }
+
+          .player-equipment-compact {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+          }
+        }
+      }
+    }
+  }
+
+  .available-players {
+    h3 {
+      margin-top: 0;
+    }
+
+    .player-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+
+      input[type="text"], select {
+        padding: 0.5rem;
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background-color: rgba(255, 255, 255, 0.05);
+        color: $text-light;
+        font-family: inherit;
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+      }
+    }
+
+    .players-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 600px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+
+      .player-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: $border-radius;
+        padding: 0.75rem;
+        cursor: grab;
+        transition: $transition;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+          border-color: $primary-color;
+        }
+
+        &.completed {
+          opacity: 0.7;
+        }
+
+        &.dragging {
+          opacity: 0.5;
+          cursor: grabbing;
+          transform: scale(0.95);
+        }
+
+        &.in-lineup {
+          background-color: rgba(40, 167, 69, 0.15);
+          border-color: $success-color;
+          box-shadow: 0 0 8px rgba(40, 167, 69, 0.3);
+        }
+
+        &:active {
+          cursor: grabbing;
+        }
+
+        .player-info {
+          .player-name {
+            font-weight: 600;
+          }
+
+          .player-role, .player-equipment {
+            font-size: 0.9rem;
+            color: $text-muted;
+          }
+        }
+
+        .completed-badge {
+          color: $success-color;
+          font-size: 1.2rem;
+        }
+
+        .in-lineup-badge {
+          background-color: $success-color;
+          color: white;
+          padding: 0.2rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+
+  .editor-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+  }
+}
+
+// Modal
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+
+  .modal-content {
+    background-color: $background-dark;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: $border-radius;
+    padding: 2rem;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 90%;
+
+    h2 {
+      margin-top: 0;
+    }
+
+    &.confirmation-modal {
+      max-width: 500px;
+
+      .confirmation-message {
+        margin: 1.5rem 0;
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+
+      .form-actions {
+        justify-content: flex-end;
+        margin-top: 2rem;
+      }
+    }
+  }
+
+  .setup-instructions {
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-radius: $border-radius;
+    margin-bottom: 1.5rem;
+
+    h3 {
+      margin-top: 0;
+    }
+
+    ol {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+
+      li {
+        margin: 0.5rem 0;
+      }
+    }
+  }
+
+  .player-selector-list, .lineup-select-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+
+    .player-option, .lineup-option {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: $transition;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: $primary-color;
+      }
+    }
+
+    .lineup-option {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+}
+
+// Forms
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  label {
+    font-weight: 500;
+  }
+
+  input, textarea, select {
+    padding: 0.6rem;
+    border-radius: $border-radius;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.05);
+    color: $text-light;
+    font-family: inherit;
+    font-size: 1rem;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+// Equipment styling
+.equipment-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  svg {
+    vertical-align: middle;
+  }
+}
+
+.equipment-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+
+  svg {
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+}
+
+.equipment-row {
+  display: flex;
+  gap: 0.5rem;
+
+  .equipment-select {
+    flex: 1;
+
+    &.enhancement-select {
+      flex: 0 0 100px;
+    }
+  }
+}
+
+.equipment-select {
+  option {
+    padding: 0.5rem;
+  }
+}
+
+.player-equipment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+// Utility classes
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: $text-muted;
+}
+
+.error {
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid $danger-color;
+  color: $danger-color;
+  padding: 1rem;
+  border-radius: $border-radius;
+  text-align: center;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: $text-muted;
+}
+
+.info-message {
+  background-color: rgba(244, 196, 48, 0.1);
+  border: 1px solid $primary-color;
+  padding: 1rem;
+  border-radius: $border-radius;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.text-muted {
+  color: $text-muted;
+}
+
+.settings-info {
+  margin: 1rem 0;
+
+  p {
+    margin: 0.5rem 0;
+  }
+}
+
+// Toast notifications
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.95);
+  color: $text-dark;
+  border-radius: $border-radius;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid $primary-color;
+  opacity: 0;
+  transform: translateX(400px);
+  transition: all 0.3s ease;
+
+  &.toast-show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  &.toast-hide {
+    opacity: 0;
+    transform: translateX(400px);
+  }
+
+  .toast-icon {
+    font-size: 1.5rem;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .toast-message {
+    flex: 1;
+    font-size: 0.95rem;
+  }
+
+  .toast-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &.toast-success {
+    border-left-color: $success-color;
+
+    .toast-icon {
+      color: $success-color;
+    }
+  }
+
+  &.toast-error {
+    border-left-color: $danger-color;
+
+    .toast-icon {
+      color: $danger-color;
+    }
+  }
+
+  &.toast-warning {
+    border-left-color: $warning-color;
+
+    .toast-icon {
+      color: #cc9a06;
+    }
+  }
+
+  &.toast-info {
+    border-left-color: $primary-dark;
+
+    .toast-icon {
+      color: $primary-dark;
+    }
+  }
+}
+
+// Ensure good contrast for toast info in dark mode
+@media (prefers-color-scheme: dark) {
+  .toast.toast-info {
+    border-left-color: $primary-color;
+
+    .toast-icon {
+      color: $primary-color;
+    }
+  }
+}
+
+// Light mode
+@media (prefers-color-scheme: light) {
+  :root {
+    color: $text-dark;
+    background-color: $background-light;
+  }
+
+  .main-nav {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+
+    .app-title {
+      color: $primary-dark;
+      text-shadow: none;
+    }
+  }
+
+  .nav-link {
+    color: $text-dark;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    &.active {
+      background-color: $primary-dark;
+    }
+  }
+
+  .btn-primary {
+    background-color: $primary-dark;
+    box-shadow: none;
+    color: white;
+
+    &:hover {
+      background-color: darken($primary-dark, 10%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  .player-name, .lineup-card h3 {
+    color: $primary-dark !important;
+    text-shadow: none !important;
+  }
+
+  .slot-number {
+    background-color: $primary-dark !important;
+    color: white !important;
+    box-shadow: none !important;
+  }
+
+  .nav-link.active {
+    box-shadow: none;
+    color: white;
+  }
+
+  .assigned-player .player-name {
+    text-shadow: none !important;
+    color: $primary-dark !important;
+  }
+
+  .status-badge.completed {
+    background-color: $success-color;
+  }
+
+  .info-message {
+    background-color: rgba(201, 161, 42, 0.15);
+    border-color: $primary-dark;
+  }
+
+  .lineup-card, .player-card, .slot {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .lineup-card .player-slot {
+    border-color: rgba(0, 0, 0, 0.15);
+
+    .player-name {
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+
+    .player-slot-info {
+      .player-role {
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+      }
+    }
+  }
+
+  .slot.drag-over {
+    background-color: rgba(40, 167, 69, 0.15);
+    border-color: $success-color;
+  }
+
+  .lineup-editor-page .slot {
+    border-color: rgba(0, 0, 0, 0.2);
+
+    .assigned-player {
+      .player-name {
+        text-shadow: 0 0 8px rgba(201, 161, 42, 0.3), 0 1px 2px rgba(255, 255, 255, 0.5);
+      }
+
+      .player-role {
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+      }
+    }
+  }
+
+  .player-card.dragging {
+    opacity: 0.5;
+  }
+
+  .player-card.in-lineup {
+    background-color: rgba(40, 167, 69, 0.2);
+    border-color: $success-color;
+  }
+
+  .players-table {
+    background-color: rgba(0, 0, 0, 0.02);
+
+    thead {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    th, td {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .modal .modal-content {
+    background-color: $background-light;
+    border-color: rgba(0, 0, 0, 0.2);
+  }
+
+  .form-group input, .form-group textarea, .form-group select {
+    border-color: rgba(0, 0, 0, 0.2);
+    background-color: rgba(0, 0, 0, 0.05);
+    color: $text-dark;
+  }
+
+  .toast {
+    background-color: rgba(255, 255, 255, 0.98);
+    color: $text-dark;
+  }
+
+  .players-page .players-table tr {
+    background-color: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Dark mode toasts
+@media (prefers-color-scheme: dark) {
+  .toast {
+    background-color: rgba(40, 40, 40, 0.98);
+    color: $text-light;
+  }
+}
+
+// Mobile responsive styles
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  #app {
+    padding: 1rem;
+  }
+
+  // Navigation
+  .main-nav {
+    padding: 0.75rem 1rem;
+
+    .nav-container {
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .app-title {
+      font-size: 1.2rem;
+      flex: 1;
+    }
+
+    .nav-links {
+      order: 3;
+      width: 100%;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .nav-actions {
+      order: 2;
+    }
+
+    .nav-link {
+      padding: 0.75rem;
+      text-align: center;
+    }
+  }
+
+  // Lineups Page
+  .lineups-page {
+    .lineups-list {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .lineup-card {
+      padding: 1rem;
+
+      h3 {
+        font-size: 1.1rem;
+      }
+
+      .player-slot {
+        font-size: 0.9rem;
+      }
+    }
+  }
+
+  // Players Page - Convert table to cards on mobile
+  .players-page {
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .players-table {
+      display: block;
+
+      thead {
+        display: none;
+      }
+
+      tbody {
+        display: block;
+      }
+
+      tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: $border-radius;
+        padding: 1rem;
+        background-color: rgba(255, 255, 255, 0.05);
+
+        &.completed {
+          background-color: rgba(40, 167, 69, 0.1);
+        }
+      }
+
+      td {
+        display: block;
+        padding: 0.5rem 0;
+        border: none;
+        text-align: left;
+
+        &::before {
+          content: attr(data-label);
+          font-weight: 600;
+          display: inline-block;
+          width: 100px;
+          color: $primary-color;
+        }
+
+        &.actions {
+          margin-top: 0.5rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+          &::before {
+            display: none;
+          }
+        }
+      }
+
+      .notes {
+        max-width: 100%;
+        white-space: normal;
+      }
+    }
+  }
+
+  // Lineup Editor Page
+  .lineup-editor-page {
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .lineup-info {
+      grid-template-columns: 1fr;
+    }
+
+    .editor-main {
+      grid-template-columns: 1fr;
+    }
+
+    .available-players {
+      .players-list {
+        max-height: 400px;
+      }
+    }
+
+    .editor-actions {
+      flex-direction: column;
+
+      .btn {
+        width: 100%;
+      }
+    }
+  }
+
+  // Modal
+  .modal {
+    padding: 1rem;
+
+    .modal-content {
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 100%;
+
+      h2 {
+        font-size: 1.3rem;
+      }
+    }
+
+    .setup-instructions {
+      font-size: 0.9rem;
+
+      ol {
+        padding-left: 1.25rem;
+
+        li {
+          margin: 0.4rem 0;
+        }
+      }
+    }
+  }
+
+  // Forms
+  .form-actions {
+    flex-direction: column;
+
+    .btn {
+      width: 100%;
+    }
+  }
+
+  .equipment-row {
+    flex-direction: column;
+
+    .equipment-select {
+      &.enhancement-select {
+        flex: 1;
+      }
+    }
+  }
+
+  // Toast notifications
+  .toast-container {
+    left: 1rem;
+    right: 1rem;
+    max-width: calc(100% - 2rem);
+  }
+
+  .toast {
+    .toast-message {
+      font-size: 0.9rem;
+    }
+  }
+}
+
+// Small mobile devices
+@media (max-width: 480px) {
+  .main-nav {
+    .app-title {
+      font-size: 1rem;
+    }
+
+    .nav-link {
+      font-size: 0.9rem;
+    }
+  }
+
+  .lineup-card {
+    .player-slot {
+      font-size: 0.85rem;
+      padding: 0.4rem;
+
+      .slot-number {
+        width: 20px;
+        height: 20px;
+        font-size: 0.75rem;
+      }
+
+      .player-slot-info {
+        .player-name {
+          font-size: 0.85rem;
+        }
+
+        .player-role {
+          font-size: 0.75rem;
+        }
+
+        .player-equipment-compact {
+          font-size: 0.7rem;
+        }
+      }
+    }
+  }
+
+  .btn {
+    padding: 0.5em 1em;
+    font-size: 0.95em;
+  }
+
+  .modal .modal-content {
+    padding: 1rem;
+  }
+}
+
+// Improve touch targets on mobile
+@media (max-width: 768px) {
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .players-page .players-table .actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-start;
+  }
+
+  .lineup-editor-page .slot {
+    min-height: 80px;
+
+    .assigned-player {
+      .player-name,
+      .player-role {
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+      }
+
+      .player-equipment-compact {
+        font-size: 0.7rem;
+        flex-wrap: wrap;
+      }
+    }
+  }
+
+  // On mobile, drag and drop doesn't work well, so use click method
+  .lineup-editor-page .player-card {
+    cursor: pointer;
+  }
+}
