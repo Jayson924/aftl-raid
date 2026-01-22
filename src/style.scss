@@ -293,14 +293,16 @@ body {
     th, td {
       padding: 1rem;
       text-align: left;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      vertical-align: top;
     }
 
     th {
       font-weight: 600;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       transition: $transition;
 
       &:hover {
@@ -311,6 +313,14 @@ body {
         opacity: 0.7;
         background-color: rgba(40, 167, 69, 0.1);
       }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    tbody td {
+      border-bottom: none;
     }
 
     .player-name {
@@ -330,6 +340,10 @@ body {
       .player-suffixes {
         margin-top: 0.25rem;
       }
+    }
+
+    td[data-label="Status"] {
+      padding-top: 1.2rem;
     }
 
     .status-badge {
@@ -353,6 +367,9 @@ body {
     .actions {
       display: flex;
       gap: 0.5rem;
+      align-items: flex-start;
+      white-space: nowrap;
+      padding-top: 0.2rem;
     }
   }
 }

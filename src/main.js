@@ -15,8 +15,8 @@ function initApp() {
 
   // Register routes
   router.register('lineups', LineupsPage);
-  router.register('players', PlayersPage, true); // Protected
-  router.register('editor', LineupEditorPage, true); // Protected
+  router.register('players', PlayersPage, 'player'); // Requires player or admin role
+  router.register('editor', LineupEditorPage, 'admin'); // Requires admin role only
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -38,6 +38,8 @@ function renderNavigation() {
   nav.className = 'main-nav';
 
   const isAuthenticated = authService.isAuthenticated();
+  const isAdmin = authService.isAdmin();
+  const isPlayer = authService.isPlayer();
 
   nav.innerHTML = `
     <div class="nav-container">
@@ -46,6 +48,8 @@ function renderNavigation() {
         <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ${isAuthenticated ? `
           <li><a href="#" class="nav-link" data-route="players">Characters</a></li>
+        ` : ''}
+        ${isAdmin ? `
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
       </ul>
@@ -53,7 +57,7 @@ function renderNavigation() {
         ${isAuthenticated ? `
           <button id="logout-btn" class="btn-icon" title="Logout">🚪</button>
         ` : `
-          <button id="login-btn" class="btn-icon" title="Admin Login">🔐</button>
+          <button id="login-btn" class="btn-icon" title="Login">🔐</button>
         `}
       </div>
     </div>
@@ -79,8 +83,8 @@ function showLoginModal() {
   modalElement.className = 'modal';
   modalElement.innerHTML = `
     <div class="modal-content">
-      <h2>Admin Login</h2>
-      <p>Enter the admin password to access the Characters and Lineup Editor pages.</p>
+      <h2>Login</h2>
+      <p>Enter your password to access protected pages.</p>
       <form id="login-form">
         <div class="form-group">
           <label for="admin-password">Password:</label>
@@ -100,12 +104,18 @@ function showLoginModal() {
     e.preventDefault();
     const password = document.getElementById('admin-password').value;
 
-    if (authService.authenticate(password)) {
+    const result = authService.authenticate(password);
+
+    if (result.success) {
       document.body.removeChild(modalElement);
-      toast.success('Welcome po');
+      if (result.role === 'admin') {
+        toast.success('Welcome admin!');
+      } else if (result.role === 'player') {
+        toast.success('Welcome! You can add characters.');
+      }
       renderNavigation();
     } else {
-      toast.error('hoy bawal ka dito, ano ka, barlito?');
+      toast.error('Invalid password');
       document.getElementById('admin-password').value = '';
       document.getElementById('admin-password').focus();
     }
