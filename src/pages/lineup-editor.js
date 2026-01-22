@@ -273,14 +273,16 @@ export const LineupEditorPage = {
     const classFilter = document.getElementById('class-filter').value;
     const hideCompleted = document.getElementById('hide-completed').checked;
 
-    return this.players.filter(player => {
-      const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
-                          player.role.toLowerCase().includes(searchTerm);
-      const matchesClass = !classFilter || player.role === classFilter;
-      const matchesCompleted = !hideCompleted || !player.completed;
+    return this.players
+      .filter(player => {
+        const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
+                            player.role.toLowerCase().includes(searchTerm);
+        const matchesClass = !classFilter || player.role === classFilter;
+        const matchesCompleted = !hideCompleted || !player.completed;
 
-      return matchesSearch && matchesClass && matchesCompleted;
-    });
+        return matchesSearch && matchesClass && matchesCompleted;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   },
 
   filterPlayers() {
@@ -311,11 +313,15 @@ export const LineupEditorPage = {
   showPlayerSelector(slotIndex) {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
+
+    // Sort players alphabetically
+    const sortedPlayers = [...this.players].sort((a, b) => a.name.localeCompare(b.name));
+
     modalElement.innerHTML = `
       <div class="modal-content">
         <h2>Select Player for Slot ${slotIndex + 1}</h2>
         <div class="player-selector-list">
-          ${this.players.map(player => {
+          ${sortedPlayers.map(player => {
             const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
             const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
 

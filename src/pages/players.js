@@ -41,6 +41,9 @@ export const PlayersPage = {
         return;
       }
 
+      // Sort players alphabetically by name
+      const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
+
       listElement.innerHTML = `
         <table class="players-table">
           <thead>
@@ -55,7 +58,7 @@ export const PlayersPage = {
             </tr>
           </thead>
           <tbody>
-            ${players.map(player => {
+            ${sortedPlayers.map(player => {
               const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
               const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
 
