@@ -533,6 +533,22 @@ body {
         font-family: inherit;
       }
 
+      select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.7rem center;
+        background-size: 1rem;
+        padding-right: 2.5rem;
+
+        option {
+          background-color: #2a2a2a;
+          color: rgba(255, 255, 255, 0.87);
+        }
+      }
+
       .checkbox-label {
         display: flex;
         align-items: center;
@@ -909,6 +925,23 @@ body {
     }
   }
 
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+
+    option {
+      background-color: #2a2a2a;
+      color: rgba(255, 255, 255, 0.87);
+      padding: 0.5rem;
+    }
+  }
+
   textarea {
     resize: vertical;
   }
@@ -952,8 +985,30 @@ body {
 }
 
 .equipment-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem;
+  padding-right: 2.5rem;
+
   option {
+    background-color: #2a2a2a;
+    color: rgba(255, 255, 255, 0.87);
     padding: 0.5rem;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .equipment-select {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(33,53,71,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+
+    option {
+      background-color: white;
+      color: $text-dark;
+    }
   }
 }
 
@@ -1321,9 +1376,22 @@ body {
     border-color: rgba(0, 0, 0, 0.2);
   }
 
-  .form-group input, .form-group textarea, .form-group select {
+  .form-group input, .form-group textarea, .form-group select,
+  .player-filter input[type="text"], .player-filter select {
     border-color: rgba(0, 0, 0, 0.2);
     background-color: rgba(0, 0, 0, 0.05);
+    color: $text-dark;
+  }
+
+  .form-group select,
+  .player-filter select {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(33,53,71,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  }
+
+  .form-group select option,
+  .player-filter select option,
+  select option {
+    background-color: white;
     color: $text-dark;
   }
 
