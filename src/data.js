@@ -147,9 +147,11 @@ class DataService {
       notes: this.cleanValue(row[2] || ''),
       weapon: this.cleanValue(row[3] || ''),
       weaponEnhance: this.cleanValue(row[4] || ''),
-      armor: this.cleanValue(row[5] || ''),
-      armorEnhance: this.cleanValue(row[6] || ''),
-      completed: row[7] === 'TRUE' || row[7] === 'Yes'
+      suffix1: this.cleanValue(row[5] || ''),
+      suffix2: this.cleanValue(row[6] || ''),
+      armor: this.cleanValue(row[7] || ''),
+      armorEnhance: this.cleanValue(row[8] || ''),
+      completed: row[9] === 'TRUE' || row[9] === 'Yes'
     })).filter(player => player.name);
   }
 
@@ -165,7 +167,7 @@ class DataService {
 
   async getPlayers() {
     try {
-      const rows = await this.getRange('Players!A:H');
+      const rows = await this.getRange('Players!A:J');
       return this.parsePlayersFromSheet(rows);
     } catch (error) {
       console.error('Error fetching players:', error);

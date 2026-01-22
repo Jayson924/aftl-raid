@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES } from '../constants.js';
 import { modal } from '../modal.js';
 
 export const PlayersPage = {
@@ -62,6 +62,16 @@ export const PlayersPage = {
               const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
               const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
 
+              const suffixDisplay = [];
+              if (player.suffix1) {
+                const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+                suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+              }
+              if (player.suffix2) {
+                const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+                suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+              }
+
               return `
               <tr class="${player.completed ? 'completed' : ''}">
                 <td class="player-name" data-label="Name">${player.name}</td>
@@ -71,6 +81,7 @@ export const PlayersPage = {
                     <span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">
                       ${EQUIPMENT_ICONS.weapon} ${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                     </span>
+                    ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                   ` : '-'}
                 </td>
                 <td data-label="Armor">
@@ -154,6 +165,16 @@ export const PlayersPage = {
                   <option value="${level.value}">${level.label}</option>
                 `).join('')}
               </select>
+              <select id="player-suffix1" class="equipment-select">
+                ${WEAPON_SUFFIXES.map(suffix => `
+                  <option value="${suffix.value}">${suffix.label}</option>
+                `).join('')}
+              </select>
+              <select id="player-suffix2" class="equipment-select">
+                ${WEAPON_SUFFIXES.map(suffix => `
+                  <option value="${suffix.value}">${suffix.label}</option>
+                `).join('')}
+              </select>
             </div>
           </div>
           <div class="form-group">
@@ -177,7 +198,7 @@ export const PlayersPage = {
           </div>
           <div class="form-group">
             <label for="player-notes">Notes:</label>
-            <textarea id="player-notes" rows="3"></textarea>
+            <textarea id="player-notes" rows="3" maxlength="140"></textarea>
           </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Add Character</button>
@@ -195,6 +216,8 @@ export const PlayersPage = {
       const role = document.getElementById('player-class').value;
       const weapon = document.getElementById('player-weapon').value;
       const weaponEnhance = document.getElementById('player-weapon-enhance').value;
+      const suffix1 = document.getElementById('player-suffix1').value;
+      const suffix2 = document.getElementById('player-suffix2').value;
       const armor = document.getElementById('player-armor').value;
       const armorEnhance = document.getElementById('player-armor-enhance').value;
       const notes = document.getElementById('player-notes').value;
@@ -215,6 +238,8 @@ export const PlayersPage = {
           role,
           weapon,
           weaponEnhance,
+          suffix1,
+          suffix2,
           armor,
           armorEnhance,
           notes,
@@ -278,6 +303,16 @@ export const PlayersPage = {
                   <option value="${level.value}" ${player.weaponEnhance === level.value ? 'selected' : ''}>${level.label}</option>
                 `).join('')}
               </select>
+              <select id="edit-player-suffix1" class="equipment-select">
+                ${WEAPON_SUFFIXES.map(suffix => `
+                  <option value="${suffix.value}" ${player.suffix1 === suffix.value ? 'selected' : ''}>${suffix.label}</option>
+                `).join('')}
+              </select>
+              <select id="edit-player-suffix2" class="equipment-select">
+                ${WEAPON_SUFFIXES.map(suffix => `
+                  <option value="${suffix.value}" ${player.suffix2 === suffix.value ? 'selected' : ''}>${suffix.label}</option>
+                `).join('')}
+              </select>
             </div>
           </div>
           <div class="form-group">
@@ -301,7 +336,7 @@ export const PlayersPage = {
           </div>
           <div class="form-group">
             <label for="edit-player-notes">Notes:</label>
-            <textarea id="edit-player-notes" rows="3">${player.notes}</textarea>
+            <textarea id="edit-player-notes" rows="3" maxlength="140">${player.notes}</textarea>
           </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -320,6 +355,8 @@ export const PlayersPage = {
       const role = document.getElementById('edit-player-class').value;
       const weapon = document.getElementById('edit-player-weapon').value;
       const weaponEnhance = document.getElementById('edit-player-weapon-enhance').value;
+      const suffix1 = document.getElementById('edit-player-suffix1').value;
+      const suffix2 = document.getElementById('edit-player-suffix2').value;
       const armor = document.getElementById('edit-player-armor').value;
       const armorEnhance = document.getElementById('edit-player-armor-enhance').value;
       const notes = document.getElementById('edit-player-notes').value;
@@ -340,6 +377,8 @@ export const PlayersPage = {
           role,
           weapon,
           weaponEnhance,
+          suffix1,
+          suffix2,
           armor,
           armorEnhance,
           notes,

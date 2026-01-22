@@ -42,6 +42,22 @@ export const ENHANCEMENT_LEVELS = [
 
 ];
 
+// Weapon suffixes
+export const WEAPON_SUFFIXES = [
+  { value: '', label: 'None' },
+  { value: 'darkness', label: 'Darkness' },
+  { value: 'destruction', label: 'Destruction' },
+  { value: 'fire', label: 'Fire' },
+  { value: 'harsh', label: 'Harsh' },
+  { value: 'intellect', label: 'Intellect' },
+  { value: 'ironwall', label: 'Iron Wall' },
+  { value: 'light', label: 'Light' },
+  { value: 'magic', label: 'Magic' },
+  { value: 'tent', label: 'Tent' },
+  { value: 'water', label: 'Water' },
+  { value: 'wind', label: 'Wind' }
+];
+
 // SVG icons for equipment
 export const EQUIPMENT_ICONS = {
   weapon: `<svg width="16" height="16" viewBox="0 0 290.226 290.226" fill="currentColor">

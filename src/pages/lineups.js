@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES } from '../constants.js';
 
 export const LineupsPage = {
   async render(container) {
@@ -100,6 +100,16 @@ export const LineupsPage = {
                 equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
               }
 
+              const suffixDisplay = [];
+              if (player.suffix1) {
+                const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+                suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+              }
+              if (player.suffix2) {
+                const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+                suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+              }
+
               return `
               <div class="player-slot" style="${backgroundStyle}">
                 <span class="slot-number">${idx + 1}</span>
@@ -107,6 +117,7 @@ export const LineupsPage = {
                   <span class="player-name">${playerName}</span>
                   ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
                   ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
+                  ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
                 </div>
               </div>
             `;

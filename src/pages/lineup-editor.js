@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES } from '../constants.js';
 import { modal } from '../modal.js';
 
 export const LineupEditorPage = {
@@ -250,6 +250,16 @@ export const LineupEditorPage = {
         equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
       }
 
+      const suffixDisplay = [];
+      if (player.suffix1) {
+        const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+        suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+      }
+      if (player.suffix2) {
+        const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+        suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+      }
+
       return `
         <div class="player-card ${player.completed ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''}"
              data-player-name="${player.name}"
@@ -258,7 +268,9 @@ export const LineupEditorPage = {
             <div class="player-name">${player.name}</div>
             <div class="player-role">${player.role}</div>
             ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
+            ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
           </div>
+          ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
           ${player.completed ? '<span class="completed-badge">✓</span>' : ''}
           ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}
         </div>
@@ -335,12 +347,23 @@ export const LineupEditorPage = {
               equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
             }
 
+            const suffixDisplay = [];
+            if (player.suffix1) {
+              const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+              suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+            }
+            if (player.suffix2) {
+              const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+              suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+            }
+
             return `
             <div class="player-option" data-player-name="${player.name}">
               <div class="player-info">
                 <div class="player-name">${player.name}</div>
                 <div class="player-role">${player.role}</div>
                 ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
+                ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
               </div>
               ${player.completed ? '<span class="completed-badge">✓</span>' : ''}
             </div>
@@ -398,11 +421,22 @@ export const LineupEditorPage = {
       equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
     }
 
+    const suffixDisplay = [];
+    if (player.suffix1) {
+      const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+      suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+    }
+    if (player.suffix2) {
+      const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+      suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+    }
+
     slotContent.innerHTML = `
       <div class="assigned-player">
         <div class="player-name">${player.name}</div>
         <div class="player-role">${player.role}</div>
         ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
+        ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
       </div>
     `;
 
