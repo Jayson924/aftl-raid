@@ -3,8 +3,38 @@ import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES } from '../constants.js';
 import { modal } from '../modal.js';
+import { authService } from '../auth.js';
 
 export const PlayersPage = {
+  // Track characters added by current player session
+  getMyCharacters() {
+    try {
+      return JSON.parse(localStorage.getItem('my_characters') || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  addMyCharacter(characterName) {
+    const myCharacters = this.getMyCharacters();
+    if (!myCharacters.includes(characterName)) {
+      myCharacters.push(characterName);
+      localStorage.setItem('my_characters', JSON.stringify(myCharacters));
+    }
+  },
+
+  removeMyCharacter(characterName) {
+    const myCharacters = this.getMyCharacters();
+    const filtered = myCharacters.filter(name => name !== characterName);
+    localStorage.setItem('my_characters', JSON.stringify(filtered));
+  },
+
+  canEditCharacter(characterName) {
+    const isAdmin = authService.isAdmin();
+    const myCharacters = this.getMyCharacters();
+    return isAdmin || myCharacters.includes(characterName);
+  },
+
   async render(container) {
     container.innerHTML = `
       <div class="players-page">
@@ -44,6 +74,9 @@ export const PlayersPage = {
       // Sort players alphabetically by name
       const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
 
+      const isAdmin = authService.isAdmin();
+      const hasAnyEditableCharacters = sortedPlayers.some(p => this.canEditCharacter(p.name));
+
       listElement.innerHTML = `
         <table class="players-table">
           <thead>
@@ -54,7 +87,7 @@ export const PlayersPage = {
               <th>Armor</th>
               <th>Notes</th>
               <th>Status</th>
-              <th>Actions</th>
+              ${hasAnyEditableCharacters ? '<th>Actions</th>' : ''}
             </tr>
           </thead>
           <tbody>
@@ -71,6 +104,8 @@ export const PlayersPage = {
                 const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
                 suffixDisplay.push(suffix2Obj?.label || player.suffix2);
               }
+
+              const canEdit = this.canEditCharacter(player.name);
 
               return `
               <tr class="${player.completed ? 'completed' : ''}">
@@ -97,14 +132,16 @@ export const PlayersPage = {
                     ${player.completed ? 'Completed' : 'Pending'}
                   </span>
                 </td>
-                <td class="actions">
-                  <button class="btn-icon" title="Edit" data-action="edit" data-player="${player.name}">
-                    ✏️
-                  </button>
-                  <button class="btn-icon" title="Toggle Completed" data-action="toggle" data-player="${player.name}">
-                    ${player.completed ? '↩️' : '✅'}
-                  </button>
-                </td>
+                ${canEdit ? `
+                  <td class="actions">
+                    <button class="btn-icon" title="Edit" data-action="edit" data-player="${player.name}">
+                      ✏️
+                    </button>
+                    <button class="btn-icon" title="Toggle Completed" data-action="toggle" data-player="${player.name}">
+                      ${player.completed ? '↩️' : '✅'}
+                    </button>
+                  </td>
+                ` : ''}
               </tr>
             `;
             }).join('')}
@@ -113,18 +150,20 @@ export const PlayersPage = {
       `;
 
       // Add event listeners for actions
-      document.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const action = e.target.dataset.action;
-          const playerName = e.target.dataset.player;
+      if (hasAnyEditableCharacters) {
+        document.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            const playerName = e.target.dataset.player;
 
-          if (action === 'edit') {
-            this.showEditPlayerModal(players.find(p => p.name === playerName));
-          } else if (action === 'toggle') {
-            this.togglePlayerCompleted(playerName);
-          }
+            if (action === 'edit') {
+              this.showEditPlayerModal(players.find(p => p.name === playerName));
+            } else if (action === 'toggle') {
+              this.togglePlayerCompleted(playerName);
+            }
+          });
         });
-      });
+      }
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading characters: ${error.message}</div>`;
     }
@@ -245,6 +284,9 @@ export const PlayersPage = {
           notes,
           completed: false
         });
+
+        // Track this character as added by current player
+        this.addMyCharacter(name);
 
         document.body.removeChild(modalElement);
         toast.success(`Character "${name}" added successfully!`);
@@ -385,6 +427,12 @@ export const PlayersPage = {
           completed: player.completed
         }, player.name);
 
+        // If name changed, update tracking
+        if (name !== player.name) {
+          this.removeMyCharacter(player.name);
+          this.addMyCharacter(name);
+        }
+
         document.body.removeChild(modalElement);
         toast.success(`Character "${name}" updated successfully!`);
         this.loadPlayers();
@@ -417,6 +465,10 @@ export const PlayersPage = {
 
       try {
         await dataService.deletePlayer(player.name);
+
+        // Remove from tracked characters
+        this.removeMyCharacter(player.name);
+
         document.body.removeChild(modalElement);
         toast.success(`${player.name} deleted! Wala na!!`);
         this.loadPlayers();

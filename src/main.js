@@ -109,13 +109,13 @@ function showLoginModal() {
     if (result.success) {
       document.body.removeChild(modalElement);
       if (result.role === 'admin') {
-        toast.success('Welcome admin!');
+        toast.success('Admin login, bawal barlito!');
       } else if (result.role === 'player') {
-        toast.success('Welcome! You can add characters.');
+        toast.success('Welcome po');
       }
       renderNavigation();
     } else {
-      toast.error('Invalid password');
+      toast.error('hoy bawal ka dito, ano ka, barlito?');
       document.getElementById('admin-password').value = '';
       document.getElementById('admin-password').focus();
     }

@@ -25,7 +25,7 @@ class Router {
 
     if (requiredRole) {
       if (!authService.isAuthenticated()) {
-        toast.error('Please login to access this page');
+        toast.error('Where password');
         if (this.onAuthRequired) {
           this.onAuthRequired();
         }
@@ -33,7 +33,7 @@ class Router {
       }
 
       if (!authService.hasAccess(requiredRole)) {
-        toast.error('You do not have permission to access this page');
+        toast.error('Hu dis');
         this.navigate('lineups');
         return;
       }
