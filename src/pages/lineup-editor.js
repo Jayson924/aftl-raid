@@ -16,7 +16,6 @@ export const LineupEditorPage = {
       <div class="lineup-editor-page">
         <div class="page-header">
           <h1>Lineup Editor</h1>
-          <button id="load-lineup-btn" class="btn btn-secondary">Load Existing</button>
         </div>
 
         <div class="editor-container">
@@ -47,6 +46,16 @@ export const LineupEditorPage = {
                   </div>
                 `).join('')}
               </div>
+              <div class="lineup-actions">
+                <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
+                <button id="clear-lineup-btn" class="btn btn-secondary">Clear All</button>
+              </div>
+              <div class="existing-lineups-section">
+                <h3>Existing Lineups</h3>
+                <div id="existing-lineups-container" class="existing-lineups-container">
+                  <div class="loading">Loading lineups...</div>
+                </div>
+              </div>
             </div>
 
             <div class="available-players">
@@ -66,11 +75,6 @@ export const LineupEditorPage = {
                 <div class="loading">Loading players...</div>
               </div>
             </div>
-          </div>
-
-          <div class="editor-actions">
-            <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
-            <button id="clear-lineup-btn" class="btn btn-secondary">Clear All</button>
           </div>
         </div>
       </div>
@@ -117,10 +121,6 @@ export const LineupEditorPage = {
     document.getElementById('clear-lineup-btn').addEventListener('click', () => {
       this.clearLineup();
     });
-
-    document.getElementById('load-lineup-btn').addEventListener('click', () => {
-      this.showLoadLineupModal();
-    });
   },
 
   async loadPlayers() {
@@ -134,8 +134,94 @@ export const LineupEditorPage = {
     try {
       this.players = await dataService.getPlayers();
       this.renderAvailablePlayers();
+      this.loadExistingLineups();
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading players: ${error.message}</div>`;
+    }
+  },
+
+  async loadExistingLineups() {
+    const container = document.getElementById('existing-lineups-container');
+
+    try {
+      const lineups = await dataService.getLineups();
+
+      if (lineups.length === 0) {
+        container.innerHTML = '<div class="empty-state">No lineups yet</div>';
+        return;
+      }
+
+      const playerMap = new Map(this.players.map(p => [p.name, p]));
+
+      container.innerHTML = lineups.map(lineup => {
+        const statusClass = lineup.status === 'ready' ? 'ready' : 'draft';
+
+        // Create 8 mini player cards in 2x4 grid
+        const playerCards = Array(8).fill(0).map((_, idx) => {
+          const playerName = lineup.players[idx];
+          const player = playerName ? playerMap.get(playerName) : null;
+
+          if (!player) {
+            return `
+              <div class="mini-player-card empty">
+                <div class="mini-player-empty">Empty</div>
+              </div>
+            `;
+          }
+
+          const backgroundStyle = this.getEquipmentBackground(player);
+
+          return `
+            <div class="mini-player-card" style="${backgroundStyle}">
+              <div class="mini-player-info">
+                <div class="mini-player-name">${player.name}</div>
+                <div class="mini-player-role">${player.role}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="mini-lineup-card ${statusClass}" data-lineup-name="${lineup.name}">
+            <div class="mini-lineup-header">
+              <span class="mini-lineup-name">${lineup.name}</span>
+              <div class="mini-lineup-header-actions">
+                <span class="mini-lineup-status status-badge ${statusClass}">${lineup.status}</span>
+                <button class="mini-delete-btn" data-lineup-name="${lineup.name}" title="Delete lineup">×</button>
+              </div>
+            </div>
+            <div class="mini-lineup-grid">
+              ${playerCards}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers to load lineups
+      container.querySelectorAll('.mini-lineup-card').forEach(card => {
+        card.addEventListener('click', async (e) => {
+          // Don't load if clicking delete button
+          if (e.target.classList.contains('mini-delete-btn')) return;
+
+          const lineupName = card.dataset.lineupName;
+          const lineups = await dataService.getLineups();
+          const lineup = lineups.find(l => l.name === lineupName);
+          if (lineup) {
+            this.loadLineup(lineup);
+          }
+        });
+      });
+
+      // Add delete button handlers
+      container.querySelectorAll('.mini-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const lineupName = btn.dataset.lineupName;
+          await this.deleteLineup(lineupName);
+        });
+      });
+    } catch (error) {
+      container.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
     }
   },
 
@@ -392,13 +478,29 @@ export const LineupEditorPage = {
 
       const players = Array(8).fill('').map((_, idx) => this.currentLineup.players[idx] || '');
 
-      await dataService.addLineup({
-        name: this.currentLineup.name,
-        status: this.currentLineup.status,
-        players
-      });
+      // Check if lineup with this name already exists
+      const existingLineups = await dataService.getLineups();
+      const existingLineup = existingLineups.find(l => l.name === this.currentLineup.name);
 
-      toast.success(`Lineup "${this.currentLineup.name}" saved successfully!`);
+      if (existingLineup) {
+        // Update existing lineup
+        await dataService.updateLineup({
+          name: this.currentLineup.name,
+          status: this.currentLineup.status,
+          players
+        }, this.currentLineup.name);
+        toast.success(`Lineup "${this.currentLineup.name}" updated successfully!`);
+      } else {
+        // Add new lineup
+        await dataService.addLineup({
+          name: this.currentLineup.name,
+          status: this.currentLineup.status,
+          players
+        });
+        toast.success(`Lineup "${this.currentLineup.name}" saved successfully!`);
+      }
+
+      this.loadExistingLineups(); // Refresh the lineup list
 
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Lineup';
@@ -410,67 +512,26 @@ export const LineupEditorPage = {
     }
   },
 
-  async showLoadLineupModal() {
-    const modalElement = document.createElement('div');
-    modalElement.className = 'modal';
-    modalElement.innerHTML = `
-      <div class="modal-content">
-        <h2>Load Lineup</h2>
-        <div id="lineup-list-container">
-          <div class="loading">Loading lineups...</div>
-        </div>
-        <button class="btn btn-secondary" id="cancel-load-btn">Cancel</button>
-      </div>
-    `;
+  async deleteLineup(lineupName) {
+    const confirmed = await modal.confirm(
+      `Are you sure you want to delete the lineup "${lineupName}"?`,
+      {
+        title: 'Delete Lineup',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        danger: true
+      }
+    );
 
-    document.body.appendChild(modalElement);
+    if (!confirmed) return;
 
     try {
-      const lineups = await dataService.getLineups();
-
-      const container = document.getElementById('lineup-list-container');
-
-      if (lineups.length === 0) {
-        container.innerHTML = '<div class="empty-state">No lineups to load</div>';
-      } else {
-        container.innerHTML = `
-          <div class="lineup-select-list">
-            ${lineups.map(lineup => `
-              <div class="lineup-option" data-lineup='${JSON.stringify(lineup)}'>
-                <div>
-                  <strong>${lineup.name}</strong>
-                  <span class="status-badge ${lineup.status}">${lineup.status}</span>
-                </div>
-                <div style="font-size: 0.9rem; color: #888;">
-                  ${lineup.players.filter(p => p).length}/8 players
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `;
-
-        document.querySelectorAll('.lineup-option').forEach(option => {
-          option.addEventListener('click', () => {
-            const lineup = JSON.parse(option.dataset.lineup);
-            this.loadLineup(lineup);
-            document.body.removeChild(modalElement);
-          });
-        });
-      }
+      await dataService.deleteLineup(lineupName);
+      toast.success(`Lineup "${lineupName}" deleted successfully!`);
+      this.loadExistingLineups(); // Refresh the lineup list
     } catch (error) {
-      document.getElementById('lineup-list-container').innerHTML =
-        `<div class="error">Error loading lineups: ${error.message}</div>`;
+      toast.error(`Error deleting lineup: ${error.message}`);
     }
-
-    document.getElementById('cancel-load-btn').addEventListener('click', () => {
-      document.body.removeChild(modalElement);
-    });
-
-    modalElement.addEventListener('click', (e) => {
-      if (e.target === modalElement) {
-        document.body.removeChild(modalElement);
-      }
-    });
   },
 
   loadLineup(lineup) {
@@ -497,6 +558,8 @@ export const LineupEditorPage = {
         }
       }
     });
+
+    toast.info(`Loaded lineup: ${lineup.name}`);
   },
 
   setupPlayerDragHandlers() {
