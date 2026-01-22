@@ -69,7 +69,7 @@ function renderNavigation() {
   if (isAuthenticated) {
     document.getElementById('logout-btn').addEventListener('click', () => {
       authService.logout();
-      toast.info('Logged out successfully');
+      toast.info('Bye bye na');
       renderNavigation();
       router.navigate('lineups');
     });
