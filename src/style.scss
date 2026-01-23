@@ -1457,7 +1457,7 @@ body {
 
     .app-title {
       font-size: 1.2rem;
-      flex: 1;
+      order: 1;
     }
 
     .nav-links {
@@ -1469,6 +1469,7 @@ body {
 
     .nav-actions {
       order: 2;
+      margin-left: auto;
     }
 
     .nav-link {
