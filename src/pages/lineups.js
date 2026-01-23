@@ -12,8 +12,8 @@ export const LineupsPage = {
       <div class="lineups-page">
         <h1>Ready Raid Lineups</h1>
         <div class="raid-tabs">
-          <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
+          <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
         </div>
         <div class="tab-content-wrapper">
           <div id="lineups-list" class="lineups-list">
@@ -59,11 +59,11 @@ export const LineupsPage = {
 
     if (Math.abs(diff) > swipeThreshold) {
       if (diff > 0) {
-        // Swiped left - switch to Hardcore
-        this.switchRaidType('Hardcore');
-      } else {
-        // Swiped right - switch to Classic
+        // Swiped left - switch to Classic
         this.switchRaidType('Classic');
+      } else {
+        // Swiped right - switch to Hardcore
+        this.switchRaidType('Hardcore');
       }
     }
   },
