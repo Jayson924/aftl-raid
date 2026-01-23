@@ -1451,30 +1451,50 @@ body {
     padding: 0.75rem 1rem;
 
     .nav-container {
-      flex-wrap: wrap;
-      gap: 1rem;
+      display: flex;
+      flex-direction: row;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .app-title {
       font-size: 1.2rem;
-      order: 1;
+      margin: 0;
+      white-space: nowrap;
+
+      // Show only "AFTL Raids" on mobile
+      &::first-letter {
+        font-size: inherit;
+      }
+
+      // Hide everything after "AFTL Raids"
+      font-size: 0;
+
+      &::before {
+        content: "AFTL Raids";
+        font-size: 1.2rem;
+      }
     }
 
     .nav-links {
-      order: 3;
-      width: 100%;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .nav-actions {
-      order: 2;
-      margin-left: auto;
+      display: flex;
+      flex-direction: row;
+      gap: 0.25rem;
+      flex: 1;
+      justify-content: center;
+      flex-wrap: wrap;
     }
 
     .nav-link {
-      padding: 0.75rem;
+      padding: 0.5rem 0.75rem;
       text-align: center;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    .nav-actions {
+      flex-shrink: 0;
     }
   }
 
@@ -1656,11 +1676,14 @@ body {
 @media (max-width: 480px) {
   .main-nav {
     .app-title {
-      font-size: 1rem;
+      &::before {
+        font-size: 1rem;
+      }
     }
 
     .nav-link {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.6rem;
     }
   }
 
