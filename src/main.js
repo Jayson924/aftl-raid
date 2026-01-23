@@ -115,7 +115,7 @@ function showLoginModal() {
       }
       renderNavigation();
     } else {
-      toast.error('hoy bawal ka dito, ano ka, barlito?');
+      toast.error('New phone who dis?');
       document.getElementById('admin-password').value = '';
       document.getElementById('admin-password').focus();
     }

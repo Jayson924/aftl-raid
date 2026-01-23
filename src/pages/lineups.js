@@ -141,7 +141,7 @@ export const LineupsPage = {
       const readyLineups = lineups.filter(l => l.status === 'ready' && l.raidType === this.currentRaidType);
 
       if (readyLineups.length === 0) {
-        listElement.innerHTML = `<div class="empty-state">No ${this.currentRaidType} lineups ready yet. GG talaga Barlito effect!</div>`;
+        listElement.innerHTML = `<div class="empty-state">No ${this.currentRaidType} lineups ready yet!</div>`;
         return;
       }
 
