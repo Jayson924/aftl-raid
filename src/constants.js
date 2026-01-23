@@ -55,7 +55,9 @@ export const WEAPON_SUFFIXES = [
   { value: 'magic', label: 'Magic' },
   { value: 'tent', label: 'Tent' },
   { value: 'water', label: 'Water' },
-  { value: 'wind', label: 'Wind' }
+  { value: 'wind', label: 'Wind' },
+  { value: 'vigor', label: 'Vigor' },
+  { value: 'health', label: 'Health' }
 ];
 
 // SVG icons for equipment
