@@ -1,19 +1,96 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
+import { authService } from '../auth.js';
+import { modal } from '../modal.js';
 import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES } from '../constants.js';
 
 export const LineupsPage = {
+  currentRaidType: 'Hardcore',
+
   async render(container) {
     container.innerHTML = `
       <div class="lineups-page">
         <h1>Ready Raid Lineups</h1>
-        <div id="lineups-list" class="lineups-list">
-          <div class="loading">Loading lineups...</div>
+        <div class="raid-tabs">
+          <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
+          <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
+        </div>
+        <div class="tab-content-wrapper">
+          <div id="lineups-list" class="lineups-list">
+            <div class="loading">Loading lineups...</div>
+          </div>
         </div>
       </div>
     `;
 
+    this.setupTabHandlers();
+    this.setupTouchHandlers();
     this.loadLineups();
+  },
+
+  setupTabHandlers() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const raidType = button.dataset.raidType;
+        this.switchRaidType(raidType);
+      });
+    });
+  },
+
+  setupTouchHandlers() {
+    const wrapper = document.querySelector('.tab-content-wrapper');
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    wrapper.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    wrapper.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      this.handleSwipe(touchStartX, touchEndX);
+    }, { passive: true });
+  },
+
+  handleSwipe(startX, endX) {
+    const swipeThreshold = 50;
+    const diff = startX - endX;
+
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swiped left - switch to Hardcore
+        this.switchRaidType('Hardcore');
+      } else {
+        // Swiped right - switch to Classic
+        this.switchRaidType('Classic');
+      }
+    }
+  },
+
+  switchRaidType(raidType) {
+    if (this.currentRaidType === raidType) return;
+
+    this.currentRaidType = raidType;
+
+    // Update active tab button
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+      if (button.dataset.raidType === raidType) {
+        button.classList.add('active');
+      } else {
+        button.classList.remove('active');
+      }
+    });
+
+    // Add transition effect
+    const listElement = document.getElementById('lineups-list');
+    listElement.classList.add('transitioning');
+
+    setTimeout(() => {
+      this.loadLineups();
+      listElement.classList.remove('transitioning');
+    }, 150);
   },
 
   getEquipmentBackground(player) {
@@ -61,18 +138,27 @@ export const LineupsPage = {
         dataService.getPlayers()
       ]);
 
-      const readyLineups = lineups.filter(l => l.status === 'ready');
+      const readyLineups = lineups.filter(l => l.status === 'ready' && l.raidType === this.currentRaidType);
 
       if (readyLineups.length === 0) {
-        listElement.innerHTML = '<div class="empty-state">No lineups ready. GG talaga Barlito effect!</div>';
+        listElement.innerHTML = `<div class="empty-state">No ${this.currentRaidType} lineups ready yet. GG talaga Barlito effect!</div>`;
         return;
       }
 
       const playerMap = new Map(players.map(p => [p.name, p]));
+      const isAdmin = authService.isAdmin();
 
-      listElement.innerHTML = readyLineups.map(lineup => `
-        <div class="lineup-card">
-          <h3>${lineup.name}</h3>
+      listElement.innerHTML = readyLineups.map(lineup => {
+        // Check if lineup is cleared (all players completed)
+        const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
+        const isCleared = lineupPlayers.length > 0 && lineupPlayers.every(p => p.completed);
+
+        return `
+        <div class="lineup-card ${isCleared ? 'cleared' : ''}">
+          <div class="lineup-card-header">
+            <h3>${lineup.name}</h3>
+            ${isAdmin ? `<button class="btn btn-primary btn-cleared" data-lineup-name="${lineup.name}">${isCleared ? 'Not cleared' : 'Clear'}</button>` : ''}
+          </div>
           <div class="lineup-players">
             ${lineup.players.map((playerName, idx) => {
               const player = playerMap.get(playerName);
@@ -130,9 +216,56 @@ export const LineupsPage = {
             `).join('')}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
+
+      // Add click handlers for cleared buttons
+      if (isAdmin) {
+        document.querySelectorAll('.btn-cleared').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const lineupName = btn.dataset.lineupName;
+            await this.handleClearedClick(lineupName, lineups);
+          });
+        });
+      }
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
+    }
+  },
+
+  async handleClearedClick(lineupName, lineups) {
+    const lineup = lineups.find(l => l.name === lineupName);
+    if (!lineup) {
+      toast.error('Lineup not found');
+      return;
+    }
+
+    const playerNames = lineup.players.filter(p => p);
+    if (playerNames.length === 0) {
+      toast.warning('??? Disconnected ba lahat ng naka clear?');
+      return;
+    }
+
+    const confirmed = await modal.confirm(
+      `Cleared na ba ${playerNames.length} characters sa <strong>${lineupName}</strong>?<br><br>
+      <em>Click again to undo</em>`,
+      {
+        title: 'Toggle Raid Cleared Status',
+        confirmText: 'Toggle Status',
+        cancelText: 'Cancel'
+      }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await dataService.toggleMultiplePlayersCompleted(playerNames);
+      toast.success(`Updated cleared status ${playerNames.length} characters in ${lineupName}!`);
+      // Reload the lineups to show updated cleared status
+      await this.loadLineups();
+    } catch (error) {
+      toast.error(`Error: ${error.message}`);
     }
   },
 

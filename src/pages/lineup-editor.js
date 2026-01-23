@@ -7,6 +7,7 @@ export const LineupEditorPage = {
   players: [],
   currentLineup: {
     name: '',
+    raidType: 'Classic',
     status: 'draft',
     players: []
   },
@@ -23,6 +24,13 @@ export const LineupEditorPage = {
             <div class="form-group">
               <label for="lineup-name">Lineup Name:</label>
               <input type="text" id="lineup-name" placeholder="Enter lineup name...">
+            </div>
+            <div class="form-group">
+              <label for="raid-type">Raid Type:</label>
+              <select id="raid-type">
+                <option value="Classic">GDN Classic</option>
+                <option value="Hardcore">GDN Hardcore</option>
+              </select>
             </div>
             <div class="form-group">
               <label for="lineup-status">Status:</label>
@@ -48,7 +56,11 @@ export const LineupEditorPage = {
               </div>
               <div class="lineup-actions">
                 <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
-                <button id="clear-lineup-btn" class="btn btn-secondary">Clear All</button>
+                <label class="cleared-checkbox">
+                  <input type="checkbox" id="cleared-checkbox">
+                  <span>Raid Cleared</span>
+                </label>
+                <button id="clear-lineup-btn" class="btn btn-secondary">Remove Characters</button>
               </div>
               <div class="existing-lineups-section">
                 <h3>Existing Lineups</h3>
@@ -87,6 +99,10 @@ export const LineupEditorPage = {
   attachEventListeners() {
     document.getElementById('lineup-name').addEventListener('input', (e) => {
       this.currentLineup.name = e.target.value;
+    });
+
+    document.getElementById('raid-type').addEventListener('change', (e) => {
+      this.currentLineup.raidType = e.target.value;
     });
 
     document.getElementById('lineup-status').addEventListener('change', (e) => {
@@ -156,6 +172,10 @@ export const LineupEditorPage = {
       container.innerHTML = lineups.map(lineup => {
         const statusClass = lineup.status === 'ready' ? 'ready' : 'draft';
 
+        // Check if lineup is cleared (all players completed)
+        const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
+        const isCleared = lineupPlayers.length > 0 && lineupPlayers.every(p => p.completed);
+
         // Create 8 mini player cards in 2x4 grid
         const playerCards = Array(8).fill(0).map((_, idx) => {
           const playerName = lineup.players[idx];
@@ -182,11 +202,11 @@ export const LineupEditorPage = {
         }).join('');
 
         return `
-          <div class="mini-lineup-card ${statusClass}" data-lineup-name="${lineup.name}">
+          <div class="mini-lineup-card ${statusClass} ${isCleared ? 'cleared' : ''}" data-lineup-name="${lineup.name}">
             <div class="mini-lineup-header">
               <span class="mini-lineup-name">${lineup.name}</span>
               <div class="mini-lineup-header-actions">
-                <span class="mini-lineup-status status-badge ${statusClass}">${lineup.status}</span>
+                <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
                 <button class="mini-delete-btn" data-lineup-name="${lineup.name}" title="Delete lineup">×</button>
               </div>
             </div>
@@ -264,15 +284,17 @@ export const LineupEditorPage = {
         <div class="player-card ${player.completed ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''}"
              data-player-name="${player.name}"
              draggable="true">
+          ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
           <div class="player-info">
             <div class="player-name">${player.name}</div>
             <div class="player-role">${player.role}</div>
             ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
             ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
           </div>
-          ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
-          ${player.completed ? '<span class="completed-badge">✓</span>' : ''}
-          ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}
+          <div class="player-card-badges">
+            ${player.completed ? '<span class="completed-badge">✓</span>' : ''}
+            ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}
+          </div>
         </div>
       `;
     }).join('');
@@ -500,11 +522,13 @@ export const LineupEditorPage = {
 
     this.currentLineup = {
       name: '',
+      raidType: 'Classic',
       status: 'draft',
       players: []
     };
 
     document.getElementById('lineup-name').value = '';
+    document.getElementById('raid-type').value = 'Classic';
     document.getElementById('lineup-status').value = 'draft';
 
     document.querySelectorAll('.slot').forEach(slotElement => {
@@ -553,6 +577,7 @@ export const LineupEditorPage = {
         // Update existing lineup
         await dataService.updateLineup({
           name: this.currentLineup.name,
+          raidType: this.currentLineup.raidType,
           status: this.currentLineup.status,
           players
         }, this.currentLineup.name);
@@ -561,10 +586,30 @@ export const LineupEditorPage = {
         // Add new lineup
         await dataService.addLineup({
           name: this.currentLineup.name,
+          raidType: this.currentLineup.raidType,
           status: this.currentLineup.status,
           players
         });
         toast.success(`${this.currentLineup.name} saved!`);
+      }
+
+      // Check if cleared checkbox is checked
+      const clearedCheckbox = document.getElementById('cleared-checkbox');
+      if (clearedCheckbox && clearedCheckbox.checked) {
+        // Toggle all players in the lineup to completed
+        const playerNames = this.currentLineup.players.filter(p => p);
+        if (playerNames.length > 0) {
+          try {
+            await dataService.toggleMultiplePlayersCompleted(playerNames);
+            toast.success(`Cleared ${playerNames.length} players!`);
+            // Uncheck the checkbox after saving
+            clearedCheckbox.checked = false;
+            // Reload players to reflect the changes
+            await this.loadPlayers();
+          } catch (error) {
+            toast.error(`Failed to clear players: ${error.message}`);
+          }
+        }
       }
 
       this.loadExistingLineups(); // Refresh the lineup list
@@ -604,11 +649,13 @@ export const LineupEditorPage = {
   loadLineup(lineup) {
     this.currentLineup = {
       name: lineup.name,
+      raidType: lineup.raidType || 'Classic',
       status: lineup.status,
       players: [...lineup.players]
     };
 
     document.getElementById('lineup-name').value = lineup.name;
+    document.getElementById('raid-type').value = lineup.raidType || 'Classic';
     document.getElementById('lineup-status').value = lineup.status;
 
     document.querySelectorAll('.slot').forEach(slotElement => {

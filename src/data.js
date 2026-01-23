@@ -116,6 +116,10 @@ class DataService {
     return this.callAppsScript('togglePlayerCompleted', { playerName });
   }
 
+  async toggleMultiplePlayersCompleted(playerNames) {
+    return this.callAppsScript('toggleMultiplePlayersCompleted', { playerNames });
+  }
+
   async addLineup(lineup) {
     return this.callAppsScript('addLineup', { lineup });
   }
@@ -160,8 +164,9 @@ class DataService {
 
     return rows.slice(1).map(row => ({
       name: this.cleanValue(row[0] || ''),
-      status: row[1] || 'draft',
-      players: row.slice(2, 10).map(p => this.cleanValue(p || '')).filter(p => p)
+      raidType: this.cleanValue(row[1] || '') || 'Hardcore', // Default to Hardcore if empty
+      status: row[2] || 'draft',
+      players: row.slice(3, 11).map(p => this.cleanValue(p || '')).filter(p => p)
     })).filter(lineup => lineup.name);
   }
 
@@ -177,7 +182,7 @@ class DataService {
 
   async getLineups() {
     try {
-      const rows = await this.getRange('Lineups!A:J');
+      const rows = await this.getRange('Lineups!A:K');
       return this.parseLineupsFromSheet(rows);
     } catch (error) {
       console.error('Error fetching lineups:', error);
