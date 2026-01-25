@@ -7,9 +7,10 @@ export const LineupEditorPage = {
   players: [],
   currentLineup: {
     name: '',
-    raidType: 'Classic',
-    status: 'draft',
-    players: []
+    raidType: 'Hardcore',
+    status: 'ready',
+    players: [],
+    completed: false
   },
 
   async render(container) {
@@ -28,15 +29,8 @@ export const LineupEditorPage = {
             <div class="form-group">
               <label for="raid-type">Raid Type:</label>
               <select id="raid-type">
-                <option value="Classic">GDN Classic</option>
                 <option value="Hardcore">GDN Hardcore</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="lineup-status">Status:</label>
-              <select id="lineup-status">
-                <option value="draft">Draft</option>
-                <option value="ready">Ready</option>
+                <option value="Classic">GDN Classic</option>
               </select>
             </div>
           </div>
@@ -56,16 +50,20 @@ export const LineupEditorPage = {
               </div>
               <div class="lineup-actions">
                 <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
-                <label class="cleared-checkbox">
-                  <input type="checkbox" id="cleared-checkbox">
-                  <span>Raid Cleared</span>
+                <label class="toggle-cleared">
+                  <input type="checkbox" id="cleared-toggle">
+                  <span>Cleared</span>
                 </label>
                 <button id="clear-lineup-btn" class="btn btn-secondary">Remove Characters</button>
               </div>
               <div class="existing-lineups-section">
                 <h3>Existing Lineups</h3>
-                <div id="existing-lineups-container" class="existing-lineups-container">
-                  <div class="loading">Loading lineups...</div>
+                <div class="carousel-wrapper">
+                  <button id="editor-carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
+                  <div id="existing-lineups-container" class="existing-lineups-container">
+                    <div class="loading">Loading lineups...</div>
+                  </div>
+                  <button id="editor-carousel-next" class="carousel-nav-btn carousel-next" aria-label="Scroll right">▶</button>
                 </div>
               </div>
             </div>
@@ -78,10 +76,6 @@ export const LineupEditorPage = {
                   <option value="">All Classes</option>
                   ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
                 </select>
-                <label class="checkbox-label">
-                  <input type="checkbox" id="hide-completed">
-                  Hide completed
-                </label>
               </div>
               <div id="available-players-list" class="players-list">
                 <div class="loading">Loading players...</div>
@@ -93,6 +87,7 @@ export const LineupEditorPage = {
     `;
 
     this.attachEventListeners();
+    this.setupCarouselDragScroll();
     this.loadPlayers();
   },
 
@@ -105,8 +100,8 @@ export const LineupEditorPage = {
       this.currentLineup.raidType = e.target.value;
     });
 
-    document.getElementById('lineup-status').addEventListener('change', (e) => {
-      this.currentLineup.status = e.target.value;
+    document.getElementById('cleared-toggle').addEventListener('change', (e) => {
+      this.currentLineup.completed = e.target.checked;
     });
 
     document.querySelectorAll('.slot').forEach(slot => {
@@ -123,10 +118,6 @@ export const LineupEditorPage = {
     });
 
     document.getElementById('class-filter').addEventListener('change', () => {
-      this.filterPlayers();
-    });
-
-    document.getElementById('hide-completed').addEventListener('change', () => {
       this.filterPlayers();
     });
 
@@ -169,12 +160,16 @@ export const LineupEditorPage = {
 
       const playerMap = new Map(this.players.map(p => [p.name, p]));
 
-      container.innerHTML = lineups.map(lineup => {
-        const statusClass = lineup.status === 'ready' ? 'ready' : 'draft';
+      // Sort lineups: cleared ones last
+      lineups.sort((a, b) => {
+        // Non-cleared first (false < true)
+        if (a.completed === b.completed) return 0;
+        return a.completed ? 1 : -1;
+      });
 
-        // Check if lineup is cleared (all players completed)
-        const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
-        const isCleared = lineupPlayers.length > 0 && lineupPlayers.every(p => p.completed);
+      container.innerHTML = lineups.map(lineup => {
+        // Check if lineup is cleared
+        const isCleared = lineup.completed;
 
         // Create 8 mini player cards in 2x4 grid
         const playerCards = Array(8).fill(0).map((_, idx) => {
@@ -202,7 +197,7 @@ export const LineupEditorPage = {
         }).join('');
 
         return `
-          <div class="mini-lineup-card ${statusClass} ${isCleared ? 'cleared' : ''}" data-lineup-name="${lineup.name}">
+          <div class="mini-lineup-card ${isCleared ? 'cleared' : ''}" data-lineup-name="${lineup.name}">
             <div class="mini-lineup-header">
               <span class="mini-lineup-name">${lineup.name}</span>
               <div class="mini-lineup-header-actions">
@@ -240,9 +235,90 @@ export const LineupEditorPage = {
           await this.deleteLineup(lineupName);
         });
       });
+
+      // Setup arrow button handlers
+      this.setupCarouselArrows();
     } catch (error) {
       container.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
     }
+  },
+
+  setupCarouselArrows() {
+    const prevBtn = document.getElementById('editor-carousel-prev');
+    const nextBtn = document.getElementById('editor-carousel-next');
+    const container = document.getElementById('existing-lineups-container');
+
+    if (prevBtn && nextBtn && container) {
+      prevBtn.addEventListener('click', () => {
+        container.scrollBy({ left: -300, behavior: 'smooth' });
+      });
+
+      nextBtn.addEventListener('click', () => {
+        container.scrollBy({ left: 300, behavior: 'smooth' });
+      });
+
+      // Update arrow visibility based on scroll position
+      const updateArrows = () => {
+        const isAtStart = container.scrollLeft <= 0;
+        const isAtEnd = container.scrollLeft >= container.scrollWidth - container.clientWidth - 1;
+
+        prevBtn.style.opacity = isAtStart ? '0.3' : '1';
+        prevBtn.style.cursor = isAtStart ? 'default' : 'pointer';
+        nextBtn.style.opacity = isAtEnd ? '0.3' : '1';
+        nextBtn.style.cursor = isAtEnd ? 'default' : 'pointer';
+      };
+
+      container.addEventListener('scroll', updateArrows);
+      updateArrows(); // Initial check
+    }
+  },
+
+  setupCarouselDragScroll() {
+    const container = document.getElementById('existing-lineups-container');
+    if (!container) return;
+
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+    let hasMoved = false;
+
+    container.addEventListener('mousedown', (e) => {
+      isDown = true;
+      hasMoved = false;
+      container.style.cursor = 'grabbing';
+      startX = e.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    });
+
+    container.addEventListener('mouseleave', () => {
+      isDown = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mouseup', () => {
+      isDown = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      hasMoved = true;
+      const x = e.pageX - container.offsetLeft;
+      const walk = (x - startX) * 2; // Scroll speed multiplier
+      container.scrollLeft = scrollLeft - walk;
+    });
+
+    // Prevent click events on cards if dragging occurred
+    container.addEventListener('click', (e) => {
+      if (hasMoved) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+
+    // Set initial cursor
+    container.style.cursor = 'grab';
   },
 
   renderAvailablePlayers() {
@@ -292,7 +368,6 @@ export const LineupEditorPage = {
             ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
           </div>
           <div class="player-card-badges">
-            ${player.completed ? '<span class="completed-badge">✓</span>' : ''}
             ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}
           </div>
         </div>
@@ -305,16 +380,14 @@ export const LineupEditorPage = {
   getFilteredPlayers() {
     const searchTerm = document.getElementById('player-search').value.toLowerCase();
     const classFilter = document.getElementById('class-filter').value;
-    const hideCompleted = document.getElementById('hide-completed').checked;
 
     return this.players
       .filter(player => {
         const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
                             player.role.toLowerCase().includes(searchTerm);
         const matchesClass = !classFilter || player.role === classFilter;
-        const matchesCompleted = !hideCompleted || !player.completed;
 
-        return matchesSearch && matchesClass && matchesCompleted;
+        return matchesSearch && matchesClass;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -387,7 +460,6 @@ export const LineupEditorPage = {
                 ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
                 ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
               </div>
-              ${player.completed ? '<span class="completed-badge">✓</span>' : ''}
             </div>
           `;
           }).join('')}
@@ -522,14 +594,15 @@ export const LineupEditorPage = {
 
     this.currentLineup = {
       name: '',
-      raidType: 'Classic',
-      status: 'draft',
-      players: []
+      raidType: 'Hardcore',
+      status: 'ready',
+      players: [],
+      completed: false
     };
 
     document.getElementById('lineup-name').value = '';
-    document.getElementById('raid-type').value = 'Classic';
-    document.getElementById('lineup-status').value = 'draft';
+    document.getElementById('raid-type').value = 'Hardcore';
+    document.getElementById('cleared-toggle').checked = false;
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       slotElement.querySelector('.slot-content').innerHTML = '<div class="empty-slot">Drop or click</div>';
@@ -578,8 +651,9 @@ export const LineupEditorPage = {
         await dataService.updateLineup({
           name: this.currentLineup.name,
           raidType: this.currentLineup.raidType,
-          status: this.currentLineup.status,
-          players
+          status: 'ready',
+          players,
+          completed: this.currentLineup.completed
         }, this.currentLineup.name);
         toast.success(`${this.currentLineup.name} updated!`);
       } else {
@@ -587,29 +661,11 @@ export const LineupEditorPage = {
         await dataService.addLineup({
           name: this.currentLineup.name,
           raidType: this.currentLineup.raidType,
-          status: this.currentLineup.status,
-          players
+          status: 'ready',
+          players,
+          completed: this.currentLineup.completed
         });
         toast.success(`${this.currentLineup.name} saved!`);
-      }
-
-      // Check if cleared checkbox is checked
-      const clearedCheckbox = document.getElementById('cleared-checkbox');
-      if (clearedCheckbox && clearedCheckbox.checked) {
-        // Toggle all players in the lineup to completed
-        const playerNames = this.currentLineup.players.filter(p => p);
-        if (playerNames.length > 0) {
-          try {
-            await dataService.toggleMultiplePlayersCompleted(playerNames);
-            toast.success(`Cleared ${playerNames.length} players!`);
-            // Uncheck the checkbox after saving
-            clearedCheckbox.checked = false;
-            // Reload players to reflect the changes
-            await this.loadPlayers();
-          } catch (error) {
-            toast.error(`Failed to clear players: ${error.message}`);
-          }
-        }
       }
 
       this.loadExistingLineups(); // Refresh the lineup list
@@ -639,7 +695,7 @@ export const LineupEditorPage = {
 
     try {
       await dataService.deleteLineup(lineupName);
-      toast.success(`GG ${lineupName} deleted!`);
+      toast.success(`GG wala nang ${lineupName}!`);
       this.loadExistingLineups(); // Refresh the lineup list
     } catch (error) {
       toast.error(`HOY ano yan bat may error: ${error.message}`);
@@ -649,14 +705,15 @@ export const LineupEditorPage = {
   loadLineup(lineup) {
     this.currentLineup = {
       name: lineup.name,
-      raidType: lineup.raidType || 'Classic',
-      status: lineup.status,
-      players: [...lineup.players]
+      raidType: lineup.raidType || 'Hardcore',
+      status: 'ready',
+      players: [...lineup.players],
+      completed: lineup.completed || false
     };
 
     document.getElementById('lineup-name').value = lineup.name;
-    document.getElementById('raid-type').value = lineup.raidType || 'Classic';
-    document.getElementById('lineup-status').value = lineup.status;
+    document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
+    document.getElementById('cleared-toggle').checked = lineup.completed || false;
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       slotElement.querySelector('.slot-content').innerHTML = '<div class="empty-slot">Drop or click</div>';
@@ -721,9 +778,42 @@ export const LineupEditorPage = {
     const slots = document.querySelectorAll('.slot');
 
     slots.forEach(slot => {
+      // Update draggable attribute based on whether slot is filled
+      const updateDraggable = () => {
+        const slotIndex = parseInt(slot.dataset.slot);
+        if (this.currentLineup.players[slotIndex]) {
+          slot.setAttribute('draggable', 'true');
+        } else {
+          slot.removeAttribute('draggable');
+        }
+      };
+
+      // Check on mouse enter
+      slot.addEventListener('mouseenter', updateDraggable);
+
+      slot.addEventListener('dragstart', (e) => {
+        const slotIndex = parseInt(slot.dataset.slot);
+        const playerName = this.currentLineup.players[slotIndex];
+
+        if (playerName) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', playerName);
+          e.dataTransfer.setData('sourceSlot', slotIndex.toString());
+          slot.classList.add('dragging');
+        } else {
+          e.preventDefault();
+        }
+      });
+
+      slot.addEventListener('dragend', (e) => {
+        slot.classList.remove('dragging');
+        updateDraggable(); // Update draggable state after drag ends
+      });
+
       slot.addEventListener('dragover', (e) => {
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
+        const sourceSlot = e.dataTransfer.getData('sourceSlot');
+        e.dataTransfer.dropEffect = sourceSlot ? 'move' : 'copy';
         slot.classList.add('drag-over');
       });
 
@@ -736,11 +826,29 @@ export const LineupEditorPage = {
         slot.classList.remove('drag-over');
 
         const playerName = e.dataTransfer.getData('text/plain');
-        const slotIndex = parseInt(slot.dataset.slot);
+        const sourceSlotIndex = e.dataTransfer.getData('sourceSlot');
+        const targetSlotIndex = parseInt(slot.dataset.slot);
 
-        if (playerName) {
-          this.assignPlayerToSlot(slotIndex, playerName);
-          toast.success(`Assigned ${playerName} to slot ${slotIndex + 1}`);
+        if (sourceSlotIndex !== '') {
+          // Dragging from slot to slot - swap or move
+          const sourceIndex = parseInt(sourceSlotIndex);
+          const targetPlayerName = this.currentLineup.players[targetSlotIndex];
+
+          // Swap players
+          this.currentLineup.players[targetSlotIndex] = playerName;
+          this.currentLineup.players[sourceIndex] = targetPlayerName || undefined;
+
+          // Re-render both slots
+          if (targetPlayerName) {
+            this.assignPlayerToSlot(sourceIndex, targetPlayerName);
+          } else {
+            this.removePlayerFromSlot(sourceIndex);
+          }
+          this.assignPlayerToSlot(targetSlotIndex, playerName);
+        } else if (playerName) {
+          // Dragging from player list to slot
+          this.assignPlayerToSlot(targetSlotIndex, playerName);
+          toast.success(`Assigned ${playerName} to slot ${targetSlotIndex + 1}`);
         }
       });
     });

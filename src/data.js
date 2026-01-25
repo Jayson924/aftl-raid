@@ -112,14 +112,6 @@ class DataService {
     return this.callAppsScript('deletePlayer', { playerName });
   }
 
-  async togglePlayerCompleted(playerName) {
-    return this.callAppsScript('togglePlayerCompleted', { playerName });
-  }
-
-  async toggleMultiplePlayersCompleted(playerNames) {
-    return this.callAppsScript('toggleMultiplePlayersCompleted', { playerNames });
-  }
-
   async addLineup(lineup) {
     return this.callAppsScript('addLineup', { lineup });
   }
@@ -130,6 +122,10 @@ class DataService {
 
   async deleteLineup(lineupName) {
     return this.callAppsScript('deleteLineup', { lineupName });
+  }
+
+  async toggleLineupCompleted(lineupName) {
+    return this.callAppsScript('toggleLineupCompleted', { lineupName });
   }
 
   cleanValue(value) {
@@ -154,8 +150,7 @@ class DataService {
       suffix1: this.cleanValue(row[5] || ''),
       suffix2: this.cleanValue(row[6] || ''),
       armor: this.cleanValue(row[7] || ''),
-      armorEnhance: this.cleanValue(row[8] || ''),
-      completed: row[9] === 'TRUE' || row[9] === 'Yes'
+      armorEnhance: this.cleanValue(row[8] || '')
     })).filter(player => player.name);
   }
 
@@ -166,13 +161,14 @@ class DataService {
       name: this.cleanValue(row[0] || ''),
       raidType: this.cleanValue(row[1] || '') || 'Hardcore', // Default to Hardcore if empty
       status: row[2] || 'draft',
-      players: row.slice(3, 11).map(p => this.cleanValue(p || '')).filter(p => p)
+      players: row.slice(3, 11).map(p => this.cleanValue(p || '')).filter(p => p),
+      completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true
     })).filter(lineup => lineup.name);
   }
 
   async getPlayers() {
     try {
-      const rows = await this.getRange('Players!A:J');
+      const rows = await this.getRange('Players!A:I');
       return this.parsePlayersFromSheet(rows);
     } catch (error) {
       console.error('Error fetching players:', error);
@@ -182,7 +178,7 @@ class DataService {
 
   async getLineups() {
     try {
-      const rows = await this.getRange('Lineups!A:K');
+      const rows = await this.getRange('Lineups!A:L');
       return this.parseLineupsFromSheet(rows);
     } catch (error) {
       console.error('Error fetching lineups:', error);

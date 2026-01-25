@@ -6,6 +6,8 @@ import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES } from '../constan
 
 export const LineupsPage = {
   currentRaidType: 'Hardcore',
+  currentShowcaseLineup: null,
+  allLineups: [],
 
   async render(container) {
     container.innerHTML = `
@@ -16,8 +18,20 @@ export const LineupsPage = {
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
         </div>
         <div class="tab-content-wrapper">
-          <div id="lineups-list" class="lineups-list">
-            <div class="loading">Loading lineups...</div>
+          <div class="showcase-area">
+            <div id="showcase-card-container">
+              <div class="loading">Loading lineup...</div>
+            </div>
+          </div>
+          <div class="carousel-area">
+            <h3>Lineups</h3>
+            <div class="carousel-wrapper">
+              <button id="carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
+              <div id="existing-lineups-container" class="existing-lineups-container">
+                <div class="loading">Loading lineups...</div>
+              </div>
+              <button id="carousel-next" class="carousel-nav-btn carousel-next" aria-label="Scroll right">▶</button>
+            </div>
           </div>
         </div>
       </div>
@@ -25,6 +39,7 @@ export const LineupsPage = {
 
     this.setupTabHandlers();
     this.setupTouchHandlers();
+    this.setupCarouselDragScroll();
     this.loadLineups();
   },
 
@@ -83,14 +98,8 @@ export const LineupsPage = {
       }
     });
 
-    // Add transition effect
-    const listElement = document.getElementById('lineups-list');
-    listElement.classList.add('transitioning');
-
-    setTimeout(() => {
-      this.loadLineups();
-      listElement.classList.remove('transitioning');
-    }, 150);
+    // Reload lineups for new raid type
+    this.loadLineups();
   },
 
   getEquipmentBackground(player) {
@@ -115,10 +124,11 @@ export const LineupsPage = {
   },
 
   async loadLineups() {
-    const listElement = document.getElementById('lineups-list');
+    const showcaseContainer = document.getElementById('showcase-card-container');
+    const carouselContainer = document.getElementById('existing-lineups-container');
 
     if (!dataService.isConfigured()) {
-      listElement.innerHTML = `
+      showcaseContainer.innerHTML = `
         <div class="setup-message">
           <h2>Google Sheets Not Configured</h2>
           <p>Please set up your Google Sheet to get started.</p>
@@ -129,6 +139,7 @@ export const LineupsPage = {
       document.getElementById('setup-btn').addEventListener('click', () => {
         this.showSetupModal();
       });
+      carouselContainer.innerHTML = '';
       return;
     }
 
@@ -138,100 +149,293 @@ export const LineupsPage = {
         dataService.getPlayers()
       ]);
 
-      const readyLineups = lineups.filter(l => l.status === 'ready' && l.raidType === this.currentRaidType);
+      this.allLineups = lineups.filter(l => l.raidType === this.currentRaidType);
 
-      if (readyLineups.length === 0) {
-        listElement.innerHTML = `<div class="empty-state">No ${this.currentRaidType} lineups ready yet!</div>`;
+      if (this.allLineups.length === 0) {
+        showcaseContainer.innerHTML = `<div class="empty-state">No ${this.currentRaidType} lineups yet!</div>`;
+        carouselContainer.innerHTML = `<div class="empty-state">No lineups yet</div>`;
         return;
       }
 
       const playerMap = new Map(players.map(p => [p.name, p]));
-      const isAdmin = authService.isAdmin();
 
-      listElement.innerHTML = readyLineups.map(lineup => {
+      // Sort lineups: cleared ones last
+      this.allLineups.sort((a, b) => {
+        // Non-cleared first (false < true)
+        if (a.completed === b.completed) return 0;
+        return a.completed ? 1 : -1;
+      });
+
+      // Auto-select first lineup if none selected or current selection not in filtered list
+      if (!this.currentShowcaseLineup) {
+        this.currentShowcaseLineup = this.allLineups[0];
+      } else {
+        // Update to the fresh lineup object (to get updated completed status)
+        const freshLineup = this.allLineups.find(l => l.name === this.currentShowcaseLineup.name && l.raidType === this.currentRaidType);
+        if (freshLineup) {
+          this.currentShowcaseLineup = freshLineup;
+        } else {
+          // Current lineup no longer exists in this raid type, select first
+          this.currentShowcaseLineup = this.allLineups[0];
+        }
+      }
+
+      // Render showcase and carousel
+      this.renderShowcase(this.currentShowcaseLineup, playerMap);
+      this.renderCarousel(playerMap);
+      this.setupCarouselHandlers();
+    } catch (error) {
+      showcaseContainer.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
+      carouselContainer.innerHTML = '';
+    }
+  },
+
+  renderShowcase(lineup, playerMap) {
+    const showcaseContainer = document.getElementById('showcase-card-container');
+    const isAdmin = authService.isAdmin();
+
+    // Check if lineup is cleared
+    const isCleared = lineup.completed;
+
+    showcaseContainer.innerHTML = `
+      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''}">
+        <div class="lineup-card-header">
+          <h3>${lineup.name}</h3>
+          ${isAdmin ? `<button class="btn btn-primary btn-cleared" data-lineup-name="${lineup.name}">${isCleared ? 'Not cleared' : 'Clear'}</button>` : ''}
+        </div>
+        <div class="lineup-players">
+          ${lineup.players.map((playerName, idx) => {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
-        const isCleared = lineupPlayers.length > 0 && lineupPlayers.every(p => p.completed);
+            const player = playerMap.get(playerName);
+            const backgroundStyle = this.getEquipmentBackground(player);
+
+            if (!player) {
+              return `
+                <div class="player-slot empty">
+                  <span class="slot-number">${idx + 1}</span>
+                  <span class="player-name">${playerName || 'Empty'}</span>
+                </div>
+              `;
+            }
+
+            const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
+            const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
+
+            const equipmentDisplay = [];
+            if (player.weapon) {
+              const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
+              equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
+            }
+            if (player.armor) {
+              const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
+              equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
+            }
+
+            const suffixDisplay = [];
+            if (player.suffix1) {
+              const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+              suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+            }
+            if (player.suffix2) {
+              const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+              suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+            }
+
+            return `
+            <div class="player-slot" style="${backgroundStyle}">
+              <span class="slot-number">${idx + 1}</span>
+              <div class="player-slot-info">
+                <span class="player-name">${playerName}</span>
+                ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
+                ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
+                ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+              </div>
+            </div>
+          `;
+          }).join('')}
+          ${Array(8 - lineup.players.length).fill(0).map((_, idx) => `
+            <div class="player-slot empty">
+              <span class="slot-number">${lineup.players.length + idx + 1}</span>
+              <span class="player-name">Empty</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    // Add click handler for cleared button if admin
+    if (isAdmin) {
+      const clearedBtn = showcaseContainer.querySelector('.btn-cleared');
+      if (clearedBtn) {
+        clearedBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const lineupName = clearedBtn.dataset.lineupName;
+          await this.handleClearedClick(lineupName, this.allLineups);
+        });
+      }
+    }
+  },
+
+  renderCarousel(playerMap) {
+    const carouselContainer = document.getElementById('existing-lineups-container');
+
+    carouselContainer.innerHTML = this.allLineups.map(lineup => {
+      // Check if lineup is cleared
+      const isCleared = lineup.completed;
+      const isSelected = this.currentShowcaseLineup && lineup.name === this.currentShowcaseLineup.name;
+
+      // Create 8 mini player cards in 2x4 grid
+      const playerCards = Array(8).fill(0).map((_, idx) => {
+        const playerName = lineup.players[idx];
+        const player = playerName ? playerMap.get(playerName) : null;
+
+        if (!player) {
+          return `
+            <div class="mini-player-card empty">
+              <div class="mini-player-empty">Empty</div>
+            </div>
+          `;
+        }
+
+        const backgroundStyle = this.getEquipmentBackground(player);
 
         return `
-        <div class="lineup-card ${isCleared ? 'cleared' : ''}">
-          <div class="lineup-card-header">
-            <h3>${lineup.name}</h3>
-            ${isAdmin ? `<button class="btn btn-primary btn-cleared" data-lineup-name="${lineup.name}">${isCleared ? 'Not cleared' : 'Clear'}</button>` : ''}
+          <div class="mini-player-card" style="${backgroundStyle}">
+            <div class="mini-player-info">
+              <div class="mini-player-name">${player.name}</div>
+              <div class="mini-player-role">${player.role}</div>
+            </div>
           </div>
-          <div class="lineup-players">
-            ${lineup.players.map((playerName, idx) => {
-              const player = playerMap.get(playerName);
-              const backgroundStyle = this.getEquipmentBackground(player);
+        `;
+      }).join('');
 
-              if (!player) {
-                return `
-                  <div class="player-slot empty">
-                    <span class="slot-number">${idx + 1}</span>
-                    <span class="player-name">${playerName || 'Empty'}</span>
-                  </div>
-                `;
-              }
-
-              const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-              const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
-              const equipmentDisplay = [];
-              if (player.weapon) {
-                const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
-                equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
-              }
-              if (player.armor) {
-                const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
-                equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
-              }
-
-              const suffixDisplay = [];
-              if (player.suffix1) {
-                const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-                suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-              }
-              if (player.suffix2) {
-                const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-                suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-              }
-
-              return `
-              <div class="player-slot" style="${backgroundStyle}">
-                <span class="slot-number">${idx + 1}</span>
-                <div class="player-slot-info">
-                  <span class="player-name">${playerName}</span>
-                  ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
-                  ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
-                  ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
-                </div>
-              </div>
-            `;
-            }).join('')}
-            ${Array(8 - lineup.players.length).fill(0).map((_, idx) => `
-              <div class="player-slot empty">
-                <span class="slot-number">${lineup.players.length + idx + 1}</span>
-                <span class="player-name">Empty</span>
-              </div>
-            `).join('')}
+      return `
+        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''}" data-lineup-name="${lineup.name}">
+          <div class="mini-lineup-header">
+            <span class="mini-lineup-name">${lineup.name}</span>
+            <div class="mini-lineup-header-actions">
+              <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
+            </div>
+          </div>
+          <div class="mini-lineup-grid">
+            ${playerCards}
           </div>
         </div>
       `;
-      }).join('');
+    }).join('');
+  },
 
-      // Add click handlers for cleared buttons
-      if (isAdmin) {
-        document.querySelectorAll('.btn-cleared').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const lineupName = btn.dataset.lineupName;
-            await this.handleClearedClick(lineupName, lineups);
-          });
-        });
+  selectLineup(lineupName) {
+    const lineup = this.allLineups.find(l => l.name === lineupName);
+    if (!lineup) return;
+
+    this.currentShowcaseLineup = lineup;
+
+    // Get player data
+    dataService.getPlayers().then(players => {
+      const playerMap = new Map(players.map(p => [p.name, p]));
+      this.renderShowcase(lineup, playerMap);
+      this.updateCarouselSelection(lineupName);
+    });
+  },
+
+  updateCarouselSelection(lineupName) {
+    const carouselCards = document.querySelectorAll('.mini-lineup-card');
+    carouselCards.forEach(card => {
+      if (card.dataset.lineupName === lineupName) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
       }
-    } catch (error) {
-      listElement.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
+    });
+  },
+
+  setupCarouselHandlers() {
+    const carouselCards = document.querySelectorAll('.mini-lineup-card');
+    carouselCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const lineupName = card.dataset.lineupName;
+        this.selectLineup(lineupName);
+      });
+    });
+
+    // Setup arrow button handlers
+    const prevBtn = document.getElementById('carousel-prev');
+    const nextBtn = document.getElementById('carousel-next');
+    const container = document.getElementById('existing-lineups-container');
+
+    if (prevBtn && nextBtn && container) {
+      prevBtn.addEventListener('click', () => {
+        container.scrollBy({ left: -300, behavior: 'smooth' });
+      });
+
+      nextBtn.addEventListener('click', () => {
+        container.scrollBy({ left: 300, behavior: 'smooth' });
+      });
+
+      // Update arrow visibility based on scroll position
+      const updateArrows = () => {
+        const isAtStart = container.scrollLeft <= 0;
+        const isAtEnd = container.scrollLeft >= container.scrollWidth - container.clientWidth - 1;
+
+        prevBtn.style.opacity = isAtStart ? '0.3' : '1';
+        prevBtn.style.cursor = isAtStart ? 'default' : 'pointer';
+        nextBtn.style.opacity = isAtEnd ? '0.3' : '1';
+        nextBtn.style.cursor = isAtEnd ? 'default' : 'pointer';
+      };
+
+      container.addEventListener('scroll', updateArrows);
+      updateArrows(); // Initial check
     }
+  },
+
+  setupCarouselDragScroll() {
+    const container = document.getElementById('existing-lineups-container');
+    if (!container) return;
+
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+    let hasMoved = false;
+
+    container.addEventListener('mousedown', (e) => {
+      isDown = true;
+      hasMoved = false;
+      container.style.cursor = 'grabbing';
+      startX = e.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    });
+
+    container.addEventListener('mouseleave', () => {
+      isDown = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mouseup', () => {
+      isDown = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      hasMoved = true;
+      const x = e.pageX - container.offsetLeft;
+      const walk = (x - startX) * 2; // Scroll speed multiplier
+      container.scrollLeft = scrollLeft - walk;
+    });
+
+    // Prevent click events on cards if dragging occurred
+    container.addEventListener('click', (e) => {
+      if (hasMoved) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+
+    // Set initial cursor
+    container.style.cursor = 'grab';
   },
 
   async handleClearedClick(lineupName, lineups) {
@@ -241,18 +445,11 @@ export const LineupsPage = {
       return;
     }
 
-    const playerNames = lineup.players.filter(p => p);
-    if (playerNames.length === 0) {
-      toast.warning('??? Disconnected ba lahat ng naka clear?');
-      return;
-    }
-
     const confirmed = await modal.confirm(
-      `Cleared na ba ${playerNames.length} characters sa <strong>${lineupName}</strong>?<br><br>
-      <em>Click again to undo</em>`,
+      `${lineup.completed ? 'Di pa ba na clear' : 'Cleared na ba'} ang lineup <strong>${lineupName}</strong>?<br><br>`,
       {
-        title: 'Toggle Raid Cleared Status',
-        confirmText: 'Toggle Status',
+        title: 'Cleared Status',
+        confirmText: lineup.completed ? 'Not Cleared' : 'Cleared',
         cancelText: 'Cancel'
       }
     );
@@ -260,8 +457,8 @@ export const LineupsPage = {
     if (!confirmed) return;
 
     try {
-      await dataService.toggleMultiplePlayersCompleted(playerNames);
-      toast.success(`Updated cleared status ${playerNames.length} characters in ${lineupName}!`);
+      await dataService.toggleLineupCompleted(lineupName);
+      toast.success(`Updated cleared status for ${lineupName}!`);
       // Reload the lineups to show updated cleared status
       await this.loadLineups();
     } catch (error) {

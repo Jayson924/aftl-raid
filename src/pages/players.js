@@ -86,7 +86,6 @@ export const PlayersPage = {
               <th>Weapon</th>
               <th>Armor</th>
               <th>Notes</th>
-              <th>Status</th>
               ${hasAnyEditableCharacters ? '<th>Actions</th>' : ''}
             </tr>
           </thead>
@@ -108,7 +107,7 @@ export const PlayersPage = {
               const canEdit = this.canEditCharacter(player.name);
 
               return `
-              <tr class="${player.completed ? 'completed' : ''}">
+              <tr>
                 <td class="player-name" data-label="Name">${player.name}</td>
                 <td data-label="Class">${player.role}</td>
                 <td data-label="Weapon">
@@ -127,18 +126,10 @@ export const PlayersPage = {
                   ` : '-'}
                 </td>
                 <td class="notes" data-label="Notes">${player.notes}</td>
-                <td data-label="Status">
-                  <span class="status-badge ${player.completed ? 'completed' : 'pending'}">
-                    ${player.completed ? 'Completed' : 'Pending'}
-                  </span>
-                </td>
                 ${canEdit ? `
                   <td class="actions">
                     <button class="btn-icon" title="Edit" data-action="edit" data-player="${player.name}">
                       ✏️
-                    </button>
-                    <button class="btn-icon" title="Toggle Completed" data-action="toggle" data-player="${player.name}">
-                      ${player.completed ? '↩️' : '✅'}
                     </button>
                   </td>
                 ` : ''}
@@ -158,8 +149,6 @@ export const PlayersPage = {
 
             if (action === 'edit') {
               this.showEditPlayerModal(players.find(p => p.name === playerName));
-            } else if (action === 'toggle') {
-              this.togglePlayerCompleted(playerName);
             }
           });
         });
@@ -281,8 +270,7 @@ export const PlayersPage = {
           suffix2,
           armor,
           armorEnhance,
-          notes,
-          completed: false
+          notes
         });
 
         // Track this character as added by current player
@@ -423,8 +411,7 @@ export const PlayersPage = {
           suffix2,
           armor,
           armorEnhance,
-          notes,
-          completed: player.completed
+          notes
         }, player.name);
 
         // If name changed, update tracking
