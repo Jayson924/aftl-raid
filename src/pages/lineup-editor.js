@@ -968,7 +968,11 @@ export const LineupEditorPage = {
       completed: false
     };
 
-    document.getElementById('lineup-name').value = '';
+    // Clear the lineup name input field and trigger input event to sync state
+    const lineupNameInput = document.getElementById('lineup-name');
+    lineupNameInput.value = '';
+    lineupNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+
     document.getElementById('raid-type').value = 'Hardcore';
     document.getElementById('cleared-toggle').checked = false;
 
@@ -986,6 +990,7 @@ export const LineupEditorPage = {
     });
 
     this.renderAvailablePlayers();
+    toast.success('Lineup cleared! Enter a new name to save as a new lineup.');
   },
 
   async saveLineup() {
@@ -1018,6 +1023,23 @@ export const LineupEditorPage = {
       const existingLineup = existingLineups.find(l => l.name === this.currentLineup.name);
 
       if (existingLineup) {
+        // Confirm before updating existing lineup
+        const confirmed = await modal.confirm(
+          `Overwrite "${this.currentLineup.name}" lineup?`,
+          {
+            title: 'Update Lineup',
+            confirmText: 'Update',
+            cancelText: 'Cancel',
+            danger: false
+          }
+        );
+
+        if (!confirmed) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Lineup';
+          return;
+        }
+
         // Update existing lineup
         await dataService.updateLineup({
           name: this.currentLineup.name,
