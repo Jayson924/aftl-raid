@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES } from '../constants.js';
 import { modal } from '../modal.js';
 
 export const LineupEditorPage = {
@@ -12,6 +12,7 @@ export const LineupEditorPage = {
     players: [],
     completed: false
   },
+  selectedClassFamily: null,
 
   async render(container) {
     container.innerHTML = `
@@ -77,6 +78,17 @@ export const LineupEditorPage = {
                   ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
                 </select>
               </div>
+              <div class="class-family-filter">
+                ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
+                  <button class="class-family-btn" data-family="${key}" title="${family.name}">
+                    <img src="src/icons/${family.icon}" alt="${family.name}">
+                  </button>
+                `).join('')}
+              </div>
+              <label class="hide-cleared-filter">
+                <input type="checkbox" id="hide-cleared-checkbox">
+                <span>Hide Cleared</span>
+              </label>
               <div id="available-players-list" class="players-list">
                 <div class="loading">Loading players...</div>
               </div>
@@ -98,6 +110,7 @@ export const LineupEditorPage = {
 
     document.getElementById('raid-type').addEventListener('change', (e) => {
       this.currentLineup.raidType = e.target.value;
+      this.renderAvailablePlayers(); // Re-render to update completion badges
     });
 
     document.getElementById('cleared-toggle').addEventListener('change', (e) => {
@@ -117,8 +130,40 @@ export const LineupEditorPage = {
       this.filterPlayers();
     });
 
-    document.getElementById('class-filter').addEventListener('change', () => {
+    document.getElementById('class-filter').addEventListener('change', (e) => {
+      // If a specific class is selected, deactivate all class family buttons
+      if (e.target.value) {
+        this.selectedClassFamily = null;
+        document.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active'));
+      }
       this.filterPlayers();
+    });
+
+    document.getElementById('hide-cleared-checkbox').addEventListener('change', () => {
+      this.filterPlayers();
+    });
+
+    // Class family filter buttons
+    document.querySelectorAll('.class-family-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const family = btn.dataset.family;
+
+        // Toggle selection
+        if (this.selectedClassFamily === family) {
+          this.selectedClassFamily = null;
+          btn.classList.remove('active');
+        } else {
+          // Remove active from all buttons
+          document.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
+          // Set new selection
+          this.selectedClassFamily = family;
+          btn.classList.add('active');
+          // Reset class dropdown to "All Classes"
+          document.getElementById('class-filter').value = '';
+        }
+
+        this.filterPlayers();
+      });
     });
 
     document.getElementById('save-lineup-btn').addEventListener('click', () => {
@@ -174,7 +219,17 @@ export const LineupEditorPage = {
         // Create 8 mini player cards in 2x4 grid
         const playerCards = Array(8).fill(0).map((_, idx) => {
           const playerName = lineup.players[idx];
-          const player = playerName ? playerMap.get(playerName) : null;
+
+          // Check if this is a guest character
+          let player = null;
+          let isPub = false;
+          if (playerName && playerName.startsWith('[PUB]')) {
+            isPub = true;
+            const parts = playerName.substring(5).split('|');
+            player = { name: parts[0], role: parts[1] };
+          } else {
+            player = playerName ? playerMap.get(playerName) : null;
+          }
 
           if (!player) {
             return `
@@ -184,12 +239,12 @@ export const LineupEditorPage = {
             `;
           }
 
-          const backgroundStyle = this.getEquipmentBackground(player);
+          const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
 
           return `
-            <div class="mini-player-card" style="${backgroundStyle}">
+            <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
               <div class="mini-player-info">
-                <div class="mini-player-name">${player.name}</div>
+                <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
                 <div class="mini-player-role">${player.role}</div>
               </div>
             </div>
@@ -214,6 +269,13 @@ export const LineupEditorPage = {
 
       // Add click handlers to load lineups
       container.querySelectorAll('.mini-lineup-card').forEach(card => {
+        // Prevent default drag behavior on cards to allow container drag
+        card.addEventListener('mousedown', (e) => {
+          // Don't prevent if clicking delete button
+          if (e.target.classList.contains('mini-delete-btn')) return;
+          e.preventDefault();
+        });
+
         card.addEventListener('click', async (e) => {
           // Don't load if clicking delete button
           if (e.target.classList.contains('mini-delete-btn')) return;
@@ -282,7 +344,9 @@ export const LineupEditorPage = {
     let scrollLeft;
     let hasMoved = false;
 
+    // Mouse events
     container.addEventListener('mousedown', (e) => {
+      // Allow dragging even when starting on a card
       isDown = true;
       hasMoved = false;
       container.style.cursor = 'grabbing';
@@ -302,12 +366,48 @@ export const LineupEditorPage = {
 
     container.addEventListener('mousemove', (e) => {
       if (!isDown) return;
-      e.preventDefault();
-      hasMoved = true;
       const x = e.pageX - container.offsetLeft;
       const walk = (x - startX) * 2; // Scroll speed multiplier
-      container.scrollLeft = scrollLeft - walk;
+
+      // Only consider it a drag if movement exceeds threshold
+      if (Math.abs(walk) > 5) {
+        e.preventDefault();
+        hasMoved = true;
+        container.scrollLeft = scrollLeft - walk;
+      }
     });
+
+    // Touch events for mobile
+    container.addEventListener('touchstart', (e) => {
+      isDown = true;
+      hasMoved = false;
+      const touch = e.touches[0];
+      startX = touch.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    }, { passive: true });
+
+    container.addEventListener('touchend', () => {
+      isDown = false;
+      // Reset hasMoved after a short delay
+      setTimeout(() => {
+        hasMoved = false;
+      }, 50);
+    });
+
+    container.addEventListener('touchmove', (e) => {
+      if (!isDown) return;
+      const touch = e.touches[0];
+      const x = touch.pageX - container.offsetLeft;
+      const walk = (x - startX) * 2;
+
+      // Only prevent default and scroll if there's actual horizontal movement
+      if (Math.abs(walk) > 5) {
+        e.preventDefault();
+        e.stopPropagation();
+        hasMoved = true;
+        container.scrollLeft = scrollLeft - walk;
+      }
+    }, { passive: false });
 
     // Prevent click events on cards if dragging occurred
     container.addEventListener('click', (e) => {
@@ -331,10 +431,23 @@ export const LineupEditorPage = {
 
     const filteredPlayers = this.getFilteredPlayers();
 
-    listElement.innerHTML = filteredPlayers.map(player => {
+    // Add the special "Add Guest" card at the top
+    const addPubCard = `
+      <div class="player-card add-pub-card" data-player-name="[ADD_PUB]" draggable="true">
+        <div class="player-info">
+          <div class="player-name">➕ Add Guest</div>
+          <div class="player-role">Guest character</div>
+        </div>
+      </div>
+    `;
+
+    const playerCards = filteredPlayers.map(player => {
       const isInLineup = this.currentLineup.players.includes(player.name);
       const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
       const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
+
+      // Check completion status based on CURRENT lineup's raid type
+      const needsThisRaid = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
       const equipmentDisplay = [];
       if (player.weapon) {
@@ -357,10 +470,11 @@ export const LineupEditorPage = {
       }
 
       return `
-        <div class="player-card ${player.completed ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''}"
+        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''}"
              data-player-name="${player.name}"
              draggable="true">
           ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
+          ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
           <div class="player-info">
             <div class="player-name">${player.name}</div>
             <div class="player-role">${player.role}</div>
@@ -374,12 +488,16 @@ export const LineupEditorPage = {
       `;
     }).join('');
 
+    listElement.innerHTML = addPubCard + playerCards;
+
     this.setupPlayerDragHandlers();
+    this.setupAddPubHandler();
   },
 
   getFilteredPlayers() {
     const searchTerm = document.getElementById('player-search').value.toLowerCase();
     const classFilter = document.getElementById('class-filter').value;
+    const hideCleared = document.getElementById('hide-cleared-checkbox').checked;
 
     return this.players
       .filter(player => {
@@ -387,7 +505,21 @@ export const LineupEditorPage = {
                             player.role.toLowerCase().includes(searchTerm);
         const matchesClass = !classFilter || player.role === classFilter;
 
-        return matchesSearch && matchesClass;
+        // Class family filter
+        let matchesClassFamily = true;
+        if (this.selectedClassFamily) {
+          const familyClasses = CLASS_FAMILIES[this.selectedClassFamily].classes;
+          matchesClassFamily = familyClasses.includes(player.role);
+        }
+
+        // Hide cleared filter - only hide if checkbox is checked
+        let matchesCompletion = true;
+        if (hideCleared) {
+          // Only show players who need this raid (hide those who already completed)
+          matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+        }
+
+        return matchesSearch && matchesClass && matchesClassFamily && matchesCompletion;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -495,7 +627,123 @@ export const LineupEditorPage = {
     });
   },
 
+  setupAddPubHandler() {
+    const addPubCard = document.querySelector('.add-pub-card');
+    if (!addPubCard) return;
+
+    // Handle double-click on "Add Guest" card
+    addPubCard.addEventListener('dblclick', () => {
+      // Find first empty slot
+      const emptySlotIndex = this.currentLineup.players.findIndex((p, idx) => !p || p === '');
+      if (emptySlotIndex !== -1) {
+        this.showPubCharacterModal(emptySlotIndex);
+      } else {
+        toast.error('All slots are full! Remove a player first.');
+      }
+    });
+  },
+
+  showPubCharacterModal(slotIndex) {
+    const modalElement = document.createElement('div');
+    modalElement.className = 'modal';
+
+    modalElement.innerHTML = `
+      <div class="modal-content">
+        <h2>Add Guest Character to Slot ${slotIndex + 1}</h2>
+        <form id="pub-character-form">
+          <div class="form-group">
+            <label for="pub-name">Character Name: *</label>
+            <input type="text" id="pub-name" required placeholder="Enter name...">
+          </div>
+          <div class="form-group">
+            <label for="pub-class">Class: *</label>
+            <select id="pub-class" required>
+              <option value="">Select a class...</option>
+              ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">Add to Lineup</button>
+            <button type="button" id="cancel-pub-btn" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modalElement);
+
+    const form = document.getElementById('pub-character-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('pub-name').value.trim();
+      const role = document.getElementById('pub-class').value;
+
+      if (!name || !role) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      this.assignPubPlayerToSlot(slotIndex, name, role);
+      document.body.removeChild(modalElement);
+    });
+
+    document.getElementById('cancel-pub-btn').addEventListener('click', () => {
+      document.body.removeChild(modalElement);
+    });
+
+    modalElement.addEventListener('click', (e) => {
+      if (e.target === modalElement) {
+        document.body.removeChild(modalElement);
+      }
+    });
+  },
+
+  assignPubPlayerToSlot(slotIndex, name, role) {
+    // Store guest character with special format: [PUB]Name|Class
+    const pubPlayerString = `[PUB]${name}|${role}`;
+    this.currentLineup.players[slotIndex] = pubPlayerString;
+
+    const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
+    const slotContent = slotElement.querySelector('.slot-content');
+
+    slotContent.innerHTML = `
+      <div class="assigned-player pub-player">
+        <div class="player-name">${name} <span class="pub-badge">GUEST</span></div>
+        <div class="player-role">${role}</div>
+      </div>
+    `;
+
+    // Add remove button to slot
+    let removeBtn = slotElement.querySelector('.slot-remove-btn');
+    if (!removeBtn) {
+      removeBtn = document.createElement('button');
+      removeBtn.className = 'slot-remove-btn';
+      removeBtn.title = 'Remove player';
+      removeBtn.innerHTML = '×';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.removePlayerFromSlot(slotIndex);
+      });
+      slotElement.appendChild(removeBtn);
+    }
+
+    // Apply warning stripe background style
+    slotContent.style.background = 'repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px)';
+    slotContent.style.border = '2px dashed rgba(255, 193, 7, 0.5)';
+
+    this.renderAvailablePlayers();
+  },
+
   assignPlayerToSlot(slotIndex, playerName) {
+    // Check if this is a guest character
+    if (playerName.startsWith('[PUB]')) {
+      const parts = playerName.substring(5).split('|');
+      const name = parts[0];
+      const role = parts[1];
+      this.assignPubPlayerToSlot(slotIndex, name, role);
+      return;
+    }
+
     const player = this.players.find(p => p.name === playerName);
     this.currentLineup.players[slotIndex] = playerName;
 
@@ -728,14 +976,20 @@ export const LineupEditorPage = {
     // Assign players
     lineup.players.forEach((playerName, idx) => {
       if (playerName && idx < 8) {
-        const player = this.players.find(p => p.name === playerName);
-        if (player) {
+        // Check if it's a guest player or a regular player
+        if (playerName.startsWith('[PUB]')) {
+          // Guest player - assign directly
           this.assignPlayerToSlot(idx, playerName);
+        } else {
+          // Regular player - check if it exists
+          const player = this.players.find(p => p.name === playerName);
+          if (player) {
+            this.assignPlayerToSlot(idx, playerName);
+          }
         }
       }
     });
 
-    toast.info(`Loaded lineup: ${lineup.name}`);
   },
 
   setupPlayerDragHandlers() {
@@ -847,8 +1101,13 @@ export const LineupEditorPage = {
           this.assignPlayerToSlot(targetSlotIndex, playerName);
         } else if (playerName) {
           // Dragging from player list to slot
-          this.assignPlayerToSlot(targetSlotIndex, playerName);
-          toast.success(`Assigned ${playerName} to slot ${targetSlotIndex + 1}`);
+          if (playerName === '[ADD_PUB]') {
+            // Show guest character modal instead of assigning
+            this.showPubCharacterModal(targetSlotIndex);
+          } else {
+            this.assignPlayerToSlot(targetSlotIndex, playerName);
+            toast.success(`Assigned ${playerName} to slot ${targetSlotIndex + 1}`);
+          }
         }
       });
     });

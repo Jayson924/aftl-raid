@@ -22,6 +22,35 @@ export const CLASSES = [
   'Physician'
 ];
 
+// Class families for filtering
+export const CLASS_FAMILIES = {
+  warrior: {
+    name: 'Warrior',
+    icon: 'warrior.png',
+    classes: ['Moon Lord', 'Gladiator', 'Barbarian', 'Destroyer']
+  },
+  cleric: {
+    name: 'Cleric',
+    icon: 'cleric.png',
+    classes: ['Saint', 'Inquisitor', 'Crusader', 'Guardian']
+  },
+  archer: {
+    name: 'Archer',
+    icon: 'archer.png',
+    classes: ['Wind Walker', 'Artillery', 'Sniper', 'Tempest']
+  },
+  sorceress: {
+    name: 'Sorceress',
+    icon: 'sorceress.png',
+    classes: ['Elestra', 'Saleana', 'Majesty', 'Smasher']
+  },
+  academic: {
+    name: 'Academic',
+    icon: 'academic.png',
+    classes: ['Gear Master', 'Physician', 'Adept', 'Shooting Star']
+  }
+};
+
 // Equipment rarities with color codes
 export const EQUIPMENT_RARITIES = [
   { value: '', label: 'None', color: '' },

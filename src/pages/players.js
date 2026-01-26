@@ -85,6 +85,7 @@ export const PlayersPage = {
               <th>Class</th>
               <th>Weapon</th>
               <th>Armor</th>
+              <th>Raids Needed</th>
               <th>Notes</th>
               ${hasAnyEditableCharacters ? '<th>Actions</th>' : ''}
             </tr>
@@ -93,6 +94,18 @@ export const PlayersPage = {
             ${sortedPlayers.map(player => {
               const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
               const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
+
+              // Check completion status for both raid types
+              const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
+              const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
+
+              const raidBadges = [];
+              if (needsHardcore) {
+                raidBadges.push('<span class="raid-badge raid-hardcore">HC</span>');
+              }
+              if (needsClassic) {
+                raidBadges.push('<span class="raid-badge raid-classic">CL</span>');
+              }
 
               const suffixDisplay = [];
               if (player.suffix1) {
@@ -124,6 +137,9 @@ export const PlayersPage = {
                       ${EQUIPMENT_ICONS.armor} ${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                     </span>
                   ` : '-'}
+                </td>
+                <td class="raids-needed" data-label="Raids Needed">
+                  ${raidBadges.length > 0 ? raidBadges.join(' ') : '<span class="raid-complete">✓ All done</span>'}
                 </td>
                 <td class="notes" data-label="Notes">${player.notes}</td>
                 ${canEdit ? `

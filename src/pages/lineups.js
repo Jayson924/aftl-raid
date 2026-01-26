@@ -8,6 +8,7 @@ export const LineupsPage = {
   currentRaidType: 'Hardcore',
   currentShowcaseLineup: null,
   allLineups: [],
+  cachedPlayerMap: null,
 
   async render(container) {
     container.innerHTML = `
@@ -157,7 +158,7 @@ export const LineupsPage = {
         return;
       }
 
-      const playerMap = new Map(players.map(p => [p.name, p]));
+      this.cachedPlayerMap = new Map(players.map(p => [p.name, p]));
 
       // Sort lineups: cleared ones last
       this.allLineups.sort((a, b) => {
@@ -181,8 +182,8 @@ export const LineupsPage = {
       }
 
       // Render showcase and carousel
-      this.renderShowcase(this.currentShowcaseLineup, playerMap);
-      this.renderCarousel(playerMap);
+      this.renderShowcase(this.currentShowcaseLineup, this.cachedPlayerMap);
+      this.renderCarousel(this.cachedPlayerMap);
       this.setupCarouselHandlers();
     } catch (error) {
       showcaseContainer.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
@@ -207,8 +208,19 @@ export const LineupsPage = {
           ${lineup.players.map((playerName, idx) => {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
-            const player = playerMap.get(playerName);
-            const backgroundStyle = this.getEquipmentBackground(player);
+
+            // Check if this is a guest character
+            let player = null;
+            let isPub = false;
+            if (playerName && playerName.startsWith('[PUB]')) {
+              isPub = true;
+              const parts = playerName.substring(5).split('|');
+              player = { name: parts[0], role: parts[1] };
+            } else {
+              player = playerMap.get(playerName);
+            }
+
+            const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px); border: 2px dashed rgba(255, 193, 7, 0.5);' : this.getEquipmentBackground(player);
 
             if (!player) {
               return `
@@ -243,13 +255,13 @@ export const LineupsPage = {
             }
 
             return `
-            <div class="player-slot" style="${backgroundStyle}">
+            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
-                <span class="player-name">${playerName}</span>
+                <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : ''}</span>
                 ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
-                ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
-                ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+                ${!isPub && equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
+                ${!isPub && suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
               </div>
             </div>
           `;
@@ -288,7 +300,17 @@ export const LineupsPage = {
       // Create 8 mini player cards in 2x4 grid
       const playerCards = Array(8).fill(0).map((_, idx) => {
         const playerName = lineup.players[idx];
-        const player = playerName ? playerMap.get(playerName) : null;
+
+        // Check if this is a guest character
+        let player = null;
+        let isPub = false;
+        if (playerName && playerName.startsWith('[PUB]')) {
+          isPub = true;
+          const parts = playerName.substring(5).split('|');
+          player = { name: parts[0], role: parts[1] };
+        } else {
+          player = playerName ? playerMap.get(playerName) : null;
+        }
 
         if (!player) {
           return `
@@ -298,12 +320,12 @@ export const LineupsPage = {
           `;
         }
 
-        const backgroundStyle = this.getEquipmentBackground(player);
+        const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
 
         return `
-          <div class="mini-player-card" style="${backgroundStyle}">
+          <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
             <div class="mini-player-info">
-              <div class="mini-player-name">${player.name}</div>
+              <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
               <div class="mini-player-role">${player.role}</div>
             </div>
           </div>
@@ -332,12 +354,11 @@ export const LineupsPage = {
 
     this.currentShowcaseLineup = lineup;
 
-    // Get player data
-    dataService.getPlayers().then(players => {
-      const playerMap = new Map(players.map(p => [p.name, p]));
-      this.renderShowcase(lineup, playerMap);
+    // Use cached player data for instant rendering
+    if (this.cachedPlayerMap) {
+      this.renderShowcase(lineup, this.cachedPlayerMap);
       this.updateCarouselSelection(lineupName);
-    });
+    }
   },
 
   updateCarouselSelection(lineupName) {
@@ -351,9 +372,15 @@ export const LineupsPage = {
     });
   },
 
+
   setupCarouselHandlers() {
     const carouselCards = document.querySelectorAll('.mini-lineup-card');
     carouselCards.forEach(card => {
+      // Prevent default drag behavior on cards to allow container drag
+      card.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+
       card.addEventListener('click', () => {
         const lineupName = card.dataset.lineupName;
         this.selectLineup(lineupName);
@@ -399,7 +426,9 @@ export const LineupsPage = {
     let scrollLeft;
     let hasMoved = false;
 
+    // Mouse events
     container.addEventListener('mousedown', (e) => {
+      // Allow dragging even when starting on a card
       isDown = true;
       hasMoved = false;
       container.style.cursor = 'grabbing';
@@ -419,12 +448,48 @@ export const LineupsPage = {
 
     container.addEventListener('mousemove', (e) => {
       if (!isDown) return;
-      e.preventDefault();
-      hasMoved = true;
       const x = e.pageX - container.offsetLeft;
       const walk = (x - startX) * 2; // Scroll speed multiplier
-      container.scrollLeft = scrollLeft - walk;
+
+      // Only consider it a drag if movement exceeds threshold
+      if (Math.abs(walk) > 5) {
+        e.preventDefault();
+        hasMoved = true;
+        container.scrollLeft = scrollLeft - walk;
+      }
     });
+
+    // Touch events for mobile
+    container.addEventListener('touchstart', (e) => {
+      isDown = true;
+      hasMoved = false;
+      const touch = e.touches[0];
+      startX = touch.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    }, { passive: true });
+
+    container.addEventListener('touchend', () => {
+      isDown = false;
+      // Reset hasMoved after a short delay
+      setTimeout(() => {
+        hasMoved = false;
+      }, 50);
+    });
+
+    container.addEventListener('touchmove', (e) => {
+      if (!isDown) return;
+      const touch = e.touches[0];
+      const x = touch.pageX - container.offsetLeft;
+      const walk = (x - startX) * 2;
+
+      // Only prevent default and scroll if there's actual horizontal movement
+      if (Math.abs(walk) > 5) {
+        e.preventDefault();
+        e.stopPropagation();
+        hasMoved = true;
+        container.scrollLeft = scrollLeft - walk;
+      }
+    }, { passive: false });
 
     // Prevent click events on cards if dragging occurred
     container.addEventListener('click', (e) => {

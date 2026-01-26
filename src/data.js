@@ -150,7 +150,9 @@ class DataService {
       suffix1: this.cleanValue(row[5] || ''),
       suffix2: this.cleanValue(row[6] || ''),
       armor: this.cleanValue(row[7] || ''),
-      armorEnhance: this.cleanValue(row[8] || '')
+      armorEnhance: this.cleanValue(row[8] || ''),
+      hardcoreCompleted: this.cleanValue(row[9] || ''),
+      classicCompleted: this.cleanValue(row[10] || '')
     })).filter(player => player.name);
   }
 
@@ -168,7 +170,7 @@ class DataService {
 
   async getPlayers() {
     try {
-      const rows = await this.getRange('Players!A:I');
+      const rows = await this.getRange('Players!A:K');
       return this.parsePlayersFromSheet(rows);
     } catch (error) {
       console.error('Error fetching players:', error);
@@ -184,6 +186,75 @@ class DataService {
       console.error('Error fetching lineups:', error);
       return [];
     }
+  }
+
+  /**
+   * Check if a completion timestamp is from the current weekly reset period
+   * Reset period: Friday 5pm PT to next Friday 5pm PT
+   * @param {string} timestamp - ISO 8601 timestamp or empty string
+   * @returns {boolean} - true if completed this week
+   */
+  isCompletedThisWeek(timestamp) {
+    if (!timestamp) return false;
+
+    try {
+      const completedDate = new Date(timestamp);
+      const now = new Date();
+
+      // Get the most recent Friday 5pm in Pacific Time (handles DST automatically)
+      const nowPT = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+
+      // Determine current day of week in PT (0=Sun, 5=Fri, 6=Sat)
+      const dayOfWeek = nowPT.getDay();
+
+      // Calculate how many days back to last Friday 5pm PT
+      let daysBack;
+      if (dayOfWeek === 5) { // Friday
+        // Check if we're past 5pm PT
+        if (nowPT.getHours() >= 17) {
+          daysBack = 0; // Use this Friday
+        } else {
+          daysBack = 7; // Use last Friday
+        }
+      } else if (dayOfWeek === 6) { // Saturday
+        daysBack = 1;
+      } else if (dayOfWeek === 0) { // Sunday
+        daysBack = 2;
+      } else { // Mon-Thu (1-4)
+        daysBack = dayOfWeek + 2;
+      }
+
+      const lastFridayPT = new Date(nowPT);
+      lastFridayPT.setDate(lastFridayPT.getDate() - daysBack);
+      lastFridayPT.setHours(17, 0, 0, 0);
+
+      // Convert completion date to PT for comparison
+      const completedPT = new Date(completedDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+
+      // Check if completion date is on or after last Friday 5pm PT
+      return completedPT >= lastFridayPT;
+    } catch (error) {
+      console.error('Error parsing completion timestamp:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get player completion status for a specific raid type
+   * @param {object} player - Player object with completion timestamps
+   * @param {string} raidType - 'Hardcore' or 'Classic'
+   * @returns {boolean} - true if player completed this raid type this week
+   */
+  playerNeedsRaid(player, raidType) {
+    const timestamp = raidType === 'Hardcore' ? player.hardcoreCompleted : player.classicCompleted;
+    return !this.isCompletedThisWeek(timestamp);
+  }
+
+  async markPlayersCompleted(playerNames, raidType) {
+    return this.callAppsScript('markPlayersCompleted', {
+      playerNames: playerNames,
+      raidType: raidType
+    });
   }
 }
 

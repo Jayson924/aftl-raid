@@ -318,9 +318,11 @@ body {
       }
 
       &.selected {
-        border-color: $primary-color;
-        background-color: rgba(244, 196, 48, 0.1);
-        box-shadow: 0 0 16px rgba(244, 196, 48, 0.4);
+        border: 3px solid $primary-color;
+        background-color: rgba(244, 196, 48, 0.25);
+        box-shadow: 0 0 24px rgba(255, 255, 255, 0.8), 0 0 8px rgba(255, 255, 255, 0.6) inset;
+        transform: scale(1.05);
+        z-index: 10;
       }
 
       &.cleared {
@@ -678,7 +680,67 @@ body {
       white-space: nowrap;
       padding-top: 0.2rem;
     }
+
+    .raids-needed {
+      white-space: nowrap;
+    }
+
+    .raid-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 0.25rem;
+
+      &.raid-hardcore {
+        background-color: #d62d49;
+        color: white;
+      }
+
+      &.raid-classic {
+        background-color: #8f5ce0;
+        color: white;
+      }
+    }
+
+    .raid-complete {
+      color: $success-color;
+      font-weight: 600;
+    }
   }
+}
+
+// Guest character badges
+.pub-badge {
+  background-color: #ffc107;
+  color: #000;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  text-shadow: none;
+}
+
+.pub-badge-mini {
+  background-color: #ffc107;
+  color: #000;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  margin-left: 0.2rem;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.pub-player {
+  border: 2px dashed rgba(255, 193, 7, 0.6) !important;
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
+  opacity: 0.85;
 }
 
 // Lineup Editor Page
@@ -938,6 +1000,71 @@ body {
         gap: 0.5rem;
         cursor: pointer;
       }
+
+    }
+
+    .hide-cleared-filter {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: $text-light;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+
+      input[type="checkbox"] {
+        cursor: pointer;
+      }
+    }
+
+    .class-family-filter {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      justify-content: center;
+
+      .class-family-btn {
+        width: 48px;
+        height: 48px;
+        padding: 2px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: $border-radius;
+        background-color: rgba(100, 100, 100, 0.3);
+        cursor: pointer;
+        transition: $transition;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          opacity: 0.6;
+          transition: $transition;
+          transform: scale(2.5);
+        }
+
+        &:hover {
+          border-color: rgba(255, 255, 255, 0.4);
+          background-color: rgba(120, 120, 120, 0.4);
+
+          img {
+            opacity: 0.8;
+          }
+        }
+
+        &.active {
+          border-color: $success-color;
+          background-color: rgba(40, 167, 69, 0.3);
+
+          img {
+            opacity: 1;
+          }
+        }
+      }
     }
 
     .players-list {
@@ -967,7 +1094,12 @@ body {
         }
 
         &.completed {
-          opacity: 0.7;
+          opacity: 0.6;
+          border: 2px solid $success-color;
+
+          .player-name {
+            color: $success-color;
+          }
         }
 
         &.dragging {
@@ -1025,6 +1157,55 @@ body {
           font-size: 0.75rem;
           font-weight: 600;
           white-space: nowrap;
+        }
+
+        .pub-badge {
+          background-color: #ffc107;
+          color: #000;
+          padding: 0.15rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.65rem;
+          font-weight: 700;
+          margin-left: 0.25rem;
+          border: 1px solid rgba(0, 0, 0, 0.3);
+          text-shadow: none;
+        }
+
+        .completion-badge {
+          position: absolute;
+          bottom: 0.5rem;
+          right: 0.5rem;
+          background-color: $success-color;
+          color: white;
+          border-radius: 50%;
+          width: 1.5rem;
+          height: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1rem;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          z-index: 10;
+        }
+      }
+
+      .add-pub-card {
+        background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.2) 10px, rgba(0, 0, 0, 0.4) 10px, rgba(0, 0, 0, 0.4) 20px);
+        border: 2px dashed rgba(255, 193, 7, 0.6);
+
+        &:hover {
+          background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.3), rgba(255, 193, 7, 0.3) 10px, rgba(0, 0, 0, 0.5) 10px, rgba(0, 0, 0, 0.5) 20px);
+          border-color: rgba(255, 193, 7, 0.8);
+        }
+
+        .player-name {
+          color: #ffc107;
+          font-weight: 700;
+          text-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+        }
+
+        .player-role {
+          color: rgba(255, 193, 7, 0.7);
         }
       }
     }
@@ -2054,3 +2235,4 @@ body {
     left: auto;
   }
 }
+
