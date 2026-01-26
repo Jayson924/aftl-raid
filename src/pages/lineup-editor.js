@@ -81,7 +81,7 @@ export const LineupEditorPage = {
               <div class="class-family-filter">
                 ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
                   <button class="class-family-btn" data-family="${key}" title="${family.name}">
-                    <img src="src/icons/${family.icon}" alt="${family.name}">
+                    <img src="/src/icons/${family.icon}" alt="${family.name}">
                   </button>
                 `).join('')}
               </div>
