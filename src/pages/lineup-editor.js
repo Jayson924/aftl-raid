@@ -239,7 +239,7 @@ export const LineupEditorPage = {
             `;
           }
 
-          const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
+          const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
 
           return `
             <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
@@ -553,61 +553,177 @@ export const LineupEditorPage = {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
 
-    // Sort players alphabetically
-    const sortedPlayers = [...this.players].sort((a, b) => a.name.localeCompare(b.name));
-
     modalElement.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-content player-selector-modal">
         <h2>Select Player for Slot ${slotIndex + 1}</h2>
-        <div class="player-selector-list">
-          ${sortedPlayers.map(player => {
-            const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-            const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
 
-            const equipmentDisplay = [];
-            if (player.weapon) {
-              const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
-              equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
-            }
-            if (player.armor) {
-              const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
-              equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
-            }
-
-            const suffixDisplay = [];
-            if (player.suffix1) {
-              const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-              suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-            }
-            if (player.suffix2) {
-              const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-              suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-            }
-
-            return `
-            <div class="player-option" data-player-name="${player.name}">
-              <div class="player-info">
-                <div class="player-name">${player.name}</div>
-                <div class="player-role">${player.role}</div>
-                ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
-                ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
-              </div>
-            </div>
-          `;
-          }).join('')}
+        <div class="modal-filters">
+          <input type="text" id="modal-player-search" placeholder="Search characters...">
+          <select id="modal-class-filter">
+            <option value="">All Classes</option>
+            ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
+          </select>
         </div>
-        <button class="btn btn-secondary" id="remove-player-btn">Remove Player</button>
-        <button class="btn btn-secondary" id="cancel-selector-btn">Cancel</button>
+
+        <div class="modal-class-family-filter">
+          ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
+            <button class="class-family-btn" data-family="${key}" title="${family.name}">
+              <img src="/icons/${family.icon}" alt="${family.name}">
+            </button>
+          `).join('')}
+        </div>
+
+        <label class="modal-hide-cleared-filter">
+          <input type="checkbox" id="modal-hide-cleared-checkbox">
+          <span>Hide Cleared</span>
+        </label>
+
+        <div class="player-selector-list" id="modal-player-list">
+          <!-- Players will be rendered here -->
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="remove-player-btn">Remove Player</button>
+          <button class="btn btn-secondary" id="cancel-selector-btn">Cancel</button>
+        </div>
       </div>
     `;
 
     document.body.appendChild(modalElement);
 
-    modalElement.querySelectorAll('.player-option').forEach(option => {
-      option.addEventListener('click', () => {
-        const playerName = option.dataset.playerName;
-        this.assignPlayerToSlot(slotIndex, playerName);
-        document.body.removeChild(modalElement);
+    // State for modal filters
+    let modalSelectedFamily = null;
+
+    // Function to render filtered players
+    const renderModalPlayers = () => {
+      const searchTerm = document.getElementById('modal-player-search').value.toLowerCase();
+      const classFilter = document.getElementById('modal-class-filter').value;
+      const hideCleared = document.getElementById('modal-hide-cleared-checkbox').checked;
+
+      const filteredPlayers = this.players
+        .filter(player => {
+          const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
+                              player.role.toLowerCase().includes(searchTerm);
+          const matchesClass = !classFilter || player.role === classFilter;
+
+          // Class family filter
+          let matchesClassFamily = true;
+          if (modalSelectedFamily) {
+            const familyClasses = CLASS_FAMILIES[modalSelectedFamily].classes;
+            matchesClassFamily = familyClasses.includes(player.role);
+          }
+
+          // Hide cleared filter
+          let matchesCompletion = true;
+          if (hideCleared) {
+            matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+          }
+
+          return matchesSearch && matchesClass && matchesClassFamily && matchesCompletion;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const playerList = document.getElementById('modal-player-list');
+
+      // Add Guest card at the top
+      const addGuestCard = `
+        <div class="player-option add-guest-option" id="modal-add-guest">
+          <div class="player-info">
+            <div class="player-name">➕ Add Guest</div>
+            <div class="player-role">Guest character</div>
+          </div>
+        </div>
+      `;
+
+      playerList.innerHTML = addGuestCard + filteredPlayers.map(player => {
+        const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
+        const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
+        const needsThisRaid = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+
+        const equipmentDisplay = [];
+        if (player.weapon) {
+          const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
+          equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
+        }
+        if (player.armor) {
+          const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
+          equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
+        }
+
+        const suffixDisplay = [];
+        if (player.suffix1) {
+          const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+          suffixDisplay.push(suffix1Obj?.label || player.suffix1);
+        }
+        if (player.suffix2) {
+          const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+          suffixDisplay.push(suffix2Obj?.label || player.suffix2);
+        }
+
+        return `
+          <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
+            ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
+            <div class="player-info">
+              <div class="player-name">${player.name}</div>
+              <div class="player-role">${player.role}</div>
+              ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
+              ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Re-attach click handlers
+      playerList.querySelectorAll('.player-option').forEach(option => {
+        option.addEventListener('click', () => {
+          const playerName = option.dataset.playerName;
+          this.assignPlayerToSlot(slotIndex, playerName);
+          document.body.removeChild(modalElement);
+        });
+      });
+
+      // Add handler for Add Guest option
+      const addGuestOption = document.getElementById('modal-add-guest');
+      if (addGuestOption) {
+        addGuestOption.addEventListener('click', () => {
+          document.body.removeChild(modalElement);
+          this.showPubCharacterModal(slotIndex);
+        });
+      }
+    };
+
+    // Initial render
+    renderModalPlayers();
+
+    // Attach filter event listeners
+    document.getElementById('modal-player-search').addEventListener('input', renderModalPlayers);
+
+    document.getElementById('modal-class-filter').addEventListener('change', (e) => {
+      if (e.target.value) {
+        modalSelectedFamily = null;
+        modalElement.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active'));
+      }
+      renderModalPlayers();
+    });
+
+    document.getElementById('modal-hide-cleared-checkbox').addEventListener('change', renderModalPlayers);
+
+    // Class family filter buttons
+    modalElement.querySelectorAll('.class-family-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const family = btn.dataset.family;
+
+        if (modalSelectedFamily === family) {
+          modalSelectedFamily = null;
+          btn.classList.remove('active');
+        } else {
+          modalElement.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
+          modalSelectedFamily = family;
+          btn.classList.add('active');
+          document.getElementById('modal-class-filter').value = '';
+        }
+
+        renderModalPlayers();
       });
     });
 
@@ -728,7 +844,7 @@ export const LineupEditorPage = {
     }
 
     // Apply warning stripe background style to the whole slot card
-    slotElement.style.cssText = 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px) !important; border: 2px dashed rgba(255, 193, 7, 0.5) !important; border-radius: 8px;';
+    slotElement.style.cssText = 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.6) 10px, rgba(0, 0, 0, 0.6) 20px) !important; border: 2px dashed rgba(255, 193, 7, 0.5) !important; border-radius: 8px;';
 
     // Remove slot-content border/background so it doesn't create inner rectangle
     slotContent.style.cssText = 'border: none; background: transparent;';
