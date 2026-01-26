@@ -738,9 +738,9 @@ body {
 }
 
 .pub-player {
-  border: 2px dashed rgba(255, 193, 7, 0.6) !important;
-  box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
-  opacity: 0.85;
+  // Border is now applied to the slot element, not the player div
+  box-shadow: none;
+  opacity: 1;
 }
 
 // Lineup Editor Page

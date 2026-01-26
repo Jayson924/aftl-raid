@@ -727,9 +727,11 @@ export const LineupEditorPage = {
       slotElement.appendChild(removeBtn);
     }
 
-    // Apply warning stripe background style
-    slotContent.style.background = 'repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px)';
-    slotContent.style.border = '2px dashed rgba(255, 193, 7, 0.5)';
+    // Apply warning stripe background style to the whole slot card
+    slotElement.style.cssText = 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px) !important; border: 2px dashed rgba(255, 193, 7, 0.5) !important; border-radius: 8px;';
+
+    // Remove slot-content border/background so it doesn't create inner rectangle
+    slotContent.style.cssText = 'border: none; background: transparent;';
 
     this.renderAvailablePlayers();
   },
@@ -822,7 +824,9 @@ export const LineupEditorPage = {
       removeBtn.remove();
     }
 
+    // Clear both slot and slot-content styles (for guest character cleanup)
     slotElement.style.cssText = '';
+    slotContent.style.cssText = '';
 
     this.renderAvailablePlayers();
   },
@@ -853,13 +857,16 @@ export const LineupEditorPage = {
     document.getElementById('cleared-toggle').checked = false;
 
     document.querySelectorAll('.slot').forEach(slotElement => {
-      slotElement.querySelector('.slot-content').innerHTML = '<div class="empty-slot">Drop or click</div>';
+      const slotContent = slotElement.querySelector('.slot-content');
+      slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';
       // Remove any remove buttons
       const removeBtn = slotElement.querySelector('.slot-remove-btn');
       if (removeBtn) {
         removeBtn.remove();
       }
+      // Clear both slot and slot-content styles (for guest character cleanup)
       slotElement.style.cssText = '';
+      slotContent.style.cssText = '';
     });
 
     this.renderAvailablePlayers();
@@ -964,13 +971,16 @@ export const LineupEditorPage = {
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
 
     document.querySelectorAll('.slot').forEach(slotElement => {
-      slotElement.querySelector('.slot-content').innerHTML = '<div class="empty-slot">Drop or click</div>';
+      const slotContent = slotElement.querySelector('.slot-content');
+      slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';
       // Remove any remove buttons
       const removeBtn = slotElement.querySelector('.slot-remove-btn');
       if (removeBtn) {
         removeBtn.remove();
       }
+      // Clear both slot and slot-content styles (for guest character cleanup)
       slotElement.style.cssText = '';
+      slotContent.style.cssText = '';
     });
 
     // Assign players
