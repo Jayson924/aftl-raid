@@ -3,6 +3,7 @@ import { router } from './router.js'
 import { LineupsPage } from './pages/lineups.js'
 import { PlayersPage } from './pages/players.js'
 import { LineupEditorPage } from './pages/lineup-editor.js'
+import { EnhancementPage } from './pages/enhancement.js'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
 import { authService } from './auth.js'
@@ -17,6 +18,7 @@ function initApp() {
   router.register('lineups', LineupsPage);
   router.register('players', PlayersPage, 'player'); // Requires player or admin role
   router.register('editor', LineupEditorPage, 'admin'); // Requires admin role only
+  router.register('enhancement', EnhancementPage); // No auth required
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -52,6 +54,7 @@ function renderNavigation() {
         ${isAdmin ? `
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
+        <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
       </ul>
       <div class="nav-actions">
         ${isAuthenticated ? `

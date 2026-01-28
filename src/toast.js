@@ -15,6 +15,12 @@ class ToastManager {
   }
 
   show(message, type = 'info', duration = 3000) {
+    // Clear all existing toasts
+    const existingToasts = this.container.querySelectorAll('.toast');
+    existingToasts.forEach(existingToast => {
+      this.hide(existingToast);
+    });
+
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
 

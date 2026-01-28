@@ -743,6 +743,489 @@ body {
   opacity: 1;
 }
 
+// Enhancement Page
+.enhancement-page {
+  .enhancement-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .enhancement-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .blacksmith-section {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: $border-radius;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: $border-radius;
+      z-index: 0;
+    }
+
+    .background-selector {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1rem;
+
+      .background-dropdown {
+        padding: 0.5rem 1rem;
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: $text-light;
+        font-family: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: $transition;
+
+        &:hover {
+          border-color: $primary-color;
+          background-color: rgba(0, 0, 0, 0.85);
+        }
+
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+
+        option {
+          background-color: #1a1a1a;
+          color: $text-light;
+        }
+      }
+    }
+
+    .blacksmith-image {
+      max-width: 300px;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 0 20px rgba(244, 196, 48, 0.3));
+      position: relative;
+      z-index: 1;
+    }
+
+    .enhancement-display {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+
+      .current-level {
+        text-align: center;
+
+        .level-label {
+          display: block;
+          font-size: 1.2rem;
+          color: $text-muted;
+          margin-bottom: 0.5rem;
+        }
+
+        .level-value {
+          display: block;
+          font-size: 4rem;
+          font-weight: 900;
+          color: $primary-color;
+          text-shadow: 0 0 20px rgba(244, 196, 48, 0.6);
+          line-height: 1;
+        }
+      }
+
+      .enhancement-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+
+        .protection-toggle {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          cursor: pointer;
+          padding: 0.75rem;
+          background-color: rgba(255, 255, 255, 0.05);
+          border-radius: $border-radius;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: $transition;
+          justify-content: center;
+
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+          }
+
+          input[type="checkbox"] {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            accent-color: $primary-color;
+          }
+
+          span {
+            font-size: 1rem;
+            font-weight: 500;
+          }
+        }
+
+        #enhance-btn {
+          font-size: 1.2rem;
+          padding: 1rem 2rem;
+        }
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        width: 100%;
+
+        .stat-item {
+          background-color: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: $border-radius;
+          padding: 1rem;
+          text-align: center;
+
+          .stat-label {
+            display: block;
+            font-size: 0.9rem;
+            color: $text-muted;
+            margin-bottom: 0.5rem;
+          }
+
+          .stat-value {
+            display: block;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: $text-light;
+
+            &.success {
+              color: $success-color;
+            }
+
+            &.failure {
+              color: $danger-color;
+            }
+          }
+        }
+      }
+
+      .materials-tracker {
+        width: 100%;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: $border-radius;
+        padding: 1.5rem;
+        margin-top: 1rem;
+
+        h3 {
+          margin: 0 0 1rem 0;
+          text-align: center;
+          font-size: 1.1rem;
+          color: $text-light;
+        }
+
+        .materials-list {
+          display: flex;
+          gap: 0.75rem;
+
+          .material-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: $border-radius;
+            padding: 0.75rem;
+
+            .material-name {
+              font-size: 0.85rem;
+              color: $text-muted;
+              text-align: center;
+            }
+
+            .material-count {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: $text-light;
+            }
+          }
+        }
+      }
+
+      .highest-level-section {
+        width: 100%;
+        background-color: rgba(244, 196, 48, 0.1);
+        border: 2px solid $primary-color;
+        border-radius: $border-radius;
+        padding: 1.5rem;
+        margin-top: 1rem;
+
+        h3 {
+          margin: 0 0 1rem 0;
+          text-align: center;
+          font-size: 1.2rem;
+          color: $text-light;
+
+          .highest-value {
+            color: $primary-color;
+            font-size: 1.4rem;
+            text-shadow: 0 0 10px rgba(244, 196, 48, 0.5);
+          }
+        }
+
+        .milestones-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 0.75rem;
+
+          .milestone-item {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: $border-radius;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            transition: $transition;
+            position: relative;
+
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+              border-color: $primary-color;
+            }
+
+            &.has-tooltip {
+              cursor: pointer;
+            }
+
+            .milestone-tooltip {
+              position: absolute;
+              bottom: calc(100% + 10px);
+              left: 50%;
+              transform: translateX(-50%);
+              background-color: rgba(0, 0, 0, 0.95);
+              border: 1px solid $primary-color;
+              border-radius: $border-radius;
+              padding: 0.75rem;
+              min-width: 180px;
+              z-index: 1000;
+              opacity: 0;
+              pointer-events: none;
+              transition: opacity 0.2s ease;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+              .tooltip-title {
+                font-weight: 700;
+                color: $primary-color;
+                margin-bottom: 0.5rem;
+                font-size: 0.9rem;
+                text-align: center;
+              }
+
+              .tooltip-item {
+                font-size: 0.85rem;
+                color: $text-light;
+                margin-bottom: 0.25rem;
+
+                &:last-child {
+                  margin-bottom: 0;
+                }
+              }
+
+              &::after {
+                content: '';
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 6px solid transparent;
+                border-top-color: $primary-color;
+              }
+            }
+
+            // Show tooltip on hover (desktop)
+            &:hover .milestone-tooltip {
+              opacity: 1;
+            }
+
+            // Show tooltip when tapped (mobile)
+            &.tooltip-visible .milestone-tooltip {
+              opacity: 1;
+              pointer-events: auto;
+            }
+
+            // Visual feedback when tooltip is visible on mobile
+            &.tooltip-visible {
+              background-color: rgba(255, 255, 255, 0.15);
+              border-color: $primary-color;
+            }
+
+            .milestone-level {
+              font-size: 1rem;
+              font-weight: 700;
+              color: $primary-color;
+              white-space: nowrap;
+            }
+
+            .milestone-attempts {
+              font-size: 0.85rem;
+              color: $text-light;
+            }
+
+            .milestone-total {
+              font-size: 0.75rem;
+              color: $text-muted;
+              font-style: italic;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .rates-section {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: $border-radius;
+    padding: 1.5rem;
+
+    h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: $primary-color;
+      text-shadow: 0 0 8px rgba(244, 196, 48, 0.3);
+    }
+
+    .rates-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+
+      .rates-tab {
+        padding: 0.75rem 1.5rem;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: $text-light;
+        cursor: pointer;
+        transition: $transition;
+        font-size: 0.95rem;
+        font-weight: 500;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        &.active {
+          color: $primary-color;
+          border-bottom-color: $primary-color;
+          background-color: rgba(244, 196, 48, 0.1);
+        }
+      }
+    }
+
+    .rates-table-container {
+      overflow-x: auto;
+
+      .rates-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+
+        thead {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        th, td {
+          padding: 0.75rem 0.5rem;
+          text-align: center;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+          font-weight: 600;
+          font-size: 0.85rem;
+        }
+
+        tbody tr {
+          transition: $transition;
+
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+          }
+
+          &.current-row {
+            background-color: rgba(244, 196, 48, 0.15);
+            border: 2px solid $primary-color;
+
+            td {
+              font-weight: 600;
+            }
+          }
+
+          &:last-child {
+            border-bottom: none;
+          }
+        }
+
+        .success-rate {
+          color: $success-color;
+          font-weight: 600;
+        }
+
+        .failure-rate {
+          color: $text-muted;
+        }
+
+        .destruction-rate {
+          color: $danger-color;
+          font-weight: 600;
+        }
+
+        .downgrade-rate {
+          color: $warning-color;
+          font-weight: 600;
+        }
+
+        .disappear-rate {
+          color: #8f5ce0;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+}
+
 // Lineup Editor Page
 .lineup-editor-page {
   .editor-container {
@@ -2203,6 +2686,110 @@ body {
       .notes {
         max-width: 100%;
         white-space: normal;
+      }
+    }
+  }
+
+  // Enhancement Page
+  .enhancement-page {
+    .enhancement-main {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .blacksmith-section {
+      padding: 1.5rem;
+
+      .background-selector {
+        margin-bottom: 0.5rem;
+
+        .background-dropdown {
+          font-size: 0.85rem;
+          padding: 0.4rem 0.8rem;
+        }
+      }
+
+      .blacksmith-image {
+        max-width: 200px;
+      }
+
+      .enhancement-display {
+        .current-level {
+          .level-value {
+            font-size: 3rem;
+          }
+        }
+
+        .enhancement-controls {
+          #enhance-btn {
+            font-size: 1rem;
+            padding: 0.8rem 1.5rem;
+          }
+        }
+
+        .stats {
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.5rem;
+
+          .stat-item {
+            padding: 0.75rem 0.5rem;
+
+            .stat-label {
+              font-size: 0.8rem;
+            }
+
+            .stat-value {
+              font-size: 1.3rem;
+            }
+          }
+        }
+
+        .highest-level-section {
+          padding: 1rem;
+
+          h3 {
+            font-size: 1rem;
+
+            .highest-value {
+              font-size: 1.2rem;
+            }
+          }
+
+          .milestones-list {
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 0.5rem;
+
+            .milestone-item {
+              padding: 0.5rem;
+
+              .milestone-level {
+                font-size: 0.85rem;
+              }
+
+              .milestone-attempts {
+                font-size: 0.7rem;
+              }
+
+              .milestone-total {
+                font-size: 0.65rem;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .rates-section {
+      padding: 1rem;
+
+      .rates-table-container {
+        .rates-table {
+          font-size: 0.8rem;
+
+          th, td {
+            padding: 0.5rem 0.25rem;
+          }
+        }
       }
     }
   }
