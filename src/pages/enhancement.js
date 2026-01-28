@@ -1,11 +1,21 @@
 import { toast } from '../toast.js';
 
-// Materials cost for high-level enhancements
+// Materials cost for enhancements (gold values include silver and copper converted to decimal)
 const MATERIALS_COST = {
-  9: { essenceOfLife: 4, diamond: 2, protectionJelly: 18 },
-  10: { essenceOfLife: 4, diamond: 2, protectionJelly: 18 },
-  11: { essenceOfLife: 4, diamond: 2, protectionJelly: 18 },
-  12: { essenceOfLife: 5, diamond: 3, protectionJelly: 18 }
+  0: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 3.464 },
+  1: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 4.33 },
+  2: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 5.196 },
+  3: { essenceOfLife: 2, diamond: 0, protectionJelly: 0, gold: 6.62 },
+  4: { essenceOfLife: 2, diamond: 0, protectionJelly: 0, gold: 6.928 },
+  5: { essenceOfLife: 2, diamond: 0, protectionJelly: 0, gold: 7.794 },
+  6: { essenceOfLife: 3, diamond: 1, protectionJelly: 12, gold: 8.66 },
+  7: { essenceOfLife: 3, diamond: 1, protectionJelly: 12, gold: 9.526 },
+  8: { essenceOfLife: 3, diamond: 1, protectionJelly: 12, gold: 10.392 },
+  9: { essenceOfLife: 4, diamond: 2, protectionJelly: 18, gold: 17.32 },
+  10: { essenceOfLife: 4, diamond: 2, protectionJelly: 18, gold: 27.712 },
+  11: { essenceOfLife: 4, diamond: 2, protectionJelly: 18, gold: 41.568 },
+  12: { essenceOfLife: 5, diamond: 3, protectionJelly: 18, gold: 69.28 },
+  13: { essenceOfLife: 5, diamond: 3, protectionJelly: 18, gold: 103.92 }
 };
 
 // Enhancement rates data from the game
@@ -59,6 +69,7 @@ const BACKGROUNDS = [
 export const EnhancementPage = {
   currentLevel: 0,
   useProtection: false,
+  useGoldenGoose: false,
   attempts: 0,
   successes: 0,
   failures: 0,
@@ -66,13 +77,31 @@ export const EnhancementPage = {
   milestoneAttempts: {}, // Track attempts at each level when first successfully enhanced
   totalLevelAttempts: {}, // Track total attempts made at each level throughout session
   isProcessing: false, // Prevent double-clicks
-  materialsUsed: { // Track materials consumed for +10 to +13 range
+  materialsUsed: { // Track materials consumed
     essenceOfLife: 0,
     diamond: 0,
-    protectionJelly: 0
+    protectionJelly: 0,
+    gold: 0
   },
-  materialsPerLevel: {}, // Track materials used per level { 9: { essenceOfLife: 0, diamond: 0, protectionJelly: 0 }, ... }
+  materialsPerLevel: {}, // Track materials used per level { 0: { essenceOfLife: 0, diamond: 0, protectionJelly: 0, gold: 0 }, ... }
   selectedBackground: 0, // Index of selected background
+
+  formatGold(totalGold) {
+    const gold = Math.floor(totalGold);
+    const silver = Math.floor((totalGold - gold) * 100);
+    const copper = Math.round(((totalGold - gold) * 100 - silver) * 100);
+
+    if (gold === 0 && silver === 0 && copper === 0) {
+      return '0g';
+    }
+
+    let result = [];
+    if (gold > 0) result.push(`${gold}g`);
+    if (silver > 0) result.push(`${silver}s`);
+    if (copper > 0) result.push(`${copper}c`);
+
+    return result.join(' ');
+  },
 
   render(container) {
     container.innerHTML = `
@@ -100,10 +129,16 @@ export const EnhancementPage = {
                   <span class="level-value">+${this.currentLevel}</span>
                 </div>
                 <div class="enhancement-controls">
-                  <label class="protection-toggle">
-                    <input type="checkbox" id="protection-toggle" ${this.useProtection ? 'checked' : ''}>
-                    <span>Enhancement Jelly</span>
-                  </label>
+                  <div class="enhancement-toggles">
+                    <label class="protection-toggle">
+                      <input type="checkbox" id="protection-toggle" ${this.useProtection ? 'checked' : ''}>
+                      <span>Enhancement Jelly</span>
+                    </label>
+                    <label class="protection-toggle">
+                      <input type="checkbox" id="golden-goose-toggle" ${this.useGoldenGoose ? 'checked' : ''}>
+                      <span>Golden Goose Ticket</span>
+                    </label>
+                  </div>
                   <button id="enhance-btn" class="btn btn-primary">Enhance!</button>
                   <button id="reset-btn" class="btn btn-secondary">Reset</button>
                 </div>
@@ -127,21 +162,27 @@ export const EnhancementPage = {
                     ${this.renderMilestones()}
                   </div>
                 ` : ''}
-                ${this.highestLevel >= 9 ? `
+                ${this.attempts > 0 ? `
                   <div class="materials-tracker">
-                    <h3>Materials Used (+10 to +13)</h3>
+                    <h3>Total Materials Used</h3>
                     <div class="materials-list">
                       <div class="material-item">
-                        <span class="material-name">Essence of Life:</span>
                         <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
+                        <span class="material-name">Essence of Life</span>
                       </div>
                       <div class="material-item">
-                        <span class="material-name">Polished Diamond:</span>
                         <span class="material-count">${this.materialsUsed.diamond}</span>
+                        <span class="material-name">Polished Diamond</span>
                       </div>
                       <div class="material-item">
-                        <span class="material-name">Protection Jelly:</span>
                         <span class="material-count">${this.materialsUsed.protectionJelly}</span>
+                        <span class="material-name">Protection Jelly</span>
+                      </div>
+                    </div>
+                    <div class="gold-section">
+                      <div class="material-item gold-item">
+                        <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
+                        <span class="material-name">Gold</span>
                       </div>
                     </div>
                   </div>
@@ -188,7 +229,7 @@ export const EnhancementPage = {
           const firstTimeAttempts = this.milestoneAttempts[level];
           const totalAttempts = this.totalLevelAttempts[prevLevel] || 0;
           const materials = this.materialsPerLevel[prevLevel];
-          const hasTooltip = materials && (materials.essenceOfLife > 0 || materials.diamond > 0 || materials.protectionJelly > 0);
+          const hasTooltip = materials && (materials.essenceOfLife > 0 || materials.diamond > 0 || materials.protectionJelly > 0 || materials.gold > 0);
 
           return `
             <div class="milestone-item ${hasTooltip ? 'has-tooltip' : ''}">
@@ -197,10 +238,11 @@ export const EnhancementPage = {
               <span class="milestone-total">(${totalAttempts} total)</span>
               ${hasTooltip ? `
                 <div class="milestone-tooltip">
-                  <div class="tooltip-title">Materials Used</div>
+                  <div class="tooltip-title">Total Materials Used</div>
                   <div class="tooltip-item">Essence of Life: ${materials.essenceOfLife}</div>
-                  <div class="tooltip-item">Diamond: ${materials.diamond}</div>
-                  <div class="tooltip-item">Protection Jelly: ${materials.protectionJelly}</div>
+                  ${materials.diamond > 0 ? `<div class="tooltip-item">Polished Diamond: ${materials.diamond}</div>` : ''}
+                  ${materials.protectionJelly > 0 ? `<div class="tooltip-item">Protection Jelly: ${materials.protectionJelly}</div>` : ''}
+                  <div class="tooltip-item">Gold: ${this.formatGold(materials.gold)}</div>
                 </div>
               ` : ''}
             </div>
@@ -253,6 +295,10 @@ export const EnhancementPage = {
     document.getElementById('protection-toggle').addEventListener('change', (e) => {
       this.useProtection = e.target.checked;
       this.updateRatesTable();
+    });
+
+    document.getElementById('golden-goose-toggle').addEventListener('change', (e) => {
+      this.useGoldenGoose = e.target.checked;
     });
 
     document.getElementById('background-select').addEventListener('change', (e) => {
@@ -324,25 +370,30 @@ export const EnhancementPage = {
     }
     this.totalLevelAttempts[levelBeforeAttempt]++;
 
-    // Track materials used for +10 to +13 range (levels 9-12)
+    // Track materials used for all levels
     if (MATERIALS_COST[levelBeforeAttempt]) {
       const cost = MATERIALS_COST[levelBeforeAttempt];
+      const goldCost = this.useGoldenGoose ? cost.gold * 0.5 : cost.gold;
+
       // Track total materials
       this.materialsUsed.essenceOfLife += cost.essenceOfLife;
       this.materialsUsed.diamond += cost.diamond;
       this.materialsUsed.protectionJelly += cost.protectionJelly;
+      this.materialsUsed.gold += goldCost;
 
       // Track materials per level
       if (!this.materialsPerLevel[levelBeforeAttempt]) {
         this.materialsPerLevel[levelBeforeAttempt] = {
           essenceOfLife: 0,
           diamond: 0,
-          protectionJelly: 0
+          protectionJelly: 0,
+          gold: 0
         };
       }
       this.materialsPerLevel[levelBeforeAttempt].essenceOfLife += cost.essenceOfLife;
       this.materialsPerLevel[levelBeforeAttempt].diamond += cost.diamond;
       this.materialsPerLevel[levelBeforeAttempt].protectionJelly += cost.protectionJelly;
+      this.materialsPerLevel[levelBeforeAttempt].gold += goldCost;
     }
 
     const roll = Math.random() * 100;
@@ -399,7 +450,8 @@ export const EnhancementPage = {
     this.materialsUsed = {
       essenceOfLife: 0,
       diamond: 0,
-      protectionJelly: 0
+      protectionJelly: 0,
+      gold: 0
     };
     this.materialsPerLevel = {};
     this.isProcessing = false;

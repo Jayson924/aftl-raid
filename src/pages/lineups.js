@@ -39,7 +39,7 @@ export const LineupsPage = {
     `;
 
     this.setupTabHandlers();
-    this.setupTouchHandlers();
+    this.setupShowcaseSwipeHandlers();
     this.setupCarouselDragScroll();
     this.loadLineups();
   },
@@ -54,33 +54,49 @@ export const LineupsPage = {
     });
   },
 
-  setupTouchHandlers() {
-    const wrapper = document.querySelector('.tab-content-wrapper');
+  setupShowcaseSwipeHandlers() {
+    const showcaseArea = document.querySelector('.showcase-area');
+    if (!showcaseArea) return;
+
     let touchStartX = 0;
     let touchEndX = 0;
 
-    wrapper.addEventListener('touchstart', (e) => {
+    showcaseArea.addEventListener('touchstart', (e) => {
       touchStartX = e.changedTouches[0].screenX;
     }, { passive: true });
 
-    wrapper.addEventListener('touchend', (e) => {
+    showcaseArea.addEventListener('touchend', (e) => {
       touchEndX = e.changedTouches[0].screenX;
-      this.handleSwipe(touchStartX, touchEndX);
+      this.handleShowcaseSwipe(touchStartX, touchEndX);
     }, { passive: true });
   },
 
-  handleSwipe(startX, endX) {
+  handleShowcaseSwipe(startX, endX) {
     const swipeThreshold = 50;
     const diff = startX - endX;
 
     if (Math.abs(diff) > swipeThreshold) {
+      const currentRaidLineups = this.allLineups.filter(
+        lineup => lineup.raidType === this.currentRaidType && lineup.status === 'Ready'
+      );
+
+      if (currentRaidLineups.length === 0) return;
+
+      const currentIndex = currentRaidLineups.findIndex(
+        lineup => lineup.name === this.currentShowcaseLineup?.name
+      );
+
+      let newIndex;
       if (diff > 0) {
-        // Swiped left - switch to Classic
-        this.switchRaidType('Classic');
+        // Swiped left - next lineup
+        newIndex = (currentIndex + 1) % currentRaidLineups.length;
       } else {
-        // Swiped right - switch to Hardcore
-        this.switchRaidType('Hardcore');
+        // Swiped right - previous lineup
+        newIndex = (currentIndex - 1 + currentRaidLineups.length) % currentRaidLineups.length;
       }
+
+      const newLineup = currentRaidLineups[newIndex];
+      this.selectLineup(newLineup.name);
     }
   },
 

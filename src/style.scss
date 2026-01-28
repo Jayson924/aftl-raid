@@ -863,32 +863,38 @@ body {
         gap: 1rem;
         width: 100%;
 
-        .protection-toggle {
+        .enhancement-toggles {
           display: flex;
-          align-items: center;
           gap: 0.75rem;
-          cursor: pointer;
-          padding: 0.75rem;
-          background-color: rgba(255, 255, 255, 0.05);
-          border-radius: $border-radius;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          transition: $transition;
-          justify-content: center;
 
-          &:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-          }
-
-          input[type="checkbox"] {
+          .protection-toggle {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
             cursor: pointer;
-            width: 20px;
-            height: 20px;
-            accent-color: $primary-color;
-          }
+            padding: 0.75rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: $border-radius;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: $transition;
+            justify-content: center;
 
-          span {
-            font-size: 1rem;
-            font-weight: 500;
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            input[type="checkbox"] {
+              cursor: pointer;
+              width: 20px;
+              height: 20px;
+              accent-color: $primary-color;
+            }
+
+            span {
+              font-size: 0.95rem;
+              font-weight: 500;
+            }
           }
         }
 
@@ -951,11 +957,12 @@ body {
         }
 
         .materials-list {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
           gap: 0.75rem;
+          margin-bottom: 0.75rem;
 
           .material-item {
-            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -963,12 +970,43 @@ body {
             background-color: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: $border-radius;
-            padding: 0.75rem;
+            padding: 0.75rem 0.5rem;
 
             .material-name {
               font-size: 0.85rem;
               color: $text-muted;
               text-align: center;
+              line-height: 1.2;
+            }
+
+            .material-count {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: $text-light;
+            }
+          }
+        }
+
+        .gold-section {
+          display: flex;
+          justify-content: center;
+
+          .gold-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: $border-radius;
+            padding: 0.75rem 2rem;
+            min-width: 200px;
+
+            .material-name {
+              font-size: 0.85rem;
+              color: $text-muted;
+              text-align: center;
+              line-height: 1.2;
             }
 
             .material-count {
@@ -2721,6 +2759,17 @@ body {
         }
 
         .enhancement-controls {
+          .enhancement-toggles {
+            flex-direction: column;
+            gap: 0.5rem;
+
+            .protection-toggle {
+              span {
+                font-size: 0.9rem;
+              }
+            }
+          }
+
           #enhance-btn {
             font-size: 1rem;
             padding: 0.8rem 1.5rem;
@@ -2740,6 +2789,48 @@ body {
 
             .stat-value {
               font-size: 1.3rem;
+            }
+          }
+        }
+
+        .materials-tracker {
+          padding: 1rem;
+
+          h3 {
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+          }
+
+          .materials-list {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+
+            .material-item {
+              padding: 0.6rem 0.3rem;
+
+              .material-name {
+                font-size: 0.7rem;
+              }
+
+              .material-count {
+                font-size: 1.1rem;
+              }
+            }
+          }
+
+          .gold-section {
+            .gold-item {
+              padding: 0.6rem 1.5rem;
+              min-width: 150px;
+
+              .material-name {
+                font-size: 0.7rem;
+              }
+
+              .material-count {
+                font-size: 1.1rem;
+              }
             }
           }
         }
