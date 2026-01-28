@@ -1,5 +1,14 @@
 import { toast } from '../toast.js';
 
+// Import images
+import berlinImg from '../images/berlin.webp';
+import saintHavenImg from '../images/saint haven.webp';
+import calderockImg from '../images/calderock.webp';
+import manaRidgeImg from '../images/mana ridge.webp';
+import lotusMarshImg from '../images/lotus marsh.webp';
+import prairieTownImg from '../images/prairie town.webp';
+import colosseumImg from '../images/colosseum.png';
+
 // Materials cost for enhancements (gold values include silver and copper converted to decimal)
 const MATERIALS_COST = {
   0: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 3.464 },
@@ -58,12 +67,12 @@ const ENHANCEMENT_RATES = {
 
 // Available backgrounds
 const BACKGROUNDS = [
-  { name: 'Saint Haven', path: '/src/images/saint haven.webp' },
-  { name: 'Calderock', path: '/src/images/calderock.webp' },
-  { name: 'Mana Ridge', path: '/src/images/mana ridge.webp' },
-  { name: 'Lotus Marsh', path: '/src/images/lotus marsh.webp' },
-  { name: 'Prairie Town', path: '/src/images/prairie town.webp' },
-  { name: 'Colosseum', path: '/src/images/colosseum.png' }
+  { name: 'Saint Haven', path: saintHavenImg },
+  { name: 'Calderock', path: calderockImg },
+  { name: 'Mana Ridge', path: manaRidgeImg },
+  { name: 'Lotus Marsh', path: lotusMarshImg },
+  { name: 'Prairie Town', path: prairieTownImg },
+  { name: 'Colosseum', path: colosseumImg }
 ];
 
 export const EnhancementPage = {
@@ -122,7 +131,7 @@ export const EnhancementPage = {
                   `).join('')}
                 </select>
               </div>
-              <img src="/src/images/berlin.webp" alt="Blacksmith" class="blacksmith-image">
+              <img src="${berlinImg}" alt="Blacksmith" class="blacksmith-image" onerror="this.style.display='none'">
               <div class="enhancement-display">
                 <div class="current-level">
                   <span class="level-label">Current Level:</span>
