@@ -2901,7 +2901,7 @@ body {
 
         .enhancement-controls {
           .enhancement-toggles {
-            flex-direction: column;
+            flex-direction: row;
             gap: 0.5rem;
 
             .protection-toggle {
@@ -2912,12 +2912,10 @@ body {
           }
 
           .enhance-row {
-            flex-direction: column;
+            flex-direction: row;
             gap: 0.75rem;
 
             .loading-toggle {
-              align-self: center;
-
               .progressbar-icon {
                 width: 20px;
                 height: 20px;
