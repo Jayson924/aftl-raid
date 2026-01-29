@@ -207,7 +207,13 @@ export const EnhancementPage = {
               <div class="enhancement-display">
                 <div class="current-level">
                   <span class="level-label">Current Level:</span>
-                  <span class="level-value">+${this.currentLevel}</span>
+                  <select id="level-dropdown" class="level-dropdown">
+                    <option value="${this.currentLevel}" selected>+${this.currentLevel}</option>
+                    <option disabled>──────</option>
+                    ${[6, 7, 8, 9, 10, 11, 12, 13, 14].map(level => `
+                      <option value="${level}">+${level}</option>
+                    `).join('')}
+                  </select>
                 </div>
                 <div class="enhancement-controls">
                   <div class="enhancement-toggles">
@@ -406,7 +412,7 @@ export const EnhancementPage = {
             if (isGoal) classes.push('goal-row');
 
             return `
-              <tr class="${classes.join(' ')}" data-level="${rate.level}">
+              <tr class="${classes.join(' ')}" data-level="${rate.level}" ${isCurrent ? 'draggable="true"' : ''}>
                 <td>
                   ${isGoal ? `
                     <div class="goal-crosshair">
@@ -480,6 +486,15 @@ export const EnhancementPage = {
 
     document.getElementById('loading-bar-toggle').addEventListener('change', (e) => {
       this.useLoadingBar = e.target.checked;
+    });
+
+    document.getElementById('level-dropdown').addEventListener('change', (e) => {
+      const selectedLevel = parseInt(e.target.value);
+      if (!isNaN(selectedLevel)) {
+        this.setEnhancementLevelViaDrag(selectedLevel + 1); // +1 because setEnhancementLevelViaDrag expects table level (1-15)
+        // Reset dropdown to "Choose..." after selection
+        e.target.value = '';
+      }
     });
 
     document.getElementById('background-select').addEventListener('change', (e) => {
@@ -559,6 +574,103 @@ export const EnhancementPage = {
     if (this.showMaterialCostTab) {
       this.updateMaterialPrices();
     }
+
+    // Set up drag and drop for rates table
+    this.setupDragAndDropTableRows();
+  },
+
+  setupDragAndDropTableRows() {
+    const tableRows = document.querySelectorAll('.rates-table tbody tr');
+    let draggedLevel = null;
+
+    tableRows.forEach(row => {
+      const level = parseInt(row.dataset.level);
+      const isCurrent = row.classList.contains('current-row');
+
+      // Only allow dragging from current-row
+      if (isCurrent) {
+        row.addEventListener('dragstart', (e) => {
+          draggedLevel = level;
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('draggedLevel', level.toString());
+          row.classList.add('dragging-current');
+        });
+
+        row.addEventListener('dragend', (e) => {
+          row.classList.remove('dragging-current');
+
+          // Remove drag-over class from all rows
+          tableRows.forEach(r => r.classList.remove('drag-over', 'drag-source'));
+          draggedLevel = null;
+        });
+      }
+
+      // All rows are drop targets
+      row.addEventListener('dragover', (e) => {
+        if (draggedLevel !== null) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+
+          // Add visual feedback
+          if (row.classList.contains('current-row')) {
+            row.classList.add('drag-over', 'drag-source');
+          } else {
+            row.classList.add('drag-over');
+          }
+        }
+      });
+
+      row.addEventListener('dragleave', (e) => {
+        row.classList.remove('drag-over', 'drag-source');
+      });
+
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        row.classList.remove('drag-over', 'drag-source');
+
+        const draggedFromLevel = parseInt(e.dataTransfer.getData('draggedLevel'));
+        const targetLevel = level;
+
+        // Only update if dragging to a different level
+        if (draggedFromLevel !== targetLevel) {
+          this.setEnhancementLevelViaDrag(targetLevel);
+        }
+      });
+    });
+  },
+
+  setEnhancementLevelViaDrag(newLevel) {
+    // Update current level (newLevel is 1-15, but currentLevel is 0-14)
+    const targetLevelIndex = newLevel - 1;
+
+    if (this.currentLevel === targetLevelIndex) {
+      return; // No change needed
+    }
+
+    // Update current level
+    this.currentLevel = targetLevelIndex;
+
+    // Reset ALL statistics to zero
+    this.attempts = 0;
+    this.successes = 0;
+    this.failures = 0;
+    this.highestLevel = 0;
+    this.goalLevel = null;
+    this.milestoneAttempts = {};
+    this.totalLevelAttempts = {};
+    this.materialsPerLevel = {};
+    this.materialsUsed = {
+      essenceOfLife: 0,
+      diamond: 0,
+      protectionJelly: 0,
+      gold: 0
+    };
+
+    // Show success message
+    toast.info(`Enhancement level set to +${targetLevelIndex}`);
+
+    // Re-render the page to reflect all changes
+    this.render(document.querySelector('#app'));
   },
 
   updateMaterialPrices() {
@@ -817,6 +929,9 @@ export const EnhancementPage = {
             this.updateRatesTable();
           });
         });
+
+        // Set up drag and drop for rates table
+        this.setupDragAndDropTableRows();
       }
     }
   }

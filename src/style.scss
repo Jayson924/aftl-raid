@@ -848,13 +848,40 @@ body {
           margin-bottom: 0.5rem;
         }
 
-        .level-value {
+        .level-dropdown {
           display: block;
+          width: 100%;
+          max-width: 200px;
+          margin: 0 auto;
+          padding: 0.5rem 1rem;
           font-size: 4rem;
           font-weight: 900;
           color: $primary-color;
           text-shadow: 0 0 20px rgba(244, 196, 48, 0.6);
           line-height: 1;
+          background-color: rgba(0, 0, 0, 0.3);
+          border: 2px solid rgba(244, 196, 48, 0.3);
+          border-radius: $border-radius;
+          cursor: pointer;
+          transition: $transition;
+          text-align: center;
+
+          &:hover {
+            border-color: rgba(244, 196, 48, 0.6);
+            background-color: rgba(0, 0, 0, 0.5);
+          }
+
+          &:focus {
+            outline: none;
+            border-color: $primary-color;
+            box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+          }
+
+          option {
+            background-color: $background-dark;
+            color: $text-light;
+            font-size: 1.5rem;
+          }
         }
       }
 
@@ -1405,6 +1432,24 @@ body {
 
           &:last-child {
             border-bottom: none;
+          }
+
+          &.dragging-current {
+            opacity: 0.5;
+            cursor: grabbing;
+            transform: scale(0.98);
+            background-color: rgba(244, 196, 48, 0.25);
+          }
+
+          &.drag-over {
+            background-color: rgba(40, 167, 69, 0.2);
+            border: 2px dashed #28a745;
+            cursor: grab;
+          }
+
+          &.drag-over.drag-source {
+            background-color: rgba(244, 196, 48, 0.25);
+            border: 2px dashed $primary-color;
           }
         }
 
