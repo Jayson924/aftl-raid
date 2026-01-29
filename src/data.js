@@ -1,27 +1,25 @@
 // Google Sheets API integration
 class DataService {
   constructor() {
-    this.apiKey = 'AIzaSyD2Lldo3ZvtQ6eYqkr6tQrFP25yMh8wU8k';
+    this.apiKey = ''; // No longer needed - API key is now secure on the backend
     this.spreadsheetId = '1gw1cD7I2IU_0lP-jinrjl7_jle5Yf6-2HC2W-lHUxbI';
-    this.baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+    this.baseUrl = '/.netlify/functions/sheets-proxy'; // Use Netlify Function instead
     this.password = '';
     this.appsScriptUrl = 'https://script.google.com/macros/s/AKfycbx8E4Pw2WZIRgD3iJIcc-qmLzBTKS8nAO4IU_kTBeH73D9am09DumC9THBKpTrgR5RFJg/exec';
   }
 
-  configure(spreadsheetId, apiKey, password = '', appsScriptUrl = '') {
+  configure(spreadsheetId, password = '', appsScriptUrl = '') {
     this.spreadsheetId = spreadsheetId;
-    this.apiKey = apiKey;
     this.password = password;
     this.appsScriptUrl = appsScriptUrl;
-    localStorage.setItem('sheetConfig', JSON.stringify({ spreadsheetId, apiKey, password, appsScriptUrl }));
+    localStorage.setItem('sheetConfig', JSON.stringify({ spreadsheetId, password, appsScriptUrl }));
   }
 
   loadConfig() {
     const config = localStorage.getItem('sheetConfig');
     if (config) {
-      const { spreadsheetId, apiKey, password, appsScriptUrl } = JSON.parse(config);
+      const { spreadsheetId, password, appsScriptUrl } = JSON.parse(config);
       this.spreadsheetId = spreadsheetId;
-      this.apiKey = apiKey;
       this.password = password || '';
       this.appsScriptUrl = appsScriptUrl || '';
       return true;
@@ -30,7 +28,7 @@ class DataService {
   }
 
   isConfigured() {
-    return !!this.spreadsheetId && !!this.apiKey;
+    return !!this.spreadsheetId;
   }
 
   hasWriteAccess() {
@@ -44,7 +42,8 @@ class DataService {
   async getRange(range) {
     if (!this.isConfigured()) throw new Error('Sheet not configured');
 
-    const url = `${this.baseUrl}/${this.spreadsheetId}/values/${range}?key=${this.apiKey}`;
+    // Call Netlify Function instead of Google Sheets API directly
+    const url = `${this.baseUrl}?spreadsheetId=${encodeURIComponent(this.spreadsheetId)}&range=${encodeURIComponent(range)}`;
     const response = await fetch(url);
 
     if (!response.ok) {

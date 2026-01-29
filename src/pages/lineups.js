@@ -569,10 +569,7 @@ export const LineupsPage = {
           <div class="form-group">
             <label for="sheet-id">Sheet ID:</label>
             <input type="text" id="sheet-id" required placeholder="1a2B3c4D5e6F7g8H9i0J">
-          </div>
-          <div class="form-group">
-            <label for="api-key">API Key:</label>
-            <input type="text" id="api-key" required placeholder="AIzaSy...">
+            <small style="color: #888;">API key is now securely stored on the server</small>
           </div>
           <div class="form-group">
             <label for="password">Password (optional):</label>
@@ -596,11 +593,10 @@ export const LineupsPage = {
     document.getElementById('setup-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const sheetId = document.getElementById('sheet-id').value;
-      const apiKey = document.getElementById('api-key').value;
       const password = document.getElementById('password').value;
       const appsScriptUrl = document.getElementById('apps-script-url').value;
 
-      dataService.configure(sheetId, apiKey, password, appsScriptUrl);
+      dataService.configure(sheetId, password, appsScriptUrl);
       document.body.removeChild(modalElement);
       toast.success('Google Sheets configured successfully!');
       this.loadLineups();
