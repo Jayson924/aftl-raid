@@ -1,4 +1,5 @@
 import { toast } from '../toast.js';
+import { modal } from '../modal.js';
 
 // Import images
 import berlinImg from '../images/berlin.webp';
@@ -8,6 +9,8 @@ import manaRidgeImg from '../images/mana ridge.webp';
 import lotusMarshImg from '../images/lotus marsh.webp';
 import prairieTownImg from '../images/prairie town.webp';
 import colosseumImg from '../images/colosseum.png';
+import crosshairIcon from '../icons/crosshair.svg';
+import progressbarIcon from '../icons/progressbar.svg';
 
 // Materials cost for enhancements (gold values include silver and copper converted to decimal)
 const MATERIALS_COST = {
@@ -79,6 +82,7 @@ export const EnhancementPage = {
   currentLevel: 0,
   useProtection: false,
   useGoldenGoose: false,
+  useLoadingBar: false,
   attempts: 0,
   successes: 0,
   failures: 0,
@@ -94,6 +98,7 @@ export const EnhancementPage = {
   },
   materialsPerLevel: {}, // Track materials used per level { 0: { essenceOfLife: 0, diamond: 0, protectionJelly: 0, gold: 0 }, ... }
   selectedBackground: 0, // Index of selected background
+  goalLevel: null, // Target enhancement level
 
   formatGold(totalGold) {
     const gold = Math.floor(totalGold);
@@ -110,6 +115,69 @@ export const EnhancementPage = {
     if (copper > 0) result.push(`${copper}c`);
 
     return result.join(' ');
+  },
+
+  showLoadingBar() {
+    return new Promise((resolve, reject) => {
+      const loadingModal = document.createElement('div');
+      loadingModal.className = 'modal loading-bar-modal';
+      loadingModal.innerHTML = `
+        <div class="modal-content loading-bar-content">
+          <h2>Enhancing...</h2>
+          <div class="loading-bar-container">
+            <div class="loading-bar-fill" id="loading-bar-fill"></div>
+          </div>
+          <button type="button" class="btn btn-secondary" id="cancel-loading-btn">Cancel</button>
+        </div>
+      `;
+
+      document.body.appendChild(loadingModal);
+
+      const loadingBarFill = document.getElementById('loading-bar-fill');
+      const cancelBtn = document.getElementById('cancel-loading-btn');
+
+      let cancelled = false;
+
+      // Start animation
+      loadingBarFill.style.transition = 'width 2.4s linear';
+      setTimeout(() => {
+        loadingBarFill.style.width = '100%';
+      }, 10);
+
+      // Handle completion
+      const completionTimeout = setTimeout(() => {
+        if (!cancelled) {
+          document.body.removeChild(loadingModal);
+          resolve();
+        }
+      }, 2400);
+
+      // Handle cancellation
+      const handleCancel = () => {
+        cancelled = true;
+        clearTimeout(completionTimeout);
+        document.body.removeChild(loadingModal);
+        reject(new Error('Enhancement cancelled'));
+      };
+
+      cancelBtn.addEventListener('click', handleCancel);
+
+      // Close on backdrop click
+      loadingModal.addEventListener('click', (e) => {
+        if (e.target === loadingModal) {
+          handleCancel();
+        }
+      });
+
+      // Close on Escape key
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          document.removeEventListener('keydown', handleEscape);
+          handleCancel();
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+    });
   },
 
   render(container) {
@@ -148,7 +216,16 @@ export const EnhancementPage = {
                       <span>Golden Goose Ticket</span>
                     </label>
                   </div>
-                  <button id="enhance-btn" class="btn btn-primary">Enhance!</button>
+                  <div class="enhance-row">
+                    <button id="enhance-btn" class="btn btn-primary">Enhance!</button>
+                    <label class="loading-toggle">
+                      <input type="checkbox" id="loading-bar-toggle" ${this.useLoadingBar ? 'checked' : ''}>
+                      <svg class="progressbar-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M28,21H4a2.0021,2.0021,0,0,1-2-2V13a2.0021,2.0021,0,0,1,2-2H28a2.0021,2.0021,0,0,1,2,2v6A2.0021,2.0021,0,0,1,28,21ZM4,13v6H28V13Z"/>
+                        <rect x="6" y="15" width="14" height="2"/>
+                      </svg>
+                    </label>
+                  </div>
                   <button id="reset-btn" class="btn btn-secondary">Reset</button>
                 </div>
                 <div class="stats">
@@ -277,16 +354,31 @@ export const EnhancementPage = {
           </tr>
         </thead>
         <tbody>
-          ${rates.map(rate => `
-            <tr class="${this.currentLevel === rate.level - 1 ? 'current-row' : ''}">
-              <td>${rate.level}</td>
-              <td class="success-rate">${rate.success}%</td>
-              <td class="failure-rate">${rate.failure}%</td>
-              <td class="destruction-rate">${rate.destruction > 0 ? rate.destruction + '%' : '-'}</td>
-              <td class="downgrade-rate">${rate.downgrade > 0 ? rate.downgrade + '%' : '-'}</td>
-              <td class="disappear-rate">${rate.disappear > 0 ? rate.disappear + '%' : '-'}</td>
-            </tr>
-          `).join('')}
+          ${rates.map(rate => {
+            const isCurrent = this.currentLevel === rate.level - 1;
+            const isGoal = this.goalLevel === rate.level;
+            const classes = [];
+            if (isCurrent) classes.push('current-row');
+            if (isGoal) classes.push('goal-row');
+
+            return `
+              <tr class="${classes.join(' ')}" data-level="${rate.level}">
+                <td>
+                  ${isGoal ? `
+                    <div class="goal-crosshair">
+                      <img src="${crosshairIcon}" alt="Goal" class="crosshair-icon" />
+                      <span class="crosshair-level">${rate.level}</span>
+                    </div>
+                  ` : rate.level}
+                </td>
+                <td class="success-rate">${rate.success}%</td>
+                <td class="failure-rate">${rate.failure}%</td>
+                <td class="destruction-rate">${rate.destruction > 0 ? rate.destruction + '%' : '-'}</td>
+                <td class="downgrade-rate">${rate.downgrade > 0 ? rate.downgrade + '%' : '-'}</td>
+                <td class="disappear-rate">${rate.disappear > 0 ? rate.disappear + '%' : '-'}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     `;
@@ -310,6 +402,10 @@ export const EnhancementPage = {
       this.useGoldenGoose = e.target.checked;
     });
 
+    document.getElementById('loading-bar-toggle').addEventListener('change', (e) => {
+      this.useLoadingBar = e.target.checked;
+    });
+
     document.getElementById('background-select').addEventListener('change', (e) => {
       this.selectedBackground = parseInt(e.target.value);
       this.render(document.querySelector('#app'));
@@ -324,6 +420,21 @@ export const EnhancementPage = {
 
         document.querySelectorAll('.rates-tab').forEach(t => t.classList.remove('active'));
         e.target.classList.add('active');
+      });
+    });
+
+    // Add click handlers for rates table rows to set goal
+    document.querySelectorAll('.rates-table tbody tr').forEach(row => {
+      row.addEventListener('click', (e) => {
+        const level = parseInt(row.dataset.level);
+
+        // Toggle goal: if clicking the same level, remove goal
+        if (this.goalLevel === level) {
+          this.goalLevel = null;
+        } else {
+          this.goalLevel = level;
+        }
+        this.updateRatesTable();
       });
     });
 
@@ -352,7 +463,7 @@ export const EnhancementPage = {
     });
   },
 
-  attemptEnhancement() {
+  async attemptEnhancement() {
     // Prevent double-clicking
     if (this.isProcessing) {
       return;
@@ -363,6 +474,17 @@ export const EnhancementPage = {
       toast.warning('Maximum enhancement level reached!');
       this.isProcessing = false;
       return;
+    }
+
+    // Show loading bar if enabled
+    if (this.useLoadingBar) {
+      try {
+        await this.showLoadingBar();
+      } catch (error) {
+        // User cancelled
+        this.isProcessing = false;
+        return;
+      }
     }
 
     const rates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
@@ -418,6 +540,23 @@ export const EnhancementPage = {
         this.milestoneAttempts[this.currentLevel] = this.totalLevelAttempts[levelBeforeAttempt] || 0;
       }
 
+      // Check if goal was reached
+      if (this.goalLevel !== null && this.currentLevel === this.goalLevel) {
+        this.render(document.querySelector('#app'));
+        this.isProcessing = false;
+
+        modal.alert(
+          `Congratulations! You've reached +${this.goalLevel}!<br><br>` +
+          `<strong>Total taps:</strong> ${this.attempts}<br>` +
+          `<strong>Success rate:</strong> ${((this.successes / this.attempts) * 100).toFixed(1)}%`,
+          {
+            title: `Enhancement Reached: +${this.goalLevel}`,
+            okText: 'Continue'
+          }
+        );
+        return;
+      }
+
       toast.success(`Enhancement success! Now at +${this.currentLevel}`);
 
       if (this.currentLevel === 15) {
@@ -463,6 +602,7 @@ export const EnhancementPage = {
       gold: 0
     };
     this.materialsPerLevel = {};
+    this.goalLevel = null;
     this.isProcessing = false;
     this.render(document.querySelector('#app'));
     toast.info('Enhancement simulator reset');
@@ -472,6 +612,21 @@ export const EnhancementPage = {
     const tableContainer = document.querySelector('.rates-table-container');
     if (tableContainer) {
       tableContainer.innerHTML = this.renderRatesTable();
+
+      // Re-attach click handlers for rates table rows to set goal
+      document.querySelectorAll('.rates-table tbody tr').forEach(row => {
+        row.addEventListener('click', (e) => {
+          const level = parseInt(row.dataset.level);
+
+          // Toggle goal: if clicking the same level, remove goal
+          if (this.goalLevel === level) {
+            this.goalLevel = null;
+          } else {
+            this.goalLevel = level;
+          }
+          this.updateRatesTable();
+        });
+      });
     }
   }
 };
