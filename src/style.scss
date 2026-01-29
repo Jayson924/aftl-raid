@@ -1019,7 +1019,7 @@ body {
         .materials-header {
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
           margin-bottom: 1rem;
 
           h3 {
@@ -1028,18 +1028,32 @@ body {
             color: $text-light;
           }
 
-          .material-cost-toggle {
+          .toggle-section {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            font-size: 0.9rem;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
 
-            input[type="checkbox"] {
+            .material-cost-toggle {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
               cursor: pointer;
-              width: 18px;
-              height: 18px;
-              accent-color: $primary-color;
+              font-size: 0.9rem;
+
+              input[type="checkbox"] {
+                cursor: pointer;
+                width: 18px;
+                height: 18px;
+                accent-color: $primary-color;
+              }
+            }
+
+            .material-cost-hint {
+              margin: 0;
+              font-size: 0.75rem;
+              color: $text-muted;
+              font-style: italic;
             }
           }
         }
@@ -1066,6 +1080,29 @@ body {
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: $border-radius;
             padding: 0.75rem 0.5rem;
+            transition: all 0.2s ease;
+
+            &.clickable {
+              cursor: pointer;
+              user-select: none;
+
+              &:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.4);
+                transform: translateY(-2px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+              }
+
+              &:active {
+                transform: translateY(0);
+              }
+
+              &.show-cost {
+                background-color: rgba(244, 196, 48, 0.1);
+                border-color: $primary-color;
+                box-shadow: 0 0 10px rgba(244, 196, 48, 0.3);
+              }
+            }
 
             .material-name {
               font-size: 0.85rem;
@@ -3106,25 +3143,21 @@ body {
           padding: 1rem;
 
           .materials-header {
-            flex-direction: row;
-            align-items: center;
-            gap: 0.5rem;
-
             h3 {
-              font-size: 0.95rem;
+              font-size: 0.9rem;
             }
 
-            .material-cost-toggle {
-              font-size: 0.8rem;
-              white-space: nowrap;
+            .toggle-section {
+              .material-cost-toggle {
+                font-size: 0.7rem;
 
-              span {
-                display: none;
+                span {
+                  font-size: 0.7rem;
+                }
               }
 
-              &::after {
-                content: 'Mat. Cost';
-                font-size: 0.75rem;
+              .material-cost-hint {
+                font-size: 0.6rem;
               }
             }
           }

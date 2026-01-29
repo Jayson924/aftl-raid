@@ -102,7 +102,11 @@ export const EnhancementPage = {
   essenceOfLifePrice: 0, // Gold price per Essence of Life
   polishedDiamondPrice: 0, // Gold price per Polished Diamond
   protectionJellyPrice: 0, // Gold price per Protection Jelly
-  showMaterialCost: false, // Whether to show material cost in total
+  showMaterialCosts: { // Individual toggles for each material cost
+    essenceOfLife: false,
+    diamond: false,
+    protectionJelly: false
+  },
   showMaterialCostTab: false, // Whether Material Cost tab is active
 
   formatGold(totalGold) {
@@ -263,30 +267,37 @@ export const EnhancementPage = {
                   <div class="materials-tracker">
                     <div class="materials-header">
                       <h3>Total Materials Used</h3>
-                      <label class="material-cost-toggle">
-                        <input type="checkbox" id="material-cost-toggle" ${this.showMaterialCost ? 'checked' : ''}>
-                        <span>Show Material Cost</span>
-                      </label>
+                      <div class="toggle-section">
+                        <label class="material-cost-toggle">
+                          <input type="checkbox" id="material-cost-toggle" ${
+                            this.showMaterialCosts.essenceOfLife &&
+                            this.showMaterialCosts.diamond &&
+                            this.showMaterialCosts.protectionJelly ? 'checked' : ''
+                          }>
+                          <span>Show Material Cost</span>
+                        </label>
+                        <p class="material-cost-hint">Or click each material</p>
+                      </div>
                     </div>
                     <div class="materials-list">
-                      <div class="material-item">
+                      <div class="material-item clickable ${this.showMaterialCosts.essenceOfLife ? 'show-cost' : ''}" data-material="essenceOfLife">
                         <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
                         <span class="material-name">Essence of Life</span>
-                        ${this.showMaterialCost && this.essenceOfLifePrice > 0 ? `
+                        ${this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
                         ` : ''}
                       </div>
-                      <div class="material-item">
+                      <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
                         <span class="material-count">${this.materialsUsed.diamond}</span>
                         <span class="material-name">Polished Diamond</span>
-                        ${this.showMaterialCost && this.polishedDiamondPrice > 0 ? `
+                        ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
                         ` : ''}
                       </div>
-                      <div class="material-item">
+                      <div class="material-item clickable ${this.showMaterialCosts.protectionJelly ? 'show-cost' : ''}" data-material="protectionJelly">
                         <span class="material-count">${this.materialsUsed.protectionJelly}</span>
                         <span class="material-name">Protection Jelly</span>
-                        ${this.showMaterialCost && this.protectionJellyPrice > 0 ? `
+                        ${this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.protectionJelly * this.protectionJellyPrice)}</span>
                         ` : ''}
                       </div>
@@ -296,13 +307,15 @@ export const EnhancementPage = {
                         <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
                         <span class="material-name">Gold</span>
                       </div>
-                      ${this.showMaterialCost && (this.essenceOfLifePrice > 0 || this.polishedDiamondPrice > 0 || this.protectionJellyPrice > 0) ? `
+                      ${(this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0) ||
+                        (this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0) ||
+                        (this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0) ? `
                         <div class="material-item gold-item total-cost">
                           <span class="material-count">${this.formatGold(
                             this.materialsUsed.gold +
-                            (this.materialsUsed.essenceOfLife * this.essenceOfLifePrice) +
-                            (this.materialsUsed.diamond * this.polishedDiamondPrice) +
-                            (this.materialsUsed.protectionJelly * this.protectionJellyPrice)
+                            (this.showMaterialCosts.essenceOfLife ? this.materialsUsed.essenceOfLife * this.essenceOfLifePrice : 0) +
+                            (this.showMaterialCosts.diamond ? this.materialsUsed.diamond * this.polishedDiamondPrice : 0) +
+                            (this.showMaterialCosts.protectionJelly ? this.materialsUsed.protectionJelly * this.protectionJellyPrice : 0)
                           )}</span>
                           <span class="material-name">Total Cost</span>
                         </div>
@@ -366,27 +379,29 @@ export const EnhancementPage = {
                 <div class="milestone-tooltip">
                   <div class="tooltip-title">Total Materials Used</div>
                   <div class="tooltip-item">Essence of Life: ${materials.essenceOfLife}${
-                    this.showMaterialCost && this.essenceOfLifePrice > 0
+                    this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0
                       ? ` (${this.formatGold(materials.essenceOfLife * this.essenceOfLifePrice)})`
                       : ''
                   }</div>
                   ${materials.diamond > 0 ? `<div class="tooltip-item">Polished Diamond: ${materials.diamond}${
-                    this.showMaterialCost && this.polishedDiamondPrice > 0
+                    this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0
                       ? ` (${this.formatGold(materials.diamond * this.polishedDiamondPrice)})`
                       : ''
                   }</div>` : ''}
                   ${materials.protectionJelly > 0 ? `<div class="tooltip-item">Protection Jelly: ${materials.protectionJelly}${
-                    this.showMaterialCost && this.protectionJellyPrice > 0
+                    this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0
                       ? ` (${this.formatGold(materials.protectionJelly * this.protectionJellyPrice)})`
                       : ''
                   }</div>` : ''}
                   <div class="tooltip-item">Gold: ${this.formatGold(materials.gold)}</div>
-                  ${this.showMaterialCost && (this.essenceOfLifePrice > 0 || this.polishedDiamondPrice > 0 || this.protectionJellyPrice > 0) ? `
+                  ${(this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0) ||
+                    (this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0) ||
+                    (this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0) ? `
                     <div class="tooltip-item tooltip-total">Total Cost: ${this.formatGold(
                       materials.gold +
-                      (materials.essenceOfLife * this.essenceOfLifePrice) +
-                      (materials.diamond * this.polishedDiamondPrice) +
-                      (materials.protectionJelly * this.protectionJellyPrice)
+                      (this.showMaterialCosts.essenceOfLife ? materials.essenceOfLife * this.essenceOfLifePrice : 0) +
+                      (this.showMaterialCosts.diamond ? materials.diamond * this.polishedDiamondPrice : 0) +
+                      (this.showMaterialCosts.protectionJelly ? materials.protectionJelly * this.protectionJellyPrice : 0)
                     )}</div>
                   ` : ''}
                 </div>
@@ -582,14 +597,28 @@ export const EnhancementPage = {
       }
     });
 
-    // Material cost toggle checkbox
+    // Material cost toggle checkbox - toggle all at once
     const materialCostToggle = document.getElementById('material-cost-toggle');
     if (materialCostToggle) {
       materialCostToggle.addEventListener('change', (e) => {
-        this.showMaterialCost = e.target.checked;
+        const checked = e.target.checked;
+        this.showMaterialCosts.essenceOfLife = checked;
+        this.showMaterialCosts.diamond = checked;
+        this.showMaterialCosts.protectionJelly = checked;
         this.render(document.querySelector('#app'));
       });
     }
+
+    // Material item click handlers for toggling cost display
+    document.querySelectorAll('.material-item.clickable').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const material = item.dataset.material;
+        if (material) {
+          this.showMaterialCosts[material] = !this.showMaterialCosts[material];
+          this.render(document.querySelector('#app'));
+        }
+      });
+    });
 
     // Attach material price input listeners if Material Cost tab is active
     if (this.showMaterialCostTab) {
@@ -702,8 +731,8 @@ export const EnhancementPage = {
     if (essenceInput) {
       essenceInput.addEventListener('input', (e) => {
         this.essenceOfLifePrice = parseFloat(e.target.value) || 0;
-        // Only update materials display if checkbox is checked
-        if (this.showMaterialCost) {
+        // Update materials display if any cost is being shown
+        if (Object.values(this.showMaterialCosts).some(show => show)) {
           this.updateMaterialsDisplay();
         }
       });
@@ -712,8 +741,8 @@ export const EnhancementPage = {
     if (diamondInput) {
       diamondInput.addEventListener('input', (e) => {
         this.polishedDiamondPrice = parseFloat(e.target.value) || 0;
-        // Only update materials display if checkbox is checked
-        if (this.showMaterialCost) {
+        // Update materials display if any cost is being shown
+        if (Object.values(this.showMaterialCosts).some(show => show)) {
           this.updateMaterialsDisplay();
         }
       });
@@ -722,8 +751,8 @@ export const EnhancementPage = {
     if (jellyInput) {
       jellyInput.addEventListener('input', (e) => {
         this.protectionJellyPrice = parseFloat(e.target.value) || 0;
-        // Only update materials display if checkbox is checked
-        if (this.showMaterialCost) {
+        // Update materials display if any cost is being shown
+        if (Object.values(this.showMaterialCosts).some(show => show)) {
           this.updateMaterialsDisplay();
         }
       });
@@ -734,34 +763,40 @@ export const EnhancementPage = {
     // Update the materials tracker display without full re-render
     const materialsTracker = document.querySelector('.materials-tracker');
     if (materialsTracker && this.attempts > 0) {
-      const materialsHeader = materialsTracker.querySelector('.materials-header');
       const materialsHtml = `
         <div class="materials-header">
           <h3>Total Materials Used</h3>
-          <label class="material-cost-toggle">
-            <input type="checkbox" id="material-cost-toggle" ${this.showMaterialCost ? 'checked' : ''}>
-            <span>Show Material Cost</span>
-          </label>
+          <div class="toggle-section">
+            <label class="material-cost-toggle">
+              <input type="checkbox" id="material-cost-toggle" ${
+                this.showMaterialCosts.essenceOfLife &&
+                this.showMaterialCosts.diamond &&
+                this.showMaterialCosts.protectionJelly ? 'checked' : ''
+              }>
+              <span>Show Material Cost</span>
+            </label>
+            <p class="material-cost-hint">Or click each material</p>
+          </div>
         </div>
         <div class="materials-list">
-          <div class="material-item">
+          <div class="material-item clickable ${this.showMaterialCosts.essenceOfLife ? 'show-cost' : ''}" data-material="essenceOfLife">
             <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
             <span class="material-name">Essence of Life</span>
-            ${this.showMaterialCost && this.essenceOfLifePrice > 0 ? `
+            ${this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0 ? `
               <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
             ` : ''}
           </div>
-          <div class="material-item">
+          <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
             <span class="material-count">${this.materialsUsed.diamond}</span>
             <span class="material-name">Polished Diamond</span>
-            ${this.showMaterialCost && this.polishedDiamondPrice > 0 ? `
+            ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
               <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
             ` : ''}
           </div>
-          <div class="material-item">
+          <div class="material-item clickable ${this.showMaterialCosts.protectionJelly ? 'show-cost' : ''}" data-material="protectionJelly">
             <span class="material-count">${this.materialsUsed.protectionJelly}</span>
             <span class="material-name">Protection Jelly</span>
-            ${this.showMaterialCost && this.protectionJellyPrice > 0 ? `
+            ${this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0 ? `
               <span class="material-cost">${this.formatGold(this.materialsUsed.protectionJelly * this.protectionJellyPrice)}</span>
             ` : ''}
           </div>
@@ -771,13 +806,15 @@ export const EnhancementPage = {
             <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
             <span class="material-name">Gold</span>
           </div>
-          ${this.showMaterialCost && (this.essenceOfLifePrice > 0 || this.polishedDiamondPrice > 0 || this.protectionJellyPrice > 0) ? `
+          ${(this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0) ||
+            (this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0) ||
+            (this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0) ? `
             <div class="material-item gold-item total-cost">
               <span class="material-count">${this.formatGold(
                 this.materialsUsed.gold +
-                (this.materialsUsed.essenceOfLife * this.essenceOfLifePrice) +
-                (this.materialsUsed.diamond * this.polishedDiamondPrice) +
-                (this.materialsUsed.protectionJelly * this.protectionJellyPrice)
+                (this.showMaterialCosts.essenceOfLife ? this.materialsUsed.essenceOfLife * this.essenceOfLifePrice : 0) +
+                (this.showMaterialCosts.diamond ? this.materialsUsed.diamond * this.polishedDiamondPrice : 0) +
+                (this.showMaterialCosts.protectionJelly ? this.materialsUsed.protectionJelly * this.protectionJellyPrice : 0)
               )}</span>
               <span class="material-name">Total Cost</span>
             </div>
@@ -790,10 +827,24 @@ export const EnhancementPage = {
       const materialCostToggle = document.getElementById('material-cost-toggle');
       if (materialCostToggle) {
         materialCostToggle.addEventListener('change', (e) => {
-          this.showMaterialCost = e.target.checked;
+          const checked = e.target.checked;
+          this.showMaterialCosts.essenceOfLife = checked;
+          this.showMaterialCosts.diamond = checked;
+          this.showMaterialCosts.protectionJelly = checked;
           this.render(document.querySelector('#app'));
         });
       }
+
+      // Re-attach click listeners
+      document.querySelectorAll('.material-item.clickable').forEach(item => {
+        item.addEventListener('click', (e) => {
+          const material = item.dataset.material;
+          if (material) {
+            this.showMaterialCosts[material] = !this.showMaterialCosts[material];
+            this.render(document.querySelector('#app'));
+          }
+        });
+      });
     }
   },
 
