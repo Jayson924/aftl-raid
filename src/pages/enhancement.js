@@ -431,7 +431,7 @@ export const EnhancementPage = {
   renderMaterialCostTab() {
     return `
       <div class="material-cost-tab">
-        <p class="material-cost-description">Enter the gold cost of materials to calculate total expenses:</p>
+        <p class="material-cost-description">How much each material costs:</p>
         <div class="material-cost-inputs">
           <div class="form-group">
             <label for="essence-price">Essence of Life:</label>
