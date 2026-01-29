@@ -99,6 +99,10 @@ export const EnhancementPage = {
   materialsPerLevel: {}, // Track materials used per level { 0: { essenceOfLife: 0, diamond: 0, protectionJelly: 0, gold: 0 }, ... }
   selectedBackground: 0, // Index of selected background
   goalLevel: null, // Target enhancement level
+  essenceOfLifePrice: 0, // Gold price per Essence of Life
+  polishedDiamondPrice: 0, // Gold price per Polished Diamond
+  showMaterialCost: false, // Whether to show material cost in total
+  showMaterialCostTab: false, // Whether Material Cost tab is active
 
   formatGold(totalGold) {
     const gold = Math.floor(totalGold);
@@ -250,15 +254,27 @@ export const EnhancementPage = {
                 ` : ''}
                 ${this.attempts > 0 ? `
                   <div class="materials-tracker">
-                    <h3>Total Materials Used</h3>
+                    <div class="materials-header">
+                      <h3>Total Materials Used</h3>
+                      <label class="material-cost-toggle">
+                        <input type="checkbox" id="material-cost-toggle" ${this.showMaterialCost ? 'checked' : ''}>
+                        <span>Show Material Cost</span>
+                      </label>
+                    </div>
                     <div class="materials-list">
                       <div class="material-item">
                         <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
                         <span class="material-name">Essence of Life</span>
+                        ${this.showMaterialCost && this.essenceOfLifePrice > 0 ? `
+                          <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
+                        ` : ''}
                       </div>
                       <div class="material-item">
                         <span class="material-count">${this.materialsUsed.diamond}</span>
                         <span class="material-name">Polished Diamond</span>
+                        ${this.showMaterialCost && this.polishedDiamondPrice > 0 ? `
+                          <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
+                        ` : ''}
                       </div>
                       <div class="material-item">
                         <span class="material-count">${this.materialsUsed.protectionJelly}</span>
@@ -270,6 +286,16 @@ export const EnhancementPage = {
                         <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
                         <span class="material-name">Gold</span>
                       </div>
+                      ${this.showMaterialCost && (this.essenceOfLifePrice > 0 || this.polishedDiamondPrice > 0) ? `
+                        <div class="material-item gold-item total-cost">
+                          <span class="material-count">${this.formatGold(
+                            this.materialsUsed.gold +
+                            (this.materialsUsed.essenceOfLife * this.essenceOfLifePrice) +
+                            (this.materialsUsed.diamond * this.polishedDiamondPrice)
+                          )}</span>
+                          <span class="material-name">Total Cost</span>
+                        </div>
+                      ` : ''}
                     </div>
                   </div>
                 ` : ''}
@@ -279,15 +305,18 @@ export const EnhancementPage = {
             <div class="rates-section">
               <h3>Enhancement Rates</h3>
               <div class="rates-tabs">
-                <button class="rates-tab ${!this.useProtection ? 'active' : ''}" data-protection="false">
+                <button class="rates-tab ${!this.useProtection && !this.showMaterialCostTab ? 'active' : ''}" data-tab="no-protection">
                   No Protection
                 </button>
-                <button class="rates-tab ${this.useProtection ? 'active' : ''}" data-protection="true">
+                <button class="rates-tab ${this.useProtection && !this.showMaterialCostTab ? 'active' : ''}" data-tab="with-protection">
                   With Protection
+                </button>
+                <button class="rates-tab ${this.showMaterialCostTab ? 'active' : ''}" data-tab="material-cost">
+                  Material Cost
                 </button>
               </div>
               <div class="rates-table-container">
-                ${this.renderRatesTable()}
+                ${this.showMaterialCostTab ? this.renderMaterialCostTab() : this.renderRatesTable()}
               </div>
             </div>
           </div>
@@ -325,10 +354,25 @@ export const EnhancementPage = {
               ${hasTooltip ? `
                 <div class="milestone-tooltip">
                   <div class="tooltip-title">Total Materials Used</div>
-                  <div class="tooltip-item">Essence of Life: ${materials.essenceOfLife}</div>
-                  ${materials.diamond > 0 ? `<div class="tooltip-item">Polished Diamond: ${materials.diamond}</div>` : ''}
+                  <div class="tooltip-item">Essence of Life: ${materials.essenceOfLife}${
+                    this.showMaterialCost && this.essenceOfLifePrice > 0
+                      ? ` (${this.formatGold(materials.essenceOfLife * this.essenceOfLifePrice)})`
+                      : ''
+                  }</div>
+                  ${materials.diamond > 0 ? `<div class="tooltip-item">Polished Diamond: ${materials.diamond}${
+                    this.showMaterialCost && this.polishedDiamondPrice > 0
+                      ? ` (${this.formatGold(materials.diamond * this.polishedDiamondPrice)})`
+                      : ''
+                  }</div>` : ''}
                   ${materials.protectionJelly > 0 ? `<div class="tooltip-item">Protection Jelly: ${materials.protectionJelly}</div>` : ''}
                   <div class="tooltip-item">Gold: ${this.formatGold(materials.gold)}</div>
+                  ${this.showMaterialCost && (this.essenceOfLifePrice > 0 || this.polishedDiamondPrice > 0) ? `
+                    <div class="tooltip-item tooltip-total">Total Cost: ${this.formatGold(
+                      materials.gold +
+                      (materials.essenceOfLife * this.essenceOfLifePrice) +
+                      (materials.diamond * this.polishedDiamondPrice)
+                    )}</div>
+                  ` : ''}
                 </div>
               ` : ''}
             </div>
@@ -384,6 +428,38 @@ export const EnhancementPage = {
     `;
   },
 
+  renderMaterialCostTab() {
+    return `
+      <div class="material-cost-tab">
+        <p class="material-cost-description">Enter the gold cost of materials to calculate total expenses:</p>
+        <div class="material-cost-inputs">
+          <div class="form-group">
+            <label for="essence-price">Essence of Life:</label>
+            <input
+              type="number"
+              id="essence-price"
+              min="0"
+              step="0.01"
+              value="${this.essenceOfLifePrice}"
+              placeholder="0.00"
+            >
+          </div>
+          <div class="form-group">
+            <label for="diamond-price">Polished Diamond:</label>
+            <input
+              type="number"
+              id="diamond-price"
+              min="0"
+              step="0.01"
+              value="${this.polishedDiamondPrice}"
+              placeholder="0.00"
+            >
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
   attachEventListeners() {
     document.getElementById('enhance-btn').addEventListener('click', () => {
       this.attemptEnhancement();
@@ -413,9 +489,17 @@ export const EnhancementPage = {
 
     document.querySelectorAll('.rates-tab').forEach(tab => {
       tab.addEventListener('click', (e) => {
-        const useProtection = e.target.dataset.protection === 'true';
-        this.useProtection = useProtection;
-        document.getElementById('protection-toggle').checked = useProtection;
+        const tabType = e.target.dataset.tab;
+
+        if (tabType === 'material-cost') {
+          this.showMaterialCostTab = true;
+        } else {
+          this.showMaterialCostTab = false;
+          const useProtection = tabType === 'with-protection';
+          this.useProtection = useProtection;
+          document.getElementById('protection-toggle').checked = useProtection;
+        }
+
         this.updateRatesTable();
 
         document.querySelectorAll('.rates-tab').forEach(t => t.classList.remove('active'));
@@ -461,6 +545,108 @@ export const EnhancementPage = {
         });
       }
     });
+
+    // Material cost toggle checkbox
+    const materialCostToggle = document.getElementById('material-cost-toggle');
+    if (materialCostToggle) {
+      materialCostToggle.addEventListener('change', (e) => {
+        this.showMaterialCost = e.target.checked;
+        this.render(document.querySelector('#app'));
+      });
+    }
+
+    // Attach material price input listeners if Material Cost tab is active
+    if (this.showMaterialCostTab) {
+      this.updateMaterialPrices();
+    }
+  },
+
+  updateMaterialPrices() {
+    const essenceInput = document.getElementById('essence-price');
+    const diamondInput = document.getElementById('diamond-price');
+
+    if (essenceInput) {
+      essenceInput.addEventListener('input', (e) => {
+        this.essenceOfLifePrice = parseFloat(e.target.value) || 0;
+        // Only update materials display if checkbox is checked
+        if (this.showMaterialCost) {
+          this.updateMaterialsDisplay();
+        }
+      });
+    }
+
+    if (diamondInput) {
+      diamondInput.addEventListener('input', (e) => {
+        this.polishedDiamondPrice = parseFloat(e.target.value) || 0;
+        // Only update materials display if checkbox is checked
+        if (this.showMaterialCost) {
+          this.updateMaterialsDisplay();
+        }
+      });
+    }
+  },
+
+  updateMaterialsDisplay() {
+    // Update the materials tracker display without full re-render
+    const materialsTracker = document.querySelector('.materials-tracker');
+    if (materialsTracker && this.attempts > 0) {
+      const materialsHeader = materialsTracker.querySelector('.materials-header');
+      const materialsHtml = `
+        <div class="materials-header">
+          <h3>Total Materials Used</h3>
+          <label class="material-cost-toggle">
+            <input type="checkbox" id="material-cost-toggle" ${this.showMaterialCost ? 'checked' : ''}>
+            <span>Show Material Cost</span>
+          </label>
+        </div>
+        <div class="materials-list">
+          <div class="material-item">
+            <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
+            <span class="material-name">Essence of Life</span>
+            ${this.showMaterialCost && this.essenceOfLifePrice > 0 ? `
+              <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
+            ` : ''}
+          </div>
+          <div class="material-item">
+            <span class="material-count">${this.materialsUsed.diamond}</span>
+            <span class="material-name">Polished Diamond</span>
+            ${this.showMaterialCost && this.polishedDiamondPrice > 0 ? `
+              <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
+            ` : ''}
+          </div>
+          <div class="material-item">
+            <span class="material-count">${this.materialsUsed.protectionJelly}</span>
+            <span class="material-name">Protection Jelly</span>
+          </div>
+        </div>
+        <div class="gold-section">
+          <div class="material-item gold-item">
+            <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
+            <span class="material-name">Gold</span>
+          </div>
+          ${this.showMaterialCost && (this.essenceOfLifePrice > 0 || this.polishedDiamondPrice > 0) ? `
+            <div class="material-item gold-item total-cost">
+              <span class="material-count">${this.formatGold(
+                this.materialsUsed.gold +
+                (this.materialsUsed.essenceOfLife * this.essenceOfLifePrice) +
+                (this.materialsUsed.diamond * this.polishedDiamondPrice)
+              )}</span>
+              <span class="material-name">Total Cost</span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      materialsTracker.innerHTML = materialsHtml;
+
+      // Re-attach checkbox listener
+      const materialCostToggle = document.getElementById('material-cost-toggle');
+      if (materialCostToggle) {
+        materialCostToggle.addEventListener('change', (e) => {
+          this.showMaterialCost = e.target.checked;
+          this.render(document.querySelector('#app'));
+        });
+      }
+    }
   },
 
   async attemptEnhancement() {
@@ -611,22 +797,27 @@ export const EnhancementPage = {
   updateRatesTable() {
     const tableContainer = document.querySelector('.rates-table-container');
     if (tableContainer) {
-      tableContainer.innerHTML = this.renderRatesTable();
+      tableContainer.innerHTML = this.showMaterialCostTab ? this.renderMaterialCostTab() : this.renderRatesTable();
 
-      // Re-attach click handlers for rates table rows to set goal
-      document.querySelectorAll('.rates-table tbody tr').forEach(row => {
-        row.addEventListener('click', (e) => {
-          const level = parseInt(row.dataset.level);
+      if (this.showMaterialCostTab) {
+        // Attach listeners for material price inputs
+        this.updateMaterialPrices();
+      } else {
+        // Re-attach click handlers for rates table rows to set goal
+        document.querySelectorAll('.rates-table tbody tr').forEach(row => {
+          row.addEventListener('click', (e) => {
+            const level = parseInt(row.dataset.level);
 
-          // Toggle goal: if clicking the same level, remove goal
-          if (this.goalLevel === level) {
-            this.goalLevel = null;
-          } else {
-            this.goalLevel = level;
-          }
-          this.updateRatesTable();
+            // Toggle goal: if clicking the same level, remove goal
+            if (this.goalLevel === level) {
+              this.goalLevel = null;
+            } else {
+              this.goalLevel = level;
+            }
+            this.updateRatesTable();
+          });
         });
-      });
+      }
     }
   }
 };
