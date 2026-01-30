@@ -10,9 +10,81 @@ export const LineupEditorPage = {
     raidType: 'Hardcore',
     status: 'ready',
     players: [],
-    completed: false
+    completed: false,
+    isTemplate: false
   },
   selectedClassFamily: null,
+
+  /**
+   * Get the most recent Friday 5pm PT reset date
+   * @returns {Date} - The most recent Friday 5pm PT
+   */
+  getLastResetDate() {
+    const now = new Date();
+    const nowPT = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+
+    // Determine current day of week in PT (0=Sun, 5=Fri, 6=Sat)
+    const dayOfWeek = nowPT.getDay();
+
+    // Calculate how many days back to last Friday 5pm PT
+    let daysBack;
+    if (dayOfWeek === 5) { // Friday
+      // Check if we're past 5pm PT
+      if (nowPT.getHours() >= 17) {
+        daysBack = 0; // Use this Friday
+      } else {
+        daysBack = 7; // Use last Friday
+      }
+    } else if (dayOfWeek === 6) { // Saturday
+      daysBack = 1;
+    } else if (dayOfWeek === 0) { // Sunday
+      daysBack = 2;
+    } else { // Mon-Thu (1-4)
+      daysBack = dayOfWeek + 2;
+    }
+
+    const lastFridayPT = new Date(nowPT);
+    lastFridayPT.setDate(lastFridayPT.getDate() - daysBack);
+    lastFridayPT.setHours(17, 0, 0, 0);
+
+    return lastFridayPT;
+  },
+
+  /**
+   * Check if we've crossed a weekly reset boundary and auto-clear non-template lineups
+   */
+  async checkAndClearWeeklyLineups() {
+    const lastResetDate = this.getLastResetDate();
+    const lastResetTimestamp = lastResetDate.getTime();
+
+    // Get the stored last check timestamp from localStorage
+    const storedLastCheck = localStorage.getItem('lastWeeklyResetCheck');
+    const lastCheckTimestamp = storedLastCheck ? parseInt(storedLastCheck) : 0;
+
+    // If we've crossed a reset boundary since last check, clear non-template lineups
+    if (lastCheckTimestamp < lastResetTimestamp) {
+      // Get all lineups
+      const allLineups = await dataService.getLineups();
+
+      // Delete all non-template lineups
+      let deletedCount = 0;
+      for (const lineup of allLineups) {
+        if (!lineup.isTemplate) {
+          try {
+            await dataService.deleteLineup(lineup.name);
+            deletedCount++;
+          } catch (error) {
+            console.error(`Failed to delete lineup ${lineup.name}:`, error);
+          }
+        }
+      }
+
+      // Update the stored last check timestamp
+      localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
+
+      console.log(`Weekly reset: ${deletedCount} non-template lineups cleared`);
+    }
+  },
 
   async render(container) {
     container.innerHTML = `
@@ -23,9 +95,14 @@ export const LineupEditorPage = {
 
         <div class="editor-container">
           <div class="lineup-info">
-            <div class="form-group">
+            <div class="form-group lineup-name-group">
               <label for="lineup-name">Lineup Name:</label>
               <input type="text" id="lineup-name" placeholder="Enter lineup name...">
+              <label class="template-toggle">
+                <input type="checkbox" id="template-toggle">
+                <img src="/icons/group.svg" class="template-checkbox-icon" alt="Template">
+                <span>Template</span>
+              </label>
             </div>
             <div class="form-group">
               <label for="raid-type">Raid Type:</label>
@@ -111,10 +188,15 @@ export const LineupEditorPage = {
     document.getElementById('raid-type').addEventListener('change', (e) => {
       this.currentLineup.raidType = e.target.value;
       this.renderAvailablePlayers(); // Re-render to update completion badges
+      this.loadExistingLineups(); // Re-filter existing lineups by raid type
     });
 
     document.getElementById('cleared-toggle').addEventListener('change', (e) => {
       this.currentLineup.completed = e.target.checked;
+    });
+
+    document.getElementById('template-toggle').addEventListener('change', (e) => {
+      this.currentLineup.isTemplate = e.target.checked;
     });
 
     document.querySelectorAll('.slot').forEach(slot => {
@@ -184,6 +266,11 @@ export const LineupEditorPage = {
     }
 
     try {
+      // Check and clear weekly lineups before loading
+      if (dataService.hasWriteAccess()) {
+        await this.checkAndClearWeeklyLineups();
+      }
+
       this.players = await dataService.getPlayers();
       this.renderAvailablePlayers();
       this.loadExistingLineups();
@@ -196,10 +283,16 @@ export const LineupEditorPage = {
     const container = document.getElementById('existing-lineups-container');
 
     try {
-      const lineups = await dataService.getLineups();
+      const allLineups = await dataService.getLineups();
+
+      // Filter lineups by current raid type
+      const lineups = allLineups.filter(lineup => {
+        const lineupRaidType = lineup.raidType || 'Hardcore'; // Default to Hardcore if not set
+        return lineupRaidType === this.currentLineup.raidType;
+      });
 
       if (lineups.length === 0) {
-        container.innerHTML = '<div class="empty-state">No lineups yet</div>';
+        container.innerHTML = `<div class="empty-state">No ${this.currentLineup.raidType} lineups yet</div>`;
         return;
       }
 
@@ -254,7 +347,10 @@ export const LineupEditorPage = {
         return `
           <div class="mini-lineup-card ${isCleared ? 'cleared' : ''}" data-lineup-name="${lineup.name}">
             <div class="mini-lineup-header">
-              <span class="mini-lineup-name">${lineup.name}</span>
+              <span class="mini-lineup-name">
+                ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" title="Template lineup" alt="Template">' : ''}
+                ${lineup.name}
+              </span>
               <div class="mini-lineup-header-actions">
                 <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
                 <button class="mini-delete-btn" data-lineup-name="${lineup.name}" title="Delete lineup">×</button>
@@ -965,7 +1061,8 @@ export const LineupEditorPage = {
       raidType: 'Hardcore',
       status: 'ready',
       players: [],
-      completed: false
+      completed: false,
+      isTemplate: false
     };
 
     // Clear the lineup name input field and trigger input event to sync state
@@ -975,6 +1072,7 @@ export const LineupEditorPage = {
 
     document.getElementById('raid-type').value = 'Hardcore';
     document.getElementById('cleared-toggle').checked = false;
+    document.getElementById('template-toggle').checked = false;
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       const slotContent = slotElement.querySelector('.slot-content');
@@ -1046,7 +1144,8 @@ export const LineupEditorPage = {
           raidType: this.currentLineup.raidType,
           status: 'ready',
           players,
-          completed: this.currentLineup.completed
+          completed: this.currentLineup.completed,
+          isTemplate: this.currentLineup.isTemplate
         }, this.currentLineup.name);
         toast.success(`${this.currentLineup.name} updated!`);
       } else {
@@ -1056,7 +1155,8 @@ export const LineupEditorPage = {
           raidType: this.currentLineup.raidType,
           status: 'ready',
           players,
-          completed: this.currentLineup.completed
+          completed: this.currentLineup.completed,
+          isTemplate: this.currentLineup.isTemplate
         });
         toast.success(`${this.currentLineup.name} saved!`);
       }
@@ -1101,12 +1201,14 @@ export const LineupEditorPage = {
       raidType: lineup.raidType || 'Hardcore',
       status: 'ready',
       players: [...lineup.players],
-      completed: lineup.completed || false
+      completed: lineup.completed || false,
+      isTemplate: lineup.isTemplate || false
     };
 
     document.getElementById('lineup-name').value = lineup.name;
     document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
+    document.getElementById('template-toggle').checked = lineup.isTemplate || false;
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       const slotContent = slotElement.querySelector('.slot-content');

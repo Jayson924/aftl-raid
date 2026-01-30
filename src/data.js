@@ -1,9 +1,11 @@
 // Google Sheets API integration
 class DataService {
   constructor() {
-    this.apiKey = ''; // No longer needed - API key is now secure on the backend
+    // For local dev: Vite exposes env vars prefixed with VITE_
+    this.apiKey = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY || '';
     this.spreadsheetId = '1gw1cD7I2IU_0lP-jinrjl7_jle5Yf6-2HC2W-lHUxbI';
-    this.baseUrl = '/.netlify/functions/sheets-proxy'; // Use Netlify Function instead
+    this.baseUrl = '/.netlify/functions/sheets-proxy'; // Use Netlify Function in production
+    this.isDev = import.meta.env.DEV; // true when running with Vite dev server
     this.password = '';
     this.appsScriptUrl = 'https://script.google.com/macros/s/AKfycbx8E4Pw2WZIRgD3iJIcc-qmLzBTKS8nAO4IU_kTBeH73D9am09DumC9THBKpTrgR5RFJg/exec';
   }
@@ -42,8 +44,16 @@ class DataService {
   async getRange(range) {
     if (!this.isConfigured()) throw new Error('Sheet not configured');
 
-    // Call Netlify Function instead of Google Sheets API directly
-    const url = `${this.baseUrl}?spreadsheetId=${encodeURIComponent(this.spreadsheetId)}&range=${encodeURIComponent(range)}`;
+    let url;
+
+    // In development mode, use Google Sheets API directly if we have an API key
+    if (this.isDev && this.apiKey) {
+      url = `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/${range}?key=${this.apiKey}`;
+    } else {
+      // In production, use Netlify Function (keeps API key secure)
+      url = `${this.baseUrl}?spreadsheetId=${encodeURIComponent(this.spreadsheetId)}&range=${encodeURIComponent(range)}`;
+    }
+
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -163,7 +173,8 @@ class DataService {
       raidType: this.cleanValue(row[1] || '') || 'Hardcore', // Default to Hardcore if empty
       status: row[2] || 'draft',
       players: row.slice(3, 11).map(p => this.cleanValue(p || '')).filter(p => p),
-      completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true
+      completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true,
+      isTemplate: row[12] === 'TRUE' || row[12] === 'Yes' || row[12] === true
     })).filter(lineup => lineup.name);
   }
 
@@ -179,7 +190,7 @@ class DataService {
 
   async getLineups() {
     try {
-      const rows = await this.getRange('Lineups!A:L');
+      const rows = await this.getRange('Lineups!A:M');
       return this.parseLineupsFromSheet(rows);
     } catch (error) {
       console.error('Error fetching lineups:', error);
