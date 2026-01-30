@@ -215,7 +215,7 @@ export const LineupsPage = {
     const isCleared = lineup.completed;
 
     showcaseContainer.innerHTML = `
-      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''}">
+      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}">
         <div class="lineup-card-header">
           <h3>
             ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
@@ -352,7 +352,7 @@ export const LineupsPage = {
       }).join('');
 
       return `
-        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''}" data-lineup-name="${lineup.name}">
+        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-name="${lineup.name}">
           <div class="mini-lineup-header">
             <span class="mini-lineup-name">
               ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}

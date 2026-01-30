@@ -319,10 +319,29 @@ body {
 
       &.selected {
         border: 3px solid $primary-color;
-        background-color: rgba(244, 196, 48, 0.25);
-        box-shadow: 0 0 24px rgba(255, 255, 255, 0.8), 0 0 8px rgba(255, 255, 255, 0.6) inset;
+        box-shadow: 0 0 20px rgba(244, 196, 48, 0.6), 0 0 10px rgba(244, 196, 48, 0.4) inset;
         transform: scale(1.05);
         z-index: 10;
+
+        // For non-template cards, add a subtle background
+        &:not(.template) {
+          background-color: rgba(244, 196, 48, 0.1);
+        }
+      }
+
+      &.template {
+        background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+        border-color: rgba(150, 184, 255, 0.3);
+
+        &:hover {
+          background: linear-gradient(180deg, rgba(150, 184, 255, 0.2) 0%, rgba(150, 184, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 100%);
+          border-color: rgba(150, 184, 255, 0.5);
+        }
+
+        // Selected template keeps its gradient visible
+        &.selected {
+          // Gradient is preserved, just add stronger border via parent .selected rule
+        }
       }
 
       &.cleared {
@@ -504,6 +523,11 @@ body {
       flex-shrink: 0;
       padding: 0.5rem 1rem;
       font-size: 0.9rem;
+    }
+
+    &.template {
+      background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+      border-color: rgba(150, 184, 255, 0.3);
     }
 
     &.cleared {
@@ -2170,6 +2194,16 @@ body {
         border-color: $primary-color;
         background-color: rgba(244, 196, 48, 0.05);
         transform: translateY(-2px);
+      }
+
+      &.template {
+        background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+        border-color: rgba(150, 184, 255, 0.3);
+
+        &:hover {
+          background: linear-gradient(180deg, rgba(150, 184, 255, 0.2) 0%, rgba(150, 184, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 100%);
+          border-color: rgba(150, 184, 255, 0.5);
+        }
       }
 
       &.cleared {
