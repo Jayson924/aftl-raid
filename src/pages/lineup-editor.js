@@ -348,7 +348,7 @@ export const LineupEditorPage = {
           <div class="mini-lineup-card ${isCleared ? 'cleared' : ''}" data-lineup-name="${lineup.name}">
             <div class="mini-lineup-header">
               <span class="mini-lineup-name">
-                ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" title="Template lineup" alt="Template">' : ''}
+                ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}
                 ${lineup.name}
               </span>
               <div class="mini-lineup-header-actions">

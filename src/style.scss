@@ -359,19 +359,31 @@ body {
           font-size: 0.9rem;
           font-weight: 600;
           color: $primary-color;
-          text-overflow: ellipsis;
-          overflow: hidden;
-          white-space: nowrap;
           flex: 1;
           display: flex;
           align-items: center;
           gap: 0.4rem;
+          min-width: 0;
+          overflow: hidden;
 
-          .template-icon {
-            width: 16px;
-            height: 16px;
+          img.template-icon {
+            width: 14px !important;
+            height: 14px !important;
+            min-width: 14px;
+            min-height: 14px;
+            max-width: 14px;
+            max-height: 14px;
             flex-shrink: 0;
             filter: none;
+            object-fit: contain;
+            display: block;
+            vertical-align: middle;
+          }
+
+          span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
         }
 
@@ -1632,11 +1644,17 @@ body {
           color: rgba(255, 255, 255, 0.95);
         }
 
-        .template-checkbox-icon {
-          width: 16px;
-          height: 16px;
+        img.template-checkbox-icon {
+          width: 16px !important;
+          height: 16px !important;
+          min-width: 16px;
+          min-height: 16px;
+          max-width: 16px;
+          max-height: 16px;
           opacity: 1;
           filter: none;
+          display: block;
+          flex-shrink: 0;
         }
 
         span {

@@ -217,7 +217,10 @@ export const LineupsPage = {
     showcaseContainer.innerHTML = `
       <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''}">
         <div class="lineup-card-header">
-          <h3>${lineup.name}</h3>
+          <h3>
+            ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
+            ${lineup.name}
+          </h3>
           ${isAdmin ? `<button class="btn btn-primary btn-cleared" data-lineup-name="${lineup.name}">${isCleared ? 'Not cleared' : 'Clear'}</button>` : ''}
         </div>
         <div class="lineup-players">
@@ -351,7 +354,10 @@ export const LineupsPage = {
       return `
         <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''}" data-lineup-name="${lineup.name}">
           <div class="mini-lineup-header">
-            <span class="mini-lineup-name">${lineup.name}</span>
+            <span class="mini-lineup-name">
+              ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}
+              ${lineup.name}
+            </span>
             <div class="mini-lineup-header-actions">
               <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
             </div>
