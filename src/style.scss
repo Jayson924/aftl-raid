@@ -1629,6 +1629,12 @@ body {
         margin-bottom: 0.25rem;
       }
 
+      .lineup-toggles {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
       .template-toggle {
         display: flex;
         align-items: center;
@@ -1653,6 +1659,11 @@ body {
           display: none;
 
           &:checked + .template-checkbox-icon + span {
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 600;
+          }
+
+          &:checked + span {
             color: rgba(255, 255, 255, 0.95);
             font-weight: 600;
           }

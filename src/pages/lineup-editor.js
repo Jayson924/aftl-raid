@@ -15,6 +15,7 @@ export const LineupEditorPage = {
     isTemplate: false
   },
   selectedClassFamily: null,
+  nextWeekMode: false,
 
   /**
    * Get the most recent Friday 5pm PT reset date
@@ -99,11 +100,17 @@ export const LineupEditorPage = {
             <div class="form-group lineup-name-group">
               <label for="lineup-name">Lineup Name:</label>
               <input type="text" id="lineup-name" placeholder="Enter lineup name...">
-              <label class="template-toggle">
-                <input type="checkbox" id="template-toggle">
-                <img src="/icons/group.svg" class="template-checkbox-icon" alt="Template">
-                <span>Template</span>
-              </label>
+              <div class="lineup-toggles">
+                <label class="template-toggle">
+                  <input type="checkbox" id="template-toggle">
+                  <img src="/icons/group.svg" class="template-checkbox-icon" alt="Template">
+                  <span>Template</span>
+                </label>
+                <label class="template-toggle">
+                  <input type="checkbox" id="next-week-toggle">
+                  <span>Next Week</span>
+                </label>
+              </div>
             </div>
             <div class="form-group">
               <label for="raid-type">Raid Type:</label>
@@ -198,6 +205,11 @@ export const LineupEditorPage = {
 
     document.getElementById('template-toggle').addEventListener('change', (e) => {
       this.currentLineup.isTemplate = e.target.checked;
+    });
+
+    document.getElementById('next-week-toggle').addEventListener('change', (e) => {
+      this.nextWeekMode = e.target.checked;
+      this.renderAvailablePlayers(); // Re-render to show/hide cleared players
     });
 
     document.querySelectorAll('.slot').forEach(slot => {
@@ -550,11 +562,13 @@ export const LineupEditorPage = {
       const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
 
       // Check completion status based on CURRENT lineup's raid type
-      const needsThisRaid = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+      // In Next Week mode, treat all players as needing the raid (ignore current completion status)
+      const needsThisRaid = this.nextWeekMode ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
       // Check if player is in another lineup (not the current one)
+      // Don't show this in Next Week mode since current week assignments aren't relevant
       let presentInLineup = null;
-      if (this.allLineups && this.allLineups.length > 0) {
+      if (!this.nextWeekMode && this.allLineups && this.allLineups.length > 0) {
         const otherLineup = this.allLineups.find(lineup => {
           // Skip the current lineup being edited
           if (lineup.name === this.currentLineup.name) return false;
@@ -630,8 +644,9 @@ export const LineupEditorPage = {
         }
 
         // Hide cleared filter - only hide if checkbox is checked
+        // In Next Week mode, don't hide anyone regardless of cleared status
         let matchesCompletion = true;
-        if (hideCleared) {
+        if (hideCleared && !this.nextWeekMode) {
           // Only show players who need this raid (hide those who already completed)
           matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
         }
@@ -730,9 +745,9 @@ export const LineupEditorPage = {
             matchesClassFamily = familyClasses.includes(player.role);
           }
 
-          // Hide cleared filter
+          // Hide cleared filter - respect Next Week mode
           let matchesCompletion = true;
-          if (hideCleared) {
+          if (hideCleared && !this.nextWeekMode) {
             matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
           }
 
@@ -755,7 +770,8 @@ export const LineupEditorPage = {
       playerList.innerHTML = addGuestCard + filteredPlayers.map(player => {
         const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
         const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-        const needsThisRaid = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+        // In Next Week mode, treat all players as needing the raid
+        const needsThisRaid = this.nextWeekMode ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
         const equipmentDisplay = [];
         if (player.weapon) {
@@ -1292,6 +1308,7 @@ export const LineupEditorPage = {
     document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('template-toggle').checked = lineup.isTemplate || false;
+    // Don't change Next Week mode when loading a lineup - let user control it
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       const slotContent = slotElement.querySelector('.slot-content');
