@@ -1139,6 +1139,10 @@ export const LineupEditorPage = {
           return;
         }
 
+        // Check if we're unchecking a previously cleared lineup
+        const wasCleared = existingLineup.completed;
+        const isNowCleared = this.currentLineup.completed;
+
         // Update existing lineup - use the actual name from the sheet as oldName
         await dataService.updateLineup({
           name: trimmedName,
@@ -1149,6 +1153,38 @@ export const LineupEditorPage = {
           isTemplate: this.currentLineup.isTemplate
         }, existingLineup.name);
         toast.success(`${trimmedName} updated!`);
+
+        // Handle player completion status changes
+        const playerNames = players.filter(p => p && !p.startsWith('[PUB]'));
+
+        if (wasCleared && !isNowCleared && playerNames.length > 0) {
+          // Lineup was cleared but now unchecked - unmark players
+          try {
+            await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, trimmedName);
+            console.log(`Unmarked players for ${this.currentLineup.raidType} (lineup unchecked)`);
+          } catch (error) {
+            console.error('Error unmarking players:', error);
+            toast.warning('Saved pero may nangyari sa unmark? Refresh nalang dong');
+          }
+        } else if (!wasCleared && isNowCleared && playerNames.length > 0) {
+          // Lineup was not cleared but now checked - mark players
+          try {
+            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
+            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+          } catch (error) {
+            console.error('Error marking players as completed:', error);
+            toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
+          }
+        } else if (isNowCleared && playerNames.length > 0) {
+          // Lineup is still cleared, but players may have changed - mark all players
+          try {
+            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
+            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+          } catch (error) {
+            console.error('Error marking players as completed:', error);
+            toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
+          }
+        }
       } else {
         // Add new lineup
         await dataService.addLineup({
@@ -1160,20 +1196,20 @@ export const LineupEditorPage = {
           isTemplate: this.currentLineup.isTemplate
         });
         toast.success(`${trimmedName} saved!`);
-      }
 
-      // If the lineup is marked as cleared, mark all players as completed for this raid type
-      if (this.currentLineup.completed) {
-        // Get only non-guest players (exclude [PUB] entries)
-        const playerNames = players.filter(p => p && !p.startsWith('[PUB]'));
+        // If the lineup is marked as cleared, mark all players as completed for this raid type
+        if (this.currentLineup.completed) {
+          // Get only non-guest players (exclude [PUB] entries)
+          const playerNames = players.filter(p => p && !p.startsWith('[PUB]'));
 
-        if (playerNames.length > 0) {
-          try {
-            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
-            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
-          } catch (error) {
-            console.error('Error marking players as completed:', error);
-            toast.warning('Saved pero may nangyari? Refresh nalang dong');
+          if (playerNames.length > 0) {
+            try {
+              await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
+              console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+            } catch (error) {
+              console.error('Error marking players as completed:', error);
+              toast.warning('Saved pero may nangyari? Refresh nalang dong');
+            }
           }
         }
       }

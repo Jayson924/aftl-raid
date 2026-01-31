@@ -266,6 +266,14 @@ class DataService {
       raidType: raidType
     });
   }
+
+  async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName) {
+    return this.callAppsScript('unmarkPlayersCompleted', {
+      playerNames: playerNames,
+      raidType: raidType,
+      excludeLineupName: excludeLineupName
+    });
+  }
 }
 
 export const dataService = new DataService();
