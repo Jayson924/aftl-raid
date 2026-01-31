@@ -1092,7 +1092,7 @@ export const LineupEditorPage = {
   },
 
   async saveLineup() {
-    if (!this.currentLineup.name) {
+    if (!this.currentLineup.name || !this.currentLineup.name.trim()) {
       toast.warning('Lineup name po');
       return;
     }
@@ -1118,7 +1118,8 @@ export const LineupEditorPage = {
 
       // Check if lineup with this name already exists
       const existingLineups = await dataService.getLineups();
-      const existingLineup = existingLineups.find(l => l.name === this.currentLineup.name);
+      const trimmedName = this.currentLineup.name.trim();
+      const existingLineup = existingLineups.find(l => l.name.trim() === trimmedName);
 
       if (existingLineup) {
         // Confirm before updating existing lineup
@@ -1138,30 +1139,51 @@ export const LineupEditorPage = {
           return;
         }
 
-        // Update existing lineup
+        // Update existing lineup - use the actual name from the sheet as oldName
         await dataService.updateLineup({
-          name: this.currentLineup.name,
+          name: trimmedName,
           raidType: this.currentLineup.raidType,
           status: 'ready',
           players,
           completed: this.currentLineup.completed,
           isTemplate: this.currentLineup.isTemplate
-        }, this.currentLineup.name);
-        toast.success(`${this.currentLineup.name} updated!`);
+        }, existingLineup.name);
+        toast.success(`${trimmedName} updated!`);
       } else {
         // Add new lineup
         await dataService.addLineup({
-          name: this.currentLineup.name,
+          name: trimmedName,
           raidType: this.currentLineup.raidType,
           status: 'ready',
           players,
           completed: this.currentLineup.completed,
           isTemplate: this.currentLineup.isTemplate
         });
-        toast.success(`${this.currentLineup.name} saved!`);
+        toast.success(`${trimmedName} saved!`);
       }
 
-      this.loadExistingLineups(); // Refresh the lineup list
+      // If the lineup is marked as cleared, mark all players as completed for this raid type
+      if (this.currentLineup.completed) {
+        // Get only non-guest players (exclude [PUB] entries)
+        const playerNames = players.filter(p => p && !p.startsWith('[PUB]'));
+
+        if (playerNames.length > 0) {
+          try {
+            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
+            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+          } catch (error) {
+            console.error('Error marking players as completed:', error);
+            toast.warning('Saved pero may nangyari? Refresh nalang dong');
+          }
+        }
+      }
+
+      // Refresh player list to show updated completion status and "in lineup" badges
+      this.players = await dataService.getPlayers();
+      this.renderAvailablePlayers();
+
+      // Refresh the lineup carousel
+      this.loadExistingLineups();
 
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Lineup';
