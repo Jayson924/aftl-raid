@@ -2076,6 +2076,20 @@ body {
           white-space: nowrap;
         }
 
+        .present-in-badge {
+          position: absolute;
+          bottom: 0.5rem;
+          right: 0.5rem;
+          background-color: rgba(255, 255, 255, 0.15);
+          color: rgba(255, 255, 255, 0.7);
+          padding: 0.2rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          font-style: italic;
+          white-space: nowrap;
+        }
+
         .pub-badge {
           background-color: #ffc107;
           color: #000;

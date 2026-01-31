@@ -5,6 +5,7 @@ import { modal } from '../modal.js';
 
 export const LineupEditorPage = {
   players: [],
+  allLineups: [],
   currentLineup: {
     name: '',
     raidType: 'Hardcore',
@@ -271,7 +272,12 @@ export const LineupEditorPage = {
         await this.checkAndClearWeeklyLineups();
       }
 
-      this.players = await dataService.getPlayers();
+      // Load both players and lineups
+      [this.players, this.allLineups] = await Promise.all([
+        dataService.getPlayers(),
+        dataService.getLineups()
+      ]);
+
       this.renderAvailablePlayers();
       this.loadExistingLineups();
     } catch (error) {
@@ -283,10 +289,11 @@ export const LineupEditorPage = {
     const container = document.getElementById('existing-lineups-container');
 
     try {
-      const allLineups = await dataService.getLineups();
+      // Refresh lineups from the server
+      this.allLineups = await dataService.getLineups();
 
       // Filter lineups by current raid type
-      const lineups = allLineups.filter(lineup => {
+      const lineups = this.allLineups.filter(lineup => {
         const lineupRaidType = lineup.raidType || 'Hardcore'; // Default to Hardcore if not set
         return lineupRaidType === this.currentLineup.raidType;
       });
@@ -545,6 +552,20 @@ export const LineupEditorPage = {
       // Check completion status based on CURRENT lineup's raid type
       const needsThisRaid = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
+      // Check if player is in another lineup (not the current one)
+      let presentInLineup = null;
+      if (this.allLineups && this.allLineups.length > 0) {
+        const otherLineup = this.allLineups.find(lineup => {
+          // Skip the current lineup being edited
+          if (lineup.name === this.currentLineup.name) return false;
+          // Check if player is in this lineup
+          return lineup.players && lineup.players.includes(player.name);
+        });
+        if (otherLineup) {
+          presentInLineup = otherLineup.name;
+        }
+      }
+
       const equipmentDisplay = [];
       if (player.weapon) {
         const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
@@ -570,7 +591,7 @@ export const LineupEditorPage = {
              data-player-name="${player.name}"
              draggable="true">
           ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
-          ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
+          ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           <div class="player-info">
             <div class="player-name">${player.name}</div>
             <div class="player-role">${player.role}</div>
