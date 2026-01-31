@@ -1143,6 +1143,8 @@ export const LineupEditorPage = {
         const wasCleared = existingLineup.completed;
         const isNowCleared = this.currentLineup.completed;
 
+        console.log('Clear check:', { wasCleared, isNowCleared, lineupName: trimmedName });
+
         // Update existing lineup - use the actual name from the sheet as oldName
         await dataService.updateLineup({
           name: trimmedName,
@@ -1159,8 +1161,10 @@ export const LineupEditorPage = {
 
         if (wasCleared && !isNowCleared && playerNames.length > 0) {
           // Lineup was cleared but now unchecked - unmark players
+          console.log('Unmarking:', playerNames, 'for:', this.currentLineup.raidType);
           try {
-            await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, trimmedName);
+            const result = await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, trimmedName);
+            console.log(`Unmark result:`, result);
             console.log(`Unmarked players for ${this.currentLineup.raidType} (lineup unchecked)`);
           } catch (error) {
             console.error('Error unmarking players:', error);
