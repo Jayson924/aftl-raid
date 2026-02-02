@@ -3044,21 +3044,13 @@ body {
     }
 
     .app-title {
-      font-size: 1.2rem;
+      font-size: 1rem;
       margin: 0;
       white-space: nowrap;
 
-      // Show only "AFTL Raids" on mobile
-      &::first-letter {
-        font-size: inherit;
-      }
-
-      // Hide everything after "AFTL Raids"
-      font-size: 0;
-
-      &::before {
-        content: "AFTL Raids";
-        font-size: 1.2rem;
+      // Make version smaller on mobile
+      span {
+        font-size: 0.5em;
       }
     }
 
