@@ -636,6 +636,9 @@ export const LineupEditorPage = {
         const otherLineup = this.allLineups.find(lineup => {
           // Skip the current lineup being edited
           if (lineup.name === this.currentLineup.name) return false;
+          // Only check lineups of the same raid type
+          const lineupRaidType = lineup.raidType || 'Hardcore';
+          if (lineupRaidType !== this.currentLineup.raidType) return false;
           // Check if player is in this lineup
           return lineup.players && lineup.players.includes(player.name);
         });
@@ -874,6 +877,11 @@ export const LineupEditorPage = {
       playerList.querySelectorAll('.player-option').forEach(option => {
         option.addEventListener('click', () => {
           const playerName = option.dataset.playerName;
+          // Check if player is already in another slot and remove them first
+          const existingSlotIndex = this.currentLineup.players.findIndex(p => p === playerName);
+          if (existingSlotIndex !== -1 && existingSlotIndex !== slotIndex) {
+            this.removePlayerFromSlot(existingSlotIndex);
+          }
           this.assignPlayerToSlot(slotIndex, playerName);
           document.body.removeChild(modalElement);
         });
@@ -1157,9 +1165,12 @@ export const LineupEditorPage = {
 
     if (!confirmed) return;
 
+    // Preserve the current raid type when clearing
+    const currentRaidType = this.currentLineup.raidType;
+
     this.currentLineup = {
       name: '',
-      raidType: 'Hardcore',
+      raidType: currentRaidType,
       status: 'ready',
       players: [],
       completed: false,
@@ -1171,7 +1182,7 @@ export const LineupEditorPage = {
     lineupNameInput.value = '';
     lineupNameInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    document.getElementById('raid-type').value = 'Hardcore';
+    document.getElementById('raid-type').value = currentRaidType;
     document.getElementById('cleared-toggle').checked = false;
     document.getElementById('template-toggle').checked = false;
 
@@ -1423,6 +1434,13 @@ export const LineupEditorPage = {
       card.addEventListener('dblclick', (e) => {
         const playerName = card.dataset.playerName;
 
+        // Check if player is already in a slot
+        const existingSlotIndex = this.currentLineup.players.findIndex(p => p === playerName);
+        if (existingSlotIndex !== -1) {
+          toast.warning(`${playerName} is already in slot ${existingSlotIndex + 1}`);
+          return;
+        }
+
         // Find first empty slot
         let firstEmptySlot = -1;
         for (let i = 0; i < 8; i++) {
@@ -1519,6 +1537,11 @@ export const LineupEditorPage = {
             // Show guest character modal instead of assigning
             this.showPubCharacterModal(targetSlotIndex);
           } else {
+            // Check if player is already in another slot and remove them first
+            const existingSlotIndex = this.currentLineup.players.findIndex(p => p === playerName);
+            if (existingSlotIndex !== -1 && existingSlotIndex !== targetSlotIndex) {
+              this.removePlayerFromSlot(existingSlotIndex);
+            }
             this.assignPlayerToSlot(targetSlotIndex, playerName);
             toast.success(`Assigned ${playerName} to slot ${targetSlotIndex + 1}`);
           }
