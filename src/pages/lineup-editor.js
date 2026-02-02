@@ -60,18 +60,32 @@ export const LineupEditorPage = {
     }
 
     // Start searching from approximate target (in epoch time)
+    // Round down to the nearest hour to start with a clean boundary
     const approximateTarget = now - (daysBack * 24 * 60 * 60 * 1000);
-    let candidate = approximateTarget - (12 * 60 * 60 * 1000); // Start 12 hours before
+    const oneHour = 60 * 60 * 1000;
+    let candidate = Math.floor((approximateTarget - (12 * oneHour)) / oneHour) * oneHour;
 
     // Search forward hour by hour (up to 48 hours to be safe)
-    const oneHour = 60 * 60 * 1000;
     for (let i = 0; i < 48; i++) {
       const candidateDayOfWeek = getPTDayOfWeek(candidate);
       const candidateHour = getPTHour(candidate);
 
       if (candidateDayOfWeek === 5 && candidateHour === 17) {
-        // Found Friday 5pm PT - return the epoch timestamp
-        return candidate;
+        // Found Friday 5pm PT - candidate is already normalized to hour boundary
+        // Now we need to fine-tune to find exactly when PT hour becomes 17
+        // Search backwards in 1-minute increments to find the exact moment
+        let exactMoment = candidate;
+        for (let j = 0; j < 60; j++) {
+          const testTime = candidate - (j * 60 * 1000);
+          if (getPTHour(testTime) !== 17) {
+            // We've gone too far back, the exact moment is one minute forward
+            exactMoment = testTime + (60 * 1000);
+            break;
+          }
+        }
+
+        // Round down to the nearest minute for consistency
+        return Math.floor(exactMoment / 60000) * 60000;
       }
 
       // Move forward 1 hour
@@ -92,6 +106,13 @@ export const LineupEditorPage = {
     // Get the stored last check timestamp from localStorage
     const storedLastCheck = localStorage.getItem('lastWeeklyResetCheck');
 
+    console.log('[Weekly Reset Check]', {
+      lastResetTimestamp,
+      lastResetDate: new Date(lastResetTimestamp).toISOString(),
+      storedLastCheck,
+      storedDate: storedLastCheck ? new Date(parseInt(storedLastCheck)).toISOString() : 'none'
+    });
+
     // On first load, initialize to current reset date (don't delete existing lineups)
     if (!storedLastCheck) {
       localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
@@ -103,6 +124,11 @@ export const LineupEditorPage = {
 
     // If we've crossed a reset boundary since last check, clear non-template lineups
     if (lastCheckTimestamp < lastResetTimestamp) {
+      console.warn('[DELETING LINEUPS]', {
+        reason: 'lastCheckTimestamp < lastResetTimestamp',
+        difference: lastResetTimestamp - lastCheckTimestamp,
+        differenceHours: (lastResetTimestamp - lastCheckTimestamp) / (1000 * 60 * 60)
+      });
       // Get all lineups
       const allLineups = await dataService.getLineups();
 
