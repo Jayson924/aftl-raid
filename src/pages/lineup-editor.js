@@ -23,20 +23,34 @@ export const LineupEditorPage = {
    */
   getLastResetDate() {
     const now = new Date();
-    const nowPT = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
 
-    // Determine current day of week in PT (0=Sun, 5=Fri, 6=Sat)
-    const dayOfWeek = nowPT.getDay();
+    // Helper: Get hour in PT timezone for any date
+    const getPTHour = (date) => {
+      return parseInt(date.toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric',
+        hour12: false
+      }));
+    };
 
-    // Calculate how many days back to last Friday 5pm PT
+    // Helper: Get day of week in PT timezone (0=Sun, 5=Fri, 6=Sat)
+    const getPTDayOfWeek = (date) => {
+      const dayName = date.toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        weekday: 'short'
+      });
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      return days.indexOf(dayName);
+    };
+
+    // Get current day/hour in PT
+    const dayOfWeek = getPTDayOfWeek(now);
+    const currentHourPT = getPTHour(now);
+
+    // Calculate how many days back to the target Friday
     let daysBack;
-    if (dayOfWeek === 5) { // Friday
-      // Check if we're past 5pm PT
-      if (nowPT.getHours() >= 17) {
-        daysBack = 0; // Use this Friday
-      } else {
-        daysBack = 7; // Use last Friday
-      }
+    if (dayOfWeek === 5) { // Currently Friday in PT
+      daysBack = currentHourPT >= 17 ? 0 : 7;
     } else if (dayOfWeek === 6) { // Saturday
       daysBack = 1;
     } else if (dayOfWeek === 0) { // Sunday
@@ -45,11 +59,32 @@ export const LineupEditorPage = {
       daysBack = dayOfWeek + 2;
     }
 
-    const lastFridayPT = new Date(nowPT);
-    lastFridayPT.setDate(lastFridayPT.getDate() - daysBack);
-    lastFridayPT.setHours(17, 0, 0, 0);
+    // Approximate the target day
+    const approximateTarget = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
-    return lastFridayPT;
+    // Search for the exact moment of Friday 5pm PT
+    // Start searching from 12 hours before our approximation
+    let candidate = new Date(approximateTarget);
+    candidate.setHours(candidate.getHours() - 12, 0, 0, 0);
+
+    // Search forward hour by hour (up to 48 hours to be safe)
+    for (let i = 0; i < 48; i++) {
+      const candidateDayOfWeek = getPTDayOfWeek(candidate);
+      const candidateHour = getPTHour(candidate);
+
+      if (candidateDayOfWeek === 5 && candidateHour === 17) {
+        // Found Friday 5pm PT
+        candidate.setMinutes(0, 0, 0);
+        return candidate;
+      }
+
+      // Move forward 1 hour
+      candidate = new Date(candidate.getTime() + 60 * 60 * 1000);
+    }
+
+    // Fallback (should never happen)
+    console.error('Could not determine last reset date');
+    return now;
   },
 
   /**
@@ -61,7 +96,15 @@ export const LineupEditorPage = {
 
     // Get the stored last check timestamp from localStorage
     const storedLastCheck = localStorage.getItem('lastWeeklyResetCheck');
-    const lastCheckTimestamp = storedLastCheck ? parseInt(storedLastCheck) : 0;
+
+    // On first load, initialize to current reset date (don't delete existing lineups)
+    if (!storedLastCheck) {
+      localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
+      console.log('First-time setup: initialized weekly reset tracker to', new Date(lastResetTimestamp));
+      return; // Don't delete anything on first load
+    }
+
+    const lastCheckTimestamp = parseInt(storedLastCheck);
 
     // If we've crossed a reset boundary since last check, clear non-template lineups
     if (lastCheckTimestamp < lastResetTimestamp) {
