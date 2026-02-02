@@ -18,15 +18,15 @@ export const LineupEditorPage = {
   nextWeekMode: false,
 
   /**
-   * Get the most recent Friday 5pm PT reset date
-   * @returns {Date} - The most recent Friday 5pm PT
+   * Get the most recent Friday 5pm PT reset date (returns epoch timestamp)
+   * @returns {number} - Epoch timestamp (milliseconds) of the most recent Friday 5pm PT
    */
   getLastResetDate() {
-    const now = new Date();
+    const now = Date.now(); // Current time in epoch milliseconds
 
-    // Helper: Get hour in PT timezone for any date
-    const getPTHour = (date) => {
-      return parseInt(date.toLocaleString('en-US', {
+    // Helper: Get hour in PT timezone for any epoch timestamp
+    const getPTHour = (epochMs) => {
+      return parseInt(new Date(epochMs).toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
         hour: 'numeric',
         hour12: false
@@ -34,8 +34,8 @@ export const LineupEditorPage = {
     };
 
     // Helper: Get day of week in PT timezone (0=Sun, 5=Fri, 6=Sat)
-    const getPTDayOfWeek = (date) => {
-      const dayName = date.toLocaleString('en-US', {
+    const getPTDayOfWeek = (epochMs) => {
+      const dayName = new Date(epochMs).toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
         weekday: 'short'
       });
@@ -59,27 +59,23 @@ export const LineupEditorPage = {
       daysBack = dayOfWeek + 2;
     }
 
-    // Approximate the target day
-    const approximateTarget = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-
-    // Search for the exact moment of Friday 5pm PT
-    // Start searching from 12 hours before our approximation
-    let candidate = new Date(approximateTarget);
-    candidate.setHours(candidate.getHours() - 12, 0, 0, 0);
+    // Start searching from approximate target (in epoch time)
+    const approximateTarget = now - (daysBack * 24 * 60 * 60 * 1000);
+    let candidate = approximateTarget - (12 * 60 * 60 * 1000); // Start 12 hours before
 
     // Search forward hour by hour (up to 48 hours to be safe)
+    const oneHour = 60 * 60 * 1000;
     for (let i = 0; i < 48; i++) {
       const candidateDayOfWeek = getPTDayOfWeek(candidate);
       const candidateHour = getPTHour(candidate);
 
       if (candidateDayOfWeek === 5 && candidateHour === 17) {
-        // Found Friday 5pm PT
-        candidate.setMinutes(0, 0, 0);
+        // Found Friday 5pm PT - return the epoch timestamp
         return candidate;
       }
 
       // Move forward 1 hour
-      candidate = new Date(candidate.getTime() + 60 * 60 * 1000);
+      candidate += oneHour;
     }
 
     // Fallback (should never happen)
@@ -91,8 +87,7 @@ export const LineupEditorPage = {
    * Check if we've crossed a weekly reset boundary and auto-clear non-template lineups
    */
   async checkAndClearWeeklyLineups() {
-    const lastResetDate = this.getLastResetDate();
-    const lastResetTimestamp = lastResetDate.getTime();
+    const lastResetTimestamp = this.getLastResetDate(); // Now returns epoch milliseconds
 
     // Get the stored last check timestamp from localStorage
     const storedLastCheck = localStorage.getItem('lastWeeklyResetCheck');
@@ -100,7 +95,7 @@ export const LineupEditorPage = {
     // On first load, initialize to current reset date (don't delete existing lineups)
     if (!storedLastCheck) {
       localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
-      console.log('First-time setup: initialized weekly reset tracker to', new Date(lastResetTimestamp));
+      console.log('First-time setup: initialized weekly reset tracker to', new Date(lastResetTimestamp).toISOString());
       return; // Don't delete anything on first load
     }
 
@@ -127,7 +122,7 @@ export const LineupEditorPage = {
       // Update the stored last check timestamp
       localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
 
-      console.log(`Weekly reset: ${deletedCount} non-template lineups cleared`);
+      console.log(`Weekly reset: ${deletedCount} non-template lineups cleared at ${new Date(lastResetTimestamp).toISOString()}`);
     }
   },
 
