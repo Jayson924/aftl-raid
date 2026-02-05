@@ -98,58 +98,15 @@ export const LineupEditorPage = {
   },
 
   /**
-   * Check if we've crossed a weekly reset boundary and auto-clear non-template lineups
+   * Check if we've crossed a weekly reset boundary and auto-clear non-template lineups.
+   * Cleanup runs server-side (Apps Script) so the state is shared across all devices/browsers.
    */
   async checkAndClearWeeklyLineups() {
-    const lastResetTimestamp = this.getLastResetDate(); // Now returns epoch milliseconds
+    const lastResetTimestamp = this.getLastResetDate();
+    console.log('[Weekly Reset Check] sending lastResetTimestamp:', new Date(lastResetTimestamp).toISOString());
 
-    // Get the stored last check timestamp from localStorage
-    const storedLastCheck = localStorage.getItem('lastWeeklyResetCheck');
-
-    console.log('[Weekly Reset Check]', {
-      lastResetTimestamp,
-      lastResetDate: new Date(lastResetTimestamp).toISOString(),
-      storedLastCheck,
-      storedDate: storedLastCheck ? new Date(parseInt(storedLastCheck)).toISOString() : 'none'
-    });
-
-    // On first load, initialize to current reset date (don't delete existing lineups)
-    if (!storedLastCheck) {
-      localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
-      console.log('First-time setup: initialized weekly reset tracker to', new Date(lastResetTimestamp).toISOString());
-      return; // Don't delete anything on first load
-    }
-
-    const lastCheckTimestamp = parseInt(storedLastCheck);
-
-    // If we've crossed a reset boundary since last check, clear non-template lineups
-    if (lastCheckTimestamp < lastResetTimestamp) {
-      console.warn('[DELETING LINEUPS]', {
-        reason: 'lastCheckTimestamp < lastResetTimestamp',
-        difference: lastResetTimestamp - lastCheckTimestamp,
-        differenceHours: (lastResetTimestamp - lastCheckTimestamp) / (1000 * 60 * 60)
-      });
-      // Get all lineups
-      const allLineups = await dataService.getLineups();
-
-      // Delete all non-template lineups
-      let deletedCount = 0;
-      for (const lineup of allLineups) {
-        if (!lineup.isTemplate) {
-          try {
-            await dataService.deleteLineup(lineup.name);
-            deletedCount++;
-          } catch (error) {
-            console.error(`Failed to delete lineup ${lineup.name}:`, error);
-          }
-        }
-      }
-
-      // Update the stored last check timestamp
-      localStorage.setItem('lastWeeklyResetCheck', lastResetTimestamp.toString());
-
-      console.log(`Weekly reset: ${deletedCount} non-template lineups cleared at ${new Date(lastResetTimestamp).toISOString()}`);
-    }
+    const result = await dataService.checkWeeklyReset(lastResetTimestamp);
+    console.log('[Weekly Reset Check]', result);
   },
 
   async render(container) {
@@ -436,7 +393,7 @@ export const LineupEditorPage = {
               </span>
               <div class="mini-lineup-header-actions">
                 <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
-                <button class="mini-delete-btn" data-lineup-name="${lineup.name}" title="Delete lineup">×</button>
+                <button class="mini-delete-btn" data-lineup-name="${lineup.name}" data-lineup-raidtype="${lineup.raidType || 'Hardcore'}" title="Delete lineup">×</button>
               </div>
             </div>
             <div class="mini-lineup-grid">
@@ -473,7 +430,8 @@ export const LineupEditorPage = {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const lineupName = btn.dataset.lineupName;
-          await this.deleteLineup(lineupName);
+          const raidType = btn.dataset.lineupRaidtype;
+          await this.deleteLineup(lineupName, raidType);
         });
       });
 
@@ -1231,7 +1189,7 @@ export const LineupEditorPage = {
       // Check if lineup with this name already exists
       const existingLineups = await dataService.getLineups();
       const trimmedName = this.currentLineup.name.trim();
-      const existingLineup = existingLineups.find(l => l.name.trim() === trimmedName);
+      const existingLineup = existingLineups.find(l => l.name.trim() === trimmedName && (l.raidType || 'Hardcore') === this.currentLineup.raidType);
 
       if (existingLineup) {
         // Confirm before updating existing lineup
@@ -1347,7 +1305,7 @@ export const LineupEditorPage = {
     }
   },
 
-  async deleteLineup(lineupName) {
+  async deleteLineup(lineupName, raidType) {
     const confirmed = await modal.confirm(
       `Delete lineup ${lineupName}?`,
       {
@@ -1361,7 +1319,7 @@ export const LineupEditorPage = {
     if (!confirmed) return;
 
     try {
-      await dataService.deleteLineup(lineupName);
+      await dataService.deleteLineup(lineupName, raidType);
       toast.success(`GG wala nang ${lineupName}!`);
       this.loadExistingLineups(); // Refresh the lineup list
     } catch (error) {

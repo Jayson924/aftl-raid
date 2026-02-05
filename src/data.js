@@ -129,8 +129,12 @@ class DataService {
     return this.callAppsScript('updateLineup', { lineup, oldName });
   }
 
-  async deleteLineup(lineupName) {
-    return this.callAppsScript('deleteLineup', { lineupName });
+  async deleteLineup(lineupName, raidType) {
+    return this.callAppsScript('deleteLineup', { lineupName, raidType });
+  }
+
+  async checkWeeklyReset(lastResetTimestamp) {
+    return this.callAppsScript('checkWeeklyReset', { lastResetTimestamp });
   }
 
   async toggleLineupCompleted(lineupName) {
