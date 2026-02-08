@@ -1,0 +1,328 @@
+// Modal
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+
+  .modal-content {
+    background-color: $background-dark;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: $border-radius;
+    padding: 2rem;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 90%;
+
+    h2 {
+      margin-top: 0;
+    }
+
+    &.confirmation-modal {
+      max-width: 500px;
+
+      .confirmation-message {
+        margin: 1.5rem 0;
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+
+      .form-actions {
+        justify-content: flex-end;
+        margin-top: 2rem;
+      }
+    }
+  }
+
+  .setup-instructions {
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-radius: $border-radius;
+    margin-bottom: 1.5rem;
+
+    h3 {
+      margin-top: 0;
+    }
+
+    ol {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+
+      li {
+        margin: 0.5rem 0;
+      }
+    }
+  }
+
+  .player-selector-modal {
+    max-width: 600px;
+    width: 100%;
+  }
+
+  .modal-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+
+    input[type="text"], select {
+      padding: 0.5rem;
+      border-radius: $border-radius;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background-color: rgba(255, 255, 255, 0.05);
+      color: $text-light;
+      font-family: inherit;
+    }
+
+    select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 0.7rem center;
+      background-size: 1rem;
+      padding-right: 2.5rem;
+
+      option {
+        background-color: #2a2a2a;
+        color: rgba(255, 255, 255, 0.87);
+      }
+    }
+  }
+
+  .modal-class-family-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    justify-content: center;
+
+    .class-family-btn {
+      width: 48px;
+      height: 48px;
+      padding: 2px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: $border-radius;
+      background-color: rgba(100, 100, 100, 0.3);
+      cursor: pointer;
+      transition: $transition;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.6;
+        transition: $transition;
+        transform: scale(2.5);
+      }
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        background-color: rgba(120, 120, 120, 0.4);
+
+        img {
+          opacity: 0.8;
+        }
+      }
+
+      &.active {
+        border-color: $success-color;
+        background-color: rgba(40, 167, 69, 0.3);
+
+        img {
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  .modal-hide-cleared-filter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: $text-light;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+
+    input[type="checkbox"] {
+      cursor: pointer;
+    }
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .player-selector-list, .lineup-select-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+
+    .player-option, .lineup-option {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+
+      &.completed {
+        opacity: 0.6;
+        border-color: $success-color;
+      }
+
+      .completion-badge {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background-color: $success-color;
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+      }
+      border-radius: $border-radius;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: $transition;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: $primary-color;
+      }
+
+      .player-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+
+        .player-name {
+          font-weight: 600;
+          font-size: 1rem;
+          color: $primary-color;
+        }
+
+        .player-role {
+          font-size: 0.85rem;
+          color: $text-muted;
+        }
+
+        .player-equipment {
+          display: flex;
+          gap: 0.5rem;
+          font-size: 0.75rem;
+          margin-top: 0.25rem;
+        }
+
+        .player-suffixes {
+          font-size: 0.75rem;
+          color: $text-muted;
+          font-style: italic;
+        }
+      }
+
+      &.add-guest-option {
+        background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.4) 10px, rgba(0, 0, 0, 0.4) 20px);
+        border: 2px dashed rgba(255, 193, 7, 0.6);
+
+        &:hover {
+          background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.21), rgba(255, 193, 7, 0.25) 10px, rgba(0, 0, 0, 0.5) 10px, rgba(0, 0, 0, 0.5) 20px);
+          border-color: rgba(255, 193, 7, 0.8);
+        }
+
+        .player-name {
+          color: #ffc107;
+          font-weight: 700;
+          text-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+        }
+      }
+    }
+
+    .lineup-option {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+
+  // Loading bar modal
+  &.loading-bar-modal {
+    .loading-bar-content {
+      max-width: 400px;
+      text-align: center;
+
+      h2 {
+        margin-bottom: 1.5rem;
+        color: $primary-color;
+      }
+
+      .loading-bar-container {
+        width: 100%;
+        height: 30px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: $border-radius;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+
+        .loading-bar-fill {
+          width: 0%;
+          height: 100%;
+          background: linear-gradient(90deg, $primary-color 0%, $primary-hover 100%);
+          box-shadow: 0 0 10px rgba(244, 196, 48, 0.5);
+          position: relative;
+
+          &::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
+            animation: shimmer 1.5s infinite;
+          }
+        }
+      }
+
+      #cancel-loading-btn {
+        width: 100%;
+      }
+    }
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

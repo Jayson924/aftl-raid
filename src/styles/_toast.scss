@@ -1,0 +1,120 @@
+// Toast notifications
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.95);
+  color: $text-dark;
+  border-radius: $border-radius;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid $primary-color;
+  opacity: 0;
+  transform: translateX(400px);
+  transition: all 0.3s ease;
+
+  &.toast-show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  &.toast-hide {
+    opacity: 0;
+    transform: translateX(400px);
+  }
+
+  .toast-icon {
+    font-size: 1.5rem;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .toast-message {
+    flex: 1;
+    font-size: 0.95rem;
+  }
+
+  .toast-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &.toast-success {
+    border-left-color: $success-color;
+
+    .toast-icon {
+      color: $success-color;
+    }
+  }
+
+  &.toast-error {
+    border-left-color: $danger-color;
+
+    .toast-icon {
+      color: $danger-color;
+    }
+  }
+
+  &.toast-warning {
+    border-left-color: $warning-color;
+
+    .toast-icon {
+      color: #cc9a06;
+    }
+  }
+
+  &.toast-info {
+    border-left-color: $primary-dark;
+
+    .toast-icon {
+      color: $primary-dark;
+    }
+  }
+}
+
+// Ensure good contrast for toast info in dark mode
+@media (prefers-color-scheme: dark) {
+  .toast.toast-info {
+    border-left-color: $primary-color;
+
+    .toast-icon {
+      color: $primary-color;
+    }
+  }
+}
+
+
+// Dark mode toasts
+@media (prefers-color-scheme: dark) {
+  .toast {
+    background-color: rgba(40, 40, 40, 0.98);
+    color: $text-light;
+  }
+}

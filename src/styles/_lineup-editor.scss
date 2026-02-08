@@ -1,0 +1,775 @@
+// Lineup Editor Page
+.lineup-editor-page {
+  .editor-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .lineup-info {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+
+    .form-group {
+      margin-bottom: 0;
+
+      &:first-child {
+        flex: 2;
+      }
+
+      &:not(:first-child) {
+        flex: 1;
+      }
+    }
+
+    .lineup-name-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+
+      > label:first-child {
+        margin-bottom: 0;
+      }
+
+      input {
+        margin-bottom: 0.25rem;
+      }
+
+      .lineup-toggles {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .template-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        user-select: none;
+        padding: 0.5rem 1rem;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.2s ease;
+        width: fit-content;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        input[type="checkbox"] {
+          display: none;
+
+          &:checked + .template-checkbox-icon + span {
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 600;
+          }
+
+          &:checked + span {
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 600;
+          }
+
+          &:checked ~ * {
+            color: rgba(255, 255, 255, 0.95);
+          }
+        }
+
+        &:has(input:checked) {
+          background-color: rgba(244, 196, 48, 0.15);
+          border-color: rgba(244, 196, 48, 0.4);
+          color: rgba(255, 255, 255, 0.95);
+        }
+
+        img.template-checkbox-icon {
+          width: 16px !important;
+          height: 16px !important;
+          min-width: 16px;
+          min-height: 16px;
+          max-width: 16px;
+          max-height: 16px;
+          opacity: 1;
+          filter: none;
+          display: block;
+          flex-shrink: 0;
+        }
+
+        span {
+          font-weight: 500;
+        }
+      }
+    }
+  }
+
+  .editor-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    min-width: 0;
+
+    > * {
+      min-width: 0;
+    }
+  }
+
+  .lineup-slots {
+    max-width: 100%;
+    overflow: hidden;
+
+    h3 {
+      margin-top: 0;
+    }
+
+    .slots-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .lineup-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+      justify-content: center;
+      align-items: center;
+
+      .btn {
+        flex: 1;
+        max-width: 200px;
+      }
+
+      .toggle-cleared {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        white-space: nowrap;
+        user-select: none;
+        padding: 0.5rem 1rem;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: $transition;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        input[type="checkbox"] {
+          cursor: pointer;
+          width: 18px;
+          height: 18px;
+          accent-color: $success-color;
+        }
+
+        input[type="checkbox"]:checked + span {
+          color: $success-color;
+          font-weight: 600;
+        }
+
+        span {
+          font-size: 0.9rem;
+          color: $text-light;
+        }
+      }
+    }
+
+    .slot {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      padding: 1rem;
+      cursor: pointer;
+      transition: $transition;
+      position: relative;
+      overflow: hidden;
+
+      &[draggable="true"] {
+        cursor: grab;
+      }
+
+      &.dragging {
+        opacity: 0.5;
+        cursor: grabbing;
+        transform: scale(0.95);
+        border-color: $primary-color;
+      }
+
+      &:hover {
+        border-color: $primary-color;
+        background-color: rgba(244, 196, 48, 0.1);
+      }
+
+      &.drag-over {
+        border-color: $success-color;
+        background-color: rgba(40, 167, 69, 0.2);
+        border-style: dashed;
+        transform: scale(1.02);
+      }
+
+      .slot-number {
+        display: inline-block;
+        background-color: $primary-color;
+        color: #1a1a1a;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 28px;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+        position: relative;
+        z-index: 1;
+      }
+
+      .slot-content {
+        position: relative;
+        z-index: 1;
+
+        .empty-slot {
+          color: $text-muted;
+          font-style: italic;
+        }
+
+        .assigned-player {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+
+          .player-name {
+            font-weight: 600;
+            color: $primary-color;
+            text-shadow: 0 0 8px rgba(244, 196, 48, 0.3), 0 1px 2px rgba(0, 0, 0, 0.3);
+          }
+
+          .player-role {
+            font-size: 0.9rem;
+            color: $text-muted;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          }
+
+          .player-equipment-compact {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+          }
+        }
+      }
+
+      .slot-remove-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background-color: $danger-color;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.4rem;
+        line-height: 1;
+        padding: 0;
+        transition: $transition;
+        opacity: 0.8;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+
+        &:hover {
+          opacity: 1;
+          background-color: darken($danger-color, 10%);
+          transform: scale(1.15);
+        }
+      }
+    }
+  }
+
+  .available-players {
+    h3 {
+      margin-top: 0;
+    }
+
+    .player-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+
+      input[type="text"], select {
+        padding: 0.5rem;
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background-color: rgba(255, 255, 255, 0.05);
+        color: $text-light;
+        font-family: inherit;
+      }
+
+      select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.7rem center;
+        background-size: 1rem;
+        padding-right: 2.5rem;
+
+        option {
+          background-color: #2a2a2a;
+          color: rgba(255, 255, 255, 0.87);
+        }
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+      }
+
+    }
+
+    .hide-cleared-filter {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: $text-light;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+
+      input[type="checkbox"] {
+        cursor: pointer;
+      }
+    }
+
+    .class-family-filter {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      justify-content: center;
+
+      .class-family-btn {
+        width: 48px;
+        height: 48px;
+        padding: 2px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: $border-radius;
+        background-color: rgba(100, 100, 100, 0.3);
+        cursor: pointer;
+        transition: $transition;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          opacity: 0.6;
+          transition: $transition;
+          transform: scale(2.5);
+        }
+
+        &:hover {
+          border-color: rgba(255, 255, 255, 0.4);
+          background-color: rgba(120, 120, 120, 0.4);
+
+          img {
+            opacity: 0.8;
+          }
+        }
+
+        &.active {
+          border-color: $success-color;
+          background-color: rgba(40, 167, 69, 0.3);
+
+          img {
+            opacity: 1;
+          }
+        }
+      }
+    }
+
+    .players-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 600px;
+      overflow-y: auto;
+      overflow-x: visible;
+      padding-right: 0.5rem;
+
+      .player-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: $border-radius;
+        padding: 0.75rem;
+        cursor: grab;
+        transition: $transition;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+          border-color: $primary-color;
+        }
+
+        &.completed {
+          opacity: 0.6;
+          border: 2px solid $success-color;
+
+          .player-name {
+            color: $success-color;
+          }
+        }
+
+        &.dragging {
+          opacity: 0.5;
+          cursor: grabbing;
+          transform: scale(0.95);
+        }
+
+        &.in-lineup {
+          background-color: rgba(40, 167, 69, 0.15);
+          border-color: $success-color;
+          box-shadow: 0 0 8px rgba(40, 167, 69, 0.3);
+        }
+
+        &:active {
+          cursor: grabbing;
+        }
+
+        .player-info {
+          flex: 1;
+
+          .player-name {
+            font-weight: 600;
+          }
+
+          .player-role, .player-equipment {
+            font-size: 0.9rem;
+            color: $text-muted;
+          }
+        }
+
+        .player-card-badges {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-shrink: 0;
+        }
+
+        .note-icon {
+          position: absolute;
+          top: 0.75rem;
+          right: 0.75rem;
+        }
+
+        .completed-badge {
+          color: $success-color;
+          font-size: 1.2rem;
+        }
+
+        .in-lineup-badge {
+          background-color: $success-color;
+          color: white;
+          padding: 0.2rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        .present-in-badge {
+          position: absolute;
+          bottom: 0.5rem;
+          right: 0.5rem;
+          background-color: rgba(255, 255, 255, 0.15);
+          color: rgba(255, 255, 255, 0.7);
+          padding: 0.2rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          font-style: italic;
+          white-space: nowrap;
+        }
+
+        .pub-badge {
+          background-color: #ffc107;
+          color: #000;
+          padding: 0.15rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.65rem;
+          font-weight: 700;
+          margin-left: 0.25rem;
+          border: 1px solid rgba(0, 0, 0, 0.3);
+          text-shadow: none;
+        }
+
+        .completion-badge {
+          position: absolute;
+          bottom: 0.5rem;
+          right: 0.5rem;
+          background-color: $success-color;
+          color: white;
+          border-radius: 50%;
+          width: 1.5rem;
+          height: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1rem;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          z-index: 10;
+        }
+      }
+
+      .add-pub-card {
+        background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.4) 10px, rgba(0, 0, 0, 0.4) 20px);
+        border: 2px dashed rgba(255, 193, 7, 0.6);
+
+        &:hover {
+          background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.21), rgba(255, 193, 7, 0.25) 10px, rgba(0, 0, 0, 0.5) 10px, rgba(0, 0, 0, 0.5) 20px);
+          border-color: rgba(255, 193, 7, 0.8);
+        }
+
+        .player-name {
+          color: #ffc107;
+          font-weight: 700;
+          text-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+        }
+
+        .player-role {
+          color: rgba(255, 193, 7, 0.7);
+        }
+      }
+    }
+  }
+
+  .existing-lineups-section {
+    margin-top: 1rem;
+    max-width: 100%;
+    overflow: hidden;
+
+    h3 {
+      margin: 0 0 1rem 0;
+      font-size: 1.1rem;
+    }
+
+    .carousel-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .existing-lineups-container {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      flex: 1;
+      cursor: grab;
+      user-select: none;
+
+      &::-webkit-scrollbar {
+        height: 8px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+      }
+
+      &:active {
+        cursor: grabbing;
+      }
+    }
+
+    .mini-lineup-card {
+      min-width: 280px;
+      max-width: 280px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: $transition;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+
+      &:hover {
+        border-color: $primary-color;
+        background-color: rgba(244, 196, 48, 0.05);
+        transform: translateY(-2px);
+      }
+
+      &.template {
+        background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+        border-color: rgba(150, 184, 255, 0.3);
+
+        &:hover {
+          background: linear-gradient(180deg, rgba(150, 184, 255, 0.2) 0%, rgba(150, 184, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 100%);
+          border-color: rgba(150, 184, 255, 0.5);
+        }
+      }
+
+      &.cleared {
+        background-color: rgba(40, 167, 69, 0.15);
+        border-color: rgba(40, 167, 69, 0.5);
+
+        &::after {
+          content: 'CLEARED';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-45deg);
+          font-size: 1.5rem;
+          font-weight: 900;
+          color: rgba(40, 167, 69, 0.2);
+          text-shadow: 0 0 20px rgba(40, 167, 69, 0.4);
+          pointer-events: none;
+          z-index: 1;
+          white-space: nowrap;
+          letter-spacing: 0.1em;
+        }
+
+        &:hover {
+          border-color: $success-color;
+        }
+      }
+
+      .mini-lineup-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        gap: 0.5rem;
+        position: relative;
+        z-index: 2;
+
+        .mini-lineup-name {
+          font-weight: 600;
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 0.9rem;
+        }
+
+        .mini-lineup-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+        }
+
+        .mini-lineup-raid-type {
+          font-size: 0.7rem;
+          padding: 0.2rem 0.4rem;
+          background-color: rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+          font-weight: 500;
+        }
+
+        .mini-delete-btn {
+          background-color: $danger-color;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 1.2rem;
+          line-height: 1;
+          padding: 0;
+          transition: $transition;
+          opacity: 0.7;
+
+          &:hover {
+            opacity: 1;
+            background-color: darken($danger-color, 10%);
+            transform: scale(1.1);
+          }
+        }
+      }
+
+      .mini-lineup-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.4rem;
+        position: relative;
+        z-index: 2;
+      }
+
+      .mini-player-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        padding: 0.4rem;
+        position: relative;
+        min-height: 38px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+
+        &.empty {
+          opacity: 0.5;
+        }
+
+        .mini-player-info {
+          .mini-player-name {
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.1rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .mini-player-role {
+            font-size: 0.65rem;
+            color: #888;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        }
+
+        .mini-player-empty {
+          font-size: 0.7rem;
+          color: #666;
+          text-align: center;
+        }
+      }
+    }
+  }
+}

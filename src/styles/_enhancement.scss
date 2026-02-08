@@ -1,0 +1,799 @@
+// Enhancement Page
+.enhancement-page {
+  .enhancement-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .enhancement-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .blacksmith-section {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgb(66, 66, 66);
+    border-radius: $border-radius;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.75);
+      border-radius: $border-radius;
+      z-index: 0;
+    }
+
+    .background-selector {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1rem;
+
+      .background-dropdown {
+        padding: 0.5rem 1rem;
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: $text-light;
+        font-family: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: $transition;
+
+        &:hover {
+          border-color: $primary-color;
+          background-color: rgba(0, 0, 0, 0.85);
+        }
+
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+
+        option {
+          background-color: #1a1a1a;
+          color: $text-light;
+        }
+      }
+    }
+
+    .blacksmith-image {
+      max-width: 300px;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 0 20px rgba(244, 196, 48, 0.3));
+      position: relative;
+      z-index: 1;
+    }
+
+    .enhancement-display {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+
+      .current-level {
+        text-align: center;
+
+        .level-label {
+          display: block;
+          font-size: 1.2rem;
+          color: $text-muted;
+          margin-bottom: 0.5rem;
+        }
+
+        .level-dropdown {
+          display: block;
+          width: 100%;
+          max-width: 200px;
+          margin: 0 auto;
+          padding: 0.5rem 1rem;
+          font-size: 4rem;
+          font-weight: 900;
+          color: $primary-color;
+          text-shadow: 0 0 20px rgba(244, 196, 48, 0.6);
+          line-height: 1;
+          background-color: rgba(0, 0, 0, 0.3);
+          border: 2px solid rgba(244, 196, 48, 0.3);
+          border-radius: $border-radius;
+          cursor: pointer;
+          transition: $transition;
+          text-align: center;
+
+          &:hover {
+            border-color: rgba(244, 196, 48, 0.6);
+            background-color: rgba(0, 0, 0, 0.5);
+          }
+
+          &:focus {
+            outline: none;
+            border-color: $primary-color;
+            box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+          }
+
+          option {
+            background-color: $background-dark;
+            color: $text-light;
+            font-size: 1.5rem;
+          }
+        }
+      }
+
+      .enhancement-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+
+        .enhancement-toggles {
+          display: flex;
+          gap: 0.75rem;
+
+          .protection-toggle {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.75rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: $border-radius;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: $transition;
+            justify-content: center;
+
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            input[type="checkbox"] {
+              cursor: pointer;
+              width: 20px;
+              height: 20px;
+              accent-color: $primary-color;
+            }
+
+            span {
+              font-size: 0.95rem;
+              font-weight: 500;
+            }
+          }
+        }
+
+        .enhance-row {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          width: 100%;
+
+          .loading-toggle {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: $border-radius;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: $transition;
+
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            input[type="checkbox"] {
+              cursor: pointer;
+              width: 18px;
+              height: 18px;
+              accent-color: $primary-color;
+              margin: 0;
+            }
+
+            .progressbar-icon {
+              width: 24px;
+              height: 24px;
+              fill: rgba(255, 255, 255, 0.87);
+            }
+          }
+
+          #enhance-btn {
+            flex: 1;
+            font-size: 1.2rem;
+            padding: 1rem 2rem;
+          }
+        }
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        width: 100%;
+
+        .stat-item {
+          background-color: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: $border-radius;
+          padding: 1rem;
+          text-align: center;
+
+          .stat-label {
+            display: block;
+            font-size: 0.9rem;
+            color: $text-muted;
+            margin-bottom: 0.5rem;
+          }
+
+          .stat-value {
+            display: block;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: $text-light;
+
+            &.success {
+              color: $success-color;
+            }
+
+            &.failure {
+              color: $danger-color;
+            }
+          }
+        }
+      }
+
+      .materials-tracker {
+        width: 100%;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: $border-radius;
+        padding: 1.5rem;
+        margin-top: 1rem;
+
+        .materials-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 1rem;
+
+          h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: $text-light;
+          }
+
+          .toggle-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+
+            .material-cost-toggle {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              cursor: pointer;
+              font-size: 0.9rem;
+
+              input[type="checkbox"] {
+                cursor: pointer;
+                width: 18px;
+                height: 18px;
+                accent-color: $primary-color;
+              }
+            }
+
+            .material-cost-hint {
+              margin: 0;
+              font-size: 0.75rem;
+              color: $text-muted;
+              font-style: italic;
+            }
+          }
+        }
+
+        h3 {
+          margin: 0 0 1rem 0;
+          text-align: center;
+          font-size: 1.1rem;
+          color: $text-light;
+        }
+
+        .materials-list {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.75rem;
+          margin-bottom: 0.75rem;
+
+          .material-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: $border-radius;
+            padding: 0.75rem 0.5rem;
+            transition: all 0.2s ease;
+
+            &.clickable {
+              cursor: pointer;
+              user-select: none;
+
+              &:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.4);
+                transform: translateY(-2px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+              }
+
+              &:active {
+                transform: translateY(0);
+              }
+
+              &.show-cost {
+                background-color: rgba(244, 196, 48, 0.1);
+                border-color: $primary-color;
+                box-shadow: 0 0 10px rgba(244, 196, 48, 0.3);
+              }
+            }
+
+            .material-name {
+              font-size: 0.85rem;
+              color: $text-muted;
+              text-align: center;
+              line-height: 1.2;
+            }
+
+            .material-count {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: $text-light;
+            }
+
+            .material-cost {
+              font-size: 0.75rem;
+              color: $primary-color;
+              font-weight: 600;
+              margin-top: 0.1rem;
+            }
+          }
+        }
+
+        .gold-section {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          align-items: center;
+
+          .gold-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: $border-radius;
+            padding: 0.75rem 2rem;
+            min-width: 200px;
+
+            .material-name {
+              font-size: 0.85rem;
+              color: $text-muted;
+              text-align: center;
+              line-height: 1.2;
+            }
+
+            .material-count {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: $text-light;
+            }
+
+            &.total-cost {
+              background-color: rgba(244, 196, 48, 0.1);
+              border: 2px solid $primary-color;
+
+              .material-name {
+                color: $primary-color;
+                font-weight: 600;
+              }
+
+              .material-count {
+                color: $primary-color;
+              }
+            }
+          }
+        }
+      }
+
+      .highest-level-section {
+        width: 100%;
+        background-color: rgba(244, 196, 48, 0.1);
+        border: 2px solid $primary-color;
+        border-radius: $border-radius;
+        padding: 1.5rem;
+        margin-top: 1rem;
+
+        h3 {
+          margin: 0 0 1rem 0;
+          text-align: center;
+          font-size: 1.2rem;
+          color: $text-light;
+
+          .highest-value {
+            color: $primary-color;
+            font-size: 1.4rem;
+            text-shadow: 0 0 10px rgba(244, 196, 48, 0.5);
+          }
+        }
+
+        .milestones-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 0.75rem;
+
+          .milestone-item {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: $border-radius;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            transition: $transition;
+            position: relative;
+
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+              border-color: $primary-color;
+            }
+
+            &.has-tooltip {
+              cursor: pointer;
+            }
+
+            .milestone-tooltip {
+              position: absolute;
+              bottom: calc(100% + 10px);
+              left: 50%;
+              transform: translateX(-50%);
+              background-color: rgba(0, 0, 0, 0.95);
+              border: 1px solid $primary-color;
+              border-radius: $border-radius;
+              padding: 0.75rem;
+              min-width: 180px;
+              z-index: 1000;
+              opacity: 0;
+              pointer-events: none;
+              transition: opacity 0.2s ease;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+              .tooltip-title {
+                font-weight: 700;
+                color: $primary-color;
+                margin-bottom: 0.5rem;
+                font-size: 0.9rem;
+                text-align: center;
+              }
+
+              .tooltip-item {
+                font-size: 0.85rem;
+                color: $text-light;
+                margin-bottom: 0.25rem;
+
+                &:last-child {
+                  margin-bottom: 0;
+                }
+
+                &.tooltip-total {
+                  margin-top: 0.5rem;
+                  padding-top: 0.5rem;
+                  border-top: 1px solid rgba(244, 196, 48, 0.3);
+                  color: $primary-color;
+                  font-weight: 700;
+                }
+              }
+
+              &::after {
+                content: '';
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 6px solid transparent;
+                border-top-color: $primary-color;
+              }
+            }
+
+            // Show tooltip on hover (desktop)
+            &:hover .milestone-tooltip {
+              opacity: 1;
+            }
+
+            // Show tooltip when tapped (mobile)
+            &.tooltip-visible .milestone-tooltip {
+              opacity: 1;
+              pointer-events: auto;
+            }
+
+            // Visual feedback when tooltip is visible on mobile
+            &.tooltip-visible {
+              background-color: rgba(255, 255, 255, 0.15);
+              border-color: $primary-color;
+            }
+
+            .milestone-level {
+              font-size: 1rem;
+              font-weight: 700;
+              color: $primary-color;
+              white-space: nowrap;
+            }
+
+            .milestone-attempts {
+              font-size: 0.85rem;
+              color: $text-light;
+            }
+
+            .milestone-total {
+              font-size: 0.75rem;
+              color: $text-muted;
+              font-style: italic;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .rates-section {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: $border-radius;
+    padding: 1.5rem;
+
+    h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: $primary-color;
+      text-shadow: 0 0 8px rgba(244, 196, 48, 0.3);
+    }
+
+    .rates-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+
+      .rates-tab {
+        padding: 0.75rem 1.5rem;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: $text-light;
+        cursor: pointer;
+        transition: $transition;
+        font-size: 0.95rem;
+        font-weight: 500;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        &.active {
+          color: $primary-color;
+          border-bottom-color: $primary-color;
+          background-color: rgba(244, 196, 48, 0.1);
+        }
+      }
+    }
+
+    .rates-table-container {
+      overflow-x: auto;
+
+      .material-cost-tab {
+        padding: 1.5rem;
+
+        .material-cost-description {
+          margin: 0 0 1.5rem 0;
+          text-align: center;
+          color: $text-muted;
+          font-size: 0.95rem;
+        }
+
+        .material-cost-inputs {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          max-width: 600px;
+          margin: 0 auto;
+
+          .form-group {
+            margin-bottom: 0;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 1rem;
+
+            label {
+              font-size: 0.95rem;
+              color: $text-light;
+              margin-bottom: 0;
+              white-space: nowrap;
+              flex: 0 0 220px;
+            }
+
+            input[type="number"] {
+              flex: 1;
+              padding: 0.75rem;
+              border-radius: $border-radius;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              background-color: rgba(255, 255, 255, 0.05);
+              color: $text-light;
+              font-family: inherit;
+              font-size: 1rem;
+
+              &:focus {
+                outline: none;
+                border-color: $primary-color;
+                box-shadow: 0 0 0 2px rgba(244, 196, 48, 0.2);
+              }
+            }
+          }
+        }
+      }
+
+      .rates-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+
+        thead {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        th, td {
+          padding: 0.75rem 0.5rem;
+          text-align: center;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+          font-weight: 600;
+          font-size: 0.85rem;
+        }
+
+        tbody tr {
+          transition: $transition;
+          cursor: pointer;
+
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+          }
+
+          &.current-row {
+            background-color: rgba(244, 196, 48, 0.15);
+            border: 2px solid $primary-color;
+
+            td {
+              font-weight: 600;
+            }
+          }
+
+          &.goal-row {
+            background-color: rgba(56, 142, 60, 0.15);
+            border: 2px solid #388e3c;
+
+            td {
+              font-weight: 600;
+              color: #66bb6a;
+            }
+
+            &:hover {
+              background-color: rgba(56, 142, 60, 0.25);
+            }
+          }
+
+          &.current-row.goal-row {
+            background: linear-gradient(135deg, rgba(244, 196, 48, 0.15) 0%, rgba(56, 142, 60, 0.15) 100%);
+            border: 2px solid #388e3c;
+            box-shadow: 0 0 8px rgba(56, 142, 60, 0.4);
+          }
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          &.dragging-current {
+            opacity: 0.5;
+            cursor: grabbing;
+            transform: scale(0.98);
+            background-color: rgba(244, 196, 48, 0.25);
+          }
+
+          &.drag-over {
+            background-color: rgba(40, 167, 69, 0.2);
+            border: 2px dashed #28a745;
+            cursor: grab;
+          }
+
+          &.drag-over.drag-source {
+            background-color: rgba(244, 196, 48, 0.25);
+            border: 2px dashed $primary-color;
+          }
+        }
+
+        .success-rate {
+          color: $success-color;
+          font-weight: 600;
+        }
+
+        .failure-rate {
+          color: $text-muted;
+        }
+
+        .destruction-rate {
+          color: $danger-color;
+          font-weight: 600;
+        }
+
+        .downgrade-rate {
+          color: $warning-color;
+          font-weight: 600;
+        }
+
+        .disappear-rate {
+          color: #8f5ce0;
+          font-weight: 600;
+        }
+
+        .goal-crosshair {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 48px;
+          height: 48px;
+
+          .crosshair-icon {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            filter: invert(79%) sepia(23%) saturate(676%) hue-rotate(73deg) brightness(95%) contrast(87%);
+          }
+
+          .crosshair-level {
+            position: relative;
+            z-index: 1;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #66bb6a;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+          }
+        }
+      }
+    }
+  }
+}

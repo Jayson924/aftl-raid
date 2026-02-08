@@ -1,0 +1,56 @@
+// Navigation
+.main-nav {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem 2rem;
+
+  .nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .app-title {
+    margin: 0;
+    font-size: 1.5rem;
+    color: $primary-color;
+    text-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+    font-weight: 700;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+  }
+
+  .nav-link {
+    color: $text-light;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: $border-radius;
+    transition: $transition;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    &.active {
+      background-color: $primary-color;
+      color: #1a1a1a;
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+    }
+  }
+
+  .nav-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+}

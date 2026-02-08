@@ -1,0 +1,232 @@
+// Spending Guide Page
+.spending-guide-page {
+  .page-subtitle {
+    color: $text-muted;
+    margin-top: 0.5rem;
+  }
+
+  .calculator-section {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1.5rem;
+    border-radius: $border-radius;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+
+    .form-group {
+      flex: 1;
+      max-width: 300px;
+      margin-bottom: 0;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: $border-radius;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.1);
+      color: $text-light;
+      font-size: 1.1rem;
+
+      &::placeholder {
+        color: $text-muted;
+      }
+    }
+  }
+
+  .results-section {
+    margin-bottom: 2rem;
+
+    h2 {
+      margin-bottom: 1rem;
+    }
+
+    .results-row {
+      display: flex;
+      gap: 1rem;
+
+      .result-card {
+        flex: 1;
+      }
+    }
+
+    .result-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: $border-radius;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid $primary-color;
+
+      &.cash-shop {
+        border-left-color: #9b59b6;
+      }
+
+      &.player-trade {
+        border-left-color: #3498db;
+      }
+
+      &.comparison {
+        border-left-color: $success-color;
+        background: rgba(40, 167, 69, 0.1);
+      }
+
+      h3 {
+        margin: 0 0 0.75rem 0;
+        font-size: 1.1rem;
+      }
+
+      .result-details p {
+        margin: 0.4rem 0;
+      }
+
+      .note {
+        color: $text-muted;
+        font-size: 0.85rem;
+        font-style: italic;
+      }
+    }
+
+    .better-deal {
+      font-weight: 600;
+
+      &.cash {
+        color: #9b59b6;
+      }
+
+      &.player {
+        color: #3498db;
+      }
+    }
+  }
+
+  .rates-section {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1.5rem;
+    border-radius: $border-radius;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
+    h2 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+
+    .rates-info {
+      color: $text-muted;
+      margin-bottom: 1.5rem;
+    }
+
+    .rates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .rate-group {
+      h4 {
+        margin: 0 0 1rem 0;
+        color: $primary-color;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-size: 0.9rem;
+      }
+
+      input {
+        padding: 0.5rem;
+        border-radius: $border-radius;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.1);
+        color: $text-light;
+        width: 100%;
+      }
+
+      .input-with-unit {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+
+        .unit-prefix,
+        .unit-suffix {
+          color: $text-muted;
+          font-size: 0.9rem;
+          white-space: nowrap;
+        }
+
+        input {
+          flex: 1;
+          min-width: 80px;
+          max-width: 140px;
+        }
+
+        select {
+          padding: 0.5rem;
+          border-radius: $border-radius;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          background: rgba(255, 255, 255, 0.1);
+          color: $text-light;
+          cursor: pointer;
+        }
+
+        .btn-icon {
+          padding: 0.4rem 0.6rem;
+          font-size: 0.9rem;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: $border-radius;
+          cursor: pointer;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.2);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+
+    .loading {
+      padding: 2rem;
+      text-align: center;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .spending-guide-page {
+    .calculator-section {
+      flex-direction: column;
+      align-items: stretch;
+
+      .form-group {
+        max-width: none;
+      }
+    }
+
+    .rates-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .rate-group {
+      .input-with-unit {
+        flex-wrap: wrap;
+
+        input {
+          min-width: 70px;
+          max-width: 120px;
+        }
+      }
+    }
+  }
+}

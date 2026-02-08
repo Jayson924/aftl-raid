@@ -278,6 +278,14 @@ class DataService {
       excludeLineupName: excludeLineupName
     });
   }
+
+  async getSpendingConfig() {
+    return this.callAppsScript('getSpendingConfig', {});
+  }
+
+  async saveSpendingConfig(config) {
+    return this.callAppsScript('saveSpendingConfig', { config });
+  }
 }
 
 export const dataService = new DataService();

@@ -1,9 +1,10 @@
-import './style.scss'
+import './styles/style.scss'
 import { router } from './router.js'
 import { LineupsPage } from './pages/lineups.js'
 import { PlayersPage } from './pages/players.js'
 import { LineupEditorPage } from './pages/lineup-editor.js'
 import { EnhancementPage } from './pages/enhancement.js'
+import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
 import { authService } from './auth.js'
@@ -19,6 +20,7 @@ function initApp() {
   router.register('players', PlayersPage, 'player'); // Requires player or admin role
   router.register('editor', LineupEditorPage, 'admin'); // Requires admin role only
   router.register('enhancement', EnhancementPage); // No auth required
+  router.register('spending', SpendingGuidePage); // No auth required
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -45,7 +47,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.003</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.004</span></h1>
       <ul class="nav-links">
         <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ${isAuthenticated ? `
@@ -55,6 +57,7 @@ function renderNavigation() {
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
+        <li><a href="#" class="nav-link" data-route="spending">Gold/Lavish</a></li>
       </ul>
       <div class="nav-actions">
         ${isAuthenticated ? `

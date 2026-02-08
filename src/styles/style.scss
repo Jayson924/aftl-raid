@@ -1,0 +1,27 @@
+// Main stylesheet - imports all partials
+
+// Variables must be first (used by all other partials)
+@import 'variables';
+
+// Base styles
+@import 'base';
+
+// Components
+@import 'nav';
+@import 'buttons';
+@import 'layout';
+@import 'forms';
+@import 'equipment';
+@import 'modal';
+@import 'toast';
+@import 'utilities';
+
+// Page-specific styles
+@import 'lineups';
+@import 'players';
+@import 'enhancement';
+@import 'lineup-editor';
+@import 'spending-guide';
+
+// Responsive styles (should be last to override other styles)
+@import 'responsive';
