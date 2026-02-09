@@ -165,26 +165,48 @@ class DataService {
       armor: this.cleanValue(row[7] || ''),
       armorEnhance: this.cleanValue(row[8] || ''),
       hardcoreCompleted: this.cleanValue(row[9] || ''),
-      classicCompleted: this.cleanValue(row[10] || '')
+      classicCompleted: this.cleanValue(row[10] || ''),
+      classicTicketUsed: this.cleanValue(row[11] || '') // Column L: Classic ticket usage timestamp
     })).filter(player => player.name);
   }
 
   parseLineupsFromSheet(rows) {
     if (rows.length === 0) return [];
 
-    return rows.slice(1).map(row => ({
-      name: this.cleanValue(row[0] || ''),
-      raidType: this.cleanValue(row[1] || '') || 'Hardcore', // Default to Hardcore if empty
-      status: row[2] || 'draft',
-      players: row.slice(3, 11).map(p => this.cleanValue(p || '')).filter(p => p),
-      completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true,
-      isTemplate: row[12] === 'TRUE' || row[12] === 'Yes' || row[12] === true
-    })).filter(lineup => lineup.name);
+    return rows.slice(1).map(row => {
+      // Parse player names and extract ticket status
+      const rawPlayers = row.slice(3, 11).map(p => this.cleanValue(p || ''));
+      const players = [];
+      const ticketPlayers = [];
+
+      rawPlayers.forEach(playerName => {
+        if (!playerName) return;
+
+        // Check for [T] suffix indicating ticket usage
+        if (playerName.endsWith('[T]')) {
+          players.push(playerName.slice(0, -3)); // Remove [T] suffix
+          ticketPlayers.push(true);
+        } else {
+          players.push(playerName);
+          ticketPlayers.push(false);
+        }
+      });
+
+      return {
+        name: this.cleanValue(row[0] || ''),
+        raidType: this.cleanValue(row[1] || '') || 'Hardcore', // Default to Hardcore if empty
+        status: row[2] || 'draft',
+        players,
+        ticketPlayers, // Array of booleans matching players array
+        completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true,
+        isTemplate: row[12] === 'TRUE' || row[12] === 'Yes' || row[12] === true
+      };
+    }).filter(lineup => lineup.name);
   }
 
   async getPlayers() {
     try {
-      const rows = await this.getRange('Players!A:K');
+      const rows = await this.getRange('Players!A:L'); // Extended to include ClassicTicketUsed column
       return this.parsePlayersFromSheet(rows);
     } catch (error) {
       console.error('Error fetching players:', error);
@@ -264,10 +286,24 @@ class DataService {
     return !this.isCompletedThisWeek(timestamp);
   }
 
-  async markPlayersCompleted(playerNames, raidType) {
+  /**
+   * Check if player has already used their ticket this week
+   * Currently only Classic raid has tickets
+   * @param {object} player - Player object with ticket usage timestamp
+   * @param {string} raidType - 'Hardcore' or 'Classic'
+   * @returns {boolean} - true if player has used their ticket this week
+   */
+  playerTicketUsed(player, raidType) {
+    // Currently only Classic has tickets
+    if (raidType !== 'Classic') return false;
+    return this.isCompletedThisWeek(player.classicTicketUsed);
+  }
+
+  async markPlayersCompleted(playerNames, raidType, ticketPlayerNames = []) {
     return this.callAppsScript('markPlayersCompleted', {
       playerNames: playerNames,
-      raidType: raidType
+      raidType: raidType,
+      ticketPlayerNames: ticketPlayerNames
     });
   }
 

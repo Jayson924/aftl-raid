@@ -9,6 +9,7 @@ export const LineupsPage = {
   currentShowcaseLineup: null,
   allLineups: [],
   cachedPlayerMap: null,
+  pendingTicketChanges: {}, // Track unsaved ticket changes per lineup: { lineupName: [true, false, ...] }
 
   async render(container) {
     container.innerHTML = `
@@ -166,6 +167,9 @@ export const LineupsPage = {
         dataService.getPlayers()
       ]);
 
+      // Clear pending ticket changes when fresh data is loaded
+      this.pendingTicketChanges = {};
+
       this.allLineups = lineups.filter(l => l.raidType === this.currentRaidType);
 
       if (this.allLineups.length === 0) {
@@ -213,6 +217,13 @@ export const LineupsPage = {
 
     // Check if lineup is cleared
     const isCleared = lineup.completed;
+    const hasPendingChanges = this.hasPendingTicketChanges(lineup);
+
+    // Determine button text
+    let buttonText = isCleared ? 'Not cleared' : 'Clear';
+    if (hasPendingChanges && !isCleared) {
+      buttonText = 'Save & Clear';
+    }
 
     showcaseContainer.innerHTML = `
       <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}">
@@ -221,12 +232,16 @@ export const LineupsPage = {
             ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
             ${lineup.name}
           </h3>
-          ${isAdmin ? `<button class="btn btn-primary btn-cleared" data-lineup-name="${lineup.name}">${isCleared ? 'Not cleared' : 'Clear'}</button>` : ''}
+          ${isAdmin ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-name="${lineup.name}">${buttonText}</button>` : ''}
         </div>
         <div class="lineup-players">
           ${lineup.players.map((playerName, idx) => {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
+
+            // Check ticket status for this player (Classic only)
+            const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
+            const showTicketFlag = lineup.raidType === 'Classic';
 
             // Check if this is a guest character
             let player = null;
@@ -274,7 +289,7 @@ export const LineupsPage = {
             }
 
             return `
-            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
+            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${isAdmin ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${isAdmin ? ' (click to toggle)' : ''}"><img src="/src/icons/ticket.svg" alt="Ticket"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
                 <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : ''}</span>
@@ -305,6 +320,16 @@ export const LineupsPage = {
           await this.handleClearedClick(lineupName, this.allLineups);
         });
       }
+
+      // Add click handlers for ticket flags (Classic only)
+      const ticketFlags = showcaseContainer.querySelectorAll('.ticket-flag--clickable');
+      ticketFlags.forEach(flag => {
+        flag.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const slotIndex = parseInt(flag.dataset.slotIndex, 10);
+          await this.handleTicketToggle(lineup, slotIndex);
+        });
+      });
     }
   },
 
@@ -319,6 +344,10 @@ export const LineupsPage = {
       // Create 8 mini player cards in 2x4 grid
       const playerCards = Array(8).fill(0).map((_, idx) => {
         const playerName = lineup.players[idx];
+
+        // Check ticket status for this player (Classic only)
+        const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
+        const showTicketFlag = lineup.raidType === 'Classic';
 
         // Check if this is a guest character
         let player = null;
@@ -342,7 +371,7 @@ export const LineupsPage = {
         const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
 
         return `
-          <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
+          <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/src/icons/ticket.svg" alt="T"></div>` : ''}
             <div class="mini-player-info">
               <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
               <div class="mini-player-role">${player.role}</div>
@@ -532,8 +561,15 @@ export const LineupsPage = {
       return;
     }
 
+    const hasPendingChanges = this.hasPendingTicketChanges(lineup);
+    let confirmMessage = `${lineup.completed ? 'Di pa ba na clear' : 'Cleared na ba'} ang lineup <strong>${lineupName}</strong>?`;
+
+    if (hasPendingChanges && !lineup.completed) {
+      confirmMessage += `<br><br><small style="color: #f4c430;">Ticket changes will be saved.</small>`;
+    }
+
     const confirmed = await modal.confirm(
-      `${lineup.completed ? 'Di pa ba na clear' : 'Cleared na ba'} ang lineup <strong>${lineupName}</strong>?<br><br>`,
+      confirmMessage,
       {
         title: 'Cleared Status',
         confirmText: lineup.completed ? 'Not Cleared' : 'Cleared',
@@ -544,6 +580,30 @@ export const LineupsPage = {
     if (!confirmed) return;
 
     try {
+      // If there are pending ticket changes and we're marking as cleared, save them first
+      if (hasPendingChanges && !lineup.completed) {
+        const lineupKey = `${lineup.name}|${lineup.raidType}`;
+        const ticketPlayers = this.pendingTicketChanges[lineupKey];
+
+        // Build players array with [T] suffix for ticket players
+        const playersWithTickets = lineup.players.map((playerName, idx) => {
+          if (!playerName) return '';
+          return ticketPlayers[idx] ? `${playerName}[T]` : playerName;
+        });
+
+        await dataService.updateLineup({
+          name: lineup.name,
+          raidType: lineup.raidType,
+          status: lineup.status,
+          players: playersWithTickets,
+          completed: lineup.completed,
+          isTemplate: lineup.isTemplate
+        }, lineup.name);
+
+        // Clear pending changes after saving
+        this.clearPendingTicketChanges(lineup);
+      }
+
       await dataService.toggleLineupCompleted(lineupName);
       toast.success(`Updated cleared status for ${lineupName}!`);
       // Reload the lineups to show updated cleared status
@@ -551,6 +611,40 @@ export const LineupsPage = {
     } catch (error) {
       toast.error(`Error: ${error.message}`);
     }
+  },
+
+  handleTicketToggle(lineup, slotIndex) {
+    const lineupKey = `${lineup.name}|${lineup.raidType}`;
+
+    // Initialize pending changes from current state if not exists
+    if (!this.pendingTicketChanges[lineupKey]) {
+      this.pendingTicketChanges[lineupKey] = [...(lineup.ticketPlayers || Array(8).fill(false))];
+    }
+
+    // Toggle the ticket status for this slot
+    this.pendingTicketChanges[lineupKey][slotIndex] = !this.pendingTicketChanges[lineupKey][slotIndex];
+
+    // Update local lineup state for immediate UI feedback
+    lineup.ticketPlayers = [...this.pendingTicketChanges[lineupKey]];
+
+    // Re-render showcase with updated data
+    this.renderShowcase(lineup, this.cachedPlayerMap);
+    this.renderCarousel(this.cachedPlayerMap);
+    this.setupCarouselHandlers();
+
+    const playerName = lineup.players[slotIndex];
+    const ticketStatus = this.pendingTicketChanges[lineupKey][slotIndex] ? 'using ticket' : 'no ticket';
+    toast.info(`${playerName}: ${ticketStatus} (pending)`);
+  },
+
+  hasPendingTicketChanges(lineup) {
+    const lineupKey = `${lineup.name}|${lineup.raidType}`;
+    return !!this.pendingTicketChanges[lineupKey];
+  },
+
+  clearPendingTicketChanges(lineup) {
+    const lineupKey = `${lineup.name}|${lineup.raidType}`;
+    delete this.pendingTicketChanges[lineupKey];
   },
 
   showSetupModal() {

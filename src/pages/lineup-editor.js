@@ -11,6 +11,7 @@ export const LineupEditorPage = {
     raidType: 'Hardcore',
     status: 'ready',
     players: [],
+    ticketSlots: Array(8).fill(false), // Track ticket usage per slot
     completed: false,
     isTemplate: false
   },
@@ -353,6 +354,9 @@ export const LineupEditorPage = {
         const playerCards = Array(8).fill(0).map((_, idx) => {
           const playerName = lineup.players[idx];
 
+          // Check ticket status for this player
+          const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
+
           // Check if this is a guest character
           let player = null;
           let isPub = false;
@@ -374,8 +378,13 @@ export const LineupEditorPage = {
 
           const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
 
+          // Mini ticket indicator (only for Classic raid)
+          const showTicketFlag = lineup.raidType === 'Classic';
+          const ticketIndicator = showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/src/icons/ticket.svg" alt="T"></div>` : '';
+
           return `
             <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
+              ${ticketIndicator}
               <div class="mini-player-info">
                 <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
                 <div class="mini-player-role">${player.role}</div>
@@ -587,6 +596,9 @@ export const LineupEditorPage = {
       // In Next Week mode, treat all players as needing the raid (ignore current completion status)
       const needsThisRaid = this.nextWeekMode ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
+      // Check if player has already used their ticket this week (Classic only)
+      const ticketUsed = this.nextWeekMode ? false : dataService.playerTicketUsed(player, this.currentLineup.raidType);
+
       // Check if player is in another lineup (not the current one)
       // Don't show this in Next Week mode since current week assignments aren't relevant
       let presentInLineup = null;
@@ -625,11 +637,15 @@ export const LineupEditorPage = {
         suffixDisplay.push(suffix2Obj?.label || player.suffix2);
       }
 
+      // Ticket used badge (only for Classic)
+      const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/src/icons/ticket.svg" alt="T"></span>` : '';
+
       return `
-        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''}"
+        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''}"
              data-player-name="${player.name}"
              draggable="true">
           ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
+          ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           <div class="player-info">
             <div class="player-name">${player.name}</div>
@@ -985,12 +1001,45 @@ export const LineupEditorPage = {
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
 
+    // Get current ticket status for this slot (only show for Classic raid)
+    const hasTicket = this.currentLineup.ticketSlots[slotIndex];
+    const showTicketToggle = this.currentLineup.raidType === 'Classic';
+
     slotContent.innerHTML = `
       <div class="assigned-player pub-player">
         <div class="player-name">${name} <span class="pub-badge">GUEST</span></div>
         <div class="player-role">${role}</div>
       </div>
+      ${showTicketToggle ? `
+        <label class="ticket-toggle" title="Using ticket run">
+          <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
+          <img src="/src/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
+        </label>
+      ` : ''}
     `;
+
+    // Add ticket checkbox handler (only if shown)
+    if (showTicketToggle) {
+      const ticketToggle = slotContent.querySelector('.ticket-toggle');
+      if (ticketToggle) {
+        // Stop click from bubbling to slot (which opens modal)
+        ticketToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      const ticketCheckbox = slotContent.querySelector('.ticket-checkbox');
+      if (ticketCheckbox) {
+        ticketCheckbox.addEventListener('change', (e) => {
+          e.stopPropagation();
+          this.currentLineup.ticketSlots[slotIndex] = e.target.checked;
+          const icon = slotContent.querySelector('.ticket-toggle-icon');
+          if (icon) {
+            icon.classList.toggle('active', e.target.checked);
+          }
+        });
+      }
+    }
 
     // Add remove button to slot
     let removeBtn = slotElement.querySelector('.slot-remove-btn');
@@ -1054,6 +1103,10 @@ export const LineupEditorPage = {
       suffixDisplay.push(suffix2Obj?.label || player.suffix2);
     }
 
+    // Get current ticket status for this slot (only show for Classic raid)
+    const hasTicket = this.currentLineup.ticketSlots[slotIndex];
+    const showTicketToggle = this.currentLineup.raidType === 'Classic';
+
     slotContent.innerHTML = `
       <div class="assigned-player">
         <div class="player-name">${player.name}</div>
@@ -1061,7 +1114,36 @@ export const LineupEditorPage = {
         ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
         ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
       </div>
+      ${showTicketToggle ? `
+        <label class="ticket-toggle" title="Using ticket run">
+          <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
+          <img src="/src/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
+        </label>
+      ` : ''}
     `;
+
+    // Add ticket checkbox handler (only if shown)
+    if (showTicketToggle) {
+      const ticketToggle = slotContent.querySelector('.ticket-toggle');
+      if (ticketToggle) {
+        // Stop click from bubbling to slot (which opens modal)
+        ticketToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      const ticketCheckbox = slotContent.querySelector('.ticket-checkbox');
+      if (ticketCheckbox) {
+        ticketCheckbox.addEventListener('change', (e) => {
+          e.stopPropagation();
+          this.currentLineup.ticketSlots[slotIndex] = e.target.checked;
+          const icon = slotContent.querySelector('.ticket-toggle-icon');
+          if (icon) {
+            icon.classList.toggle('active', e.target.checked);
+          }
+        });
+      }
+    }
 
     // Add remove button to slot (not inside slot-content)
     let removeBtn = slotElement.querySelector('.slot-remove-btn');
@@ -1091,6 +1173,7 @@ export const LineupEditorPage = {
 
   removePlayerFromSlot(slotIndex) {
     this.currentLineup.players[slotIndex] = null;
+    this.currentLineup.ticketSlots[slotIndex] = false; // Clear ticket status
 
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
@@ -1131,6 +1214,7 @@ export const LineupEditorPage = {
       raidType: currentRaidType,
       status: 'ready',
       players: [],
+      ticketSlots: Array(8).fill(false),
       completed: false,
       isTemplate: false
     };
@@ -1184,7 +1268,13 @@ export const LineupEditorPage = {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      const players = Array(8).fill('').map((_, idx) => this.currentLineup.players[idx] || '');
+      // Build players array with [T] suffix for ticket runs
+      const players = Array(8).fill('').map((_, idx) => {
+        const playerName = this.currentLineup.players[idx] || '';
+        if (!playerName) return '';
+        // Append [T] suffix if using ticket
+        return this.currentLineup.ticketSlots[idx] ? `${playerName}[T]` : playerName;
+      });
 
       // Check if lineup with this name already exists
       const existingLineups = await dataService.getLineups();
@@ -1227,7 +1317,13 @@ export const LineupEditorPage = {
         toast.success(`${trimmedName} updated!`);
 
         // Handle player completion status changes
-        const playerNames = players.filter(p => p && !p.startsWith('[PUB]'));
+        // Extract ticket players (those with [T] suffix) and strip suffix for marking
+        const nonGuestPlayers = players.filter(p => p && !p.startsWith('[PUB]'));
+        const ticketPlayerNames = nonGuestPlayers
+          .filter(p => p.endsWith('[T]'))
+          .map(p => p.slice(0, -3));
+        const playerNames = nonGuestPlayers
+          .map(p => p.endsWith('[T]') ? p.slice(0, -3) : p);
 
         if (wasCleared && !isNowCleared && playerNames.length > 0) {
           // Lineup was cleared but now unchecked - unmark players
@@ -1243,8 +1339,8 @@ export const LineupEditorPage = {
         } else if (!wasCleared && isNowCleared && playerNames.length > 0) {
           // Lineup was not cleared but now checked - mark players
           try {
-            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
-            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
+            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}, ${ticketPlayerNames.length} tickets used`);
           } catch (error) {
             console.error('Error marking players as completed:', error);
             toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
@@ -1252,8 +1348,8 @@ export const LineupEditorPage = {
         } else if (isNowCleared && playerNames.length > 0) {
           // Lineup is still cleared, but players may have changed - mark all players
           try {
-            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
-            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
+            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}, ${ticketPlayerNames.length} tickets used`);
           } catch (error) {
             console.error('Error marking players as completed:', error);
             toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
@@ -1273,13 +1369,18 @@ export const LineupEditorPage = {
 
         // If the lineup is marked as cleared, mark all players as completed for this raid type
         if (this.currentLineup.completed) {
-          // Get only non-guest players (exclude [PUB] entries)
-          const playerNames = players.filter(p => p && !p.startsWith('[PUB]'));
+          // Get only non-guest players (exclude [PUB] entries), extract ticket players
+          const nonGuestPlayers = players.filter(p => p && !p.startsWith('[PUB]'));
+          const ticketPlayerNames = nonGuestPlayers
+            .filter(p => p.endsWith('[T]'))
+            .map(p => p.slice(0, -3));
+          const playerNames = nonGuestPlayers
+            .map(p => p.endsWith('[T]') ? p.slice(0, -3) : p);
 
           if (playerNames.length > 0) {
             try {
-              await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType);
-              console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}`);
+              await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
+              console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}, ${ticketPlayerNames.length} tickets used`);
             } catch (error) {
               console.error('Error marking players as completed:', error);
               toast.warning('Saved pero may nangyari? Refresh nalang dong');
@@ -1328,11 +1429,20 @@ export const LineupEditorPage = {
   },
 
   loadLineup(lineup) {
+    // Build ticketSlots array from lineup.ticketPlayers (if present)
+    const ticketSlots = Array(8).fill(false);
+    if (lineup.ticketPlayers) {
+      lineup.ticketPlayers.forEach((hasTicket, idx) => {
+        if (idx < 8) ticketSlots[idx] = hasTicket;
+      });
+    }
+
     this.currentLineup = {
       name: lineup.name,
       raidType: lineup.raidType || 'Hardcore',
       status: 'ready',
       players: [...lineup.players],
+      ticketSlots,
       completed: lineup.completed || false,
       isTemplate: lineup.isTemplate || false
     };
@@ -1478,9 +1588,17 @@ export const LineupEditorPage = {
           const sourceIndex = parseInt(sourceSlotIndex);
           const targetPlayerName = this.currentLineup.players[targetSlotIndex];
 
+          // Swap ticket status along with players
+          const sourceTicket = this.currentLineup.ticketSlots[sourceIndex];
+          const targetTicket = this.currentLineup.ticketSlots[targetSlotIndex];
+
           // Swap players
           this.currentLineup.players[targetSlotIndex] = playerName;
           this.currentLineup.players[sourceIndex] = targetPlayerName || undefined;
+
+          // Swap ticket status
+          this.currentLineup.ticketSlots[targetSlotIndex] = sourceTicket;
+          this.currentLineup.ticketSlots[sourceIndex] = targetPlayerName ? targetTicket : false;
 
           // Re-render both slots
           if (targetPlayerName) {
