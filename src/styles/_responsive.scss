@@ -18,12 +18,14 @@
       gap: 0.75rem;
       align-items: center;
       justify-content: space-between;
+      position: relative;
     }
 
     .app-title {
       font-size: 1rem;
       margin: 0;
       white-space: nowrap;
+      flex: 1;
 
       // Make version smaller on mobile
       span {
@@ -31,24 +33,63 @@
       }
     }
 
-    .nav-links {
+    // Show hamburger on mobile
+    .hamburger-btn {
       display: flex;
-      flex-direction: row;
-      gap: 0.25rem;
-      flex: 1;
-      justify-content: center;
-      flex-wrap: wrap;
+    }
+
+    // Hide desktop nav actions on mobile
+    .nav-actions {
+      display: none;
+    }
+
+    // Mobile nav links - dropdown menu
+    .nav-links {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: -1rem;
+      right: -1rem;
+      flex-direction: column;
+      gap: 0;
+      background-color: rgba(26, 26, 26, 0.98);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.5rem 0;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+      &.open {
+        display: flex;
+      }
+
+      li {
+        list-style: none;
+      }
     }
 
     .nav-link {
-      padding: 0.5rem 0.75rem;
-      text-align: center;
-      font-size: 0.9rem;
+      display: block;
+      padding: 0.85rem 1.5rem;
+      text-align: left;
+      font-size: 1rem;
       white-space: nowrap;
+      border-radius: 0;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      &.active {
+        border-radius: 0;
+      }
     }
 
-    .nav-actions {
-      flex-shrink: 0;
+    // Show mobile auth link
+    .nav-auth-mobile {
+      display: block;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
     }
   }
 
@@ -92,6 +133,16 @@
 
       .player-slot {
         font-size: 0.9rem;
+        gap: 0.5rem;
+        min-width: 0;
+
+        .player-slot-info {
+          min-width: 0;
+        }
+      }
+
+      .lineup-players {
+        gap: 0.75rem;
       }
     }
 
@@ -208,8 +259,10 @@
 
       .enhancement-display {
         .current-level {
-          .level-value {
-            font-size: 3rem;
+          .level-dropdown {
+            font-size: 2.5rem;
+            max-width: 150px;
+            padding: 0.4rem 0.75rem;
           }
         }
 
@@ -532,14 +585,7 @@
 @media (max-width: 480px) {
   .main-nav {
     .app-title {
-      &::before {
-        font-size: 1rem;
-      }
-    }
-
-    .nav-link {
-      font-size: 0.85rem;
-      padding: 0.4rem 0.6rem;
+      font-size: 0.9rem;
     }
   }
 
@@ -547,6 +593,7 @@
     .player-slot {
       font-size: 0.85rem;
       padding: 0.4rem;
+      gap: 0.4rem;
 
       .slot-number {
         width: 20px;
@@ -555,6 +602,8 @@
       }
 
       .player-slot-info {
+        min-width: 0;
+
         .player-name {
           font-size: 0.85rem;
         }
@@ -577,6 +626,20 @@
 
   .modal .modal-content {
     padding: 1rem;
+  }
+
+  .enhancement-page {
+    .blacksmith-section {
+      .enhancement-display {
+        .current-level {
+          .level-dropdown {
+            font-size: 2rem;
+            max-width: 120px;
+            padding: 0.3rem 0.5rem;
+          }
+        }
+      }
+    }
   }
 }
 

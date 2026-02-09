@@ -307,11 +307,12 @@ class DataService {
     });
   }
 
-  async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName) {
+  async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName, ticketPlayerNames = []) {
     return this.callAppsScript('unmarkPlayersCompleted', {
       playerNames: playerNames,
       raidType: raidType,
-      excludeLineupName: excludeLineupName
+      excludeLineupName: excludeLineupName,
+      ticketPlayerNames: ticketPlayerNames
     });
   }
 

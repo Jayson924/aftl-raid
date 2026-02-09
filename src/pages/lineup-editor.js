@@ -1327,9 +1327,15 @@ export const LineupEditorPage = {
 
         if (wasCleared && !isNowCleared && playerNames.length > 0) {
           // Lineup was cleared but now unchecked - unmark players
-          console.log('Unmarking:', playerNames, 'for:', this.currentLineup.raidType);
+          // Use ORIGINAL ticket info from existingLineup, not current UI state
+          const originalTicketPlayerNames = existingLineup.ticketPlayers
+            ? existingLineup.players
+                .filter((p, idx) => p && !p.startsWith('[PUB]') && existingLineup.ticketPlayers[idx])
+                .map(p => p) // These are already clean names without [T]
+            : [];
+          console.log('Unmarking:', playerNames, 'original tickets:', originalTicketPlayerNames, 'for:', this.currentLineup.raidType);
           try {
-            const result = await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, trimmedName);
+            const result = await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, trimmedName, originalTicketPlayerNames);
             console.log(`Unmark result:`, result);
             console.log(`Unmarked players for ${this.currentLineup.raidType} (lineup unchecked)`);
           } catch (error) {

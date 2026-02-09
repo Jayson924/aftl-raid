@@ -47,8 +47,13 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.005</span></h1>
-      <ul class="nav-links">
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.006</span></h1>
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
+      <ul class="nav-links" id="nav-links">
         <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ${isAuthenticated ? `
           <li><a href="#" class="nav-link" data-route="players">Characters</a></li>
@@ -58,6 +63,13 @@ function renderNavigation() {
         ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         <li><a href="#" class="nav-link" data-route="spending">Gold/Lavish</a></li>
+        <li class="nav-auth-mobile">
+          ${isAuthenticated ? `
+            <a href="#" class="nav-link" id="logout-btn-mobile">Logout</a>
+          ` : `
+            <a href="#" class="nav-link" id="login-btn-mobile">Login</a>
+          `}
+        </li>
       </ul>
       <div class="nav-actions">
         ${isAuthenticated ? `
@@ -71,7 +83,32 @@ function renderNavigation() {
 
   document.body.insertBefore(nav, document.querySelector('#app'));
 
-  // Login/Logout buttons
+  // Hamburger menu toggle
+  const hamburgerBtn = document.getElementById('hamburger-btn');
+  const navLinks = document.getElementById('nav-links');
+
+  hamburgerBtn.addEventListener('click', () => {
+    hamburgerBtn.classList.toggle('active');
+    navLinks.classList.toggle('open');
+  });
+
+  // Close menu when a link is clicked
+  navLinks.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      hamburgerBtn.classList.remove('active');
+      navLinks.classList.remove('open');
+    });
+  });
+
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!nav.contains(e.target) && navLinks.classList.contains('open')) {
+      hamburgerBtn.classList.remove('active');
+      navLinks.classList.remove('open');
+    }
+  });
+
+  // Login/Logout buttons (desktop)
   if (isAuthenticated) {
     document.getElementById('logout-btn').addEventListener('click', () => {
       authService.logout();
@@ -81,6 +118,24 @@ function renderNavigation() {
     });
   } else {
     document.getElementById('login-btn').addEventListener('click', showLoginModal);
+  }
+
+  // Login/Logout buttons (mobile)
+  if (isAuthenticated) {
+    document.getElementById('logout-btn-mobile').addEventListener('click', (e) => {
+      e.preventDefault();
+      authService.logout();
+      toast.info('Bye bye na');
+      renderNavigation();
+      router.navigate('lineups');
+    });
+  } else {
+    document.getElementById('login-btn-mobile').addEventListener('click', (e) => {
+      e.preventDefault();
+      hamburgerBtn.classList.remove('active');
+      navLinks.classList.remove('open');
+      showLoginModal();
+    });
   }
 }
 
