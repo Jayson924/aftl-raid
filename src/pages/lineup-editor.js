@@ -380,7 +380,7 @@ export const LineupEditorPage = {
 
           // Mini ticket indicator (only for Classic raid)
           const showTicketFlag = lineup.raidType === 'Classic';
-          const ticketIndicator = showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/src/icons/ticket.svg" alt="T"></div>` : '';
+          const ticketIndicator = showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>` : '';
 
           return `
             <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
@@ -638,7 +638,7 @@ export const LineupEditorPage = {
       }
 
       // Ticket used badge (only for Classic)
-      const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/src/icons/ticket.svg" alt="T"></span>` : '';
+      const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/icons/ticket.svg" alt="T"></span>` : '';
 
       return `
         <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''}"
@@ -1013,7 +1013,7 @@ export const LineupEditorPage = {
       ${showTicketToggle ? `
         <label class="ticket-toggle" title="Using ticket run">
           <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
-          <img src="/src/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
+          <img src="/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
         </label>
       ` : ''}
     `;
@@ -1117,7 +1117,7 @@ export const LineupEditorPage = {
       ${showTicketToggle ? `
         <label class="ticket-toggle" title="Using ticket run">
           <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
-          <img src="/src/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
+          <img src="/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
         </label>
       ` : ''}
     `;
