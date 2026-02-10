@@ -11,7 +11,8 @@ export const SpendingGuidePage = {
     goldPrice: 0.44,
     goldCurrency: 'PHP',
     phpPerUsd: 56,
-    audPerUsd: 1.55
+    audPerUsd: 1.55,
+    idrPerUsd: 16000
   },
 
   tradingHouseCut: 0.10, // 10% cut, always fixed
@@ -32,7 +33,7 @@ export const SpendingGuidePage = {
         </div>
 
         <div id="results" class="results-section">
-          <h2>Results</h2>
+          <h2></h2>
 
           <div class="results-row">
             <div class="result-card cash-shop">
@@ -51,6 +52,7 @@ export const SpendingGuidePage = {
                 <p><strong>USD equivalent:</strong> <span id="player-usd">-</span></p>
                 <p><strong>AUD equivalent:</strong> <span id="player-aud">-</span></p>
                 <p><strong>PHP cost:</strong> <span id="player-php">-</span></p>
+                <p><strong>IDR cost:</strong> <span id="player-idr">-</span></p>
               </div>
             </div>
           </div>
@@ -91,15 +93,16 @@ export const SpendingGuidePage = {
                       <option value="PHP">PHP</option>
                       <option value="USD">USD</option>
                       <option value="AUD">AUD</option>
+                      <option value="IDR">IDR</option>
                     </select>
                   </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="exchange-rate-group">
                   <label>Exchange rate:</label>
                   <div class="input-with-unit">
                     <span class="unit-prefix">$1 =</span>
-                    <input type="number" id="rate-php-per-usd" min="0.01" step="0.01">
-                    <span class="unit-suffix">PHP</span>
+                    <input type="number" id="rate-exchange" min="0.01" step="0.01">
+                    <span class="unit-suffix" id="exchange-rate-suffix">PHP</span>
                     <button type="button" id="refresh-rate-btn" class="btn-icon" title="Fetch current rate">🔄</button>
                   </div>
                 </div>
@@ -141,9 +144,9 @@ export const SpendingGuidePage = {
       this.fetchExchangeRate();
     });
 
-    // Recalculate when currency changes and update label
+    // Recalculate when currency changes and update labels
     document.getElementById('rate-gold-currency').addEventListener('change', () => {
-      this.updateGoldRateLabel();
+      this.updateGoldRateLabel(); // This also calls updateExchangeRateField
       this.calculate();
     });
 
@@ -153,7 +156,7 @@ export const SpendingGuidePage = {
     });
 
     // Recalculate when exchange rate changes
-    document.getElementById('rate-php-per-usd').addEventListener('input', () => {
+    document.getElementById('rate-exchange').addEventListener('input', () => {
       this.calculate();
     });
 
@@ -211,21 +214,60 @@ export const SpendingGuidePage = {
     document.getElementById('rate-gold-per-lavish').value = this.config.goldPerLavish;
     document.getElementById('rate-gold-price').value = this.config.goldPrice;
     document.getElementById('rate-gold-currency').value = this.config.goldCurrency;
-    document.getElementById('rate-php-per-usd').value = this.config.phpPerUsd;
     this.updateGoldRateLabel();
+    this.updateExchangeRateField();
   },
 
   updateGoldRateLabel() {
     const currency = document.getElementById('rate-gold-currency').value;
     const prefix = document.getElementById('gold-rate-prefix');
-    prefix.textContent = (currency === 'USD' || currency === 'AUD') ? '100 Gold =' : '1 Gold =';
+    if (currency === 'USD' || currency === 'AUD') {
+      prefix.textContent = '100 Gold =';
+    } else {
+      prefix.textContent = '1 Gold =';
+    }
+    this.updateExchangeRateField();
+  },
+
+  updateExchangeRateField() {
+    const currency = document.getElementById('rate-gold-currency').value;
+    const exchangeGroup = document.getElementById('exchange-rate-group');
+    const exchangeInput = document.getElementById('rate-exchange');
+    const exchangeSuffix = document.getElementById('exchange-rate-suffix');
+
+    // Hide exchange rate for USD (it's the base currency)
+    if (currency === 'USD') {
+      exchangeGroup.style.display = 'none';
+    } else {
+      exchangeGroup.style.display = '';
+      exchangeSuffix.textContent = currency;
+
+      // Set the appropriate exchange rate value
+      if (currency === 'PHP') {
+        exchangeInput.value = this.config.phpPerUsd;
+      } else if (currency === 'AUD') {
+        exchangeInput.value = this.config.audPerUsd;
+      } else if (currency === 'IDR') {
+        exchangeInput.value = this.config.idrPerUsd;
+      }
+    }
   },
 
   readFormFields() {
     this.config.goldPerLavish = parseFloat(document.getElementById('rate-gold-per-lavish').value) || 700;
     this.config.goldPrice = parseFloat(document.getElementById('rate-gold-price').value) || 0.44;
     this.config.goldCurrency = document.getElementById('rate-gold-currency').value || 'PHP';
-    this.config.phpPerUsd = parseFloat(document.getElementById('rate-php-per-usd').value) || 56;
+
+    // Read exchange rate based on current currency
+    const exchangeRate = parseFloat(document.getElementById('rate-exchange').value);
+    const currency = this.config.goldCurrency;
+    if (currency === 'PHP') {
+      this.config.phpPerUsd = exchangeRate || 56;
+    } else if (currency === 'AUD') {
+      this.config.audPerUsd = exchangeRate || 1.55;
+    } else if (currency === 'IDR') {
+      this.config.idrPerUsd = exchangeRate || 16000;
+    }
   },
 
   async saveConfig() {
@@ -281,22 +323,31 @@ export const SpendingGuidePage = {
     const cashShopUsd = cashPointsNeeded / pointsPerUsd;
 
     // Player trade calculation
-    let playerUsd, playerPhp, playerAud;
+    let playerUsd, playerPhp, playerAud, playerIdr;
     if (this.config.goldCurrency === 'USD') {
       // Price is in USD per 100 gold
       playerUsd = targetGold * (this.config.goldPrice / 100);
       playerPhp = playerUsd * this.config.phpPerUsd;
       playerAud = playerUsd * this.config.audPerUsd;
+      playerIdr = playerUsd * this.config.idrPerUsd;
     } else if (this.config.goldCurrency === 'AUD') {
       // Price is in AUD per 100 gold, convert to USD
       playerAud = targetGold * (this.config.goldPrice / 100);
       playerUsd = playerAud / this.config.audPerUsd;
       playerPhp = playerUsd * this.config.phpPerUsd;
+      playerIdr = playerUsd * this.config.idrPerUsd;
+    } else if (this.config.goldCurrency === 'IDR') {
+      // Price is in IDR per 1 gold, convert to USD
+      playerIdr = targetGold * this.config.goldPrice;
+      playerUsd = playerIdr / this.config.idrPerUsd;
+      playerPhp = playerUsd * this.config.phpPerUsd;
+      playerAud = playerUsd * this.config.audPerUsd;
     } else {
       // Price is in PHP per 1 gold
       playerPhp = targetGold * this.config.goldPrice;
       playerUsd = playerPhp / this.config.phpPerUsd;
       playerAud = playerUsd * this.config.audPerUsd;
+      playerIdr = playerUsd * this.config.idrPerUsd;
     }
 
     // Display results
@@ -306,46 +357,58 @@ export const SpendingGuidePage = {
     document.getElementById('player-usd').textContent = `$${playerUsd.toFixed(2)}`;
     document.getElementById('player-aud').textContent = `A$${playerAud.toFixed(2)}`;
     document.getElementById('player-php').textContent = `₱${playerPhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    document.getElementById('player-idr').textContent = `Rp ${playerIdr.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
     // Recommendation
     const recommendation = document.getElementById('recommendation');
     const savings = Math.abs(cashShopUsd - playerUsd);
 
-    let note = '';
-    if (this.config.goldCurrency === 'PHP' && savings < 30) {
-      note = '<p class="note">* The difference is LOW, selling lavish is preferable depending on your transaction fees</p>';
-    }
-
     if (cashShopUsd < playerUsd) {
-      recommendation.innerHTML = `<span class="better-deal cash">Cash Shop is cheaper</span> by <strong>$${savings.toFixed(2)}</strong>${note}`;
+      recommendation.innerHTML = `<span class="better-deal cash">Cash Shop is cheaper</span> by <strong>$${savings.toFixed(2)}</strong>`;
     } else if (playerUsd < cashShopUsd) {
+      let note = '';
+      if (savings < 33) {
+        note = '<p class="note">* The difference is LOW, selling lavish is preferable depending on your transaction fees</p>';
+      }
       recommendation.innerHTML = `<span class="better-deal player">Player Trade is cheaper</span> by <strong>$${savings.toFixed(2)}</strong>${note}`;
     } else {
-      recommendation.innerHTML = `Both options cost the same!${note}`;
+      recommendation.innerHTML = `Both options cost the same!`;
     }
   },
 
   async fetchExchangeRate() {
     const btn = document.getElementById('refresh-rate-btn');
-    const input = document.getElementById('rate-php-per-usd');
+    const input = document.getElementById('rate-exchange');
+    const currency = document.getElementById('rate-gold-currency').value;
 
     btn.disabled = true;
     btn.textContent = '...';
 
     try {
-      const response = await fetch('https://api.frankfurter.app/latest?from=USD&to=PHP,AUD');
+      const response = await fetch('https://api.frankfurter.app/latest?from=USD&to=PHP,AUD,IDR');
       if (!response.ok) throw new Error('Failed to fetch');
 
       const data = await response.json();
       const phpRate = data.rates.PHP;
       const audRate = data.rates.AUD;
+      const idrRate = data.rates.IDR;
 
-      input.value = phpRate.toFixed(2);
       this.config.phpPerUsd = phpRate;
       this.config.audPerUsd = audRate;
+      this.config.idrPerUsd = idrRate;
+
+      // Update input based on current currency
+      if (currency === 'PHP') {
+        input.value = phpRate.toFixed(2);
+      } else if (currency === 'AUD') {
+        input.value = audRate.toFixed(2);
+      } else if (currency === 'IDR') {
+        input.value = Math.round(idrRate);
+      }
+
       this.calculate();
 
-      toast.success(`Rates updated: $1 = ₱${phpRate.toFixed(2)} / A$${audRate.toFixed(2)}`);
+      toast.success(`Rates updated: $1 = ₱${phpRate.toFixed(2)} / A$${audRate.toFixed(2)} / Rp${idrRate.toLocaleString()}`);
     } catch (error) {
       console.error('Failed to fetch exchange rate:', error);
       toast.error('Failed to fetch exchange rate');
