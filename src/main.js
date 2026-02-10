@@ -17,10 +17,10 @@ function initApp() {
 
   // Register routes
   router.register('lineups', LineupsPage);
-  router.register('players', PlayersPage, 'player'); // Requires player or admin role
+  router.register('characters', PlayersPage, 'player'); // Requires player or admin role
   router.register('editor', LineupEditorPage, 'admin'); // Requires admin role only
   router.register('enhancement', EnhancementPage); // No auth required
-  router.register('spending', SpendingGuidePage); // No auth required
+  router.register('lavish', SpendingGuidePage); // No auth required
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -47,7 +47,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.006</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.1.06</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -56,13 +56,13 @@ function renderNavigation() {
       <ul class="nav-links" id="nav-links">
         <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ${isAuthenticated ? `
-          <li><a href="#" class="nav-link" data-route="players">Characters</a></li>
+          <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
         ` : ''}
         ${isAdmin ? `
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
-        <li><a href="#" class="nav-link" data-route="spending">Gold/Lavish</a></li>
+        <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout</a>

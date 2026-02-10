@@ -222,6 +222,30 @@
             flex: 1;
             font-size: 1.2rem;
             padding: 1rem 2rem;
+
+            &:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
+          }
+
+          #auto-enhance-btn {
+            &.auto-active {
+              background-color: rgba(244, 196, 48, 0.2);
+              border-color: $primary-color;
+              color: $primary-color;
+              box-shadow: 0 0 15px rgba(244, 196, 48, 0.5);
+              animation: pulse-glow 1.5s ease-in-out infinite;
+            }
+          }
+
+          @keyframes pulse-glow {
+            0%, 100% {
+              box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+            }
+            50% {
+              box-shadow: 0 0 20px rgba(244, 196, 48, 0.7);
+            }
           }
         }
       }
@@ -683,6 +707,15 @@
         th {
           font-weight: 600;
           font-size: 0.85rem;
+        }
+
+        // Locked state during auto-enhance
+        &.locked {
+          tbody tr {
+            pointer-events: none;
+            cursor: default;
+            opacity: 0.6;
+          }
         }
 
         tbody tr {

@@ -7,6 +7,7 @@ class Router {
     this.routePermissions = {};
     this.currentPage = null;
     this.onAuthRequired = null;
+    this.defaultRoute = 'lineups';
   }
 
   register(path, component, requiredRole = null) {
@@ -20,7 +21,16 @@ class Router {
     this.onAuthRequired = handler;
   }
 
-  navigate(path) {
+  // Get route from current URL path
+  getRouteFromUrl() {
+    const path = window.location.pathname;
+    // Remove leading slash and get the route name
+    const route = path.replace(/^\//, '') || this.defaultRoute;
+    // Check if route exists, otherwise return default
+    return this.routes[route] ? route : this.defaultRoute;
+  }
+
+  navigate(path, updateHistory = true) {
     const requiredRole = this.routePermissions[path];
 
     if (requiredRole) {
@@ -42,6 +52,13 @@ class Router {
     const component = this.routes[path];
     if (component) {
       this.currentPage = path;
+
+      // Update URL without triggering popstate
+      if (updateHistory) {
+        const urlPath = path === this.defaultRoute ? '/' : `/${path}`;
+        window.history.pushState({ route: path }, '', urlPath);
+      }
+
       const appElement = document.querySelector('#app');
       appElement.innerHTML = '';
       component.render(appElement);
@@ -53,6 +70,7 @@ class Router {
   }
 
   init() {
+    // Handle click navigation
     document.addEventListener('click', (e) => {
       if (e.target.matches('[data-route]')) {
         e.preventDefault();
@@ -60,7 +78,19 @@ class Router {
       }
     });
 
-    this.navigate('lineups');
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', (e) => {
+      const route = e.state?.route || this.getRouteFromUrl();
+      this.navigate(route, false);
+    });
+
+    // Navigate to initial route based on URL
+    const initialRoute = this.getRouteFromUrl();
+    this.navigate(initialRoute, false);
+
+    // Set initial history state
+    const urlPath = initialRoute === this.defaultRoute ? '/' : `/${initialRoute}`;
+    window.history.replaceState({ route: initialRoute }, '', urlPath);
   }
 }
 

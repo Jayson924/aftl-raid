@@ -90,6 +90,8 @@ export const EnhancementPage = {
   milestoneAttempts: {}, // Track attempts at each level when first successfully enhanced
   totalLevelAttempts: {}, // Track total attempts made at each level throughout session
   isProcessing: false, // Prevent double-clicks
+  isAutoEnhancing: false, // Track auto-enhance mode
+  autoEnhanceCancelled: false, // Track if auto-enhance was cancelled
   materialsUsed: { // Track materials consumed
     essenceOfLife: 0,
     diamond: 0,
@@ -109,6 +111,10 @@ export const EnhancementPage = {
   },
   showMaterialCostTab: false, // Whether Material Cost tab is active
 
+  formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  },
+
   formatGold(totalGold) {
     const gold = Math.floor(totalGold);
     const silver = Math.floor((totalGold - gold) * 100);
@@ -119,7 +125,7 @@ export const EnhancementPage = {
     }
 
     let result = [];
-    if (gold > 0) result.push(`${gold}g`);
+    if (gold > 0) result.push(`${this.formatNumber(gold)}g`);
     if (silver > 0) result.push(`${silver}s`);
     if (copper > 0) result.push(`${copper}c`);
 
@@ -232,7 +238,8 @@ export const EnhancementPage = {
                     </label>
                   </div>
                   <div class="enhance-row">
-                    <button id="enhance-btn" class="btn btn-primary">Enhance!</button>
+                    <button id="enhance-btn" class="btn btn-primary" ${this.isAutoEnhancing ? 'disabled' : ''}>Enhance!</button>
+                    <button id="auto-enhance-btn" class="btn btn-secondary ${this.isAutoEnhancing ? 'auto-active' : ''}">${this.isAutoEnhancing ? 'Stop' : 'Auto'}</button>
                     <label class="loading-toggle">
                       <input type="checkbox" id="loading-bar-toggle" ${this.useLoadingBar ? 'checked' : ''}>
                       <svg class="progressbar-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
@@ -246,15 +253,15 @@ export const EnhancementPage = {
                 <div class="stats">
                   <div class="stat-item">
                     <span class="stat-label">Attempts:</span>
-                    <span class="stat-value">${this.attempts}</span>
+                    <span class="stat-value">${this.formatNumber(this.attempts)}</span>
                   </div>
                   <div class="stat-item">
                     <span class="stat-label">Successes:</span>
-                    <span class="stat-value success">${this.successes}</span>
+                    <span class="stat-value success">${this.formatNumber(this.successes)}</span>
                   </div>
                   <div class="stat-item">
                     <span class="stat-label">Failures:</span>
-                    <span class="stat-value failure">${this.failures}</span>
+                    <span class="stat-value failure">${this.formatNumber(this.failures)}</span>
                   </div>
                 </div>
                 ${this.highestLevel >= 7 ? `
@@ -281,21 +288,21 @@ export const EnhancementPage = {
                     </div>
                     <div class="materials-list">
                       <div class="material-item clickable ${this.showMaterialCosts.essenceOfLife ? 'show-cost' : ''}" data-material="essenceOfLife">
-                        <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
+                        <span class="material-count">${this.formatNumber(this.materialsUsed.essenceOfLife)}</span>
                         <span class="material-name">Essence of Life</span>
                         ${this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
                         ` : ''}
                       </div>
                       <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
-                        <span class="material-count">${this.materialsUsed.diamond}</span>
+                        <span class="material-count">${this.formatNumber(this.materialsUsed.diamond)}</span>
                         <span class="material-name">Polished Diamond</span>
                         ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
                         ` : ''}
                       </div>
                       <div class="material-item clickable ${this.showMaterialCosts.protectionJelly ? 'show-cost' : ''}" data-material="protectionJelly">
-                        <span class="material-count">${this.materialsUsed.protectionJelly}</span>
+                        <span class="material-count">${this.formatNumber(this.materialsUsed.protectionJelly)}</span>
                         <span class="material-name">Protection Jelly</span>
                         ${this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.protectionJelly * this.protectionJellyPrice)}</span>
@@ -417,7 +424,7 @@ export const EnhancementPage = {
     const rates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
 
     return `
-      <table class="rates-table">
+      <table class="rates-table${this.isAutoEnhancing ? ' locked' : ''}">
         <thead>
           <tr>
             <th>Level</th>
@@ -507,6 +514,14 @@ export const EnhancementPage = {
       this.attemptEnhancement();
     });
 
+    document.getElementById('auto-enhance-btn').addEventListener('click', () => {
+      if (this.isAutoEnhancing) {
+        this.stopAutoEnhance();
+      } else {
+        this.startAutoEnhance();
+      }
+    });
+
     document.getElementById('reset-btn').addEventListener('click', () => {
       this.reset();
     });
@@ -561,6 +576,11 @@ export const EnhancementPage = {
     // Add click handlers for rates table rows to set goal
     document.querySelectorAll('.rates-table tbody tr').forEach(row => {
       row.addEventListener('click', (e) => {
+        // Prevent changing goal while auto-enhancing
+        if (this.isAutoEnhancing) {
+          return;
+        }
+
         const level = parseInt(row.dataset.level);
 
         // Toggle goal: if clicking the same level, remove goal
@@ -855,14 +875,20 @@ export const EnhancementPage = {
     }
     this.isProcessing = true;
 
+    // Bail out if auto-enhance was cancelled (only during auto-enhance)
+    if (this.isAutoEnhancing && this.autoEnhanceCancelled) {
+      this.isProcessing = false;
+      return;
+    }
+
     if (this.currentLevel >= 15) {
       toast.warning('Maximum enhancement level reached!');
       this.isProcessing = false;
       return;
     }
 
-    // Show loading bar if enabled
-    if (this.useLoadingBar) {
+    // Show loading bar if enabled (skip during auto-enhance)
+    if (this.useLoadingBar && !this.isAutoEnhancing) {
       try {
         await this.showLoadingBar();
       } catch (error) {
@@ -942,7 +968,9 @@ export const EnhancementPage = {
         return;
       }
 
-      toast.success(`Enhancement success! Now at +${this.currentLevel}`);
+      if (!this.isAutoEnhancing) {
+        toast.success(`Enhancement success! Now at +${this.currentLevel}`);
+      }
 
       if (this.currentLevel === 15) {
         toast.success('Maximum level achieved! Congratulations!', 5000);
@@ -958,18 +986,128 @@ export const EnhancementPage = {
 
       if (failureRoll < destructionChance) {
         this.currentLevel = 0;
-        toast.error('Enhancement failed! Item destroyed!');
+        if (!this.isAutoEnhancing) {
+          toast.error('Enhancement failed! Item destroyed!');
+        }
       } else if (failureRoll < downgradeChance) {
         const newLevel = Math.max(0, this.currentLevel - currentRates.downgradeLevel);
-        toast.error(`Enhancement failed! Item downgraded from +${this.currentLevel} to +${newLevel}`);
+        if (!this.isAutoEnhancing) {
+          toast.error(`Enhancement failed! Item downgraded from +${this.currentLevel} to +${newLevel}`);
+        }
         this.currentLevel = newLevel;
       } else {
-        toast.info('Enhancement failed! Materials disappeared (no change)');
+        if (!this.isAutoEnhancing) {
+          toast.info('Enhancement failed! Materials disappeared (no change)');
+        }
+      }
+    }
+
+    // Skip re-render during auto-enhance to avoid flickering
+    if (!this.isAutoEnhancing) {
+      this.render(document.querySelector('#app'));
+    }
+    this.isProcessing = false;
+  },
+
+  async startAutoEnhance() {
+    if (this.isAutoEnhancing || this.currentLevel >= 15) {
+      return;
+    }
+
+    // Require a goal to be set
+    if (this.goalLevel === null) {
+      toast.warning('Set a target by clicking on a level in the rates table');
+      return;
+    }
+
+    // Check if already at or above goal
+    if (this.currentLevel >= this.goalLevel) {
+      toast.info(`Already at +${this.currentLevel}`);
+      return;
+    }
+
+    this.isAutoEnhancing = true;
+    this.autoEnhanceCancelled = false;
+
+    // Update button states
+    const autoBtn = document.getElementById('auto-enhance-btn');
+    if (autoBtn) {
+      autoBtn.textContent = 'Stop';
+      autoBtn.classList.add('auto-active');
+    }
+
+    const enhanceBtn = document.getElementById('enhance-btn');
+    if (enhanceBtn) {
+      enhanceBtn.disabled = true;
+    }
+
+    const levelDropdown = document.getElementById('level-dropdown');
+    if (levelDropdown) {
+      levelDropdown.disabled = true;
+    }
+
+    await this.runAutoEnhanceLoop();
+  },
+
+  stopAutoEnhance() {
+    this.autoEnhanceCancelled = true;
+    this.isAutoEnhancing = false;
+
+    // Update button states
+    const autoBtn = document.getElementById('auto-enhance-btn');
+    if (autoBtn) {
+      autoBtn.textContent = 'Auto';
+      autoBtn.classList.remove('auto-active');
+    }
+
+    const enhanceBtn = document.getElementById('enhance-btn');
+    if (enhanceBtn) {
+      enhanceBtn.disabled = false;
+    }
+
+    const levelDropdown = document.getElementById('level-dropdown');
+    if (levelDropdown) {
+      levelDropdown.disabled = false;
+    }
+  },
+
+  async runAutoEnhanceLoop() {
+    const targetLevel = this.goalLevel;
+
+    while (this.isAutoEnhancing && !this.autoEnhanceCancelled) {
+      const levelBefore = this.currentLevel;
+
+      await this.attemptEnhancement();
+
+      // Check if goal reached
+      if (this.currentLevel >= targetLevel) {
+        toast.success(`Auto-enhance complete! Reached +${this.currentLevel}`);
+        this.stopAutoEnhance();
+        break;
+      }
+
+      // Check for destruction (level went to 0 from a higher level)
+      if (levelBefore > 0 && this.currentLevel === 0) {
+        toast.error('Auto-enhance stopped: Item destroyed!');
+        this.stopAutoEnhance();
+        break;
+      }
+
+      // Check if max level reached
+      if (this.currentLevel >= 15) {
+        this.stopAutoEnhance();
+        break;
+      }
+
+      // Add delay and update UI if loading bar toggle is on
+      // Re-check the current value so user can toggle mid-run
+      if (this.useLoadingBar) {
+        this.updateStatsDisplay();
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
     this.render(document.querySelector('#app'));
-    this.isProcessing = false;
   },
 
   reset() {
@@ -989,8 +1127,26 @@ export const EnhancementPage = {
     this.materialsPerLevel = {};
     this.goalLevel = null;
     this.isProcessing = false;
+    this.isAutoEnhancing = false;
+    this.autoEnhanceCancelled = false;
     this.render(document.querySelector('#app'));
     toast.info('Enhancement simulator reset');
+  },
+
+  updateStatsDisplay() {
+    // Update just the stats without full re-render
+    const levelDropdown = document.getElementById('level-dropdown');
+    if (levelDropdown) {
+      levelDropdown.options[0].text = `+${this.currentLevel}`;
+      levelDropdown.options[0].value = this.currentLevel;
+    }
+
+    const statValues = document.querySelectorAll('.stat-value');
+    if (statValues.length >= 3) {
+      statValues[0].textContent = this.formatNumber(this.attempts);
+      statValues[1].textContent = this.formatNumber(this.successes);
+      statValues[2].textContent = this.formatNumber(this.failures);
+    }
   },
 
   updateRatesTable() {
@@ -1005,6 +1161,11 @@ export const EnhancementPage = {
         // Re-attach click handlers for rates table rows to set goal
         document.querySelectorAll('.rates-table tbody tr').forEach(row => {
           row.addEventListener('click', (e) => {
+            // Prevent changing goal while auto-enhancing
+            if (this.isAutoEnhancing) {
+              return;
+            }
+
             const level = parseInt(row.dataset.level);
 
             // Toggle goal: if clicking the same level, remove goal
