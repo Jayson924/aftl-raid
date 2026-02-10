@@ -1147,6 +1147,14 @@ export const EnhancementPage = {
       statValues[1].textContent = this.formatNumber(this.successes);
       statValues[2].textContent = this.formatNumber(this.failures);
     }
+
+    // Update the rates table highlighting
+    const tableRows = document.querySelectorAll('.rates-table tbody tr');
+    tableRows.forEach(row => {
+      const rowLevel = parseInt(row.dataset.level);
+      const isCurrent = this.currentLevel === rowLevel - 1;
+      row.classList.toggle('current-row', isCurrent);
+    });
   },
 
   updateRatesTable() {
