@@ -290,6 +290,24 @@
               text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
             }
 
+            .pilot-info-mini {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.15rem;
+              font-size: 0.6rem;
+              color: rgba(100, 149, 237, 0.9);
+              background-color: rgba(100, 149, 237, 0.15);
+              padding: 0.1rem 0.35rem;
+              border-radius: 8px;
+              margin-bottom: 0.1rem;
+
+              .pilot-info-icon-mini {
+                width: 9px;
+                height: 9px;
+                filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+              }
+            }
+
             .mini-player-role {
               font-size: 0.65rem;
               color: $text-muted;
@@ -451,6 +469,24 @@
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+
+        .pilot-info {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          font-size: 0.75rem;
+          color: rgba(100, 149, 237, 0.9);
+          background-color: rgba(100, 149, 237, 0.15);
+          padding: 0.1rem 0.4rem;
+          border-radius: 10px;
+          width: fit-content;
+
+          .pilot-info-icon {
+            width: 11px;
+            height: 11px;
+            filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+          }
         }
 
         .player-role {

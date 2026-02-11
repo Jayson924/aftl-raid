@@ -12,6 +12,7 @@ export const LineupEditorPage = {
     status: 'ready',
     players: [],
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
+    pilotSlots: Array(8).fill(''), // Track pilot names per slot (empty string if no pilot)
     completed: false,
     isTemplate: false
   },
@@ -219,6 +220,7 @@ export const LineupEditorPage = {
       this.currentLineup.raidType = e.target.value;
       this.renderAvailablePlayers(); // Re-render to update completion badges
       this.loadExistingLineups(); // Re-filter existing lineups by raid type
+      this.reRenderLineupSlots(); // Re-render slots to show/hide ticket toggle
     });
 
     document.getElementById('cleared-toggle').addEventListener('change', (e) => {
@@ -382,11 +384,16 @@ export const LineupEditorPage = {
           const showTicketFlag = lineup.raidType === 'Classic';
           const ticketIndicator = showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>` : '';
 
+          // Check pilot status for this player (only for non-guest)
+          const pilotName = !isPub && lineup.pilotPlayers && lineup.pilotPlayers[idx] ? lineup.pilotPlayers[idx] : '';
+          const pilotDisplay = pilotName ? `<span class="pilot-info-mini"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon-mini">${pilotName}</span>` : '';
+
           return `
             <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
               ${ticketIndicator}
               <div class="mini-player-info">
                 <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
+                ${pilotDisplay}
                 <div class="mini-player-role">${player.role}</div>
               </div>
             </div>
@@ -993,6 +1000,65 @@ export const LineupEditorPage = {
     });
   },
 
+  showPilotModal(slotIndex) {
+    const playerName = this.currentLineup.players[slotIndex];
+    const currentPilot = this.currentLineup.pilotSlots[slotIndex] || '';
+
+    const modalElement = document.createElement('div');
+    modalElement.className = 'modal';
+
+    modalElement.innerHTML = `
+      <div class="modal-content pilot-modal">
+        <h2>Set Pilot for ${playerName}</h2>
+        <p class="pilot-modal-desc">Who will use this character?:</p>
+        <form id="pilot-form">
+          <div class="form-group">
+            <input type="text" id="pilot-name-input" placeholder="Pilot's name..." value="${currentPilot}">
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="clear-pilot-btn" class="btn btn-secondary">Clear</button>
+            <button type="button" id="cancel-pilot-btn" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modalElement);
+
+    // Focus the input
+    const input = document.getElementById('pilot-name-input');
+    input.focus();
+    input.select();
+
+    const form = document.getElementById('pilot-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pilotName = input.value.trim();
+      this.currentLineup.pilotSlots[slotIndex] = pilotName;
+      // Re-render the slot to update display
+      this.assignPlayerToSlot(slotIndex, playerName);
+      document.body.removeChild(modalElement);
+    });
+
+    document.getElementById('clear-pilot-btn').addEventListener('click', () => {
+      this.currentLineup.pilotSlots[slotIndex] = '';
+      // Re-render the slot to update display
+      this.assignPlayerToSlot(slotIndex, playerName);
+      document.body.removeChild(modalElement);
+    });
+
+    document.getElementById('cancel-pilot-btn').addEventListener('click', () => {
+      document.body.removeChild(modalElement);
+    });
+
+    modalElement.addEventListener('click', (e) => {
+      if (e.target === modalElement) {
+        document.body.removeChild(modalElement);
+      }
+    });
+  },
+
   assignPubPlayerToSlot(slotIndex, name, role) {
     // Store guest character with special format: [PUB]Name|Class
     const pubPlayerString = `[PUB]${name}|${role}`;
@@ -1107,19 +1173,29 @@ export const LineupEditorPage = {
     const hasTicket = this.currentLineup.ticketSlots[slotIndex];
     const showTicketToggle = this.currentLineup.raidType === 'Classic';
 
+    // Get current pilot for this slot
+    const pilotName = this.currentLineup.pilotSlots[slotIndex] || '';
+    const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
+
     slotContent.innerHTML = `
       <div class="assigned-player">
         <div class="player-name">${player.name}</div>
+        ${pilotDisplay}
         <div class="player-role">${player.role}</div>
         ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
         ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
       </div>
-      ${showTicketToggle ? `
-        <label class="ticket-toggle" title="Using ticket run">
-          <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
-          <img src="/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
-        </label>
-      ` : ''}
+      <div class="slot-toggles">
+        ${showTicketToggle ? `
+          <label class="ticket-toggle" title="Using ticket run">
+            <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
+            <img src="/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
+          </label>
+        ` : ''}
+        <button class="pilot-btn ${pilotName ? 'active' : ''}" data-slot="${slotIndex}" title="${pilotName ? `Piloted by: ${pilotName}` : 'Set pilot'}">
+          <img src="/icons/headphones.svg" alt="Pilot" class="pilot-icon">
+        </button>
+      </div>
     `;
 
     // Add ticket checkbox handler (only if shown)
@@ -1143,6 +1219,15 @@ export const LineupEditorPage = {
           }
         });
       }
+    }
+
+    // Add pilot button handler
+    const pilotBtn = slotContent.querySelector('.pilot-btn');
+    if (pilotBtn) {
+      pilotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showPilotModal(slotIndex);
+      });
     }
 
     // Add remove button to slot (not inside slot-content)
@@ -1174,6 +1259,7 @@ export const LineupEditorPage = {
   removePlayerFromSlot(slotIndex) {
     this.currentLineup.players[slotIndex] = null;
     this.currentLineup.ticketSlots[slotIndex] = false; // Clear ticket status
+    this.currentLineup.pilotSlots[slotIndex] = ''; // Clear pilot
 
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
@@ -1191,6 +1277,15 @@ export const LineupEditorPage = {
     slotContent.style.cssText = '';
 
     this.renderAvailablePlayers();
+  },
+
+  reRenderLineupSlots() {
+    // Re-render all assigned players to update ticket/pilot toggles based on raid type
+    this.currentLineup.players.forEach((playerName, idx) => {
+      if (playerName) {
+        this.assignPlayerToSlot(idx, playerName);
+      }
+    });
   },
 
   async clearLineup() {
@@ -1215,6 +1310,7 @@ export const LineupEditorPage = {
       status: 'ready',
       players: [],
       ticketSlots: Array(8).fill(false),
+      pilotSlots: Array(8).fill(''),
       completed: false,
       isTemplate: false
     };
@@ -1268,12 +1364,21 @@ export const LineupEditorPage = {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      // Build players array with [T] suffix for ticket runs
+      // Build players array with [T] and [P:PilotName] suffixes
       const players = Array(8).fill('').map((_, idx) => {
         const playerName = this.currentLineup.players[idx] || '';
         if (!playerName) return '';
+        let result = playerName;
         // Append [T] suffix if using ticket
-        return this.currentLineup.ticketSlots[idx] ? `${playerName}[T]` : playerName;
+        if (this.currentLineup.ticketSlots[idx]) {
+          result += '[T]';
+        }
+        // Append [P:PilotName] suffix if pilot is set (only for non-guest players)
+        const pilotName = this.currentLineup.pilotSlots[idx];
+        if (pilotName && !playerName.startsWith('[PUB]')) {
+          result += `[P:${pilotName}]`;
+        }
+        return result;
       });
 
       // Check if lineup with this name already exists
@@ -1443,12 +1548,21 @@ export const LineupEditorPage = {
       });
     }
 
+    // Build pilotSlots array from lineup.pilotPlayers (if present)
+    const pilotSlots = Array(8).fill('');
+    if (lineup.pilotPlayers) {
+      lineup.pilotPlayers.forEach((pilotName, idx) => {
+        if (idx < 8) pilotSlots[idx] = pilotName || '';
+      });
+    }
+
     this.currentLineup = {
       name: lineup.name,
       raidType: lineup.raidType || 'Hardcore',
       status: 'ready',
       players: [...lineup.players],
       ticketSlots,
+      pilotSlots,
       completed: lineup.completed || false,
       isTemplate: lineup.isTemplate || false
     };
@@ -1598,6 +1712,10 @@ export const LineupEditorPage = {
           const sourceTicket = this.currentLineup.ticketSlots[sourceIndex];
           const targetTicket = this.currentLineup.ticketSlots[targetSlotIndex];
 
+          // Swap pilot status along with players
+          const sourcePilot = this.currentLineup.pilotSlots[sourceIndex];
+          const targetPilot = this.currentLineup.pilotSlots[targetSlotIndex];
+
           // Swap players
           this.currentLineup.players[targetSlotIndex] = playerName;
           this.currentLineup.players[sourceIndex] = targetPlayerName || undefined;
@@ -1605,6 +1723,10 @@ export const LineupEditorPage = {
           // Swap ticket status
           this.currentLineup.ticketSlots[targetSlotIndex] = sourceTicket;
           this.currentLineup.ticketSlots[sourceIndex] = targetPlayerName ? targetTicket : false;
+
+          // Swap pilot status
+          this.currentLineup.pilotSlots[targetSlotIndex] = sourcePilot;
+          this.currentLineup.pilotSlots[sourceIndex] = targetPlayerName ? targetPilot : '';
 
           // Re-render both slots
           if (targetPlayerName) {

@@ -256,6 +256,24 @@
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
           }
 
+          .pilot-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.8rem;
+            color: rgba(100, 149, 237, 0.9);
+            background-color: rgba(100, 149, 237, 0.15);
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            margin-top: 0.15rem;
+
+            .pilot-info-icon {
+              width: 12px;
+              height: 12px;
+              filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+            }
+          }
+
           .player-equipment-compact {
             display: flex;
             gap: 0.5rem;
@@ -293,16 +311,22 @@
         }
       }
 
-      // Ticket toggle in slot
-      .ticket-toggle {
+      // Container for ticket and pilot toggles
+      .slot-toggles {
         position: absolute;
         bottom: 0.25rem;
         right: 0.25rem;
         display: flex;
+        gap: 0.25rem;
+        z-index: 10;
+      }
+
+      // Ticket toggle in slot
+      .ticket-toggle {
+        display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        z-index: 10;
         padding: 0.5rem;
         min-width: 36px;
         min-height: 36px;
@@ -336,6 +360,44 @@
           background-color: rgba(244, 196, 48, 0.2);
           border-color: rgba(244, 196, 48, 0.5);
           box-shadow: 0 0 8px rgba(244, 196, 48, 0.3);
+        }
+      }
+
+      // Pilot button in slot
+      .pilot-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0.5rem;
+        min-width: 36px;
+        min-height: 36px;
+        border-radius: 6px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.2s ease;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.4);
+          transform: scale(1.05);
+        }
+
+        .pilot-icon {
+          width: 20px;
+          height: 20px;
+          filter: brightness(0) invert(0.5);
+          transition: all 0.2s ease;
+        }
+
+        &.active {
+          background-color: rgba(100, 149, 237, 0.25);
+          border-color: rgba(100, 149, 237, 0.6);
+          box-shadow: 0 0 8px rgba(100, 149, 237, 0.3);
+
+          .pilot-icon {
+            filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+          }
         }
       }
     }
@@ -832,6 +894,24 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+          }
+
+          .pilot-info-mini {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15rem;
+            font-size: 0.6rem;
+            color: rgba(100, 149, 237, 0.9);
+            background-color: rgba(100, 149, 237, 0.15);
+            padding: 0.1rem 0.35rem;
+            border-radius: 8px;
+            margin-bottom: 0.1rem;
+
+            .pilot-info-icon-mini {
+              width: 9px;
+              height: 9px;
+              filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+            }
           }
 
           .mini-player-role {

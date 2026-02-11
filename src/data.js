@@ -174,22 +174,40 @@ class DataService {
     if (rows.length === 0) return [];
 
     return rows.slice(1).map(row => {
-      // Parse player names and extract ticket status
+      // Parse player names and extract ticket/pilot status
       const rawPlayers = row.slice(3, 11).map(p => this.cleanValue(p || ''));
       const players = [];
       const ticketPlayers = [];
+      const pilotPlayers = [];
 
       rawPlayers.forEach(playerName => {
-        if (!playerName) return;
+        if (!playerName) {
+          players.push('');
+          ticketPlayers.push(false);
+          pilotPlayers.push('');
+          return;
+        }
+
+        let name = playerName;
+        let hasTicket = false;
+        let pilotName = '';
+
+        // Extract [P:PilotName] suffix if present
+        const pilotMatch = name.match(/\[P:([^\]]+)\]$/);
+        if (pilotMatch) {
+          pilotName = pilotMatch[1];
+          name = name.slice(0, -pilotMatch[0].length);
+        }
 
         // Check for [T] suffix indicating ticket usage
-        if (playerName.endsWith('[T]')) {
-          players.push(playerName.slice(0, -3)); // Remove [T] suffix
-          ticketPlayers.push(true);
-        } else {
-          players.push(playerName);
-          ticketPlayers.push(false);
+        if (name.endsWith('[T]')) {
+          hasTicket = true;
+          name = name.slice(0, -3);
         }
+
+        players.push(name);
+        ticketPlayers.push(hasTicket);
+        pilotPlayers.push(pilotName);
       });
 
       return {
@@ -198,6 +216,7 @@ class DataService {
         status: row[2] || 'draft',
         players,
         ticketPlayers, // Array of booleans matching players array
+        pilotPlayers,  // Array of pilot names (empty string if no pilot)
         completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true,
         isTemplate: row[12] === 'TRUE' || row[12] === 'Yes' || row[12] === true
       };
