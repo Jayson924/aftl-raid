@@ -365,7 +365,10 @@ export const LineupEditorPage = {
           if (playerName && playerName.startsWith('[PUB]')) {
             isPub = true;
             const parts = playerName.substring(5).split('|');
-            player = { name: parts[0], role: parts[1] };
+            const pubName = parts[0];
+            const pubRole = parts[1];
+            // If no name, use class name as display name
+            player = { name: pubName || pubRole, role: pubName ? pubRole : '' };
           } else {
             player = playerName ? playerMap.get(playerName) : null;
           }
@@ -954,8 +957,8 @@ export const LineupEditorPage = {
         <h2>Add Guest Character to Slot ${slotIndex + 1}</h2>
         <form id="pub-character-form">
           <div class="form-group">
-            <label for="pub-name">Character Name: *</label>
-            <input type="text" id="pub-name" required placeholder="Enter name...">
+            <label for="pub-name">Character Name:</label>
+            <input type="text" id="pub-name" placeholder="Leave empty for placeholder">
           </div>
           <div class="form-group">
             <label for="pub-class">Class: *</label>
@@ -980,8 +983,8 @@ export const LineupEditorPage = {
       const name = document.getElementById('pub-name').value.trim();
       const role = document.getElementById('pub-class').value;
 
-      if (!name || !role) {
-        toast.error('Please fill in all required fields');
+      if (!role) {
+        toast.error('Please select a class');
         return;
       }
 
@@ -1071,10 +1074,13 @@ export const LineupEditorPage = {
     const hasTicket = this.currentLineup.ticketSlots[slotIndex];
     const showTicketToggle = this.currentLineup.raidType === 'Classic';
 
+    // If no name provided, display the class name as the name
+    const displayName = name || role;
+
     slotContent.innerHTML = `
       <div class="assigned-player pub-player">
-        <div class="player-name">${name} <span class="pub-badge">GUEST</span></div>
-        <div class="player-role">${role}</div>
+        <div class="player-name">${displayName} <span class="pub-badge">GUEST</span></div>
+        ${name ? `<div class="player-role">${role}</div>` : ''}
       </div>
       ${showTicketToggle ? `
         <label class="ticket-toggle" title="Using ticket run">

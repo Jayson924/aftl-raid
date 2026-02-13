@@ -145,7 +145,7 @@
         transform: translateY(-2px);
       }
 
-      &.selected {
+      &.selected:not(.cleared) {
         border: 3px solid $primary-color;
         box-shadow: 0 0 20px rgba(244, 196, 48, 0.6), 0 0 10px rgba(244, 196, 48, 0.4) inset;
         transform: scale(1.05);
@@ -190,6 +190,17 @@
           z-index: 1;
           white-space: nowrap;
           letter-spacing: 0.1em;
+        }
+
+        // Selected + cleared: keep green theme with stronger glow
+        &.selected {
+          border: 3px solid rgba(40, 167, 69, 0.9);
+          box-shadow:
+            0 0 20px rgba(40, 167, 69, 0.6),
+            inset 0 0 15px rgba(40, 167, 69, 0.3),
+            inset 0 0 30px rgba(40, 167, 69, 0.15);
+          transform: scale(1.05);
+          z-index: 10;
         }
       }
 
@@ -430,6 +441,7 @@
       transition: $transition;
       position: relative;
       overflow: hidden;
+      min-height: 85px;
 
       &.empty {
         opacity: 0.5;

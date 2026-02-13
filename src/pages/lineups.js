@@ -249,7 +249,10 @@ export const LineupsPage = {
             if (playerName && playerName.startsWith('[PUB]')) {
               isPub = true;
               const parts = playerName.substring(5).split('|');
-              player = { name: parts[0], role: parts[1] };
+              const pubName = parts[0];
+              const pubRole = parts[1];
+              // If no name, use class name as display name
+              player = { name: pubName || pubRole, role: pubName ? pubRole : '' };
             } else {
               player = playerMap.get(playerName);
             }
@@ -360,7 +363,10 @@ export const LineupsPage = {
         if (playerName && playerName.startsWith('[PUB]')) {
           isPub = true;
           const parts = playerName.substring(5).split('|');
-          player = { name: parts[0], role: parts[1] };
+          const pubName = parts[0];
+          const pubRole = parts[1];
+          // If no name, use class name as display name
+          player = { name: pubName || pubRole, role: pubName ? pubRole : '' };
         } else {
           player = playerName ? playerMap.get(playerName) : null;
         }
