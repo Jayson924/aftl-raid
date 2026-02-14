@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES } from '../constants.js';
 import { modal } from '../modal.js';
 
 export const LineupEditorPage = {
@@ -147,6 +147,28 @@ export const LineupEditorPage = {
           <div class="editor-main">
             <div class="lineup-slots">
               <h3>Raid Lineup (8 characters)</h3>
+              <div class="damage-amp-display">
+                <div class="damage-amp-bar physical">
+                  <span class="damage-amp-label">Physical</span>
+                  <div class="damage-amp-track">
+                    <div class="damage-amp-fill" id="physical-amp-fill" style="width: 0%"></div>
+                  </div>
+                  <div class="damage-amp-value-wrapper">
+                    <span class="damage-amp-value" id="physical-amp-value">0%</span>
+                    <div class="damage-amp-tooltip" id="physical-amp-tooltip"></div>
+                  </div>
+                </div>
+                <div class="damage-amp-bar magic">
+                  <span class="damage-amp-label">Magic</span>
+                  <div class="damage-amp-track">
+                    <div class="damage-amp-fill" id="magic-amp-fill" style="width: 0%"></div>
+                  </div>
+                  <div class="damage-amp-value-wrapper">
+                    <span class="damage-amp-value" id="magic-amp-value">0%</span>
+                    <div class="damage-amp-tooltip" id="magic-amp-tooltip"></div>
+                  </div>
+                </div>
+              </div>
               <div id="lineup-slots-container" class="slots-container">
                 ${Array(8).fill(0).map((_, idx) => `
                   <div class="slot" data-slot="${idx}">
@@ -292,6 +314,28 @@ export const LineupEditorPage = {
     document.getElementById('clear-lineup-btn').addEventListener('click', () => {
       this.clearLineup();
     });
+
+    // Mobile tap-to-toggle for damage amp tooltips
+    document.querySelectorAll('.damage-amp-value-wrapper').forEach(wrapper => {
+      wrapper.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tooltip = wrapper.querySelector('.damage-amp-tooltip');
+        const isOpen = tooltip.classList.contains('open');
+
+        // Close all other tooltips first
+        document.querySelectorAll('.damage-amp-tooltip.open').forEach(t => t.classList.remove('open'));
+
+        // Toggle this tooltip
+        if (!isOpen) {
+          tooltip.classList.add('open');
+        }
+      });
+    });
+
+    // Close tooltips when clicking elsewhere
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.damage-amp-tooltip.open').forEach(t => t.classList.remove('open'));
+    });
   },
 
   async loadPlayers() {
@@ -316,6 +360,7 @@ export const LineupEditorPage = {
 
       this.renderAvailablePlayers();
       this.loadExistingLineups();
+      this.updateDamageAmpDisplay();
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading players: ${error.message}</div>`;
     }
@@ -732,6 +777,106 @@ export const LineupEditorPage = {
     return `background: linear-gradient(180deg, ${weaponColor}33 0%, ${armorColor}33 100%);`;
   },
 
+  calculateDamageAmp() {
+    // Collect all roles from the lineup
+    const roles = [];
+    this.currentLineup.players.forEach(playerName => {
+      if (!playerName) return;
+
+      let role = null;
+      if (playerName.startsWith('[PUB]')) {
+        // Guest player - extract role from format [PUB]Name|Role
+        const parts = playerName.substring(5).split('|');
+        role = parts[1];
+      } else {
+        const player = this.players.find(p => p.name === playerName);
+        if (player) {
+          role = player.role;
+        }
+      }
+
+      if (role) {
+        roles.push(role);
+      }
+    });
+
+    // Check which amp sources are activated (each source only counts once)
+    let physicalAmp = 0;
+    let magicAmp = 0;
+    const physicalSources = [];
+    const magicSources = [];
+
+    for (const source of Object.values(DAMAGE_AMP_SOURCES)) {
+      // Find which class in the lineup activates this source
+      const activatingClass = source.classes.find(cls => roles.includes(cls));
+      if (activatingClass) {
+        if (source.physical > 0) {
+          physicalAmp += source.physical;
+          physicalSources.push({
+            class: activatingClass,
+            skill: source.name,
+            value: source.physical
+          });
+        }
+        if (source.magic > 0) {
+          magicAmp += source.magic;
+          magicSources.push({
+            class: activatingClass,
+            skill: source.name,
+            value: source.magic
+          });
+        }
+      }
+    }
+
+    // Return both raw and capped values, plus source breakdowns
+    return {
+      physical: physicalAmp,
+      magic: magicAmp,
+      physicalCapped: Math.min(physicalAmp, 100),
+      magicCapped: Math.min(magicAmp, 100),
+      physicalSources,
+      magicSources
+    };
+  },
+
+  updateDamageAmpDisplay() {
+    const { physical, magic, physicalCapped, magicCapped, physicalSources, magicSources } = this.calculateDamageAmp();
+
+    const physicalFill = document.getElementById('physical-amp-fill');
+    const physicalValue = document.getElementById('physical-amp-value');
+    const physicalTooltip = document.getElementById('physical-amp-tooltip');
+    const magicFill = document.getElementById('magic-amp-fill');
+    const magicValue = document.getElementById('magic-amp-value');
+    const magicTooltip = document.getElementById('magic-amp-tooltip');
+
+    if (physicalFill && physicalValue && physicalTooltip) {
+      physicalFill.style.width = `${physicalCapped}%`;
+      physicalValue.textContent = `${physical}%`;
+      physicalFill.classList.toggle('capped', physical === 100);
+      physicalFill.classList.toggle('overcapped', physical > 100);
+      physicalValue.classList.toggle('overcapped', physical > 100);
+
+      // Update tooltip
+      physicalTooltip.innerHTML = physicalSources.length > 0
+        ? physicalSources.map(s => `<div class="tooltip-row"><span class="tooltip-class">${s.class}</span><span class="tooltip-skill">${s.skill}</span><span class="tooltip-value">${s.value}%</span></div>`).join('')
+        : '<div class="tooltip-empty">No sources</div>';
+    }
+
+    if (magicFill && magicValue && magicTooltip) {
+      magicFill.style.width = `${magicCapped}%`;
+      magicValue.textContent = `${magic}%`;
+      magicFill.classList.toggle('capped', magic === 100);
+      magicFill.classList.toggle('overcapped', magic > 100);
+      magicValue.classList.toggle('overcapped', magic > 100);
+
+      // Update tooltip
+      magicTooltip.innerHTML = magicSources.length > 0
+        ? magicSources.map(s => `<div class="tooltip-row"><span class="tooltip-class">${s.class}</span><span class="tooltip-skill">${s.skill}</span><span class="tooltip-value">${s.value}%</span></div>`).join('')
+        : '<div class="tooltip-empty">No sources</div>';
+    }
+  },
+
   showPlayerSelector(slotIndex) {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
@@ -1134,6 +1279,7 @@ export const LineupEditorPage = {
     slotContent.style.cssText = 'border: none; background: transparent;';
 
     this.renderAvailablePlayers();
+    this.updateDamageAmpDisplay();
   },
 
   assignPlayerToSlot(slotIndex, playerName) {
@@ -1260,6 +1406,7 @@ export const LineupEditorPage = {
     }
 
     this.renderAvailablePlayers();
+    this.updateDamageAmpDisplay();
   },
 
   removePlayerFromSlot(slotIndex) {
@@ -1283,6 +1430,7 @@ export const LineupEditorPage = {
     slotContent.style.cssText = '';
 
     this.renderAvailablePlayers();
+    this.updateDamageAmpDisplay();
   },
 
   reRenderLineupSlots() {
@@ -1344,6 +1492,7 @@ export const LineupEditorPage = {
     });
 
     this.renderAvailablePlayers();
+    this.updateDamageAmpDisplay();
     toast.success('Lineup cleared! Enter a new name to save as a new lineup.');
   },
 
@@ -1609,6 +1758,7 @@ export const LineupEditorPage = {
       }
     });
 
+    this.updateDamageAmpDisplay();
   },
 
   setupPlayerDragHandlers() {

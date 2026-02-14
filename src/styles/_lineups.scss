@@ -34,7 +34,6 @@
     flex-direction: column;
     gap: 2rem;
     position: relative;
-    overflow: hidden;
   }
 
   .showcase-area {
@@ -352,7 +351,6 @@
     border-radius: $border-radius;
     padding: 1.5rem;
     position: relative;
-    overflow: hidden;
 
     &.showcase-lineup-card {
       width: 100%;
@@ -367,6 +365,204 @@
       gap: 1rem;
       position: relative;
       z-index: 2;
+    }
+
+    .damage-amp-display {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background-color: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      position: relative;
+      z-index: 2;
+
+      .damage-amp-bar {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+
+        .damage-amp-label {
+          font-size: 0.85rem;
+          font-weight: 600;
+          min-width: 60px;
+        }
+
+        .damage-amp-track {
+          flex: 1;
+          height: 12px;
+          background-color: rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+          overflow: hidden;
+          position: relative;
+
+          &::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(255, 255, 255, 0.3);
+          }
+        }
+
+        .damage-amp-fill {
+          height: 100%;
+          border-radius: 6px;
+          transition: width 0.3s ease;
+        }
+
+        .damage-amp-value-wrapper {
+          position: relative;
+          min-width: 45px;
+        }
+
+        .damage-amp-value {
+          font-size: 0.9rem;
+          font-weight: 700;
+          text-align: right;
+          cursor: help;
+        }
+
+        .damage-amp-tooltip {
+          display: none;
+          flex-direction: column;
+          position: absolute;
+          bottom: calc(100% + 8px);
+          right: 0;
+          background-color: rgba(20, 20, 20, 0.95);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          padding: 0.5rem 0.75rem;
+          min-width: 200px;
+          z-index: 100;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+          &::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 12px;
+            border: 6px solid transparent;
+            border-top-color: rgba(20, 20, 20, 0.95);
+          }
+
+          .tooltip-row {
+            display: grid;
+            grid-template-columns: 90px 1fr 40px;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+            font-size: 0.8rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+            &:last-child {
+              border-bottom: none;
+            }
+          }
+
+          .tooltip-class {
+            font-weight: 600;
+          }
+
+          .tooltip-skill {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.75rem;
+          }
+
+          .tooltip-value {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 700;
+            text-align: right;
+          }
+
+          .tooltip-empty {
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+            font-size: 0.8rem;
+          }
+        }
+
+        .damage-amp-value-wrapper:hover .damage-amp-tooltip,
+        .damage-amp-tooltip.open {
+          display: flex;
+        }
+
+        // Physical bar
+        &.physical {
+          .damage-amp-label {
+            color: #e87474;
+          }
+
+          .damage-amp-fill {
+            background: linear-gradient(90deg, #c75555 0%, #e87474 100%);
+            box-shadow: 0 0 8px rgba(232, 116, 116, 0.4);
+
+            &.capped {
+              background: linear-gradient(90deg, #e87474 0%, #ffd700 100%);
+              box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+            }
+
+            &.overcapped {
+              background: linear-gradient(90deg, #e87474 0%, #ff4444 100%);
+              box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+            }
+          }
+
+          .damage-amp-value {
+            color: #e87474;
+
+            &.overcapped {
+              color: #ff4444;
+              font-weight: 800;
+              text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+            }
+          }
+
+          .tooltip-class {
+            color: #e87474;
+          }
+        }
+
+        // Magic bar
+        &.magic {
+          .damage-amp-label {
+            color: #73bbe6;
+          }
+
+          .damage-amp-fill {
+            background: linear-gradient(90deg, #5a9bc7 0%, #73bbe6 100%);
+            box-shadow: 0 0 8px rgba(115, 187, 230, 0.4);
+
+            &.capped {
+              background: linear-gradient(90deg, #73bbe6 0%, #00ffff 100%);
+              box-shadow: 0 0 12px rgba(0, 255, 255, 0.6);
+            }
+
+            &.overcapped {
+              background: linear-gradient(90deg, #73bbe6 0%, #ff4444 100%);
+              box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+            }
+          }
+
+          .damage-amp-value {
+            color: #73bbe6;
+
+            &.overcapped {
+              color: #ff4444;
+              font-weight: 800;
+              text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+            }
+          }
+
+          .tooltip-class {
+            color: #73bbe6;
+          }
+        }
+      }
     }
 
     h3 {

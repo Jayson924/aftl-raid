@@ -19,8 +19,74 @@ export const CLASSES = [
   'Shooting Star',
   'Gear Master',
   'Adept',
-  'Physician'
+  'Physician',
+  'Screamer'
 ];
+
+// Damage amplification sources - each source only counts once even if multiple classes provide it
+// This prevents stacking (e.g., Gladiator + Moon Lord don't stack Swordmaster amp)
+export const DAMAGE_AMP_SOURCES = {
+  paladin: {
+    name: 'Armor Break',
+    physical: 18,
+    magic: 18,
+    classes: ['Guardian', 'Crusader']
+  },
+  forceUser: {
+    name: 'Force Mirror',
+    physical: 0,
+    magic: 26,
+    classes: ['Smasher', 'Majesty']
+  },
+  bowmaster: {
+    name: 'Bulls Eye',
+    physical: 16,
+    magic: 16,
+    classes: ['Sniper', 'Artillery']
+  },
+  swordmaster: {
+    name: 'Provoking Slam',
+    physical: 35,
+    magic: 35,
+    classes: ['Gladiator', 'Moon Lord']
+  },
+  tempest: {
+    name: 'Binding Shot EX',
+    physical: 30,
+    magic: 0,
+    classes: ['Tempest']
+  },
+  windwalker: {
+    name: 'Blooming Kick',
+    physical: 30,
+    magic: 0,
+    classes: ['Wind Walker']
+  },
+  moonlord: {
+    name: 'Cyclone Slash EX',
+    physical: 0,
+    magic: 30,
+    classes: ['Moon Lord']
+  },
+  physicianMagic: {
+    name: 'Love Virus',
+    physical: 8,
+    magic: 8,
+    classes: ['Physician']
+  },
+  physicianBoth: {
+    name: 'Disease EX',
+    physical: 10,
+    magic: 10,
+    classes: ['Physician']
+  },
+  screamer: {
+    name: 'Summon Puppet',
+    physical: 19,
+    magic: 19,
+    classes: ['Screamer']
+  }
+};
 
 // Class families for filtering
 export const CLASS_FAMILIES = {

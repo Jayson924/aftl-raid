@@ -2,7 +2,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES } from '../constants.js';
 
 export const LineupsPage = {
   currentRaidType: 'Hardcore',
@@ -43,6 +43,11 @@ export const LineupsPage = {
     this.setupShowcaseSwipeHandlers();
     this.setupCarouselDragScroll();
     this.loadLineups();
+
+    // Close damage amp tooltips when clicking elsewhere
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.damage-amp-tooltip.open').forEach(t => t.classList.remove('open'));
+    });
   },
 
   setupTabHandlers() {
@@ -141,6 +146,67 @@ export const LineupsPage = {
     return `background: linear-gradient(180deg, ${weaponColor}33 0%, ${armorColor}33 100%);`;
   },
 
+  calculateDamageAmp(lineup, playerMap) {
+    // Collect all roles from the lineup
+    const roles = [];
+    lineup.players.forEach(playerName => {
+      if (!playerName) return;
+
+      let role = null;
+      if (playerName.startsWith('[PUB]')) {
+        // Guest player - extract role from format [PUB]Name|Role
+        const parts = playerName.substring(5).split('|');
+        role = parts[1];
+      } else {
+        const player = playerMap.get(playerName);
+        if (player) {
+          role = player.role;
+        }
+      }
+
+      if (role) {
+        roles.push(role);
+      }
+    });
+
+    // Check which amp sources are activated (each source only counts once)
+    let physicalAmp = 0;
+    let magicAmp = 0;
+    const physicalSources = [];
+    const magicSources = [];
+
+    for (const source of Object.values(DAMAGE_AMP_SOURCES)) {
+      const activatingClass = source.classes.find(cls => roles.includes(cls));
+      if (activatingClass) {
+        if (source.physical > 0) {
+          physicalAmp += source.physical;
+          physicalSources.push({
+            class: activatingClass,
+            skill: source.name,
+            value: source.physical
+          });
+        }
+        if (source.magic > 0) {
+          magicAmp += source.magic;
+          magicSources.push({
+            class: activatingClass,
+            skill: source.name,
+            value: source.magic
+          });
+        }
+      }
+    }
+
+    return {
+      physical: physicalAmp,
+      magic: magicAmp,
+      physicalCapped: Math.min(physicalAmp, 100),
+      magicCapped: Math.min(magicAmp, 100),
+      physicalSources,
+      magicSources
+    };
+  },
+
   async loadLineups() {
     const showcaseContainer = document.getElementById('showcase-card-container');
     const carouselContainer = document.getElementById('existing-lineups-container');
@@ -225,6 +291,17 @@ export const LineupsPage = {
       buttonText = 'Save & Clear';
     }
 
+    // Calculate damage amp
+    const damageAmp = this.calculateDamageAmp(lineup, playerMap);
+
+    // Build tooltip content
+    const physicalTooltip = damageAmp.physicalSources.length > 0
+      ? damageAmp.physicalSources.map(s => `<div class="tooltip-row"><span class="tooltip-class">${s.class}</span><span class="tooltip-skill">${s.skill}</span><span class="tooltip-value">${s.value}%</span></div>`).join('')
+      : '<div class="tooltip-empty">No sources</div>';
+    const magicTooltip = damageAmp.magicSources.length > 0
+      ? damageAmp.magicSources.map(s => `<div class="tooltip-row"><span class="tooltip-class">${s.class}</span><span class="tooltip-skill">${s.skill}</span><span class="tooltip-value">${s.value}%</span></div>`).join('')
+      : '<div class="tooltip-empty">No sources</div>';
+
     showcaseContainer.innerHTML = `
       <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}">
         <div class="lineup-card-header">
@@ -233,6 +310,28 @@ export const LineupsPage = {
             ${lineup.name}
           </h3>
           ${isAdmin ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-name="${lineup.name}">${buttonText}</button>` : ''}
+        </div>
+        <div class="damage-amp-display">
+          <div class="damage-amp-bar physical">
+            <span class="damage-amp-label">Physical</span>
+            <div class="damage-amp-track">
+              <div class="damage-amp-fill ${damageAmp.physical >= 100 ? (damageAmp.physical > 100 ? 'overcapped' : 'capped') : ''}" style="width: ${damageAmp.physicalCapped}%"></div>
+            </div>
+            <div class="damage-amp-value-wrapper">
+              <span class="damage-amp-value ${damageAmp.physical > 100 ? 'overcapped' : ''}">${damageAmp.physical}%</span>
+              <div class="damage-amp-tooltip">${physicalTooltip}</div>
+            </div>
+          </div>
+          <div class="damage-amp-bar magic">
+            <span class="damage-amp-label">Magic</span>
+            <div class="damage-amp-track">
+              <div class="damage-amp-fill ${damageAmp.magic >= 100 ? (damageAmp.magic > 100 ? 'overcapped' : 'capped') : ''}" style="width: ${damageAmp.magicCapped}%"></div>
+            </div>
+            <div class="damage-amp-value-wrapper">
+              <span class="damage-amp-value ${damageAmp.magic > 100 ? 'overcapped' : ''}">${damageAmp.magic}%</span>
+              <div class="damage-amp-tooltip">${magicTooltip}</div>
+            </div>
+          </div>
         </div>
         <div class="lineup-players">
           ${lineup.players.map((playerName, idx) => {
@@ -339,6 +438,24 @@ export const LineupsPage = {
         });
       });
     }
+
+    // Mobile tap-to-toggle for damage amp tooltips
+    const ampWrappers = showcaseContainer.querySelectorAll('.damage-amp-value-wrapper');
+    ampWrappers.forEach(wrapper => {
+      wrapper.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tooltip = wrapper.querySelector('.damage-amp-tooltip');
+        const isOpen = tooltip.classList.contains('open');
+
+        // Close all other tooltips first
+        document.querySelectorAll('.damage-amp-tooltip.open').forEach(t => t.classList.remove('open'));
+
+        // Toggle this tooltip
+        if (!isOpen) {
+          tooltip.classList.add('open');
+        }
+      });
+    });
   },
 
   renderCarousel(playerMap) {
