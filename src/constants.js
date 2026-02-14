@@ -32,6 +32,12 @@ export const DAMAGE_AMP_SOURCES = {
     magic: 18,
     classes: ['Guardian', 'Crusader']
   },
+  priest: {
+    name: 'Shock Relic',
+    physical: 14,
+    magic: 14,
+    classes: ['Inquisitor', 'Saint']
+  },
   forceUser: {
     name: 'Force Mirror',
     physical: 0,
