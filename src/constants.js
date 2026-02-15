@@ -28,8 +28,8 @@ export const CLASSES = [
 export const DAMAGE_AMP_SOURCES = {
   paladin: {
     name: 'Armor Break',
-    physical: 18,
-    magic: 18,
+    physical: 16,
+    magic: 16,
     classes: ['Guardian', 'Crusader']
   },
   priest: {
@@ -91,6 +91,12 @@ export const DAMAGE_AMP_SOURCES = {
     physical: 19,
     magic: 19,
     classes: ['Screamer']
+  },
+  destroyer: {
+    name: 'Flying Swing',
+    physical: 20,
+    magic: 20,
+    classes: ['Destroyer']
   }
 };
 
