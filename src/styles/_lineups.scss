@@ -53,10 +53,34 @@
   .carousel-area {
     width: 100%;
 
-    h3 {
-      margin: 0 0 1rem 0;
-      font-size: 1.1rem;
-      color: $text-light;
+    .carousel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+
+      h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: $text-light;
+      }
+    }
+
+    .show-templates-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.5);
+
+      input[type="checkbox"] {
+        cursor: pointer;
+      }
+
+      &:hover {
+        color: rgba(255, 255, 255, 0.7);
+      }
     }
   }
 
@@ -624,6 +648,19 @@
       gap: 1rem;
       position: relative;
       z-index: 2;
+    }
+
+    .lineup-notes-display {
+      margin-top: 1rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.6);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+      .notes-label {
+        color: rgba(255, 255, 255, 0.4);
+        font-weight: 500;
+      }
     }
 
     .player-slot {

@@ -218,7 +218,8 @@ class DataService {
         ticketPlayers, // Array of booleans matching players array
         pilotPlayers,  // Array of pilot names (empty string if no pilot)
         completed: row[11] === 'TRUE' || row[11] === 'Yes' || row[11] === true,
-        isTemplate: row[12] === 'TRUE' || row[12] === 'Yes' || row[12] === true
+        isTemplate: row[12] === 'TRUE' || row[12] === 'Yes' || row[12] === true,
+        notes: this.cleanValue(row[13] || '')
       };
     }).filter(lineup => lineup.name);
   }
@@ -235,7 +236,7 @@ class DataService {
 
   async getLineups() {
     try {
-      const rows = await this.getRange('Lineups!A:M');
+      const rows = await this.getRange('Lineups!A:N');
       return this.parseLineupsFromSheet(rows);
     } catch (error) {
       console.error('Error fetching lineups:', error);

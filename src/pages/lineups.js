@@ -10,6 +10,7 @@ export const LineupsPage = {
   allLineups: [],
   cachedPlayerMap: null,
   pendingTicketChanges: {}, // Track unsaved ticket changes per lineup: { lineupName: [true, false, ...] }
+  showTemplates: false,
 
   async render(container) {
     container.innerHTML = `
@@ -26,7 +27,13 @@ export const LineupsPage = {
             </div>
           </div>
           <div class="carousel-area">
-            <h3>Lineups</h3>
+            <div class="carousel-header">
+              <h3>Lineups</h3>
+              <label class="show-templates-toggle">
+                <input type="checkbox" id="show-templates-checkbox">
+                <span>Show Templates</span>
+              </label>
+            </div>
             <div class="carousel-wrapper">
               <button id="carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
               <div id="existing-lineups-container" class="existing-lineups-container">
@@ -42,6 +49,7 @@ export const LineupsPage = {
     this.setupTabHandlers();
     this.setupShowcaseSwipeHandlers();
     this.setupCarouselDragScroll();
+    this.setupTemplateToggle();
     this.loadLineups();
 
     // Close damage amp tooltips when clicking elsewhere
@@ -58,6 +66,17 @@ export const LineupsPage = {
         this.switchRaidType(raidType);
       });
     });
+  },
+
+  setupTemplateToggle() {
+    const checkbox = document.getElementById('show-templates-checkbox');
+    if (checkbox) {
+      checkbox.addEventListener('change', (e) => {
+        this.showTemplates = e.target.checked;
+        this.renderCarousel(this.cachedPlayerMap);
+        this.setupCarouselHandlers();
+      });
+    }
   },
 
   setupShowcaseSwipeHandlers() {
@@ -414,6 +433,7 @@ export const LineupsPage = {
             </div>
           `).join('')}
         </div>
+        ${lineup.notes ? `<div class="lineup-notes-display"><span class="notes-label">Notes:</span> ${lineup.notes}</div>` : ''}
       </div>
     `;
 
@@ -461,7 +481,17 @@ export const LineupsPage = {
   renderCarousel(playerMap) {
     const carouselContainer = document.getElementById('existing-lineups-container');
 
-    carouselContainer.innerHTML = this.allLineups.map(lineup => {
+    // Filter templates based on toggle
+    const lineupsToShow = this.showTemplates
+      ? this.allLineups
+      : this.allLineups.filter(l => !l.isTemplate);
+
+    if (lineupsToShow.length === 0) {
+      carouselContainer.innerHTML = `<div class="empty-state">No lineups to show</div>`;
+      return;
+    }
+
+    carouselContainer.innerHTML = lineupsToShow.map(lineup => {
       // Check if lineup is cleared
       const isCleared = lineup.completed;
       const isSelected = this.currentShowcaseLineup && lineup.name === this.currentShowcaseLineup.name;

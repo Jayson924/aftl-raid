@@ -14,10 +14,13 @@ export const LineupEditorPage = {
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
     pilotSlots: Array(8).fill(''), // Track pilot names per slot (empty string if no pilot)
     completed: false,
-    isTemplate: false
+    isTemplate: false,
+    notes: ''
   },
   selectedClassFamily: null,
   nextWeekMode: false,
+  showCarouselLineups: true,
+  showCarouselTemplates: false,
 
   /**
    * Get the most recent Friday 5pm PT reset date (returns epoch timestamp)
@@ -120,9 +123,20 @@ export const LineupEditorPage = {
 
         <div class="editor-container">
           <div class="lineup-info">
-            <div class="form-group lineup-name-group">
-              <label for="lineup-name">Lineup Name:</label>
-              <input type="text" id="lineup-name" placeholder="Enter lineup name...">
+            <div class="lineup-info-left">
+              <div class="lineup-info-row">
+                <div class="form-group raid-type-group">
+                  <label for="raid-type">Raid Type:</label>
+                  <select id="raid-type">
+                    <option value="Hardcore">GDN Hardcore</option>
+                    <option value="Classic">GDN Classic</option>
+                  </select>
+                </div>
+                <div class="form-group lineup-name-group">
+                  <label for="lineup-name">Lineup Name:</label>
+                  <input type="text" id="lineup-name" placeholder="Enter lineup name...">
+                </div>
+              </div>
               <div class="lineup-toggles">
                 <label class="template-toggle">
                   <input type="checkbox" id="template-toggle">
@@ -135,12 +149,11 @@ export const LineupEditorPage = {
                 </label>
               </div>
             </div>
-            <div class="form-group">
-              <label for="raid-type">Raid Type:</label>
-              <select id="raid-type">
-                <option value="Hardcore">GDN Hardcore</option>
-                <option value="Classic">GDN Classic</option>
-              </select>
+            <div class="lineup-info-right">
+              <div class="form-group lineup-notes-group">
+                <label for="lineup-notes">Notes:</label>
+                <textarea id="lineup-notes" placeholder="Add notes for this lineup..." rows="2"></textarea>
+              </div>
             </div>
           </div>
 
@@ -188,7 +201,10 @@ export const LineupEditorPage = {
                 <button id="clear-lineup-btn" class="btn btn-secondary">Remove Characters</button>
               </div>
               <div class="existing-lineups-section">
-                <h3>Existing Lineups</h3>
+                <div class="carousel-tabs">
+                  <button class="carousel-tab active" data-tab="lineups" id="carousel-tab-lineups">Lineups</button>
+                  <button class="carousel-tab" data-tab="templates" id="carousel-tab-templates">Templates</button>
+                </div>
                 <div class="carousel-wrapper">
                   <button id="editor-carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
                   <div id="existing-lineups-container" class="existing-lineups-container">
@@ -215,10 +231,16 @@ export const LineupEditorPage = {
                   </button>
                 `).join('')}
               </div>
-              <label class="hide-cleared-filter">
-                <input type="checkbox" id="hide-cleared-checkbox">
-                <span>Hide Cleared</span>
-              </label>
+              <div class="player-filter-checkboxes">
+                <label class="hide-cleared-filter">
+                  <input type="checkbox" id="hide-cleared-checkbox">
+                  <span>Hide Cleared</span>
+                </label>
+                <label class="hide-cleared-filter">
+                  <input type="checkbox" id="hide-in-lineup-checkbox">
+                  <span>Hide in Lineup</span>
+                </label>
+              </div>
               <div id="available-players-list" class="players-list">
                 <div class="loading">Loading players...</div>
               </div>
@@ -245,6 +267,10 @@ export const LineupEditorPage = {
       this.reRenderLineupSlots(); // Re-render slots to show/hide ticket toggle
     });
 
+    document.getElementById('lineup-notes').addEventListener('input', (e) => {
+      this.currentLineup.notes = e.target.value;
+    });
+
     document.getElementById('cleared-toggle').addEventListener('change', (e) => {
       this.currentLineup.completed = e.target.checked;
     });
@@ -256,6 +282,29 @@ export const LineupEditorPage = {
     document.getElementById('next-week-toggle').addEventListener('change', (e) => {
       this.nextWeekMode = e.target.checked;
       this.renderAvailablePlayers(); // Re-render to show/hide cleared players
+    });
+
+    // Carousel tab handlers (toggleable - both can be active)
+    document.getElementById('carousel-tab-lineups').addEventListener('click', (e) => {
+      this.showCarouselLineups = !this.showCarouselLineups;
+      e.target.classList.toggle('active', this.showCarouselLineups);
+      // Ensure at least one is selected
+      if (!this.showCarouselLineups && !this.showCarouselTemplates) {
+        this.showCarouselTemplates = true;
+        document.getElementById('carousel-tab-templates').classList.add('active');
+      }
+      this.loadExistingLineups();
+    });
+
+    document.getElementById('carousel-tab-templates').addEventListener('click', (e) => {
+      this.showCarouselTemplates = !this.showCarouselTemplates;
+      e.target.classList.toggle('active', this.showCarouselTemplates);
+      // Ensure at least one is selected
+      if (!this.showCarouselLineups && !this.showCarouselTemplates) {
+        this.showCarouselLineups = true;
+        document.getElementById('carousel-tab-lineups').classList.add('active');
+      }
+      this.loadExistingLineups();
     });
 
     document.querySelectorAll('.slot').forEach(slot => {
@@ -281,6 +330,10 @@ export const LineupEditorPage = {
     });
 
     document.getElementById('hide-cleared-checkbox').addEventListener('change', () => {
+      this.filterPlayers();
+    });
+
+    document.getElementById('hide-in-lineup-checkbox').addEventListener('change', () => {
       this.filterPlayers();
     });
 
@@ -373,14 +426,17 @@ export const LineupEditorPage = {
       // Refresh lineups from the server
       this.allLineups = await dataService.getLineups();
 
-      // Filter lineups by current raid type
+      // Filter lineups by current raid type and selected tabs
       const lineups = this.allLineups.filter(lineup => {
         const lineupRaidType = lineup.raidType || 'Hardcore'; // Default to Hardcore if not set
-        return lineupRaidType === this.currentLineup.raidType;
+        const matchesRaidType = lineupRaidType === this.currentLineup.raidType;
+        const matchesFilter = (this.showCarouselLineups && !lineup.isTemplate) ||
+                              (this.showCarouselTemplates && lineup.isTemplate);
+        return matchesRaidType && matchesFilter;
       });
 
       if (lineups.length === 0) {
-        container.innerHTML = `<div class="empty-state">No ${this.currentLineup.raidType} lineups yet</div>`;
+        container.innerHTML = `<div class="empty-state">No ${this.currentLineup.raidType} lineups to show</div>`;
         return;
       }
 
@@ -725,6 +781,7 @@ export const LineupEditorPage = {
     const searchTerm = document.getElementById('player-search').value.toLowerCase();
     const classFilter = document.getElementById('class-filter').value;
     const hideCleared = document.getElementById('hide-cleared-checkbox').checked;
+    const hideInLineup = document.getElementById('hide-in-lineup-checkbox').checked;
 
     return this.players
       .filter(player => {
@@ -747,7 +804,22 @@ export const LineupEditorPage = {
           matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
         }
 
-        return matchesSearch && matchesClass && matchesClassFamily && matchesCompletion;
+        // Hide in lineup filter - hide players who are in another lineup of the same raid type
+        let matchesNotInLineup = true;
+        if (hideInLineup && !this.nextWeekMode && this.allLineups && this.allLineups.length > 0) {
+          const inOtherLineup = this.allLineups.some(lineup => {
+            // Skip the current lineup being edited
+            if (lineup.name === this.currentLineup.name) return false;
+            // Only check lineups of the same raid type
+            const lineupRaidType = lineup.raidType || 'Hardcore';
+            if (lineupRaidType !== this.currentLineup.raidType) return false;
+            // Check if player is in this lineup
+            return lineup.players && lineup.players.includes(player.name);
+          });
+          matchesNotInLineup = !inOtherLineup;
+        }
+
+        return matchesSearch && matchesClass && matchesClassFamily && matchesCompletion && matchesNotInLineup;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -1466,7 +1538,8 @@ export const LineupEditorPage = {
       ticketSlots: Array(8).fill(false),
       pilotSlots: Array(8).fill(''),
       completed: false,
-      isTemplate: false
+      isTemplate: false,
+      notes: ''
     };
 
     // Clear the lineup name input field and trigger input event to sync state
@@ -1477,6 +1550,7 @@ export const LineupEditorPage = {
     document.getElementById('raid-type').value = currentRaidType;
     document.getElementById('cleared-toggle').checked = false;
     document.getElementById('template-toggle').checked = false;
+    document.getElementById('lineup-notes').value = '';
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       const slotContent = slotElement.querySelector('.slot-content');
@@ -1572,7 +1646,8 @@ export const LineupEditorPage = {
           status: 'ready',
           players,
           completed: this.currentLineup.completed,
-          isTemplate: this.currentLineup.isTemplate
+          isTemplate: this.currentLineup.isTemplate,
+          notes: this.currentLineup.notes
         }, existingLineup.name);
         toast.success(`${trimmedName} updated!`);
 
@@ -1629,7 +1704,8 @@ export const LineupEditorPage = {
           status: 'ready',
           players,
           completed: this.currentLineup.completed,
-          isTemplate: this.currentLineup.isTemplate
+          isTemplate: this.currentLineup.isTemplate,
+          notes: this.currentLineup.notes
         });
         toast.success(`${trimmedName} saved!`);
 
@@ -1719,13 +1795,15 @@ export const LineupEditorPage = {
       ticketSlots,
       pilotSlots,
       completed: lineup.completed || false,
-      isTemplate: lineup.isTemplate || false
+      isTemplate: lineup.isTemplate || false,
+      notes: lineup.notes || ''
     };
 
     document.getElementById('lineup-name').value = lineup.name;
     document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('template-toggle').checked = lineup.isTemplate || false;
+    document.getElementById('lineup-notes').value = lineup.notes || '';
     // Don't change Next Week mode when loading a lineup - let user control it
 
     document.querySelectorAll('.slot').forEach(slotElement => {
