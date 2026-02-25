@@ -21,16 +21,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-// Discord OAuth configuration
-const DISCORD_CLIENT_ID = import.meta.env.VITE_DISCORD_CLIENT_ID;
-const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize';
-const SESSION_KEY = 'aftl_discord_user';
-
 class DataService {
   constructor() {
-    this._user = null;
+    this._session = null;
     this._userRole = null;
-    this._authCallbacks = [];
   }
 
   // ============================================
@@ -38,10 +32,12 @@ class DataService {
   // ============================================
 
   configure() {
-    // No-op for compatibility
+    // No-op for compatibility - Supabase uses env vars
+    console.log('configure() is not needed with Supabase');
   }
 
   loadConfig() {
+    // No-op for compatibility
     return true;
   }
 
@@ -50,129 +46,106 @@ class DataService {
   }
 
   hasWriteAccess() {
-    return this._user !== null;
+    return this._session !== null;
   }
 
   checkPassword() {
+    // Deprecated - use Supabase auth
     return true;
   }
 
   // ============================================
-  // DISCORD OAUTH (Custom - No Email)
+  // AUTHENTICATION
   // ============================================
 
   /**
-   * Redirect to Discord OAuth
-   * Only requests 'identify' scope - no email access
+   * Sign in with Discord OAuth
+   * Redirects to Discord, then back to the app
    */
-  signInWithDiscord() {
-    const redirectUri = window.location.origin;
-    const scope = 'identify'; // NO email scope
-
-    const params = new URLSearchParams({
-      client_id: DISCORD_CLIENT_ID,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: scope
-    });
-
-    window.location.href = `${DISCORD_AUTH_URL}?${params.toString()}`;
-  }
-
-  /**
-   * Handle OAuth callback - exchange code for user info
-   */
-  async handleOAuthCallback(code) {
-    const redirectUri = window.location.origin;
-
-    // Call our Netlify function to exchange code for user info
-    const response = await fetch('/.netlify/functions/discord-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirectUri })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Authentication failed');
-    }
-
-    const { user } = await response.json();
-
-    // Save user to localStorage
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-    this._user = user;
-
-    // Load or create user in database
-    await this._loadOrCreateUser();
-
-    // Notify listeners
-    this._notifyAuthChange('SIGNED_IN');
-
-    return user;
-  }
-
-  /**
-   * Load existing session from localStorage
-   */
-  async loadSession() {
-    const stored = localStorage.getItem(SESSION_KEY);
-    if (stored) {
-      try {
-        this._user = JSON.parse(stored);
-        await this._loadOrCreateUser();
-        return this._user;
-      } catch (e) {
-        localStorage.removeItem(SESSION_KEY);
+  async signInWithDiscord() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'discord',
+      options: {
+        redirectTo: window.location.origin
       }
-    }
-    return null;
+    });
+
+    if (error) throw error;
+    return data;
   }
 
   /**
-   * Sign out - clear local session
+   * Sign in with email/password (fallback)
    */
+  async signIn(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    this._session = data.session;
+    await this._loadUserRole();
+    return data;
+  }
+
   async signOut() {
-    localStorage.removeItem(SESSION_KEY);
-    this._user = null;
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+
+    this._session = null;
     this._userRole = null;
-    this._notifyAuthChange('SIGNED_OUT');
   }
 
-  /**
-   * Load user from database or create if first login
-   */
-  async _loadOrCreateUser() {
-    if (!this._user) {
+  async getSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    this._session = session;
+
+    if (session && !this._userRole) {
+      await this._loadUserRole();
+    }
+
+    return session;
+  }
+
+  async exchangeCodeForSession(code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+
+    this._session = data.session;
+    if (this._session) {
+      await this._loadUserRole();
+    }
+    return data;
+  }
+
+  async _loadUserRole() {
+    if (!this._session) {
       this._userRole = null;
       return;
     }
 
     const { data, error } = await supabase
-      .from('app_users')
+      .from('profiles')
       .select('role')
-      .eq('discord_id', this._user.id)
+      .eq('id', this._session.user.id)
       .single();
 
+    // If no profile exists, create one
     if (error && error.code === 'PGRST116') {
-      // User doesn't exist, create them
-      const { data: newUser, error: insertError } = await supabase
-        .from('app_users')
+      console.log('[Auth] Creating profile for new user');
+      const { data: newProfile } = await supabase
+        .from('profiles')
         .insert({
-          discord_id: this._user.id,
-          username: this._user.username,
-          display_name: this._user.displayName,
-          avatar_url: this._user.avatar,
-          role: 'player'
+          id: this._session.user.id,
+          role: 'player',
+          display_name: this.getDisplayName()
         })
         .select('role')
         .single();
 
-      if (insertError) {
-        console.error('Failed to create user:', insertError);
-      }
-
-      this._userRole = newUser?.role || 'player';
+      this._userRole = newProfile?.role || 'player';
       return;
     }
 
@@ -180,33 +153,34 @@ class DataService {
   }
 
   /**
-   * Register auth state change callback
+   * Get the current user's Discord info
    */
-  onAuthStateChange(callback) {
-    this._authCallbacks.push(callback);
-    return { unsubscribe: () => {
-      this._authCallbacks = this._authCallbacks.filter(cb => cb !== callback);
-    }};
-  }
-
-  _notifyAuthChange(event) {
-    this._authCallbacks.forEach(cb => cb(event, this._user));
-  }
-
-  // ============================================
-  // USER INFO
-  // ============================================
-
   getUser() {
-    return this._user;
+    return this._session?.user || null;
   }
 
+  /**
+   * Get Discord username for display
+   */
   getDisplayName() {
-    return this._user?.displayName || this._user?.username || null;
+    const user = this.getUser();
+    if (!user) return null;
+
+    // Discord users have user_metadata with username
+    return user.user_metadata?.full_name
+      || user.user_metadata?.custom_claims?.global_name
+      || user.user_metadata?.name
+      || user.user_metadata?.preferred_username
+      || user.user_metadata?.username
+      || 'User';
   }
 
+  /**
+   * Get Discord avatar URL
+   */
   getAvatarUrl() {
-    return this._user?.avatar || null;
+    const user = this.getUser();
+    return user?.user_metadata?.avatar_url || null;
   }
 
   getUserRole() {
@@ -214,7 +188,7 @@ class DataService {
   }
 
   isAuthenticated() {
-    return this._user !== null;
+    return this._session !== null;
   }
 
   isAdmin() {
@@ -225,6 +199,9 @@ class DataService {
     return this._userRole === 'player' || this._userRole === 'admin';
   }
 
+  /**
+   * Check if user has required role
+   */
   hasAccess(requiredRole) {
     if (!this._userRole) return false;
 
@@ -235,6 +212,19 @@ class DataService {
     }
 
     return false;
+  }
+
+  // Listen for auth changes
+  onAuthStateChange(callback) {
+    return supabase.auth.onAuthStateChange((event, session) => {
+      this._session = session;
+      if (session) {
+        this._loadUserRole().then(() => callback(event, session));
+      } else {
+        this._userRole = null;
+        callback(event, session);
+      }
+    });
   }
 
   // ============================================
@@ -266,58 +256,8 @@ class DataService {
       armorEnhance: p.armor_enhance || '',
       hardcoreCompleted: p.hardcore_completed || '',
       classicCompleted: p.classic_completed || '',
-      classicTicketUsed: p.classic_ticket_used || '',
-      discordId: p.discord_id || null
+      classicTicketUsed: p.classic_ticket_used || ''
     }));
-  }
-
-  /**
-   * Check if current user can edit a player
-   */
-  canEditPlayer(player) {
-    if (!this._user) return false;
-    if (this.isAdmin()) return true;
-    return player.discordId === this._user.id;
-  }
-
-  /**
-   * Get all Discord users (for admin assignment dropdown)
-   */
-  async getAppUsers() {
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('discord_id, username, display_name, avatar_url, role')
-      .order('display_name');
-
-    if (error) {
-      console.error('Error fetching app users:', error);
-      return [];
-    }
-
-    return data.map(u => ({
-      discordId: u.discord_id,
-      username: u.username,
-      displayName: u.display_name || u.username,
-      avatarUrl: u.avatar_url,
-      role: u.role
-    }));
-  }
-
-  /**
-   * Assign a character to a Discord user (admin only)
-   */
-  async assignCharacterOwner(playerId, discordId) {
-    if (!this.isAdmin()) {
-      throw new Error('Only admins can assign character owners');
-    }
-
-    const { error } = await supabase
-      .from('players')
-      .update({ discord_id: discordId })
-      .eq('id', playerId);
-
-    if (error) throw error;
-    return { success: true };
   }
 
   async addPlayer(player) {
@@ -364,10 +304,10 @@ class DataService {
       query = query.eq('name', oldName || player.name);
     }
 
-    const { error } = await query;
+    const { data, error } = await query.select().single();
 
     if (error) throw error;
-    return { success: true };
+    return { success: true, data };
   }
 
   async deletePlayer(playerName) {

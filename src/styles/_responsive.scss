@@ -274,6 +274,23 @@
         max-width: 100%;
         white-space: normal;
       }
+
+      .player-owner {
+        display: flex;
+        align-items: center;
+
+        &::before {
+          flex-shrink: 0;
+        }
+
+        .owner-badge {
+          display: inline-flex;
+        }
+
+        .no-owner {
+          display: inline;
+        }
+      }
     }
   }
 

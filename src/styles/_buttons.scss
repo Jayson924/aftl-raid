@@ -54,3 +54,56 @@
     background-color: rgba(255, 255, 255, 0.1);
   }
 }
+
+// Discord OAuth button (navbar)
+.btn-discord {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #5865F2;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: $border-radius;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: $transition;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background-color: #4752C4;
+    transform: translateY(-1px);
+  }
+}
+
+// Discord OAuth button (modal/large)
+.btn-discord-large {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background-color: #5865F2;
+  color: white;
+  border: none;
+  padding: 0.875rem 1.5rem;
+  border-radius: $border-radius;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: $transition;
+  width: 100%;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background-color: #4752C4;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+  }
+}

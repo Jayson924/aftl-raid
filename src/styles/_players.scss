@@ -49,6 +49,34 @@
       color: $primary-color;
     }
 
+    .player-owner {
+      .owner-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+
+        .owner-avatar {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          object-fit: cover;
+        }
+
+        .owner-name {
+          font-size: 0.85rem;
+          color: $text-light;
+          max-width: 100px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+
+      .no-owner {
+        color: rgba(255, 255, 255, 0.3);
+      }
+    }
+
     .notes {
       max-width: 200px;
       white-space: normal;

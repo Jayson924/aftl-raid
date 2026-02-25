@@ -11,5 +11,8 @@
   "devDependencies": {
     "sass": "^1.97.3",
     "vite": "^7.2.4"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0"
   }
 }

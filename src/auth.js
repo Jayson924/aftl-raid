@@ -1,57 +1,52 @@
-// Simple authentication service for protected pages
-class AuthService {
-  constructor() {
-    this.adminPassword = 'epileptic-reference-deed-imperial-collie-exfoliate';
-    this.playerPassword = 'figment-smite-juiciness-armory-customary-corridor';
-    this.sessionKey = 'aftl_auth';
-    this.roleKey = 'aftl_role';
-  }
+/**
+ * Auth Service - Wrapper around dataService for backwards compatibility
+ *
+ * This module provides the same interface as before but delegates to
+ * dataService.isAuthenticated(), dataService.isAdmin(), etc.
+ *
+ * For new code, prefer using dataService directly.
+ */
 
+import { dataService } from './data.js';
+
+class AuthService {
   isAuthenticated() {
-    return sessionStorage.getItem(this.sessionKey) === 'true';
+    return dataService.isAuthenticated();
   }
 
   getRole() {
-    return sessionStorage.getItem(this.roleKey) || null;
+    return dataService.getUserRole();
   }
 
   isAdmin() {
-    return this.getRole() === 'admin';
+    return dataService.isAdmin();
   }
 
   isPlayer() {
-    return this.getRole() === 'player';
+    return dataService.isPlayer();
   }
 
   hasAccess(requiredRole) {
-    const currentRole = this.getRole();
-    if (!currentRole) return false;
-
-    if (requiredRole === 'admin') {
-      return currentRole === 'admin';
-    } else if (requiredRole === 'player') {
-      return currentRole === 'admin' || currentRole === 'player';
-    }
-
-    return false;
+    return dataService.hasAccess(requiredRole);
   }
 
-  authenticate(password) {
-    if (password === this.adminPassword) {
-      sessionStorage.setItem(this.sessionKey, 'true');
-      sessionStorage.setItem(this.roleKey, 'admin');
-      return { success: true, role: 'admin' };
-    } else if (password === this.playerPassword) {
-      sessionStorage.setItem(this.sessionKey, 'true');
-      sessionStorage.setItem(this.roleKey, 'player');
-      return { success: true, role: 'player' };
-    }
+  // Legacy method - now uses Discord OAuth
+  async authenticate(password) {
+    console.warn('authenticate() is deprecated. Use dataService.signInWithDiscord() instead.');
     return { success: false, role: null };
   }
 
-  logout() {
-    sessionStorage.removeItem(this.sessionKey);
-    sessionStorage.removeItem(this.roleKey);
+  async logout() {
+    await dataService.signOut();
+  }
+
+  // New helper methods
+  getDisplayName() {
+    return dataService.getDisplayName();
+  }
+
+  getAvatarUrl() {
+    return dataService.getAvatarUrl();
   }
 }
 

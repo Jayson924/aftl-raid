@@ -3,36 +3,14 @@ import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES } from '../constants.js';
 import { modal } from '../modal.js';
-import { authService } from '../auth.js';
 
 export const PlayersPage = {
-  // Track characters added by current player session
-  getMyCharacters() {
-    try {
-      return JSON.parse(localStorage.getItem('my_characters') || '[]');
-    } catch {
-      return [];
-    }
-  },
+  // Cache for app users (for owner dropdown)
+  _appUsers: [],
 
-  addMyCharacter(characterName) {
-    const myCharacters = this.getMyCharacters();
-    if (!myCharacters.includes(characterName)) {
-      myCharacters.push(characterName);
-      localStorage.setItem('my_characters', JSON.stringify(myCharacters));
-    }
-  },
-
-  removeMyCharacter(characterName) {
-    const myCharacters = this.getMyCharacters();
-    const filtered = myCharacters.filter(name => name !== characterName);
-    localStorage.setItem('my_characters', JSON.stringify(filtered));
-  },
-
-  canEditCharacter(characterName) {
-    const isAdmin = authService.isAdmin();
-    const myCharacters = this.getMyCharacters();
-    return isAdmin || myCharacters.includes(characterName);
+  // Check if current user can edit a player (using Discord-linked ownership)
+  canEditCharacter(player) {
+    return dataService.canEditPlayer(player);
   },
 
   async render(container) {
@@ -59,12 +37,24 @@ export const PlayersPage = {
     const listElement = document.getElementById('players-list');
 
     if (!dataService.isConfigured()) {
-      listElement.innerHTML = '<div class="error">Please configure Google Sheets first from the Lineups page.</div>';
+      listElement.innerHTML = '<div class="error">Please configure the database first.</div>';
       return;
     }
 
     try {
-      const players = await dataService.getPlayers();
+      // Load players and app users in parallel
+      const [players, appUsers] = await Promise.all([
+        dataService.getPlayers(),
+        dataService.getAppUsers()
+      ]);
+
+      this._appUsers = appUsers;
+
+      // Create lookup map for owners
+      const userMap = {};
+      appUsers.forEach(u => {
+        userMap[u.discordId] = u;
+      });
 
       if (players.length === 0) {
         listElement.innerHTML = '<div class="empty-state">No characters yet. Add your first character!</div>';
@@ -74,14 +64,15 @@ export const PlayersPage = {
       // Sort players alphabetically by name
       const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
 
-      const isAdmin = authService.isAdmin();
-      const hasAnyEditableCharacters = sortedPlayers.some(p => this.canEditCharacter(p.name));
+      const isAdmin = dataService.isAdmin();
+      const hasAnyEditableCharacters = sortedPlayers.some(p => this.canEditCharacter(p));
 
       listElement.innerHTML = `
         <table class="players-table">
           <thead>
             <tr>
               <th>Name</th>
+              <th>Owner</th>
               <th>Class</th>
               <th>Weapon</th>
               <th>Armor</th>
@@ -117,11 +108,20 @@ export const PlayersPage = {
                 suffixDisplay.push(suffix2Obj?.label || player.suffix2);
               }
 
-              const canEdit = this.canEditCharacter(player.name);
+              const canEdit = this.canEditCharacter(player);
+              const owner = player.discordId ? userMap[player.discordId] : null;
 
               return `
               <tr>
                 <td class="player-name" data-label="Name">${player.name}</td>
+                <td class="player-owner" data-label="Owner">
+                  ${owner ? `
+                    <div class="owner-badge" title="${owner.displayName}">
+                      ${owner.avatarUrl ? `<img src="${owner.avatarUrl}" alt="${owner.displayName}" class="owner-avatar">` : ''}
+                      <span class="owner-name">${owner.displayName}</span>
+                    </div>
+                  ` : '<span class="no-owner">—</span>'}
+                </td>
                 <td data-label="Class">${player.role}</td>
                 <td data-label="Weapon">
                   ${player.weapon ? `
@@ -142,11 +142,13 @@ export const PlayersPage = {
                   ${raidBadges.length > 0 ? raidBadges.join(' ') : '<span class="raid-complete">✓ All done</span>'}
                 </td>
                 <td class="notes" data-label="Notes">${player.notes}</td>
-                ${canEdit ? `
+                ${hasAnyEditableCharacters ? `
                   <td class="actions">
-                    <button class="btn-icon" title="Edit" data-action="edit" data-player="${player.name}">
-                      ✏️
-                    </button>
+                    ${canEdit ? `
+                      <button class="btn-icon" title="Edit" data-action="edit" data-player-id="${player.id}">
+                        ✏️
+                      </button>
+                    ` : ''}
                   </td>
                 ` : ''}
               </tr>
@@ -161,10 +163,10 @@ export const PlayersPage = {
         document.querySelectorAll('[data-action]').forEach(btn => {
           btn.addEventListener('click', (e) => {
             const action = e.target.dataset.action;
-            const playerName = e.target.dataset.player;
+            const playerId = e.target.dataset.playerId;
 
             if (action === 'edit') {
-              this.showEditPlayerModal(players.find(p => p.name === playerName));
+              this.showEditPlayerModal(sortedPlayers.find(p => p.id === playerId));
             }
           });
         });
@@ -315,6 +317,7 @@ export const PlayersPage = {
   },
 
   showEditPlayerModal(player) {
+    const isAdmin = dataService.isAdmin();
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     modalElement.innerHTML = `
@@ -325,6 +328,19 @@ export const PlayersPage = {
             <label for="edit-player-name">Name: *</label>
             <input type="text" id="edit-player-name" required value="${player.name}">
           </div>
+          ${isAdmin ? `
+          <div class="form-group">
+            <label for="edit-player-owner">Owner:</label>
+            <select id="edit-player-owner">
+              <option value="">No owner (unassigned)</option>
+              ${this._appUsers.map(u => `
+                <option value="${u.discordId}" ${player.discordId === u.discordId ? 'selected' : ''}>
+                  ${u.displayName} (${u.username})
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          ` : ''}
           <div class="form-group">
             <label for="edit-player-class">Class:</label>
             <select id="edit-player-class">
@@ -407,8 +423,12 @@ export const PlayersPage = {
       const armorEnhance = document.getElementById('edit-player-armor-enhance').value;
       const notes = document.getElementById('edit-player-notes').value;
 
+      // Get owner selection if admin
+      const ownerSelect = document.getElementById('edit-player-owner');
+      const newOwnerId = ownerSelect ? ownerSelect.value : null;
+
       if (!dataService.hasWriteAccess()) {
-        toast.warning('Write access not configured. Please update player manually in Google Sheet or configure Apps Script URL.', 5000);
+        toast.warning('Please log in to edit characters.', 5000);
         document.body.removeChild(modalElement);
         return;
       }
@@ -419,6 +439,7 @@ export const PlayersPage = {
         submitBtn.textContent = 'Saving...';
 
         await dataService.updatePlayer({
+          id: player.id,
           name,
           role,
           weapon,
@@ -430,10 +451,9 @@ export const PlayersPage = {
           notes
         }, player.name);
 
-        // If name changed, update tracking
-        if (name !== player.name) {
-          this.removeMyCharacter(player.name);
-          this.addMyCharacter(name);
+        // Update owner if admin changed it
+        if (isAdmin && newOwnerId !== player.discordId) {
+          await dataService.assignCharacterOwner(player.id, newOwnerId || null);
         }
 
         document.body.removeChild(modalElement);
@@ -447,38 +467,41 @@ export const PlayersPage = {
       }
     });
 
-    document.getElementById('delete-player-btn').addEventListener('click', async () => {
-      const confirmed = await modal.confirm(
-        `Are you sure you want to delete ${player.name}? This action cannot be undone.`,
-        {
-          title: 'Delete Character',
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
-          danger: true
+    // Only show delete button for admins
+    const deleteBtn = document.getElementById('delete-player-btn');
+    if (!isAdmin && deleteBtn) {
+      deleteBtn.style.display = 'none';
+    }
+
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (!dataService.isAdmin()) {
+          toast.error('Only admins can delete characters');
+          return;
         }
-      );
 
-      if (!confirmed) return;
+        const confirmed = await modal.confirm(
+          `Are you sure you want to delete ${player.name}? This action cannot be undone.`,
+          {
+            title: 'Delete Character',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            danger: true
+          }
+        );
 
-      if (!dataService.hasWriteAccess()) {
-        toast.warning('Write access not configured. Please delete player manually from Google Sheet or configure Apps Script URL.', 5000);
-        document.body.removeChild(modalElement);
-        return;
-      }
+        if (!confirmed) return;
 
-      try {
-        await dataService.deletePlayer(player.name);
-
-        // Remove from tracked characters
-        this.removeMyCharacter(player.name);
-
-        document.body.removeChild(modalElement);
-        toast.success(`${player.name} deleted! Wala na!!`);
-        this.loadPlayers();
-      } catch (error) {
-        toast.error(`Anong ginawa mo? Error: ${error.message}`);
-      }
-    });
+        try {
+          await dataService.deletePlayer(player.name);
+          document.body.removeChild(modalElement);
+          toast.success(`${player.name} deleted! Wala na!!`);
+          this.loadPlayers();
+        } catch (error) {
+          toast.error(`Anong ginawa mo? Error: ${error.message}`);
+        }
+      });
+    }
 
     document.getElementById('cancel-edit-btn').addEventListener('click', () => {
       document.body.removeChild(modalElement);

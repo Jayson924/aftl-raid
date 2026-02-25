@@ -1,17 +1,49 @@
 import './styles/style.scss'
 import { router } from './router.js'
-import { LineupsPage } from './pages/lineups.js'
-import { PlayersPage } from './pages/players.js'
-import { LineupEditorPage } from './pages/lineup-editor.js'
-import { EnhancementPage } from './pages/enhancement.js'
+import { LineupsPage } from './pages/lineups.jsx'
+import { PlayersPage } from './pages/players.jsx'
+import { LineupEditorPage } from './pages/lineup-editor.jsx'
+import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
-import { authService } from './auth.js'
-import { modal } from './modal.js'
 
 // Initialize the app
-function initApp() {
+async function initApp() {
+  // Handle Discord OAuth callback
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const error = params.get('error');
+
+  if (error) {
+    toast.error('Login failed: ' + (params.get('error_description') || error));
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (code) {
+    try {
+      await dataService.handleOAuthCallback(code);
+      window.history.replaceState({}, '', window.location.pathname);
+    } catch (err) {
+      console.error('OAuth error:', err);
+      toast.error('Login failed: ' + err.message);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  } else {
+    // No OAuth callback - load existing session
+    await dataService.loadSession();
+  }
+
+  // Listen for auth state changes
+  dataService.onAuthStateChange((event, user) => {
+    if (event === 'SIGNED_IN') {
+      toast.success(`Welcome, ${dataService.getDisplayName()}!`);
+      renderNavigation();
+      router.refresh();
+    } else if (event === 'SIGNED_OUT') {
+      renderNavigation();
+      router.navigate('lineups');
+    }
+  });
+
   // Create navigation
   renderNavigation();
 
@@ -41,13 +73,15 @@ function renderNavigation() {
   const nav = document.createElement('nav');
   nav.className = 'main-nav';
 
-  const isAuthenticated = authService.isAuthenticated();
-  const isAdmin = authService.isAdmin();
-  const isPlayer = authService.isPlayer();
+  const isAuthenticated = dataService.isAuthenticated();
+  const isAdmin = dataService.isAdmin();
+  const isPlayer = dataService.isPlayer();
+  const displayName = dataService.getDisplayName();
+  const avatarUrl = dataService.getAvatarUrl();
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v1.1.13</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.0.0</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -65,17 +99,26 @@ function renderNavigation() {
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
-            <a href="#" class="nav-link" id="logout-btn-mobile">Logout</a>
+            <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
           ` : `
-            <a href="#" class="nav-link" id="login-btn-mobile">Login</a>
+            <a href="#" class="nav-link" id="login-btn-mobile">Login with Discord</a>
           `}
         </li>
       </ul>
       <div class="nav-actions">
         ${isAuthenticated ? `
+          <div class="user-info" id="user-info" title="${displayName} (${dataService.getUserRole()})">
+            ${avatarUrl ? `<img src="${avatarUrl}" alt="${displayName}" class="user-avatar">` : ''}
+            <span class="user-name">${displayName}</span>
+          </div>
           <button id="logout-btn" class="btn-icon" title="Logout">🚪</button>
         ` : `
-          <button id="login-btn" class="btn-icon" title="Login">🔐</button>
+          <button id="login-btn" class="btn-discord" title="Login with Discord">
+            <svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M60.1 4.9C55.6 2.8 50.7 1.3 45.7.4c-.1 0-.2 0-.2.1-.6 1.1-1.3 2.6-1.8 3.7-5.5-.8-10.9-.8-16.3 0-.5-1.2-1.2-2.6-1.8-3.7 0-.1-.1-.1-.2-.1-5.1.9-9.9 2.4-14.5 4.5 0 0-.1 0-.1.1C1.6 18.7-.9 32.1.3 45.4c0 .1 0 .1.1.2 6.1 4.5 12 7.2 17.7 9 .1 0 .2 0 .2-.1 1.4-1.9 2.6-3.8 3.6-5.9.1-.1 0-.3-.1-.3-2-.8-3.8-1.7-5.6-2.7-.1-.1-.1-.3 0-.4.4-.3.8-.6 1.1-.9.1-.1.2-.1.2 0 11.6 5.3 24.2 5.3 35.7 0 .1 0 .2 0 .2 0 .4.3.7.6 1.1.9.1.1.1.3 0 .4-1.8 1-3.6 1.9-5.6 2.7-.1 0-.2.2-.1.3 1.1 2.1 2.3 4.1 3.6 5.9 0 .1.1.1.2.1 5.7-1.8 11.6-4.5 17.7-9 0 0 .1-.1.1-.2 1.4-14.5-2.4-27.1-10-38.3 0 0 0-.1-.1-.1zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.4 3.2 6.4 7.2 0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.2 6.4 7.2 0 4-2.8 7.2-6.4 7.2z"/>
+            </svg>
+            <span>Login</span>
+          </button>
         `}
       </div>
     </div>
@@ -110,21 +153,21 @@ function renderNavigation() {
 
   // Login/Logout buttons (desktop)
   if (isAuthenticated) {
-    document.getElementById('logout-btn').addEventListener('click', () => {
-      authService.logout();
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await dataService.signOut();
       toast.info('Bye bye na');
       renderNavigation();
       router.navigate('lineups');
     });
   } else {
-    document.getElementById('login-btn').addEventListener('click', showLoginModal);
+    document.getElementById('login-btn').addEventListener('click', handleDiscordLogin);
   }
 
   // Login/Logout buttons (mobile)
   if (isAuthenticated) {
-    document.getElementById('logout-btn-mobile').addEventListener('click', (e) => {
+    document.getElementById('logout-btn-mobile').addEventListener('click', async (e) => {
       e.preventDefault();
-      authService.logout();
+      await dataService.signOut();
       toast.info('Bye bye na');
       renderNavigation();
       router.navigate('lineups');
@@ -134,8 +177,18 @@ function renderNavigation() {
       e.preventDefault();
       hamburgerBtn.classList.remove('active');
       navLinks.classList.remove('open');
-      showLoginModal();
+      handleDiscordLogin();
     });
+  }
+}
+
+async function handleDiscordLogin() {
+  try {
+    toast.info('Redirecting to Discord...');
+    await dataService.signInWithDiscord();
+  } catch (error) {
+    console.error('Discord login error:', error);
+    toast.error('Failed to connect to Discord');
   }
 }
 
@@ -143,43 +196,26 @@ function showLoginModal() {
   const modalElement = document.createElement('div');
   modalElement.className = 'modal';
   modalElement.innerHTML = `
-    <div class="modal-content">
+    <div class="modal-content login-modal">
       <h2>Login</h2>
-      <p>Enter your password to access protected pages.</p>
-      <form id="login-form">
-        <div class="form-group">
-          <label for="admin-password">Password:</label>
-          <input type="password" id="admin-password" required autofocus>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Login</button>
-          <button type="button" class="btn btn-secondary" id="cancel-login-btn">Cancel</button>
-        </div>
-      </form>
+      <p>Sign in with your Discord account to access protected pages.</p>
+      <div class="form-actions" style="flex-direction: column; gap: 12px;">
+        <button type="button" class="btn btn-discord-large" id="discord-login-btn">
+          <svg width="24" height="18" viewBox="0 0 71 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M60.1 4.9C55.6 2.8 50.7 1.3 45.7.4c-.1 0-.2 0-.2.1-.6 1.1-1.3 2.6-1.8 3.7-5.5-.8-10.9-.8-16.3 0-.5-1.2-1.2-2.6-1.8-3.7 0-.1-.1-.1-.2-.1-5.1.9-9.9 2.4-14.5 4.5 0 0-.1 0-.1.1C1.6 18.7-.9 32.1.3 45.4c0 .1 0 .1.1.2 6.1 4.5 12 7.2 17.7 9 .1 0 .2 0 .2-.1 1.4-1.9 2.6-3.8 3.6-5.9.1-.1 0-.3-.1-.3-2-.8-3.8-1.7-5.6-2.7-.1-.1-.1-.3 0-.4.4-.3.8-.6 1.1-.9.1-.1.2-.1.2 0 11.6 5.3 24.2 5.3 35.7 0 .1 0 .2 0 .2 0 .4.3.7.6 1.1.9.1.1.1.3 0 .4-1.8 1-3.6 1.9-5.6 2.7-.1 0-.2.2-.1.3 1.1 2.1 2.3 4.1 3.6 5.9 0 .1.1.1.2.1 5.7-1.8 11.6-4.5 17.7-9 0 0 .1-.1.1-.2 1.4-14.5-2.4-27.1-10-38.3 0 0 0-.1-.1-.1zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.4 3.2 6.4 7.2 0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.2 6.4 7.2 0 4-2.8 7.2-6.4 7.2z"/>
+          </svg>
+          Sign in with Discord
+        </button>
+        <button type="button" class="btn btn-secondary" id="cancel-login-btn">Cancel</button>
+      </div>
     </div>
   `;
 
   document.body.appendChild(modalElement);
 
-  document.getElementById('login-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const password = document.getElementById('admin-password').value;
-
-    const result = authService.authenticate(password);
-
-    if (result.success) {
-      document.body.removeChild(modalElement);
-      if (result.role === 'admin') {
-        toast.success('Admin login, bawal barlito!');
-      } else if (result.role === 'player') {
-        toast.success('Welcome po');
-      }
-      renderNavigation();
-    } else {
-      toast.error('New phone who dis?');
-      document.getElementById('admin-password').value = '';
-      document.getElementById('admin-password').focus();
-    }
+  document.getElementById('discord-login-btn').addEventListener('click', async () => {
+    document.body.removeChild(modalElement);
+    await handleDiscordLogin();
   });
 
   document.getElementById('cancel-login-btn').addEventListener('click', () => {
