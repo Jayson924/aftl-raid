@@ -49,7 +49,7 @@ async function initApp() {
 
   // Register routes
   router.register('lineups', LineupsPage);
-  router.register('characters', PlayersPage, 'player'); // Requires player or admin role
+  router.register('characters', PlayersPage); // Public - anyone can view
   router.register('editor', LineupEditorPage, 'admin'); // Requires admin role only
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // No auth required
@@ -81,12 +81,13 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.0.0</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.0.1</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
       </button>
+      <ul class="nav-links" id="nav-links">
       <ul class="nav-links" id="nav-links">
         <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ${isAuthenticated ? `

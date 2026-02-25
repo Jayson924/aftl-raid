@@ -291,9 +291,6 @@ export const PlayersPage = {
           notes
         });
 
-        // Track this character as added by current player
-        this.addMyCharacter(name);
-
         document.body.removeChild(modalElement);
         toast.success(`Character "${name}" added successfully!`);
         this.loadPlayers();
