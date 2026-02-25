@@ -54,30 +54,105 @@
     align-items: center;
   }
 
-  // User info display (when logged in)
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.75rem;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: $border-radius;
-    cursor: default;
+  // User dropdown (when logged in)
+  .user-dropdown {
+    position: relative;
 
-    .user-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      object-fit: cover;
+    .user-dropdown-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.75rem;
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid transparent;
+      border-radius: $border-radius;
+      cursor: pointer;
+      transition: $transition;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      &.open {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .user-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+
+      .user-name {
+        font-size: 0.9rem;
+        color: $text-light;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .dropdown-arrow {
+        font-size: 0.6rem;
+        color: rgba(255, 255, 255, 0.5);
+        transition: transform 0.2s ease;
+      }
+
+      &.open .dropdown-arrow {
+        transform: rotate(180deg);
+      }
     }
 
-    .user-name {
-      font-size: 0.9rem;
-      color: $text-light;
-      max-width: 120px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .user-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 0.5rem);
+      right: 0;
+      min-width: 150px;
+      background-color: #2a2a2a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.2s ease;
+      z-index: 1000;
+
+      &.open {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .dropdown-header {
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        .dropdown-role {
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.5);
+          text-transform: capitalize;
+        }
+      }
+
+      .dropdown-item {
+        display: block;
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: none;
+        border: none;
+        color: $text-light;
+        font-size: 0.9rem;
+        text-align: left;
+        cursor: pointer;
+        transition: $transition;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+      }
     }
   }
 

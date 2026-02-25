@@ -88,7 +88,6 @@ function renderNavigation() {
         <span class="hamburger-line"></span>
       </button>
       <ul class="nav-links" id="nav-links">
-      <ul class="nav-links" id="nav-links">
         <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ${isAuthenticated ? `
           <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
@@ -108,11 +107,19 @@ function renderNavigation() {
       </ul>
       <div class="nav-actions">
         ${isAuthenticated ? `
-          <div class="user-info" id="user-info" title="${displayName} (${dataService.getUserRole()})">
-            ${avatarUrl ? `<img src="${avatarUrl}" alt="${displayName}" class="user-avatar">` : ''}
-            <span class="user-name">${displayName}</span>
+          <div class="user-dropdown" id="user-dropdown">
+            <button class="user-dropdown-toggle" id="user-dropdown-toggle" title="${displayName} (${dataService.getUserRole()})">
+              ${avatarUrl ? `<img src="${avatarUrl}" alt="${displayName}" class="user-avatar">` : ''}
+              <span class="user-name">${displayName}</span>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div class="user-dropdown-menu" id="user-dropdown-menu">
+              <div class="dropdown-header">
+                <span class="dropdown-role">${dataService.getUserRole()}</span>
+              </div>
+              <button class="dropdown-item" id="logout-btn">Logout</button>
+            </div>
           </div>
-          <button id="logout-btn" class="btn-icon" title="Logout">🚪</button>
         ` : `
           <button id="login-btn" class="btn-discord" title="Login with Discord">
             <svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -154,6 +161,24 @@ function renderNavigation() {
 
   // Login/Logout buttons (desktop)
   if (isAuthenticated) {
+    const dropdownToggle = document.getElementById('user-dropdown-toggle');
+    const dropdownMenu = document.getElementById('user-dropdown-menu');
+
+    // Toggle dropdown on click
+    dropdownToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.toggle('open');
+      dropdownToggle.classList.toggle('open');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dropdownToggle.contains(e.target) && !dropdownMenu.contains(e.target)) {
+        dropdownMenu.classList.remove('open');
+        dropdownToggle.classList.remove('open');
+      }
+    });
+
     document.getElementById('logout-btn').addEventListener('click', async () => {
       await dataService.signOut();
       toast.info('Bye bye na');
