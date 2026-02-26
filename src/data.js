@@ -267,7 +267,8 @@ class DataService {
       hardcoreCompleted: p.hardcore_completed || '',
       classicCompleted: p.classic_completed || '',
       classicTicketUsed: p.classic_ticket_used || '',
-      discordId: p.discord_id || null
+      discordId: p.discord_id || null,
+      accountNumber: p.account_number || null
     }));
   }
 
@@ -335,7 +336,8 @@ class DataService {
         armor_enhance: player.armorEnhance,
         hardcore_completed: player.hardcoreCompleted || null,
         classic_completed: player.classicCompleted || null,
-        classic_ticket_used: player.classicTicketUsed || null
+        classic_ticket_used: player.classicTicketUsed || null,
+        account_number: player.accountNumber || null
       })
       .select()
       .single();
@@ -355,7 +357,8 @@ class DataService {
       suffix1: player.suffix1,
       suffix2: player.suffix2,
       armor: player.armor,
-      armor_enhance: player.armorEnhance
+      armor_enhance: player.armorEnhance,
+      account_number: player.accountNumber || null
     });
 
     if (player.id) {

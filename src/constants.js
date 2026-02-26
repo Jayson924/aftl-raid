@@ -105,27 +105,87 @@ export const CLASS_FAMILIES = {
   warrior: {
     name: 'Warrior',
     icon: 'warrior.png',
-    classes: ['Moon Lord', 'Gladiator', 'Barbarian', 'Destroyer']
+    classes: ['Moon Lord', 'Gladiator', 'Barbarian', 'Destroyer'],
+    specializations: {
+      swordmaster: {
+        name: 'Swordmaster',
+        icon: 'Swordmaster.png',
+        classes: ['Moon Lord', 'Gladiator']
+      },
+      mercenary: {
+        name: 'Mercenary',
+        icon: 'Mercenary.png',
+        classes: ['Barbarian', 'Destroyer']
+      }
+    }
   },
   cleric: {
     name: 'Cleric',
     icon: 'cleric.png',
-    classes: ['Saint', 'Inquisitor', 'Crusader', 'Guardian']
+    classes: ['Saint', 'Inquisitor', 'Crusader', 'Guardian'],
+    specializations: {
+      paladin: {
+        name: 'Paladin',
+        icon: 'Paladin.png',
+        classes: ['Guardian', 'Crusader']
+      },
+      priest: {
+        name: 'Priest',
+        icon: 'Priest.png',
+        classes: ['Saint', 'Inquisitor']
+      }
+    }
   },
   archer: {
     name: 'Archer',
     icon: 'archer.png',
-    classes: ['Wind Walker', 'Artillery', 'Sniper', 'Tempest']
+    classes: ['Wind Walker', 'Artillery', 'Sniper', 'Tempest'],
+    specializations: {
+      bowmaster: {
+        name: 'Bowmaster',
+        icon: 'Bowmaster.png',
+        classes: ['Sniper', 'Artillery']
+      },
+      acrobat: {
+        name: 'Acrobat',
+        icon: 'Acrobat.png',
+        classes: ['Tempest', 'Wind Walker']
+      }
+    }
   },
   sorceress: {
     name: 'Sorceress',
     icon: 'sorceress.png',
-    classes: ['Elestra', 'Saleana', 'Majesty', 'Smasher']
+    classes: ['Elestra', 'Saleana', 'Majesty', 'Smasher'],
+    specializations: {
+      elementalist: {
+        name: 'Elemental Lord',
+        icon: 'ElementalLord.png',
+        classes: ['Elestra', 'Saleana']
+      },
+      forceuser: {
+        name: 'Force User',
+        icon: 'ForceUser.png',
+        classes: ['Majesty', 'Smasher']
+      }
+    }
   },
   academic: {
     name: 'Academic',
     icon: 'academic.png',
-    classes: ['Gear Master', 'Physician', 'Adept', 'Shooting Star']
+    classes: ['Gear Master', 'Physician', 'Adept', 'Shooting Star'],
+    specializations: {
+      engineer: {
+        name: 'Engineer',
+        icon: 'Engineer.png',
+        classes: ['Gear Master', 'Shooting Star']
+      },
+      alchemist: {
+        name: 'Alchemist',
+        icon: 'Alchemist.png',
+        classes: ['Physician', 'Adept']
+      }
+    }
   }
 };
 

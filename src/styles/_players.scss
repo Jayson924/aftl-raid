@@ -1,5 +1,188 @@
 // Players Page
 .players-page {
+  .page-header {
+    .page-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+  }
+
+  // Toggle switch
+  .toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      display: none;
+    }
+
+    .toggle-slider {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 11px;
+      transition: $transition;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        background-color: white;
+        border-radius: 50%;
+        transition: $transition;
+      }
+    }
+
+    input:checked + .toggle-slider {
+      background-color: $primary-color;
+
+      &::before {
+        transform: translateX(18px);
+      }
+    }
+
+    .toggle-label {
+      font-size: 0.9rem;
+      color: $text-light;
+      white-space: nowrap;
+    }
+  }
+  // Owner Groups
+  .owner-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .owner-group {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: $border-radius;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
+    &.collapsed {
+      .owner-group-content {
+        display: none;
+      }
+    }
+  }
+
+  .owner-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background-color: rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    user-select: none;
+    transition: $transition;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .collapse-icon {
+      font-family: monospace;
+      width: 1rem;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .owner-group-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .owner-group-name {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: $primary-color;
+    }
+
+    .owner-group-count {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.9rem;
+    }
+  }
+
+  .owner-group-content {
+    padding: 0.5rem;
+
+    // Subtle table headers inside grouped view
+    .players-table {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+
+      thead {
+        background-color: transparent;
+
+        th {
+          font-weight: 400;
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.4);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 0.5rem 1rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+      }
+    }
+  }
+
+  // Account Groups within Owner
+  .account-group {
+    margin-bottom: 0.5rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .account-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+
+    .account-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: white;
+      border-radius: 50%;
+
+      // Account colors
+      &[data-account="1"] { background-color: #3b82f6; } // Blue
+      &[data-account="2"] { background-color: #8b5cf6; } // Purple
+      &[data-account="3"] { background-color: #10b981; } // Green
+      &[data-account="4"] { background-color: #f59e0b; } // Amber
+      &[data-account="5"] { background-color: #ef4444; } // Red
+      &[data-account="6"] { background-color: #ec4899; } // Pink
+    }
+
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+
   .players-table {
     width: 100%;
     border-collapse: collapse;
@@ -181,4 +364,47 @@
   // Border is now applied to the slot element, not the player div
   box-shadow: none;
   opacity: 1;
+}
+
+// Account buttons in modal
+.account-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+
+  .account-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.05);
+    color: $text-light;
+    border-radius: $border-radius;
+    cursor: pointer;
+    transition: $transition;
+    font-size: 0.9rem;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    &.selected {
+      background-color: $primary-color;
+      border-color: $primary-color;
+      color: white;
+    }
+
+    &.add-account-btn {
+      padding: 0.5rem 0.75rem;
+      font-weight: 600;
+      background-color: rgba(255, 255, 255, 0.02);
+      border-style: dashed;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+        border-color: $primary-color;
+        color: $primary-color;
+      }
+    }
+  }
 }

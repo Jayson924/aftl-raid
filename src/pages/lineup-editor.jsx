@@ -18,6 +18,8 @@ export const LineupEditorPage = {
     notes: ''
   },
   selectedClassFamily: null,
+  expandedClassFamily: null,
+  selectedSpecialization: null,
   nextWeekMode: false,
   showCarouselLineups: true,
   showCarouselTemplates: false,
@@ -231,6 +233,7 @@ export const LineupEditorPage = {
                   </button>
                 `).join('')}
               </div>
+              <div class="specialization-filter" id="specialization-filter"></div>
               <div class="player-filter-checkboxes">
                 <label class="hide-cleared-filter">
                   <input type="checkbox" id="hide-cleared-checkbox">
@@ -321,10 +324,13 @@ export const LineupEditorPage = {
     });
 
     document.getElementById('class-filter').addEventListener('change', (e) => {
-      // If a specific class is selected, deactivate all class family buttons
+      // If a specific class is selected, deactivate all class family buttons and clear expansion
       if (e.target.value) {
         this.selectedClassFamily = null;
-        document.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active'));
+        this.expandedClassFamily = null;
+        this.selectedSpecialization = null;
+        document.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active', 'expanded'));
+        this.renderSpecializations();
       }
       this.filterPlayers();
     });
@@ -342,18 +348,34 @@ export const LineupEditorPage = {
       btn.addEventListener('click', () => {
         const family = btn.dataset.family;
 
-        // Toggle selection
-        if (this.selectedClassFamily === family) {
-          this.selectedClassFamily = null;
-          btn.classList.remove('active');
+        // If clicking the same family that's expanded
+        if (this.expandedClassFamily === family) {
+          // If a specialization is selected, deselect it but keep expanded
+          if (this.selectedSpecialization) {
+            this.selectedSpecialization = null;
+            this.selectedClassFamily = family;
+            document.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
+          } else if (this.selectedClassFamily === family) {
+            // If base class was filtering, collapse everything
+            this.expandedClassFamily = null;
+            this.selectedClassFamily = null;
+            btn.classList.remove('active', 'expanded');
+            this.renderSpecializations();
+          } else {
+            // Filter by base class
+            this.selectedClassFamily = family;
+            btn.classList.add('active');
+          }
         } else {
-          // Remove active from all buttons
-          document.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
-          // Set new selection
+          // Expanding a different family
+          document.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active', 'expanded'));
+          this.expandedClassFamily = family;
           this.selectedClassFamily = family;
-          btn.classList.add('active');
+          this.selectedSpecialization = null;
+          btn.classList.add('active', 'expanded');
           // Reset class dropdown to "All Classes"
           document.getElementById('class-filter').value = '';
+          this.renderSpecializations();
         }
 
         this.filterPlayers();
@@ -789,9 +811,14 @@ export const LineupEditorPage = {
                             player.role.toLowerCase().includes(searchTerm);
         const matchesClass = !classFilter || player.role === classFilter;
 
-        // Class family filter
+        // Class family or specialization filter
         let matchesClassFamily = true;
-        if (this.selectedClassFamily) {
+        if (this.selectedSpecialization && this.expandedClassFamily) {
+          // Filter by specialization classes
+          const family = CLASS_FAMILIES[this.expandedClassFamily];
+          const specClasses = family.specializations[this.selectedSpecialization]?.classes || [];
+          matchesClassFamily = specClasses.includes(player.role);
+        } else if (this.selectedClassFamily) {
           const familyClasses = CLASS_FAMILIES[this.selectedClassFamily].classes;
           matchesClassFamily = familyClasses.includes(player.role);
         }
@@ -826,6 +853,59 @@ export const LineupEditorPage = {
 
   filterPlayers() {
     this.renderAvailablePlayers();
+  },
+
+  renderSpecializations() {
+    const container = document.getElementById('specialization-filter');
+    if (!container) return;
+
+    if (!this.expandedClassFamily) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const family = CLASS_FAMILIES[this.expandedClassFamily];
+    if (!family || !family.specializations) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = Object.entries(family.specializations).map(([key, spec]) => `
+      <button class="specialization-btn ${this.selectedSpecialization === key ? 'active' : ''}"
+              data-specialization="${key}"
+              data-family="${this.expandedClassFamily}"
+              title="${spec.name}">
+        <div class="spec-icon-wrapper">
+          <img src="/icons/${spec.icon}" alt="${spec.name}">
+        </div>
+        <span class="spec-name">${spec.name}</span>
+      </button>
+    `).join('');
+
+    // Attach click handlers
+    container.querySelectorAll('.specialization-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const spec = btn.dataset.specialization;
+
+        if (this.selectedSpecialization === spec) {
+          // Deselect specialization, revert to base class filter
+          this.selectedSpecialization = null;
+          this.selectedClassFamily = this.expandedClassFamily;
+          btn.classList.remove('active');
+        } else {
+          // Select this specialization
+          container.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
+          this.selectedSpecialization = spec;
+          this.selectedClassFamily = null; // Clear base class filter
+          btn.classList.add('active');
+          // Also remove active from base class buttons (but keep expanded)
+          document.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
+          document.querySelector(`.class-family-btn[data-family="${this.expandedClassFamily}"]`)?.classList.add('expanded');
+        }
+
+        this.filterPlayers();
+      });
+    });
   },
 
   getEquipmentBackground(player) {
@@ -912,6 +992,74 @@ export const LineupEditorPage = {
     };
   },
 
+  // Check for same-account conflicts in the lineup
+  // Returns an object mapping slot indices to their conflict info
+  getAccountConflicts() {
+    const conflicts = {};
+    const slotsByOwnerAccount = {};
+
+    this.currentLineup.players.forEach((playerName, slotIndex) => {
+      if (!playerName || playerName.startsWith('[PUB]')) return;
+
+      const player = this.players.find(p => p.name === playerName);
+      if (!player || !player.discordId) return;
+
+      // Use accountNumber or default to 1
+      const accountNum = player.accountNumber || 1;
+      const key = `${player.discordId}-${accountNum}`;
+
+      if (!slotsByOwnerAccount[key]) {
+        slotsByOwnerAccount[key] = [];
+      }
+      slotsByOwnerAccount[key].push({ slotIndex, playerName, player });
+    });
+
+    // Find conflicts (more than one player from same owner+account)
+    Object.values(slotsByOwnerAccount).forEach(slots => {
+      if (slots.length > 1) {
+        slots.forEach(({ slotIndex, player }) => {
+          conflicts[slotIndex] = {
+            accountNumber: player.accountNumber || 1,
+            conflictCount: slots.length,
+            conflictingSlots: slots.map(s => s.slotIndex).filter(i => i !== slotIndex)
+          };
+        });
+      }
+    });
+
+    return conflicts;
+  },
+
+  // Update conflict warnings on all slots
+  updateConflictWarnings() {
+    const conflicts = this.getAccountConflicts();
+
+    document.querySelectorAll('.slot').forEach(slotElement => {
+      const slotIndex = parseInt(slotElement.dataset.slot);
+      const existingWarning = slotElement.querySelector('.account-conflict-warning');
+
+      if (conflicts[slotIndex]) {
+        const conflict = conflicts[slotIndex];
+        slotElement.classList.add('has-account-conflict');
+
+        if (!existingWarning) {
+          const warning = document.createElement('div');
+          warning.className = 'account-conflict-warning';
+          warning.innerHTML = `<span class="conflict-badge">!</span>`;
+          warning.title = `Same account as slot ${conflict.conflictingSlots.map(s => s + 1).join(', ')}`;
+          slotElement.appendChild(warning);
+        } else {
+          existingWarning.title = `Same account as slot ${conflict.conflictingSlots.map(s => s + 1).join(', ')}`;
+        }
+      } else {
+        slotElement.classList.remove('has-account-conflict');
+        if (existingWarning) {
+          existingWarning.remove();
+        }
+      }
+    });
+  },
+
   updateDamageAmpDisplay() {
     const { physical, magic, physicalCapped, magicCapped, physicalSources, magicSources } = this.calculateDamageAmp();
 
@@ -972,6 +1120,7 @@ export const LineupEditorPage = {
             </button>
           `).join('')}
         </div>
+        <div class="modal-specialization-filter" id="modal-specialization-filter"></div>
 
         <label class="modal-hide-cleared-filter">
           <input type="checkbox" id="modal-hide-cleared-checkbox">
@@ -993,6 +1142,8 @@ export const LineupEditorPage = {
 
     // State for modal filters
     let modalSelectedFamily = null;
+    let modalExpandedFamily = null;
+    let modalSelectedSpecialization = null;
 
     // Function to render filtered players
     const renderModalPlayers = () => {
@@ -1006,9 +1157,13 @@ export const LineupEditorPage = {
                               player.role.toLowerCase().includes(searchTerm);
           const matchesClass = !classFilter || player.role === classFilter;
 
-          // Class family filter
+          // Class family or specialization filter
           let matchesClassFamily = true;
-          if (modalSelectedFamily) {
+          if (modalSelectedSpecialization && modalExpandedFamily) {
+            const family = CLASS_FAMILIES[modalExpandedFamily];
+            const specClasses = family.specializations[modalSelectedSpecialization]?.classes || [];
+            matchesClassFamily = specClasses.includes(player.role);
+          } else if (modalSelectedFamily) {
             const familyClasses = CLASS_FAMILIES[modalSelectedFamily].classes;
             matchesClassFamily = familyClasses.includes(player.role);
           }
@@ -1107,26 +1262,94 @@ export const LineupEditorPage = {
     document.getElementById('modal-class-filter').addEventListener('change', (e) => {
       if (e.target.value) {
         modalSelectedFamily = null;
-        modalElement.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active'));
+        modalExpandedFamily = null;
+        modalSelectedSpecialization = null;
+        modalElement.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active', 'expanded'));
+        renderModalSpecializations();
       }
       renderModalPlayers();
     });
 
     document.getElementById('modal-hide-cleared-checkbox').addEventListener('change', renderModalPlayers);
 
+    // Function to render modal specializations
+    const renderModalSpecializations = () => {
+      const container = document.getElementById('modal-specialization-filter');
+      if (!container) return;
+
+      if (!modalExpandedFamily) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const family = CLASS_FAMILIES[modalExpandedFamily];
+      if (!family || !family.specializations) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = Object.entries(family.specializations).map(([key, spec]) => `
+        <button class="specialization-btn ${modalSelectedSpecialization === key ? 'active' : ''}"
+                data-specialization="${key}"
+                data-family="${modalExpandedFamily}"
+                title="${spec.name}">
+          <div class="spec-icon-wrapper">
+            <img src="/icons/${spec.icon}" alt="${spec.name}">
+          </div>
+          <span class="spec-name">${spec.name}</span>
+        </button>
+      `).join('');
+
+      // Attach click handlers
+      container.querySelectorAll('.specialization-btn').forEach(specBtn => {
+        specBtn.addEventListener('click', () => {
+          const spec = specBtn.dataset.specialization;
+
+          if (modalSelectedSpecialization === spec) {
+            modalSelectedSpecialization = null;
+            modalSelectedFamily = modalExpandedFamily;
+            specBtn.classList.remove('active');
+          } else {
+            container.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
+            modalSelectedSpecialization = spec;
+            modalSelectedFamily = null;
+            specBtn.classList.add('active');
+            modalElement.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
+            modalElement.querySelector(`.class-family-btn[data-family="${modalExpandedFamily}"]`)?.classList.add('expanded');
+          }
+
+          renderModalPlayers();
+        });
+      });
+    };
+
     // Class family filter buttons
     modalElement.querySelectorAll('.class-family-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const family = btn.dataset.family;
 
-        if (modalSelectedFamily === family) {
-          modalSelectedFamily = null;
-          btn.classList.remove('active');
+        if (modalExpandedFamily === family) {
+          if (modalSelectedSpecialization) {
+            modalSelectedSpecialization = null;
+            modalSelectedFamily = family;
+            document.querySelectorAll('#modal-specialization-filter .specialization-btn').forEach(b => b.classList.remove('active'));
+          } else if (modalSelectedFamily === family) {
+            modalExpandedFamily = null;
+            modalSelectedFamily = null;
+            btn.classList.remove('active', 'expanded');
+            renderModalSpecializations();
+          } else {
+            modalSelectedFamily = family;
+            btn.classList.add('active');
+          }
         } else {
-          modalElement.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
+          modalElement.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active', 'expanded'));
+          modalExpandedFamily = family;
           modalSelectedFamily = family;
-          btn.classList.add('active');
+          modalSelectedSpecialization = null;
+          btn.classList.add('active', 'expanded');
           document.getElementById('modal-class-filter').value = '';
+          renderModalSpecializations();
         }
 
         renderModalPlayers();
@@ -1352,6 +1575,7 @@ export const LineupEditorPage = {
 
     this.renderAvailablePlayers();
     this.updateDamageAmpDisplay();
+    this.updateConflictWarnings();
   },
 
   assignPlayerToSlot(slotIndex, playerName) {
@@ -1479,6 +1703,7 @@ export const LineupEditorPage = {
 
     this.renderAvailablePlayers();
     this.updateDamageAmpDisplay();
+    this.updateConflictWarnings();
   },
 
   removePlayerFromSlot(slotIndex) {
@@ -1503,6 +1728,7 @@ export const LineupEditorPage = {
 
     this.renderAvailablePlayers();
     this.updateDamageAmpDisplay();
+    this.updateConflictWarnings();
   },
 
   reRenderLineupSlots() {
@@ -1837,6 +2063,7 @@ export const LineupEditorPage = {
     });
 
     this.updateDamageAmpDisplay();
+    this.updateConflictWarnings();
   },
 
   setupPlayerDragHandlers() {
