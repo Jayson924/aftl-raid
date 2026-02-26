@@ -691,6 +691,26 @@ class DataService {
     return { success: true };
   }
 
+  /**
+   * Toggle a single player's raid completion status
+   * @param {string} playerId - Player's UUID
+   * @param {string} raidType - 'Hardcore' or 'Classic'
+   * @param {boolean} completed - Whether to mark as completed or not
+   */
+  async togglePlayerRaidCompletion(playerId, raidType, completed) {
+    const column = raidType === 'Hardcore' ? 'hardcore_completed' : 'classic_completed';
+    const value = completed ? new Date().toISOString() : null;
+
+    const { error } = await supabase
+      .from('players')
+      .update({ [column]: value })
+      .eq('id', playerId);
+
+    if (error) throw error;
+
+    return { success: true };
+  }
+
   // ============================================
   // SPENDING CONFIG
   // ============================================

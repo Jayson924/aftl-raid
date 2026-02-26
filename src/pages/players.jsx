@@ -103,6 +103,28 @@ export const PlayersPage = {
           });
         });
       }
+
+      // Add event listeners for raid badge toggles
+      document.querySelectorAll('.raid-badge.clickable').forEach(badge => {
+        badge.addEventListener('click', async (e) => {
+          const playerId = badge.dataset.playerId;
+          const raidType = badge.dataset.raidType;
+          const isCurrentlyCompleted = badge.dataset.completed === 'true';
+
+          // Toggle to opposite state
+          const newCompleted = !isCurrentlyCompleted;
+
+          try {
+            badge.style.opacity = '0.5';
+            await dataService.togglePlayerRaidCompletion(playerId, raidType, newCompleted);
+            toast.success(`${raidType} ${newCompleted ? 'marked as done' : 'marked as not done'}`);
+            this.loadPlayers(); // Refresh the list
+          } catch (error) {
+            toast.error(`Failed to update: ${error.message}`);
+            badge.style.opacity = '';
+          }
+        });
+      });
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading characters: ${error.message}</div>`;
     }
@@ -133,14 +155,8 @@ export const PlayersPage = {
 
             const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
             const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
-
-            const raidBadges = [];
-            if (needsHardcore) {
-              raidBadges.push('<span class="raid-badge raid-hardcore">HC</span>');
-            }
-            if (needsClassic) {
-              raidBadges.push('<span class="raid-badge raid-classic">CL</span>');
-            }
+            const canEdit = this.canEditCharacter(player);
+            const canToggleRaid = canEdit || dataService.isAdmin();
 
             const suffixDisplay = [];
             if (player.suffix1) {
@@ -152,7 +168,6 @@ export const PlayersPage = {
               suffixDisplay.push(suffix2Obj?.label || player.suffix2);
             }
 
-            const canEdit = this.canEditCharacter(player);
             const owner = player.discordId ? userMap[player.discordId] : null;
 
             return `
@@ -183,7 +198,16 @@ export const PlayersPage = {
                 ` : '-'}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
-                ${raidBadges.length > 0 ? raidBadges.join(' ') : '<span class="raid-complete">✓ All done</span>'}
+                <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
+                      title="${canToggleRaid ? 'Click to toggle' : ''}">
+                  ${!needsHardcore ? '✓ ' : ''}HC
+                </span>
+                <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
+                      title="${canToggleRaid ? 'Click to toggle' : ''}">
+                  ${!needsClassic ? '✓ ' : ''}CL
+                </span>
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
               ${hasAnyEditableCharacters ? `
@@ -340,14 +364,8 @@ export const PlayersPage = {
 
             const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
             const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
-
-            const raidBadges = [];
-            if (needsHardcore) {
-              raidBadges.push('<span class="raid-badge raid-hardcore">HC</span>');
-            }
-            if (needsClassic) {
-              raidBadges.push('<span class="raid-badge raid-classic">CL</span>');
-            }
+            const canEdit = this.canEditCharacter(player);
+            const canToggleRaid = canEdit || dataService.isAdmin();
 
             const suffixDisplay = [];
             if (player.suffix1) {
@@ -358,8 +376,6 @@ export const PlayersPage = {
               const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
               suffixDisplay.push(suffix2Obj?.label || player.suffix2);
             }
-
-            const canEdit = this.canEditCharacter(player);
 
             return `
             <tr>
@@ -381,7 +397,16 @@ export const PlayersPage = {
                 ` : '-'}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
-                ${raidBadges.length > 0 ? raidBadges.join(' ') : '<span class="raid-complete">✓ All done</span>'}
+                <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
+                      title="${canToggleRaid ? 'Click to toggle' : ''}">
+                  ${!needsHardcore ? '✓ ' : ''}HC
+                </span>
+                <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
+                      title="${canToggleRaid ? 'Click to toggle' : ''}">
+                  ${!needsClassic ? '✓ ' : ''}CL
+                </span>
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
               ${hasAnyEditableCharacters ? `
