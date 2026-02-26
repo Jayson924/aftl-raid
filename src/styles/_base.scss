@@ -32,3 +32,58 @@ body {
   margin: 0 auto;
   width: 100%;
 }
+
+// Presence indicator (who's viewing)
+.presence-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.presence-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.presence-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid $background-dark;
+  margin-left: -8px;
+  object-fit: cover;
+
+  &:first-child {
+    margin-left: 0;
+  }
+}
+
+.presence-avatar-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, $primary-color, $primary-dark);
+  color: $text-dark;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.presence-extra {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 2px solid $background-dark;
+  margin-left: -8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.presence-label {
+  white-space: nowrap;
+}

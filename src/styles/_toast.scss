@@ -45,6 +45,25 @@
     font-size: 0.95rem;
   }
 
+  .toast-action {
+    background-color: rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: inherit;
+    transition: background-color 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+    white-space: nowrap;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-color: rgba(0, 0, 0, 0.3);
+    }
+  }
+
   .toast-close {
     background: none;
     border: none;
@@ -116,5 +135,15 @@
   .toast {
     background-color: rgba(40, 40, 40, 0.98);
     color: $text-light;
+
+    .toast-action {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+    }
   }
 }

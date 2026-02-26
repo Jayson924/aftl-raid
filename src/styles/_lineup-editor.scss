@@ -1,5 +1,17 @@
 // Lineup Editor Page
 .lineup-editor-page {
+  .lineup-slots-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+
+    h3 {
+      margin: 0;
+    }
+  }
+
   .editor-container {
     display: flex;
     flex-direction: column;

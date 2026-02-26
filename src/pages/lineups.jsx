@@ -9,8 +9,9 @@ export const LineupsPage = {
   currentShowcaseLineup: null,
   allLineups: [],
   cachedPlayerMap: null,
-  pendingTicketChanges: {}, // Track unsaved ticket changes per lineup: { lineupName: [true, false, ...] }
+  pendingTicketChanges: {}, // Track unsaved ticket changes per lineup by ID: { lineupId: [true, false, ...] }
   showTemplates: false,
+  lineupSubscription: null, // Supabase realtime subscription
 
   async render(container) {
     container.innerHTML = `
@@ -108,7 +109,7 @@ export const LineupsPage = {
       if (currentRaidLineups.length === 0) return;
 
       const currentIndex = currentRaidLineups.findIndex(
-        lineup => lineup.name === this.currentShowcaseLineup?.name
+        lineup => lineup.id === this.currentShowcaseLineup?.id
       );
 
       let newIndex;
@@ -121,7 +122,7 @@ export const LineupsPage = {
       }
 
       const newLineup = currentRaidLineups[newIndex];
-      this.selectLineup(newLineup.name);
+      this.selectLineup(newLineup.id);
     }
   },
 
@@ -277,7 +278,7 @@ export const LineupsPage = {
         this.currentShowcaseLineup = this.allLineups[0];
       } else {
         // Update to the fresh lineup object (to get updated completed status)
-        const freshLineup = this.allLineups.find(l => l.name === this.currentShowcaseLineup.name && l.raidType === this.currentRaidType);
+        const freshLineup = this.allLineups.find(l => l.id === this.currentShowcaseLineup.id);
         if (freshLineup) {
           this.currentShowcaseLineup = freshLineup;
         } else {
@@ -290,6 +291,9 @@ export const LineupsPage = {
       this.renderShowcase(this.currentShowcaseLineup, this.cachedPlayerMap);
       this.renderCarousel(this.cachedPlayerMap);
       this.setupCarouselHandlers();
+
+      // Setup realtime subscription (only once)
+      this.setupRealtimeSubscription();
     } catch (error) {
       showcaseContainer.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
       carouselContainer.innerHTML = '';
@@ -328,7 +332,7 @@ export const LineupsPage = {
             ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
             ${lineup.name}
           </h3>
-          ${isAdmin ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-name="${lineup.name}">${buttonText}</button>` : ''}
+          ${isAdmin ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">
           <div class="damage-amp-bar physical">
@@ -443,8 +447,8 @@ export const LineupsPage = {
       if (clearedBtn) {
         clearedBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const lineupName = clearedBtn.dataset.lineupName;
-          await this.handleClearedClick(lineupName, this.allLineups);
+          const lineupId = clearedBtn.dataset.lineupId;
+          await this.handleClearedClick(lineupId);
         });
       }
 
@@ -494,7 +498,7 @@ export const LineupsPage = {
     carouselContainer.innerHTML = lineupsToShow.map(lineup => {
       // Check if lineup is cleared
       const isCleared = lineup.completed;
-      const isSelected = this.currentShowcaseLineup && lineup.name === this.currentShowcaseLineup.name;
+      const isSelected = this.currentShowcaseLineup && lineup.id === this.currentShowcaseLineup.id;
 
       // Create 8 mini player cards in 2x4 grid
       const playerCards = Array(8).fill(0).map((_, idx) => {
@@ -544,7 +548,7 @@ export const LineupsPage = {
       }).join('');
 
       return `
-        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-name="${lineup.name}">
+        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-id="${lineup.id}">
           <div class="mini-lineup-header">
             <span class="mini-lineup-name">
               ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}
@@ -562,8 +566,8 @@ export const LineupsPage = {
     }).join('');
   },
 
-  selectLineup(lineupName) {
-    const lineup = this.allLineups.find(l => l.name === lineupName);
+  selectLineup(lineupId) {
+    const lineup = this.allLineups.find(l => l.id === lineupId);
     if (!lineup) return;
 
     this.currentShowcaseLineup = lineup;
@@ -571,14 +575,14 @@ export const LineupsPage = {
     // Use cached player data for instant rendering
     if (this.cachedPlayerMap) {
       this.renderShowcase(lineup, this.cachedPlayerMap);
-      this.updateCarouselSelection(lineupName);
+      this.updateCarouselSelection(lineupId);
     }
   },
 
-  updateCarouselSelection(lineupName) {
+  updateCarouselSelection(lineupId) {
     const carouselCards = document.querySelectorAll('.mini-lineup-card');
     carouselCards.forEach(card => {
-      if (card.dataset.lineupName === lineupName) {
+      if (card.dataset.lineupId === lineupId) {
         card.classList.add('selected');
       } else {
         card.classList.remove('selected');
@@ -596,8 +600,8 @@ export const LineupsPage = {
       });
 
       card.addEventListener('click', () => {
-        const lineupName = card.dataset.lineupName;
-        this.selectLineup(lineupName);
+        const lineupId = card.dataset.lineupId;
+        this.selectLineup(lineupId);
       });
     });
 
@@ -717,15 +721,15 @@ export const LineupsPage = {
     container.style.cursor = 'grab';
   },
 
-  async handleClearedClick(lineupName, lineups) {
-    const lineup = lineups.find(l => l.name === lineupName);
+  async handleClearedClick(lineupId) {
+    const lineup = this.allLineups.find(l => l.id === lineupId);
     if (!lineup) {
       toast.error('Lineup not found');
       return;
     }
 
     const hasPendingChanges = this.hasPendingTicketChanges(lineup);
-    let confirmMessage = `${lineup.completed ? 'Di pa ba na clear' : 'Cleared na ba'} ang lineup <strong>${lineupName}</strong>?`;
+    let confirmMessage = `${lineup.completed ? 'Di pa ba na clear' : 'Cleared na ba'} ang lineup <strong>${lineup.name}</strong>?`;
 
     if (hasPendingChanges && !lineup.completed) {
       confirmMessage += `<br><br><small style="color: #f4c430;">Ticket changes will be saved.</small>`;
@@ -745,8 +749,7 @@ export const LineupsPage = {
     try {
       // If there are pending ticket changes and we're marking as cleared, save them first
       if (hasPendingChanges && !lineup.completed) {
-        const lineupKey = `${lineup.name}|${lineup.raidType}`;
-        const ticketPlayers = this.pendingTicketChanges[lineupKey];
+        const ticketPlayers = this.pendingTicketChanges[lineup.id];
 
         // Build players array with [T] suffix for ticket players
         const playersWithTickets = lineup.players.map((playerName, idx) => {
@@ -755,6 +758,7 @@ export const LineupsPage = {
         });
 
         await dataService.updateLineup({
+          id: lineup.id,
           name: lineup.name,
           raidType: lineup.raidType,
           status: lineup.status,
@@ -767,8 +771,8 @@ export const LineupsPage = {
         this.clearPendingTicketChanges(lineup);
       }
 
-      await dataService.toggleLineupCompleted(lineupName);
-      toast.success(`Updated cleared status for ${lineupName}!`);
+      await dataService.toggleLineupCompleted(lineup.id);
+      toast.success(`Updated cleared status for ${lineup.name}!`);
       // Reload the lineups to show updated cleared status
       await this.loadLineups();
     } catch (error) {
@@ -777,18 +781,16 @@ export const LineupsPage = {
   },
 
   handleTicketToggle(lineup, slotIndex) {
-    const lineupKey = `${lineup.name}|${lineup.raidType}`;
-
     // Initialize pending changes from current state if not exists
-    if (!this.pendingTicketChanges[lineupKey]) {
-      this.pendingTicketChanges[lineupKey] = [...(lineup.ticketPlayers || Array(8).fill(false))];
+    if (!this.pendingTicketChanges[lineup.id]) {
+      this.pendingTicketChanges[lineup.id] = [...(lineup.ticketPlayers || Array(8).fill(false))];
     }
 
     // Toggle the ticket status for this slot
-    this.pendingTicketChanges[lineupKey][slotIndex] = !this.pendingTicketChanges[lineupKey][slotIndex];
+    this.pendingTicketChanges[lineup.id][slotIndex] = !this.pendingTicketChanges[lineup.id][slotIndex];
 
     // Update local lineup state for immediate UI feedback
-    lineup.ticketPlayers = [...this.pendingTicketChanges[lineupKey]];
+    lineup.ticketPlayers = [...this.pendingTicketChanges[lineup.id]];
 
     // Re-render showcase with updated data
     this.renderShowcase(lineup, this.cachedPlayerMap);
@@ -796,18 +798,16 @@ export const LineupsPage = {
     this.setupCarouselHandlers();
 
     const playerName = lineup.players[slotIndex];
-    const ticketStatus = this.pendingTicketChanges[lineupKey][slotIndex] ? 'using ticket' : 'no ticket';
+    const ticketStatus = this.pendingTicketChanges[lineup.id][slotIndex] ? 'using ticket' : 'no ticket';
     toast.info(`${playerName}: ${ticketStatus} (pending)`);
   },
 
   hasPendingTicketChanges(lineup) {
-    const lineupKey = `${lineup.name}|${lineup.raidType}`;
-    return !!this.pendingTicketChanges[lineupKey];
+    return !!this.pendingTicketChanges[lineup.id];
   },
 
   clearPendingTicketChanges(lineup) {
-    const lineupKey = `${lineup.name}|${lineup.raidType}`;
-    delete this.pendingTicketChanges[lineupKey];
+    delete this.pendingTicketChanges[lineup.id];
   },
 
   showSetupModal() {
@@ -874,5 +874,44 @@ export const LineupsPage = {
         document.body.removeChild(modalElement);
       }
     });
+  },
+
+  /**
+   * Setup realtime subscription for lineup changes
+   */
+  setupRealtimeSubscription() {
+    // Only setup once
+    if (this.lineupSubscription) return;
+
+    this.lineupSubscription = dataService.subscribeToLineups((payload) => {
+      const { eventType, new: newRecord, old: oldRecord } = payload;
+      const changedLineupId = newRecord?.id || oldRecord?.id;
+
+      // Check if the change affects the currently viewed lineup
+      const isCurrentLineup = this.currentShowcaseLineup?.id === changedLineupId;
+
+      if (isCurrentLineup) {
+        // Show warning toast with reload button
+        toast.showWithAction(
+          'This lineup was updated by another user.',
+          'Reload',
+          () => this.loadLineups(),
+          'warning'
+        );
+      } else {
+        // Silently refresh the carousel for other lineups
+        this.loadLineups();
+      }
+    });
+  },
+
+  /**
+   * Cleanup when leaving the page
+   */
+  destroy() {
+    if (this.lineupSubscription) {
+      dataService.unsubscribe(this.lineupSubscription);
+      this.lineupSubscription = null;
+    }
   }
 };

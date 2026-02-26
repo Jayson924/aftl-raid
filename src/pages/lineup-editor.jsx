@@ -7,6 +7,7 @@ export const LineupEditorPage = {
   players: [],
   allLineups: [],
   currentLineup: {
+    id: null, // UUID from database (null for new unsaved lineups)
     name: '',
     raidType: 'Hardcore',
     status: 'ready',
@@ -23,6 +24,10 @@ export const LineupEditorPage = {
   nextWeekMode: false,
   showCarouselLineups: true,
   showCarouselTemplates: false,
+  lineupSubscription: null, // Supabase realtime subscription
+  presenceChannel: null, // Presence channel for showing who's viewing
+  viewingUsers: [], // Other users currently viewing this page
+  pendingDeleteId: null, // Track lineup being deleted by current user to skip self-notification
 
   /**
    * Get the most recent Friday 5pm PT reset date (returns epoch timestamp)
@@ -161,7 +166,10 @@ export const LineupEditorPage = {
 
           <div class="editor-main">
             <div class="lineup-slots">
-              <h3>Raid Lineup (8 characters)</h3>
+              <div class="lineup-slots-header">
+                <h3>Lineup</h3>
+                <div id="presence-indicator" class="presence-indicator"></div>
+              </div>
               <div class="damage-amp-display">
                 <div class="damage-amp-bar physical">
                   <span class="damage-amp-label">Physical</span>
@@ -436,6 +444,9 @@ export const LineupEditorPage = {
       this.renderAvailablePlayers();
       this.loadExistingLineups();
       this.updateDamageAmpDisplay();
+
+      // Setup realtime subscription (only once)
+      this.setupRealtimeSubscription();
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading players: ${error.message}</div>`;
     }
@@ -527,7 +538,7 @@ export const LineupEditorPage = {
         }).join('');
 
         return `
-          <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-name="${lineup.name}">
+          <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-id="${lineup.id}">
             <div class="mini-lineup-header">
               <span class="mini-lineup-name">
                 ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}
@@ -535,7 +546,7 @@ export const LineupEditorPage = {
               </span>
               <div class="mini-lineup-header-actions">
                 <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
-                <button class="mini-delete-btn" data-lineup-name="${lineup.name}" data-lineup-raidtype="${lineup.raidType || 'Hardcore'}" title="Delete lineup">×</button>
+                <button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>
               </div>
             </div>
             <div class="mini-lineup-grid">
@@ -558,9 +569,9 @@ export const LineupEditorPage = {
           // Don't load if clicking delete button
           if (e.target.classList.contains('mini-delete-btn')) return;
 
-          const lineupName = card.dataset.lineupName;
+          const lineupId = card.dataset.lineupId;
           const lineups = await dataService.getLineups();
-          const lineup = lineups.find(l => l.name === lineupName);
+          const lineup = lineups.find(l => l.id === lineupId);
           if (lineup) {
             this.loadLineup(lineup);
           }
@@ -571,9 +582,8 @@ export const LineupEditorPage = {
       container.querySelectorAll('.mini-delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const lineupName = btn.dataset.lineupName;
-          const raidType = btn.dataset.lineupRaidtype;
-          await this.deleteLineup(lineupName, raidType);
+          const lineupId = btn.dataset.lineupId;
+          await this.deleteLineup(lineupId);
         });
       });
 
@@ -1757,6 +1767,7 @@ export const LineupEditorPage = {
     const currentRaidType = this.currentLineup.raidType;
 
     this.currentLineup = {
+      id: null, // Clear the ID so next save creates a new lineup
       name: '',
       raidType: currentRaidType,
       status: 'ready',
@@ -1793,6 +1804,10 @@ export const LineupEditorPage = {
 
     this.renderAvailablePlayers();
     this.updateDamageAmpDisplay();
+
+    // Leave presence channel when clearing lineup
+    this.leaveLineupPresence();
+
     toast.success('Lineup cleared! Enter a new name to save as a new lineup.');
   },
 
@@ -1836,10 +1851,47 @@ export const LineupEditorPage = {
         return result;
       });
 
-      // Check if lineup with this name already exists
+      // Check if lineup exists - prefer ID if available, fall back to name
       const existingLineups = await dataService.getLineups();
       const trimmedName = this.currentLineup.name.trim();
-      const existingLineup = existingLineups.find(l => l.name.trim() === trimmedName && (l.raidType || 'Hardcore') === this.currentLineup.raidType);
+
+      // If we have an ID, check if that specific lineup still exists
+      let existingLineup = null;
+      let wasDeletedWhileEditing = false;
+
+      if (this.currentLineup.id) {
+        existingLineup = existingLineups.find(l => l.id === this.currentLineup.id);
+        if (!existingLineup) {
+          // Lineup was deleted while we were editing
+          wasDeletedWhileEditing = true;
+        }
+      } else {
+        // No ID - check by name and raid type
+        existingLineup = existingLineups.find(l => l.name.trim() === trimmedName && (l.raidType || 'Hardcore') === this.currentLineup.raidType);
+      }
+
+      // Handle case where lineup was deleted while editing
+      if (wasDeletedWhileEditing) {
+        const saveAsNew = await modal.confirm(
+          `This lineup has been deleted. Save as a new lineup?`,
+          {
+            title: 'Lineup Deleted',
+            confirmText: 'Save as New',
+            cancelText: 'Cancel',
+            danger: false
+          }
+        );
+
+        if (!saveAsNew) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Lineup';
+          return;
+        }
+
+        // Clear the ID so it will be created as new
+        this.currentLineup.id = null;
+        existingLineup = null;
+      }
 
       if (existingLineup) {
         // Confirm before updating existing lineup
@@ -1865,8 +1917,9 @@ export const LineupEditorPage = {
 
         console.log('Clear check:', { wasCleared, isNowCleared, lineupName: trimmedName });
 
-        // Update existing lineup - use the actual name from the sheet as oldName
+        // Update existing lineup - include ID for reliable identification
         await dataService.updateLineup({
+          id: existingLineup.id,
           name: trimmedName,
           raidType: this.currentLineup.raidType,
           status: 'ready',
@@ -1875,6 +1928,9 @@ export const LineupEditorPage = {
           isTemplate: this.currentLineup.isTemplate,
           notes: this.currentLineup.notes
         }, existingLineup.name);
+
+        // Update the stored ID in case it was a new match by name
+        this.currentLineup.id = existingLineup.id;
         toast.success(`${trimmedName} updated!`);
 
         // Handle player completion status changes
@@ -1924,7 +1980,7 @@ export const LineupEditorPage = {
         }
       } else {
         // Add new lineup
-        await dataService.addLineup({
+        const result = await dataService.addLineup({
           name: trimmedName,
           raidType: this.currentLineup.raidType,
           status: 'ready',
@@ -1933,6 +1989,12 @@ export const LineupEditorPage = {
           isTemplate: this.currentLineup.isTemplate,
           notes: this.currentLineup.notes
         });
+
+        // Store the new lineup ID for future saves
+        if (result.data?.id) {
+          this.currentLineup.id = result.data.id;
+        }
+
         toast.success(`${trimmedName} saved!`);
 
         // If the lineup is marked as cleared, mark all players as completed for this raid type
@@ -1974,7 +2036,11 @@ export const LineupEditorPage = {
     }
   },
 
-  async deleteLineup(lineupName, raidType) {
+  async deleteLineup(lineupId) {
+    // Find the lineup to get its name for the confirmation message
+    const lineup = this.allLineups.find(l => l.id === lineupId);
+    const lineupName = lineup?.name || 'this lineup';
+
     const confirmed = await modal.confirm(
       `Delete lineup ${lineupName}?`,
       {
@@ -1988,11 +2054,18 @@ export const LineupEditorPage = {
     if (!confirmed) return;
 
     try {
-      await dataService.deleteLineup(lineupName, raidType);
+      // Track this delete to skip self-notification
+      this.pendingDeleteId = lineupId;
+      await dataService.deleteLineup(lineupId);
       toast.success(`GG wala nang ${lineupName}!`);
       this.loadExistingLineups(); // Refresh the lineup list
     } catch (error) {
       toast.error(`HOY ano yan bat may error: ${error.message}`);
+    } finally {
+      // Clear the pending delete flag after a short delay to allow realtime event to process
+      setTimeout(() => {
+        this.pendingDeleteId = null;
+      }, 1000);
     }
   },
 
@@ -2014,6 +2087,7 @@ export const LineupEditorPage = {
     }
 
     this.currentLineup = {
+      id: lineup.id, // Store the ID for updates
       name: lineup.name,
       raidType: lineup.raidType || 'Hardcore',
       status: 'ready',
@@ -2064,6 +2138,9 @@ export const LineupEditorPage = {
 
     this.updateDamageAmpDisplay();
     this.updateConflictWarnings();
+
+    // Join presence channel for this specific lineup
+    this.joinLineupPresence(lineup.id);
   },
 
   setupPlayerDragHandlers() {
@@ -2213,5 +2290,131 @@ export const LineupEditorPage = {
         }
       });
     });
+  },
+
+  /**
+   * Setup realtime subscription for lineup changes
+   */
+  setupRealtimeSubscription() {
+    // Only setup once
+    if (this.lineupSubscription) return;
+
+    this.lineupSubscription = dataService.subscribeToLineups((payload) => {
+      const { eventType, new: newRecord, old: oldRecord } = payload;
+      const changedLineupId = newRecord?.id || oldRecord?.id;
+
+      // Skip notification if this user initiated the delete
+      if (eventType === 'DELETE' && this.pendingDeleteId === changedLineupId) {
+        return;
+      }
+
+      // Check if the change affects the currently edited lineup
+      const isCurrentLineup = this.currentLineup.id && this.currentLineup.id === changedLineupId;
+
+      if (isCurrentLineup) {
+        if (eventType === 'DELETE') {
+          // Lineup was deleted by another user - clear the ID but let them keep editing
+          this.currentLineup.id = null;
+          this.leaveLineupPresence();
+          toast.warning('This lineup has been deleted. You can still save it as a new lineup.');
+        } else {
+          // Lineup was updated by someone else
+          toast.showWithAction(
+            'A change was made to this lineup. Reload to see changes.',
+            'Reload',
+            () => {
+              // Find and reload the fresh lineup
+              dataService.getLineups().then(lineups => {
+                const freshLineup = lineups.find(l => l.id === changedLineupId);
+                if (freshLineup) {
+                  this.loadLineup(freshLineup);
+                }
+                this.loadExistingLineups();
+              });
+            },
+            'warning'
+          );
+        }
+      } else {
+        // Change to a different lineup - just refresh the carousel
+        this.loadExistingLineups();
+      }
+    });
+  },
+
+  /**
+   * Join presence channel for a specific lineup
+   */
+  joinLineupPresence(lineupId) {
+    if (!lineupId) return;
+
+    // Leave any existing channel first
+    this.leaveLineupPresence();
+
+    console.log('[Presence] Joining lineup channel:', lineupId);
+
+    this.presenceChannel = dataService.joinPresence(`lineup:${lineupId}`, (users) => {
+      this.viewingUsers = users;
+      this.renderPresenceIndicator();
+    });
+  },
+
+  /**
+   * Leave the current lineup presence channel
+   */
+  leaveLineupPresence() {
+    if (this.presenceChannel) {
+      console.log('[Presence] Leaving lineup channel');
+      dataService.leavePresence(this.presenceChannel);
+      this.presenceChannel = null;
+    }
+    this.viewingUsers = [];
+    this.renderPresenceIndicator();
+  },
+
+  /**
+   * Render the presence indicator showing other viewers
+   */
+  renderPresenceIndicator() {
+    const indicator = document.getElementById('presence-indicator');
+    if (!indicator) return;
+
+    if (this.viewingUsers.length === 0) {
+      indicator.innerHTML = '';
+      return;
+    }
+
+    // Show avatars (up to 3) and count
+    const maxAvatars = 3;
+    const displayUsers = this.viewingUsers.slice(0, maxAvatars);
+    const extraCount = this.viewingUsers.length - maxAvatars;
+
+    const avatarsHtml = displayUsers.map(user => {
+      if (user.avatar) {
+        return `<img src="${user.avatar}" alt="${user.name}" title="${user.name}" class="presence-avatar">`;
+      }
+      // Fallback to initials
+      const initials = (user.name || '?').charAt(0).toUpperCase();
+      return `<div class="presence-avatar presence-avatar-initials" title="${user.name}">${initials}</div>`;
+    }).join('');
+
+    const countHtml = extraCount > 0 ? `<span class="presence-extra">+${extraCount}</span>` : '';
+    const label = this.viewingUsers.length === 1 ? '1 other viewing' : `${this.viewingUsers.length} others viewing`;
+
+    indicator.innerHTML = `
+      <div class="presence-avatars">${avatarsHtml}${countHtml}</div>
+      <span class="presence-label">${label}</span>
+    `;
+  },
+
+  /**
+   * Cleanup when leaving the page
+   */
+  destroy() {
+    if (this.lineupSubscription) {
+      dataService.unsubscribe(this.lineupSubscription);
+      this.lineupSubscription = null;
+    }
+    this.leaveLineupPresence();
   }
 };

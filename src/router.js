@@ -6,6 +6,7 @@ class Router {
     this.routes = {};
     this.routePermissions = {};
     this.currentPage = null;
+    this.currentComponent = null;
     this.onAuthRequired = null;
     this.defaultRoute = 'lineups';
   }
@@ -51,7 +52,13 @@ class Router {
 
     const component = this.routes[path];
     if (component) {
+      // Call destroy on the current component before switching
+      if (this.currentComponent && typeof this.currentComponent.destroy === 'function') {
+        this.currentComponent.destroy();
+      }
+
       this.currentPage = path;
+      this.currentComponent = component;
 
       // Update URL without triggering popstate
       if (updateHistory) {

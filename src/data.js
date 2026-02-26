@@ -543,25 +543,22 @@ class DataService {
     return { success: true, data: savedLineup };
   }
 
-  async deleteLineup(lineupName, raidType) {
-    let query = supabase.from('lineups').delete().eq('name', lineupName);
-
-    if (raidType) {
-      query = query.eq('raid_type', raidType);
-    }
-
-    const { error } = await query;
+  async deleteLineup(lineupId) {
+    const { error } = await supabase
+      .from('lineups')
+      .delete()
+      .eq('id', lineupId);
 
     if (error) throw error;
     return { success: true };
   }
 
-  async toggleLineupCompleted(lineupName) {
+  async toggleLineupCompleted(lineupId) {
     // Get current state
     const { data: lineup } = await supabase
       .from('lineups')
       .select('id, completed')
-      .eq('name', lineupName)
+      .eq('id', lineupId)
       .single();
 
     if (!lineup) throw new Error('Lineup not found');
@@ -789,6 +786,73 @@ class DataService {
 
   unsubscribe(subscription) {
     supabase.removeChannel(subscription);
+  }
+
+  // ============================================
+  // PRESENCE (who's viewing)
+  // ============================================
+
+  /**
+   * Join a presence channel for a page
+   * @param {string} pageName - The page identifier (e.g., 'lineups', 'lineup-editor')
+   * @param {Function} onPresenceChange - Callback when presence changes, receives array of users
+   * @returns {Object} The channel subscription
+   */
+  joinPresence(pageName, onPresenceChange) {
+    if (!this._user) {
+      console.log('[Presence] No user logged in, skipping presence');
+      return null;
+    }
+
+    console.log('[Presence] Joining channel:', pageName);
+
+    const channel = supabase.channel(`presence:${pageName}`, {
+      config: {
+        presence: {
+          key: this._user.id
+        }
+      }
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        console.log('[Presence] Sync event, state:', state);
+        const users = Object.values(state).flat().map(p => ({
+          id: p.user_id,
+          name: p.user_name,
+          avatar: p.user_avatar
+        }));
+        // Filter out current user from the count
+        const otherUsers = users.filter(u => u.id !== this._user.id);
+        console.log('[Presence] Other users:', otherUsers);
+        onPresenceChange(otherUsers);
+      })
+      .subscribe(async (status) => {
+        console.log('[Presence] Subscribe status:', status);
+        if (status === 'SUBSCRIBED') {
+          const trackResult = await channel.track({
+            user_id: this._user.id,
+            user_name: this.getDisplayName(),
+            user_avatar: this.getAvatarUrl(),
+            online_at: new Date().toISOString()
+          });
+          console.log('[Presence] Track result:', trackResult);
+        }
+      });
+
+    return channel;
+  }
+
+  /**
+   * Leave a presence channel
+   * @param {Object} channel - The channel to leave
+   */
+  leavePresence(channel) {
+    if (channel) {
+      channel.untrack();
+      supabase.removeChannel(channel);
+    }
   }
 }
 
