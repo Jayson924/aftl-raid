@@ -49,8 +49,8 @@ export const PlayersPage = {
     this.loadPlayers();
   },
 
-  // Store collapsed state for owner groups
-  _collapsedOwners: new Set(),
+  // Store expanded state for owner groups (collapsed by default)
+  _expandedOwners: new Set(),
 
   async loadPlayers() {
     const listElement = document.getElementById('players-list');
@@ -233,14 +233,14 @@ export const PlayersPage = {
     sortedOwnerIds.forEach(ownerId => {
       const owner = userMap[ownerId];
       const ownerPlayers = groupedByOwner[ownerId];
-      const isCollapsed = this._collapsedOwners.has(ownerId);
+      const isCollapsed = !this._expandedOwners.has(ownerId);
 
       html += this.renderOwnerGroup(owner, ownerPlayers, ownerId, isCollapsed, hasAnyEditableCharacters, userMap);
     });
 
     // Render unassigned group
     if (unassigned.length > 0) {
-      const isCollapsed = this._collapsedOwners.has('unassigned');
+      const isCollapsed = !this._expandedOwners.has('unassigned');
       html += this.renderOwnerGroup(null, unassigned, 'unassigned', isCollapsed, hasAnyEditableCharacters, userMap);
     }
 
@@ -251,10 +251,10 @@ export const PlayersPage = {
     document.querySelectorAll('.owner-group-header').forEach(header => {
       header.addEventListener('click', (e) => {
         const ownerId = header.dataset.ownerId;
-        if (this._collapsedOwners.has(ownerId)) {
-          this._collapsedOwners.delete(ownerId);
+        if (this._expandedOwners.has(ownerId)) {
+          this._expandedOwners.delete(ownerId);
         } else {
-          this._collapsedOwners.add(ownerId);
+          this._expandedOwners.add(ownerId);
         }
         this.loadPlayers();
       });
