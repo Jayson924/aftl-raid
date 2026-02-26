@@ -81,7 +81,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.0.4</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.0.5</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -99,6 +99,7 @@ function renderNavigation() {
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
+            <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
           ` : `
             <a href="#" class="nav-link" id="login-btn-mobile">Login with Discord</a>
@@ -117,6 +118,7 @@ function renderNavigation() {
               <div class="dropdown-header">
                 <span class="dropdown-role">${dataService.getUserRole()}</span>
               </div>
+              <button class="dropdown-item" id="change-name-btn">Change Name</button>
               <button class="dropdown-item" id="logout-btn">Logout</button>
             </div>
           </div>
@@ -185,12 +187,25 @@ function renderNavigation() {
       renderNavigation();
       router.navigate('lineups');
     });
+
+    document.getElementById('change-name-btn').addEventListener('click', () => {
+      dropdownMenu.classList.remove('open');
+      dropdownToggle.classList.remove('open');
+      showChangeNameModal();
+    });
   } else {
     document.getElementById('login-btn').addEventListener('click', handleDiscordLogin);
   }
 
   // Login/Logout buttons (mobile)
   if (isAuthenticated) {
+    document.getElementById('change-name-btn-mobile').addEventListener('click', (e) => {
+      e.preventDefault();
+      hamburgerBtn.classList.remove('active');
+      navLinks.classList.remove('open');
+      showChangeNameModal();
+    });
+
     document.getElementById('logout-btn-mobile').addEventListener('click', async (e) => {
       e.preventDefault();
       await dataService.signOut();
@@ -216,6 +231,68 @@ async function handleDiscordLogin() {
     console.error('Discord login error:', error);
     toast.error('Failed to connect to Discord');
   }
+}
+
+function showChangeNameModal() {
+  const currentName = dataService.getDisplayName();
+  const modalElement = document.createElement('div');
+  modalElement.className = 'modal';
+  modalElement.innerHTML = `
+    <div class="modal-content" style="max-width: 400px;">
+      <h2>Change Display Name</h2>
+      <div class="form-group">
+        <label for="new-display-name">Display Name</label>
+        <input type="text" id="new-display-name" value="${currentName || ''}" maxlength="32" placeholder="Enter your display name">
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-name-btn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-name-btn">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalElement);
+
+  const input = document.getElementById('new-display-name');
+  input.focus();
+  input.select();
+
+  document.getElementById('cancel-name-btn').addEventListener('click', () => {
+    modalElement.remove();
+  });
+
+  document.getElementById('save-name-btn').addEventListener('click', async () => {
+    const newName = input.value.trim();
+    if (!newName) {
+      toast.error('Display name cannot be empty');
+      return;
+    }
+
+    try {
+      await dataService.updateDisplayName(newName);
+      toast.success('Display name updated!');
+      modalElement.remove();
+      renderNavigation();
+    } catch (error) {
+      toast.error(`Failed to update name: ${error.message}`);
+    }
+  });
+
+  // Allow Enter to save
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('save-name-btn').click();
+    } else if (e.key === 'Escape') {
+      modalElement.remove();
+    }
+  });
+
+  // Close on backdrop click
+  modalElement.addEventListener('click', (e) => {
+    if (e.target === modalElement) {
+      modalElement.remove();
+    }
+  });
 }
 
 function showLoginModal() {

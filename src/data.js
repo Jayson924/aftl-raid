@@ -145,12 +145,13 @@ class DataService {
   async _loadOrCreateUser() {
     if (!this._user) {
       this._userRole = null;
+      this._customDisplayName = null;
       return;
     }
 
     const { data, error } = await supabase
       .from('app_users')
-      .select('role')
+      .select('role, display_name')
       .eq('discord_id', this._user.id)
       .single();
 
@@ -165,7 +166,7 @@ class DataService {
           avatar_url: this._user.avatar,
           role: 'player'
         })
-        .select('role')
+        .select('role, display_name')
         .single();
 
       if (insertError) {
@@ -173,10 +174,13 @@ class DataService {
       }
 
       this._userRole = newUser?.role || 'player';
+      this._customDisplayName = null; // New user, no custom name yet
       return;
     }
 
     this._userRole = data?.role || 'player';
+    // Store custom display name if it differs from Discord name
+    this._customDisplayName = data?.display_name !== this._user.displayName ? data?.display_name : null;
   }
 
   /**
@@ -202,7 +206,7 @@ class DataService {
   }
 
   getDisplayName() {
-    return this._user?.displayName || this._user?.username || null;
+    return this._customDisplayName || this._user?.displayName || this._user?.username || null;
   }
 
   getAvatarUrl() {
@@ -211,6 +215,30 @@ class DataService {
 
   getUserRole() {
     return this._userRole;
+  }
+
+  /**
+   * Update the user's display name
+   */
+  async updateDisplayName(newName) {
+    if (!this._user) {
+      throw new Error('Not logged in');
+    }
+
+    const trimmedName = newName?.trim();
+    if (!trimmedName) {
+      throw new Error('Display name cannot be empty');
+    }
+
+    const { error } = await supabase
+      .from('app_users')
+      .update({ display_name: trimmedName })
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+
+    this._customDisplayName = trimmedName !== this._user.displayName ? trimmedName : null;
+    return { success: true };
   }
 
   isAuthenticated() {
