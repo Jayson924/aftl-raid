@@ -55,6 +55,65 @@
       white-space: nowrap;
     }
   }
+  // Raid priority filter
+  .raid-priority-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    &.grouped-filter {
+      margin-bottom: 0.75rem;
+      width: fit-content;
+    }
+
+    &.mobile-filter {
+      display: none; // Hidden on desktop
+      margin-bottom: 0.75rem;
+
+      .filter-label {
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.4);
+        margin-right: 0.25rem;
+      }
+    }
+
+    .filter-btn {
+      justify-content: space-between;
+      width: 3rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.6rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 2px;
+      background-color: rgba(255, 255, 255, 0.03);
+      color: rgba(255, 255, 255, 0.35);
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        color: rgba(255, 255, 255, 0.6);
+        background-color: rgba(255, 255, 255, 0.06);
+      }
+
+      &.active {
+        background-color: rgba($primary-color, 0.12);
+        color: rgba($primary-color, 0.8);
+      }
+    }
+  }
+
+  .filter-row {
+    background-color: rgba(25, 25, 25, 0.12);
+    td {
+      padding: 0.2rem 1rem !important;
+      border-bottom: none !important;
+    }
+
+    .raid-priority-filter {
+      width: 100%;
+    }
+  }
+
   // Owner Groups
   .owner-groups {
     display: flex;

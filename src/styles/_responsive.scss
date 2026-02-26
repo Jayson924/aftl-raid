@@ -221,6 +221,11 @@
       gap: 1rem;
     }
 
+    // Show mobile filter, hide desktop filter row
+    .raid-priority-filter.mobile-filter {
+      display: flex;
+    }
+
     .players-table {
       display: block;
 

@@ -52,6 +52,43 @@ export const PlayersPage = {
   // Store expanded state for owner groups (collapsed by default)
   _expandedOwners: new Set(),
 
+  // Filter for prioritizing uncleared raids { hc: boolean, cl: boolean }
+  _raidPriorityFilter: { hc: false, cl: false },
+
+  // Sort players by raid priority filter, then alphabetically
+  sortPlayersByRaidPriority(players) {
+    return [...players].sort((a, b) => {
+      const hasFilter = this._raidPriorityFilter.hc || this._raidPriorityFilter.cl;
+
+      if (hasFilter) {
+        const aNeedsHC = dataService.playerNeedsRaid(a, 'Hardcore');
+        const aNeedsCL = dataService.playerNeedsRaid(a, 'Classic');
+        const bNeedsHC = dataService.playerNeedsRaid(b, 'Hardcore');
+        const bNeedsCL = dataService.playerNeedsRaid(b, 'Classic');
+
+        let aNeeds = false, bNeeds = false;
+        if (this._raidPriorityFilter.hc && this._raidPriorityFilter.cl) {
+          // Both selected - needs either
+          aNeeds = aNeedsHC || aNeedsCL;
+          bNeeds = bNeedsHC || bNeedsCL;
+        } else if (this._raidPriorityFilter.hc) {
+          aNeeds = aNeedsHC;
+          bNeeds = bNeedsHC;
+        } else if (this._raidPriorityFilter.cl) {
+          aNeeds = aNeedsCL;
+          bNeeds = bNeedsCL;
+        }
+
+        // Uncleared (needs raid) comes first
+        if (aNeeds && !bNeeds) return -1;
+        if (!aNeeds && bNeeds) return 1;
+      }
+
+      // Then sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
+  },
+
   async loadPlayers() {
     const listElement = document.getElementById('players-list');
 
@@ -104,6 +141,15 @@ export const PlayersPage = {
         });
       }
 
+      // Add event listeners for raid priority filter (multi-select)
+      document.querySelectorAll('.raid-priority-filter .filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const filter = btn.dataset.filter; // 'hc' or 'cl'
+          this._raidPriorityFilter[filter] = !this._raidPriorityFilter[filter];
+          this.loadPlayers();
+        });
+      });
+
       // Add event listeners for raid badge toggles
       document.querySelectorAll('.raid-badge.clickable').forEach(badge => {
         badge.addEventListener('click', async (e) => {
@@ -131,10 +177,14 @@ export const PlayersPage = {
   },
 
   renderFlatView(listElement, players, userMap, hasAnyEditableCharacters) {
-    // Sort players alphabetically by name
-    const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort players - apply priority filter then alphabetically
+    const sortedPlayers = this.sortPlayersByRaidPriority(players);
 
     listElement.innerHTML = `
+      <div class="raid-priority-filter mobile-filter">
+        <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
+        <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
+      </div>
       <table class="players-table">
         <thead>
           <tr>
@@ -146,6 +196,21 @@ export const PlayersPage = {
             <th>Raids Needed</th>
             <th>Notes</th>
             ${hasAnyEditableCharacters ? '<th>Actions</th>' : ''}
+          </tr>
+          <tr class="filter-row">
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>
+              <div class="raid-priority-filter">
+                <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
+                <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
+              </div>
+            </td>
+            <td></td>
+            ${hasAnyEditableCharacters ? '<td></td>' : ''}
           </tr>
         </thead>
         <tbody>
@@ -250,8 +315,13 @@ export const PlayersPage = {
       return ownerA.localeCompare(ownerB);
     });
 
-    // Build grouped HTML
-    let html = '<div class="owner-groups">';
+    // Build grouped HTML with filter at top
+    let html = `
+      <div class="raid-priority-filter grouped-filter">
+        <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
+        <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
+      </div>
+      <div class="owner-groups">`;
 
     // Render each owner group
     sortedOwnerIds.forEach(ownerId => {
@@ -268,7 +338,7 @@ export const PlayersPage = {
       html += this.renderOwnerGroup(null, unassigned, 'unassigned', isCollapsed, hasAnyEditableCharacters, userMap);
     }
 
-    html += '</div>';
+    html += '</div>'; // Close owner-groups
     listElement.innerHTML = html;
 
     // Add event listeners for collapse toggles
@@ -341,8 +411,8 @@ export const PlayersPage = {
   },
 
   renderPlayersTable(players, hasAnyEditableCharacters, userMap, accountBadge = null) {
-    // Sort players alphabetically
-    const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort players by raid priority then alphabetically
+    const sortedPlayers = this.sortPlayersByRaidPriority(players);
 
     return `
       <table class="players-table">
