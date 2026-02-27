@@ -486,48 +486,6 @@ class DataService {
   }
 
   // ============================================
-  // WEEKLY RESET
-  // ============================================
-
-  async checkWeeklyReset(lastResetTimestamp) {
-    // Get last cleanup time from metadata
-    const { data: metadata } = await supabase
-      .from('metadata')
-      .select('value')
-      .eq('key', 'last_weekly_cleanup')
-      .single();
-
-    const lastCleanup = parseInt(metadata?.value || '0', 10);
-
-    if (lastCleanup >= lastResetTimestamp) {
-      console.log('[Weekly Reset] Already cleaned up for this period');
-      return { success: true, cleaned: false };
-    }
-
-    // Delete non-template lineups
-    const { data: deleted, error: deleteError } = await supabase
-      .from('lineups')
-      .delete()
-      .eq('is_template', false)
-      .select('id');
-
-    if (deleteError) throw deleteError;
-
-    // Update metadata
-    const { error: metaError } = await supabase
-      .from('metadata')
-      .upsert({
-        key: 'last_weekly_cleanup',
-        value: String(lastResetTimestamp)
-      });
-
-    if (metaError) throw metaError;
-
-    console.log(`[Weekly Reset] Deleted ${deleted?.length || 0} non-template lineups`);
-    return { success: true, cleaned: true, deletedCount: deleted?.length || 0 };
-  }
-
-  // ============================================
   // COMPLETION TRACKING
   // ============================================
 

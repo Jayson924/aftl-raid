@@ -1,0 +1,35 @@
+name: Weekly Lineup Cleanup
+
+on:
+  schedule:
+    # Runs every Saturday at 01:00 UTC = Friday 5:00 PM PST / 6:00 PM PDT
+    - cron: '0 1 * * 6'
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Weekly Lineup Cleanup
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/weekly_lineup_cleanup" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Response: $body"
+          echo "HTTP Status: $http_code"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "Error: Cleanup failed with status $http_code"
+            exit 1
+          fi
+
+          echo "Cleanup completed successfully!"

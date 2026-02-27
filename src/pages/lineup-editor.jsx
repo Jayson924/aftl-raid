@@ -29,98 +29,6 @@ export const LineupEditorPage = {
   viewingUsers: [], // Other users currently viewing this page
   pendingDeleteId: null, // Track lineup being deleted by current user to skip self-notification
 
-  /**
-   * Get the most recent Friday 5pm PT reset date (returns epoch timestamp)
-   * @returns {number} - Epoch timestamp (milliseconds) of the most recent Friday 5pm PT
-   */
-  getLastResetDate() {
-    const now = Date.now(); // Current time in epoch milliseconds
-
-    // Helper: Get hour in PT timezone for any epoch timestamp
-    const getPTHour = (epochMs) => {
-      return parseInt(new Date(epochMs).toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-        hour: 'numeric',
-        hour12: false
-      }));
-    };
-
-    // Helper: Get day of week in PT timezone (0=Sun, 5=Fri, 6=Sat)
-    const getPTDayOfWeek = (epochMs) => {
-      const dayName = new Date(epochMs).toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-        weekday: 'short'
-      });
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      return days.indexOf(dayName);
-    };
-
-    // Get current day/hour in PT
-    const dayOfWeek = getPTDayOfWeek(now);
-    const currentHourPT = getPTHour(now);
-
-    // Calculate how many days back to the target Friday
-    let daysBack;
-    if (dayOfWeek === 5) { // Currently Friday in PT
-      daysBack = currentHourPT >= 17 ? 0 : 7;
-    } else if (dayOfWeek === 6) { // Saturday
-      daysBack = 1;
-    } else if (dayOfWeek === 0) { // Sunday
-      daysBack = 2;
-    } else { // Mon-Thu (1-4)
-      daysBack = dayOfWeek + 2;
-    }
-
-    // Start searching from approximate target (in epoch time)
-    // Round down to the nearest hour to start with a clean boundary
-    const approximateTarget = now - (daysBack * 24 * 60 * 60 * 1000);
-    const oneHour = 60 * 60 * 1000;
-    let candidate = Math.floor((approximateTarget - (12 * oneHour)) / oneHour) * oneHour;
-
-    // Search forward hour by hour (up to 48 hours to be safe)
-    for (let i = 0; i < 48; i++) {
-      const candidateDayOfWeek = getPTDayOfWeek(candidate);
-      const candidateHour = getPTHour(candidate);
-
-      if (candidateDayOfWeek === 5 && candidateHour === 17) {
-        // Found Friday 5pm PT - candidate is already normalized to hour boundary
-        // Now we need to fine-tune to find exactly when PT hour becomes 17
-        // Search backwards in 1-minute increments to find the exact moment
-        let exactMoment = candidate;
-        for (let j = 0; j < 60; j++) {
-          const testTime = candidate - (j * 60 * 1000);
-          if (getPTHour(testTime) !== 17) {
-            // We've gone too far back, the exact moment is one minute forward
-            exactMoment = testTime + (60 * 1000);
-            break;
-          }
-        }
-
-        // Round down to the nearest minute for consistency
-        return Math.floor(exactMoment / 60000) * 60000;
-      }
-
-      // Move forward 1 hour
-      candidate += oneHour;
-    }
-
-    // Fallback (should never happen)
-    console.error('Could not determine last reset date');
-    return now;
-  },
-
-  /**
-   * Check if we've crossed a weekly reset boundary and auto-clear non-template lineups.
-   * Cleanup runs server-side (Apps Script) so the state is shared across all devices/browsers.
-   */
-  async checkAndClearWeeklyLineups() {
-    const lastResetTimestamp = this.getLastResetDate();
-    console.log('[Weekly Reset Check] sending lastResetTimestamp:', new Date(lastResetTimestamp).toISOString());
-
-    const result = await dataService.checkWeeklyReset(lastResetTimestamp);
-    console.log('[Weekly Reset Check]', result);
-  },
-
   async render(container) {
     container.innerHTML = `
       <div class="lineup-editor-page">
@@ -430,11 +338,6 @@ export const LineupEditorPage = {
     }
 
     try {
-      // Check and clear weekly lineups before loading
-      if (dataService.hasWriteAccess()) {
-        await this.checkAndClearWeeklyLineups();
-      }
-
       // Load both players and lineups
       [this.players, this.allLineups] = await Promise.all([
         dataService.getPlayers(),
@@ -1834,22 +1737,14 @@ export const LineupEditorPage = {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      // Build players array with [T] and [P:PilotName] suffixes
+      // Build clean players array (no suffixes - ticket/pilot stored separately)
       const players = Array(8).fill('').map((_, idx) => {
-        const playerName = this.currentLineup.players[idx] || '';
-        if (!playerName) return '';
-        let result = playerName;
-        // Append [T] suffix if using ticket
-        if (this.currentLineup.ticketSlots[idx]) {
-          result += '[T]';
-        }
-        // Append [P:PilotName] suffix if pilot is set (only for non-guest players)
-        const pilotName = this.currentLineup.pilotSlots[idx];
-        if (pilotName && !playerName.startsWith('[PUB]')) {
-          result += `[P:${pilotName}]`;
-        }
-        return result;
+        return this.currentLineup.players[idx] || '';
       });
+
+      // Build ticketPlayers and pilotPlayers arrays for database
+      const ticketPlayers = [...this.currentLineup.ticketSlots];
+      const pilotPlayers = [...this.currentLineup.pilotSlots];
 
       // Check if lineup exists - prefer ID if available, fall back to name
       const existingLineups = await dataService.getLineups();
@@ -1924,6 +1819,8 @@ export const LineupEditorPage = {
           raidType: this.currentLineup.raidType,
           status: 'ready',
           players,
+          ticketPlayers,
+          pilotPlayers,
           completed: this.currentLineup.completed,
           isTemplate: this.currentLineup.isTemplate,
           notes: this.currentLineup.notes
@@ -1934,13 +1831,17 @@ export const LineupEditorPage = {
         toast.success(`${trimmedName} updated!`);
 
         // Handle player completion status changes
-        // Extract ticket players (those with [T] suffix) and strip suffix for marking
-        const nonGuestPlayers = players.filter(p => p && !p.startsWith('[PUB]'));
-        const ticketPlayerNames = nonGuestPlayers
-          .filter(p => p.endsWith('[T]'))
-          .map(p => p.slice(0, -3));
-        const playerNames = nonGuestPlayers
-          .map(p => p.endsWith('[T]') ? p.slice(0, -3) : p);
+        // Get non-guest player names and their ticket status by index
+        const playerNames = [];
+        const ticketPlayerNames = [];
+        players.forEach((p, idx) => {
+          if (p && !p.startsWith('[PUB]')) {
+            playerNames.push(p);
+            if (ticketPlayers[idx]) {
+              ticketPlayerNames.push(p);
+            }
+          }
+        });
 
         if (wasCleared && !isNowCleared && playerNames.length > 0) {
           // Lineup was cleared but now unchecked - unmark players
@@ -1985,6 +1886,8 @@ export const LineupEditorPage = {
           raidType: this.currentLineup.raidType,
           status: 'ready',
           players,
+          ticketPlayers,
+          pilotPlayers,
           completed: this.currentLineup.completed,
           isTemplate: this.currentLineup.isTemplate,
           notes: this.currentLineup.notes
@@ -1999,18 +1902,22 @@ export const LineupEditorPage = {
 
         // If the lineup is marked as cleared, mark all players as completed for this raid type
         if (this.currentLineup.completed) {
-          // Get only non-guest players (exclude [PUB] entries), extract ticket players
-          const nonGuestPlayers = players.filter(p => p && !p.startsWith('[PUB]'));
-          const ticketPlayerNames = nonGuestPlayers
-            .filter(p => p.endsWith('[T]'))
-            .map(p => p.slice(0, -3));
-          const playerNames = nonGuestPlayers
-            .map(p => p.endsWith('[T]') ? p.slice(0, -3) : p);
+          // Get non-guest player names and their ticket status by index
+          const newPlayerNames = [];
+          const newTicketPlayerNames = [];
+          players.forEach((p, idx) => {
+            if (p && !p.startsWith('[PUB]')) {
+              newPlayerNames.push(p);
+              if (ticketPlayers[idx]) {
+                newTicketPlayerNames.push(p);
+              }
+            }
+          });
 
-          if (playerNames.length > 0) {
+          if (newPlayerNames.length > 0) {
             try {
-              await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
-              console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}, ${ticketPlayerNames.length} tickets used`);
+              await dataService.markPlayersCompleted(newPlayerNames, this.currentLineup.raidType, newTicketPlayerNames);
+              console.log(`Cleared ${newPlayerNames.length} players for ${this.currentLineup.raidType}, ${newTicketPlayerNames.length} tickets used`);
             } catch (error) {
               console.error('Error marking players as completed:', error);
               toast.warning('Saved pero may nangyari? Refresh nalang dong');

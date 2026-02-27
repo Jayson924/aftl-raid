@@ -751,18 +751,14 @@ export const LineupsPage = {
       if (hasPendingChanges && !lineup.completed) {
         const ticketPlayers = this.pendingTicketChanges[lineup.id];
 
-        // Build players array with [T] suffix for ticket players
-        const playersWithTickets = lineup.players.map((playerName, idx) => {
-          if (!playerName) return '';
-          return ticketPlayers[idx] ? `${playerName}[T]` : playerName;
-        });
-
         await dataService.updateLineup({
           id: lineup.id,
           name: lineup.name,
           raidType: lineup.raidType,
           status: lineup.status,
-          players: playersWithTickets,
+          players: lineup.players,
+          ticketPlayers: ticketPlayers,
+          pilotPlayers: lineup.pilotPlayers,
           completed: lineup.completed,
           isTemplate: lineup.isTemplate
         }, lineup.name);
