@@ -554,23 +554,61 @@ class DataService {
   }
 
   async toggleLineupCompleted(lineupId) {
-    // Get current state
+    // Get current state with full lineup data
     const { data: lineup } = await supabase
       .from('lineups')
-      .select('id, completed')
+      .select(`
+        id, completed, raid_type,
+        lineup_players (
+          player_name,
+          uses_ticket
+        )
+      `)
       .eq('id', lineupId)
       .single();
 
     if (!lineup) throw new Error('Lineup not found');
 
-    // Toggle
+    const newCompleted = !lineup.completed;
+
+    // Toggle lineup completed status
     const { error } = await supabase
       .from('lineups')
-      .update({ completed: !lineup.completed })
+      .update({ completed: newCompleted })
       .eq('id', lineup.id);
 
     if (error) throw error;
-    return { success: true, completed: !lineup.completed };
+
+    // Handle player completion based on lineup completion status
+    if (lineup.lineup_players && lineup.lineup_players.length > 0) {
+      const playerNames = lineup.lineup_players
+        .map(lp => lp.player_name)
+        .filter(name => name && name.trim() !== '');
+
+      const ticketPlayerNames = lineup.lineup_players
+        .filter(lp => lp.uses_ticket && lp.player_name)
+        .map(lp => lp.player_name);
+
+      if (newCompleted) {
+        // Mark all players as completed
+        if (playerNames.length > 0) {
+          await this.markPlayersCompleted(playerNames, lineup.raid_type, ticketPlayerNames);
+        }
+      } else {
+        // When unclearing, only unmark non-ticket players
+        // (non-ticket players can only be in one lineup per raid type)
+        // Ticket players are left alone - they may have completed in another lineup
+        const nonTicketPlayerNames = lineup.lineup_players
+          .filter(lp => !lp.uses_ticket && lp.player_name && lp.player_name.trim() !== '')
+          .map(lp => lp.player_name);
+
+        if (nonTicketPlayerNames.length > 0) {
+          await this.unmarkPlayersCompleted(nonTicketPlayerNames, lineup.raid_type, null, []);
+        }
+      }
+    }
+
+    return { success: true, completed: newCompleted };
   }
 
   // ============================================
