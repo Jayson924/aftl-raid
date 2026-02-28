@@ -12,6 +12,7 @@ export const LineupsPage = {
   pendingTicketChanges: {}, // Track unsaved ticket changes per lineup by ID: { lineupId: [true, false, ...] }
   showTemplates: false,
   lineupSubscription: null, // Supabase realtime subscription
+  pendingToggleId: null, // Track lineup being toggled by current user to skip self-notification
 
   async render(container) {
     container.innerHTML = `
@@ -767,11 +768,15 @@ export const LineupsPage = {
         this.clearPendingTicketChanges(lineup);
       }
 
+      // Mark as pending to skip self-notification from realtime
+      this.pendingToggleId = lineup.id;
       await dataService.toggleLineupCompleted(lineup.id);
+      this.pendingToggleId = null;
       toast.success(`Updated cleared status for ${lineup.name}!`);
       // Reload the lineups to show updated cleared status
       await this.loadLineups();
     } catch (error) {
+      this.pendingToggleId = null;
       toast.error(`Error: ${error.message}`);
     }
   },
@@ -882,6 +887,11 @@ export const LineupsPage = {
     this.lineupSubscription = dataService.subscribeToLineups((payload) => {
       const { eventType, new: newRecord, old: oldRecord } = payload;
       const changedLineupId = newRecord?.id || oldRecord?.id;
+
+      // Skip notification if this user initiated the toggle
+      if (this.pendingToggleId === changedLineupId) {
+        return;
+      }
 
       // Check if the change affects the currently viewed lineup
       const isCurrentLineup = this.currentShowcaseLineup?.id === changedLineupId;
