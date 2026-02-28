@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES } from '../constants.js';
 import { modal } from '../modal.js';
 
 export const PlayersPage = {
@@ -54,6 +54,144 @@ export const PlayersPage = {
 
   // Filter for prioritizing uncleared raids { hc: boolean, cl: boolean }
   _raidPriorityFilter: { hc: false, cl: false },
+
+  // Class family filter state
+  _selectedClassFamily: null,
+  _expandedClassFamily: null,
+  _selectedSpecialization: null,
+
+  // Filter players by class family/specialization
+  filterPlayersByClass(players) {
+    if (!this._selectedClassFamily && !this._selectedSpecialization) {
+      return players;
+    }
+
+    return players.filter(player => {
+      if (this._selectedSpecialization && this._expandedClassFamily) {
+        // Filter by specialization classes
+        const family = CLASS_FAMILIES[this._expandedClassFamily];
+        const specClasses = family.specializations[this._selectedSpecialization]?.classes || [];
+        return specClasses.includes(player.role);
+      } else if (this._selectedClassFamily) {
+        const familyClasses = CLASS_FAMILIES[this._selectedClassFamily].classes;
+        return familyClasses.includes(player.role);
+      }
+      return true;
+    });
+  },
+
+  // Count players in a class family
+  getClassFamilyCount(familyKey) {
+    if (!this._allPlayers) return 0;
+    const family = CLASS_FAMILIES[familyKey];
+    return this._allPlayers.filter(p => family.classes.includes(p.role)).length;
+  },
+
+  // Count players in a specialization
+  getSpecializationCount(familyKey, specKey) {
+    if (!this._allPlayers) return 0;
+    const family = CLASS_FAMILIES[familyKey];
+    const spec = family?.specializations?.[specKey];
+    if (!spec) return 0;
+    return this._allPlayers.filter(p => spec.classes.includes(p.role)).length;
+  },
+
+  // Render class family filter HTML
+  renderClassFamilyFilter() {
+    const totalCount = this._allPlayers?.length || 0;
+
+    return `
+      <div class="class-filter-header">
+        <span class="total-count">${totalCount} character${totalCount !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="class-family-filter">
+        ${Object.entries(CLASS_FAMILIES).map(([key, family]) => {
+          const count = this.getClassFamilyCount(key);
+          return `
+          <button class="class-family-btn ${this._selectedClassFamily === key ? 'active' : ''} ${this._expandedClassFamily === key ? 'expanded' : ''}"
+                  data-family="${key}" title="${family.name} (${count})">
+            <span class="class-icon-wrapper">
+              <img src="/icons/${family.icon}" alt="${family.name}">
+            </span>
+            ${count > 0 ? `<span class="class-count">${count}</span>` : ''}
+          </button>
+        `}).join('')}
+      </div>
+      <div class="specialization-filter" id="specialization-filter">
+        ${this.renderSpecializationButtons()}
+      </div>
+    `;
+  },
+
+  // Render specialization buttons for expanded class family
+  renderSpecializationButtons() {
+    if (!this._expandedClassFamily) {
+      return '';
+    }
+
+    const family = CLASS_FAMILIES[this._expandedClassFamily];
+    if (!family || !family.specializations) {
+      return '';
+    }
+
+    return Object.entries(family.specializations).map(([key, spec]) => {
+      const count = this.getSpecializationCount(this._expandedClassFamily, key);
+      return `
+      <button class="specialization-btn ${this._selectedSpecialization === key ? 'active' : ''}"
+              data-spec="${key}" title="${spec.name} (${count})">
+        <div class="spec-icon-wrapper">
+          <img src="/icons/${spec.icon}" alt="${spec.name}">
+        </div>
+        <span class="spec-name">${spec.name}</span>
+        <span class="spec-count">${count}</span>
+      </button>
+    `}).join('');
+  },
+
+  // Attach event listeners for class family filter
+  attachClassFilterListeners() {
+    // Class family buttons
+    document.querySelectorAll('.players-page .class-family-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const family = btn.dataset.family;
+
+        if (this._expandedClassFamily === family) {
+          // Clicking expanded family again - collapse and clear
+          this._expandedClassFamily = null;
+          this._selectedClassFamily = null;
+          this._selectedSpecialization = null;
+        } else if (this._selectedClassFamily === family && !this._expandedClassFamily) {
+          // Single click was active, now expand to show specializations
+          this._expandedClassFamily = family;
+          this._selectedSpecialization = null;
+        } else {
+          // New family - select it and expand
+          this._selectedClassFamily = family;
+          this._expandedClassFamily = family;
+          this._selectedSpecialization = null;
+        }
+
+        this.loadPlayers();
+      });
+    });
+
+    // Specialization buttons
+    document.querySelectorAll('.players-page .specialization-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const spec = btn.dataset.spec;
+
+        if (this._selectedSpecialization === spec) {
+          // Deselect specialization, keep family selected
+          this._selectedSpecialization = null;
+        } else {
+          // Select this specialization
+          this._selectedSpecialization = spec;
+        }
+
+        this.loadPlayers();
+      });
+    });
+  },
 
   // Sort players by raid priority filter, then alphabetically
   sortPlayersByRaidPriority(players) {
@@ -171,16 +309,21 @@ export const PlayersPage = {
           }
         });
       });
+
+      // Add event listeners for class family filter
+      this.attachClassFilterListeners();
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading characters: ${error.message}</div>`;
     }
   },
 
   renderFlatView(listElement, players, userMap, hasAnyEditableCharacters) {
-    // Sort players - apply priority filter then alphabetically
-    const sortedPlayers = this.sortPlayersByRaidPriority(players);
+    // Filter by class, then sort by raid priority
+    const filteredPlayers = this.filterPlayersByClass(players);
+    const sortedPlayers = this.sortPlayersByRaidPriority(filteredPlayers);
 
     listElement.innerHTML = `
+      ${this.renderClassFamilyFilter()}
       <div class="raid-priority-filter mobile-filter">
         <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
         <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
@@ -293,11 +436,14 @@ export const PlayersPage = {
   },
 
   renderGroupedView(listElement, players, userMap, hasAnyEditableCharacters) {
-    // Group players by owner
+    // Filter by class first
+    const filteredPlayers = this.filterPlayersByClass(players);
+
+    // Group filtered players by owner
     const groupedByOwner = {};
     const unassigned = [];
 
-    players.forEach(player => {
+    filteredPlayers.forEach(player => {
       if (player.discordId) {
         if (!groupedByOwner[player.discordId]) {
           groupedByOwner[player.discordId] = [];
@@ -315,8 +461,9 @@ export const PlayersPage = {
       return ownerA.localeCompare(ownerB);
     });
 
-    // Build grouped HTML with filter at top
+    // Build grouped HTML with filters at top
     let html = `
+      ${this.renderClassFamilyFilter()}
       <div class="raid-priority-filter grouped-filter">
         <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
         <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>

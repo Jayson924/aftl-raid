@@ -55,6 +55,209 @@
       white-space: nowrap;
     }
   }
+  // Class filter header with total count
+  .class-filter-header {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+
+    .total-count {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+
+  // Class family filter
+  .class-family-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    justify-content: center;
+
+    .class-family-btn {
+      width: 48px;
+      height: 48px;
+      padding: 2px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: $border-radius;
+      background-color: rgba(100, 100, 100, 0.3);
+      cursor: pointer;
+      transition: $transition;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      position: relative;
+
+      .class-icon-wrapper {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.6;
+        transition: $transition;
+        transform: scale(2.5);
+      }
+
+      .class-count {
+        position: absolute;
+        bottom: -6px;
+        right: -6px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: white;
+        background-color: rgba(100, 100, 100, 0.9);
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        background-color: rgba(120, 120, 120, 0.4);
+
+        img {
+          opacity: 0.8;
+        }
+      }
+
+      &.active {
+        border-color: $success-color;
+        background-color: rgba(40, 167, 69, 0.3);
+
+        img {
+          opacity: 1;
+        }
+
+        .class-count {
+          background-color: $success-color;
+        }
+      }
+
+      &.expanded {
+        border-color: rgba(255, 255, 255, 0.5);
+        background-color: rgba(255, 255, 255, 0.15);
+
+        img {
+          opacity: 0.9;
+        }
+
+        .class-count {
+          background-color: rgba(255, 255, 255, 0.3);
+        }
+      }
+    }
+  }
+
+  .specialization-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    justify-content: center;
+    min-height: 0;
+    transition: all 0.3s ease;
+
+    &:empty {
+      margin-bottom: 0;
+    }
+
+    .specialization-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: $border-radius;
+      background-color: rgba(100, 100, 100, 0.25);
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      .spec-icon-wrapper {
+        width: 28px;
+        height: 28px;
+        overflow: hidden;
+        flex-shrink: 0;
+        border-radius: 4px;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          opacity: 0.7;
+          transition: $transition;
+          transform: scale(2.3);
+        }
+      }
+
+      .spec-name {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.7);
+        font-weight: 500;
+      }
+
+      .spec-count {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.5);
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 0.1rem 0.4rem;
+        border-radius: 8px;
+        min-width: 20px;
+        text-align: center;
+      }
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        background-color: rgba(120, 120, 120, 0.35);
+
+        .spec-icon-wrapper img {
+          opacity: 0.9;
+        }
+
+        .spec-name {
+          color: rgba(255, 255, 255, 0.9);
+        }
+
+        .spec-count {
+          color: rgba(255, 255, 255, 0.7);
+        }
+      }
+
+      &.active {
+        border-color: $primary-color;
+        background-color: rgba(244, 196, 48, 0.25);
+        box-shadow: 0 0 8px rgba(244, 196, 48, 0.3);
+
+        .spec-icon-wrapper img {
+          opacity: 1;
+        }
+
+        .spec-name {
+          color: $primary-color;
+          font-weight: 600;
+        }
+
+        .spec-count {
+          color: $primary-color;
+          background-color: rgba(244, 196, 48, 0.2);
+        }
+      }
+    }
+  }
+
   // Raid priority filter
   .raid-priority-filter {
     display: flex;
