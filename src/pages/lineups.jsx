@@ -771,11 +771,17 @@ export const LineupsPage = {
       // Mark as pending to skip self-notification from realtime
       this.pendingToggleId = lineup.id;
       await dataService.toggleLineupCompleted(lineup.id);
-      this.pendingToggleId = null;
+      // Delay clearing pendingToggleId to give realtime event time to arrive
+      setTimeout(() => {
+        if (this.pendingToggleId === lineup.id) {
+          this.pendingToggleId = null;
+        }
+      }, 2000);
       toast.success(`Updated cleared status for ${lineup.name}!`);
       // Reload the lineups to show updated cleared status
       await this.loadLineups();
     } catch (error) {
+      // Clear immediately on error since no realtime event will arrive
       this.pendingToggleId = null;
       toast.error(`Error: ${error.message}`);
     }
