@@ -2,6 +2,9 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES } from '../constants.js';
 import { modal } from '../modal.js';
+import moment from 'moment';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/themes/dark.css';
 
 export const LineupEditorPage = {
   players: [],
@@ -16,7 +19,8 @@ export const LineupEditorPage = {
     pilotSlots: Array(8).fill(''), // Track pilot names per slot (empty string if no pilot)
     completed: false,
     isTemplate: false,
-    notes: ''
+    notes: '',
+    raidTime: null // Scheduled raid time (ISO string)
   },
   selectedClassFamily: null,
   expandedClassFamily: null,
@@ -28,6 +32,7 @@ export const LineupEditorPage = {
   presenceChannel: null, // Presence channel for showing who's viewing
   viewingUsers: [], // Other users currently viewing this page
   pendingDeleteId: null, // Track lineup being deleted by current user to skip self-notification
+  flatpickrInstance: null, // Flatpickr date/time picker instance
 
   async render(container) {
     container.innerHTML = `
@@ -65,6 +70,14 @@ export const LineupEditorPage = {
               </div>
             </div>
             <div class="lineup-info-right">
+              <div class="form-group lineup-time-group">
+                <label>Scheduled Time:</label>
+                <div class="raid-time-box" id="raid-time-box">
+                  <img src="/icons/calendarclock.svg" alt="" class="raid-time-box-icon">
+                  <span class="raid-time-value" id="raid-time-display">Click to set time</span>
+                  <button type="button" class="raid-time-clear" id="raid-time-clear" title="Clear time">×</button>
+                </div>
+              </div>
               <div class="form-group lineup-notes-group">
                 <label for="lineup-notes">Notes:</label>
                 <textarea id="lineup-notes" placeholder="Add notes for this lineup..." rows="2"></textarea>
@@ -171,6 +184,7 @@ export const LineupEditorPage = {
 
     this.attachEventListeners();
     this.setupCarouselDragScroll();
+    this.updateRaidTimeDisplay();
     this.loadPlayers();
   },
 
@@ -188,6 +202,28 @@ export const LineupEditorPage = {
 
     document.getElementById('lineup-notes').addEventListener('input', (e) => {
       this.currentLineup.notes = e.target.value;
+    });
+
+    // Raid time picker - initialize flatpickr
+    this.flatpickrInstance = flatpickr('#raid-time-box', {
+      enableTime: true,
+      dateFormat: 'Y-m-d H:i',
+      time_24hr: false,
+      defaultDate: this.currentLineup.raidTime ? new Date(this.currentLineup.raidTime) : null,
+      onChange: (selectedDates) => {
+        if (selectedDates.length > 0) {
+          this.currentLineup.raidTime = selectedDates[0].toISOString();
+          this.updateRaidTimeDisplay();
+        }
+      }
+    });
+
+    document.getElementById('raid-time-clear').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.currentLineup.raidTime = null;
+      this.flatpickrInstance.clear();
+      this.updateRaidTimeDisplay();
     });
 
     document.getElementById('cleared-toggle').addEventListener('change', (e) => {
@@ -1679,7 +1715,8 @@ export const LineupEditorPage = {
       pilotSlots: Array(8).fill(''),
       completed: false,
       isTemplate: false,
-      notes: ''
+      notes: '',
+      raidTime: null
     };
 
     // Clear the lineup name input field and trigger input event to sync state
@@ -1691,6 +1728,10 @@ export const LineupEditorPage = {
     document.getElementById('cleared-toggle').checked = false;
     document.getElementById('template-toggle').checked = false;
     document.getElementById('lineup-notes').value = '';
+    if (this.flatpickrInstance) {
+      this.flatpickrInstance.clear();
+    }
+    this.updateRaidTimeDisplay();
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       const slotContent = slotElement.querySelector('.slot-content');
@@ -1823,7 +1864,8 @@ export const LineupEditorPage = {
           pilotPlayers,
           completed: this.currentLineup.completed,
           isTemplate: this.currentLineup.isTemplate,
-          notes: this.currentLineup.notes
+          notes: this.currentLineup.notes,
+          raidTime: this.currentLineup.raidTime
         }, existingLineup.name);
 
         // Update the stored ID in case it was a new match by name
@@ -1890,7 +1932,8 @@ export const LineupEditorPage = {
           pilotPlayers,
           completed: this.currentLineup.completed,
           isTemplate: this.currentLineup.isTemplate,
-          notes: this.currentLineup.notes
+          notes: this.currentLineup.notes,
+          raidTime: this.currentLineup.raidTime
         });
 
         // Store the new lineup ID for future saves
@@ -2003,7 +2046,8 @@ export const LineupEditorPage = {
       pilotSlots,
       completed: lineup.completed || false,
       isTemplate: lineup.isTemplate || false,
-      notes: lineup.notes || ''
+      notes: lineup.notes || '',
+      raidTime: lineup.raidTime || null
     };
 
     document.getElementById('lineup-name').value = lineup.name;
@@ -2011,6 +2055,10 @@ export const LineupEditorPage = {
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('template-toggle').checked = lineup.isTemplate || false;
     document.getElementById('lineup-notes').value = lineup.notes || '';
+    if (this.flatpickrInstance) {
+      this.flatpickrInstance.setDate(lineup.raidTime ? new Date(lineup.raidTime) : null, false);
+    }
+    this.updateRaidTimeDisplay();
     // Don't change Next Week mode when loading a lineup - let user control it
 
     document.querySelectorAll('.slot').forEach(slotElement => {
@@ -2315,9 +2363,53 @@ export const LineupEditorPage = {
   },
 
   /**
+   * Update the raid time display text and clear button visibility
+   */
+  updateRaidTimeDisplay() {
+    const display = document.getElementById('raid-time-display');
+    const clearBtn = document.getElementById('raid-time-clear');
+    if (this.currentLineup.raidTime) {
+      display.innerHTML = this.formatRaidTimeForDisplay(this.currentLineup.raidTime);
+      display.classList.add('has-value');
+      clearBtn.style.display = 'flex';
+    } else {
+      display.textContent = 'Click to set time';
+      display.classList.remove('has-value');
+      clearBtn.style.display = 'none';
+    }
+  },
+
+  /**
+   * Format raid time for display using moment.js
+   */
+  formatRaidTimeForDisplay(isoString) {
+    if (!isoString) return 'Click to set time';
+    const m = moment(isoString);
+    const localTime = m.format('ddd, MMM D, h:mm A');
+
+    // Check if user is in GMT+8
+    const offsetMinutes = new Date().getTimezoneOffset();
+    const isGMT8 = offsetMinutes === -480; // GMT+8 = -480 minutes offset
+
+    if (isGMT8) {
+      return localTime;
+    }
+
+    // Show GMT+8 time in parentheses with arrow
+    // If user offset > -480, GMT+8 is ahead (→), else behind (←)
+    const arrow = offsetMinutes > -480 ? '→' : '←';
+    const gmt8Time = m.utcOffset(8).format('h:mm A');
+    return `${localTime} <span class="raid-time-gmt8">(<span class="raid-time-arrow">${arrow}</span> ${gmt8Time} GMT+8)</span>`;
+  },
+
+  /**
    * Cleanup when leaving the page
    */
   destroy() {
+    if (this.flatpickrInstance) {
+      this.flatpickrInstance.destroy();
+      this.flatpickrInstance = null;
+    }
     if (this.lineupSubscription) {
       dataService.unsubscribe(this.lineupSubscription);
       this.lineupSubscription = null;

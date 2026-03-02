@@ -3,6 +3,7 @@ import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
 import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES } from '../constants.js';
+import moment from 'moment';
 
 export const LineupsPage = {
   currentRaidType: 'Hardcore',
@@ -13,6 +14,17 @@ export const LineupsPage = {
   showTemplates: false,
   lineupSubscription: null, // Supabase realtime subscription
   pendingToggleId: null, // Track lineup being toggled by current user to skip self-notification
+
+  /**
+   * Format raid time for display using moment.js
+   */
+  formatRaidTime(isoString) {
+    if (!isoString) return null;
+    const m = moment(isoString);
+    const formatted = m.format('ddd, MMM D, h:mm A');
+    const relative = m.fromNow();
+    return `${formatted} <span class="raid-time-relative">(${relative})</span>`;
+  },
 
   async render(container) {
     container.innerHTML = `
@@ -326,13 +338,18 @@ export const LineupsPage = {
       ? damageAmp.magicSources.map(s => `<div class="tooltip-row"><span class="tooltip-class">${s.class}</span><span class="tooltip-skill">${s.skill}</span><span class="tooltip-value">${s.value}%</span></div>`).join('')
       : '<div class="tooltip-empty">No sources</div>';
 
+    const raidTimeDisplay = this.formatRaidTime(lineup.raidTime);
+
     showcaseContainer.innerHTML = `
       <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}">
         <div class="lineup-card-header">
-          <h3>
-            ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
-            ${lineup.name}
-          </h3>
+          <div class="lineup-card-title">
+            <h3>
+              ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
+              ${lineup.name}
+            </h3>
+            ${raidTimeDisplay ? `<span class="raid-time-display"><img src="/icons/calendarclock.svg" alt="" class="raid-time-icon">${raidTimeDisplay}</span>` : ''}
+          </div>
           ${isAdmin ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">

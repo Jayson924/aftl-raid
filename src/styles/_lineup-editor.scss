@@ -43,6 +43,86 @@
     }
 
     .lineup-info-right {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+
+      .lineup-time-group {
+        .raid-time-box {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 0.75rem;
+          border-radius: $border-radius;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          background-color: rgba(255, 255, 255, 0.05);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-height: 38px;
+
+          &:hover {
+            border-color: $primary-color;
+            background-color: rgba(244, 196, 48, 0.05);
+          }
+
+          .raid-time-box-icon {
+            width: 18px;
+            height: 18px;
+            opacity: 0.6;
+            filter: brightness(0) invert(1);
+            transition: all 0.2s ease;
+          }
+
+          &:hover .raid-time-box-icon {
+            opacity: 0.9;
+            filter: brightness(0) saturate(100%) invert(77%) sepia(60%) saturate(500%) hue-rotate(10deg) brightness(100%) contrast(95%);
+          }
+
+          .raid-time-value {
+            flex: 1;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.5);
+
+            &.has-value {
+              color: $primary-color;
+              font-weight: 500;
+
+              .raid-time-gmt8 {
+                color: rgba(255, 255, 255, 0.4);
+                font-weight: 400;
+                font-size: 0.8rem;
+
+                .raid-time-arrow {
+                  color: #de435f;
+                  font-weight: 600;
+                }
+              }
+            }
+          }
+
+          .raid-time-clear {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border: none;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            font-size: 1.1rem;
+            line-height: 1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+              background-color: $danger-color;
+              color: white;
+            }
+          }
+        }
+      }
+
       .lineup-notes-group {
         flex: 1;
 
@@ -1309,3 +1389,4 @@
     }
   }
 }
+

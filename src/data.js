@@ -460,6 +460,7 @@ class DataService {
         completed: lineup.completed,
         isTemplate: lineup.is_template,
         notes: lineup.notes || '',
+        raidTime: lineup.raid_time || null,
         players,
         ticketPlayers,
         pilotPlayers
@@ -497,7 +498,8 @@ class DataService {
       status: lineup.status || 'draft',
       completed: lineup.completed || false,
       is_template: lineup.isTemplate || false,
-      notes: lineup.notes || ''
+      notes: lineup.notes || '',
+      raid_time: lineup.raidTime || null
     };
 
     if (lineupId) {
