@@ -88,8 +88,8 @@ export const DAMAGE_AMP_SOURCES = {
   },
   screamer: {
     name: 'Summon Puppet',
-    physical: 19,
-    magic: 19,
+    physical: 18,
+    magic: 18,
     classes: ['Screamer']
   },
   destroyer: {
@@ -97,6 +97,12 @@ export const DAMAGE_AMP_SOURCES = {
     physical: 20,
     magic: 20,
     classes: ['Destroyer']
+  },
+  avenger: {
+    name: 'Dark Stinger',
+    physical: 20,
+    magic: 20,
+    classes: ['Avenger']
   }
 };
 
