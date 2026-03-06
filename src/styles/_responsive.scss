@@ -575,10 +575,22 @@
       }
     }
 
+    .raid-counter-btns {
+      gap: 0.4rem;
+    }
+
     .btn-counter {
-      min-height: 44px;
-      min-width: 44px;
-      font-size: 1.2rem;
+      min-height: 28px;
+      min-width: 28px;
+      height: 28px;
+      width: 28px;
+      font-size: 0.9rem;
+      border-radius: 4px;
+    }
+
+    .raid-delete-btn {
+      font-size: 0.9rem;
+      padding: 0.1rem 0.3rem;
     }
   }
 

@@ -265,19 +265,13 @@ export const PlayersPage = {
         this.renderFlatView(listElement, players, userMap, hasAnyEditableCharacters);
       }
 
-      // Add event listeners for actions
-      if (hasAnyEditableCharacters) {
-        document.querySelectorAll('[data-action]').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const action = e.target.dataset.action;
-            const playerId = e.target.dataset.playerId;
-
-            if (action === 'edit') {
-              this.showEditPlayerModal(players.find(p => p.id === playerId));
-            }
-          });
+      // Add event listeners for clickable player names
+      document.querySelectorAll('.player-name-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+          const playerId = link.dataset.playerId;
+          this.showEditPlayerModal(players.find(p => p.id === playerId));
         });
-      }
+      });
 
       // Add event listeners for raid priority filter (multi-select)
       document.querySelectorAll('.raid-priority-filter .filter-btn').forEach(btn => {
@@ -338,7 +332,6 @@ export const PlayersPage = {
             <th>Armor</th>
             <th>Raids Needed</th>
             <th>Notes</th>
-            ${hasAnyEditableCharacters ? '<th>Actions</th>' : ''}
           </tr>
           <tr class="filter-row">
             <td></td>
@@ -353,7 +346,6 @@ export const PlayersPage = {
               </div>
             </td>
             <td></td>
-            ${hasAnyEditableCharacters ? '<td></td>' : ''}
           </tr>
         </thead>
         <tbody>
@@ -380,7 +372,9 @@ export const PlayersPage = {
 
             return `
             <tr>
-              <td class="player-name" data-label="Name">${player.name}</td>
+              <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
+                ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
+              </td>
               <td class="player-owner" data-label="Owner">
                 ${owner ? `
                   <div class="owner-badge" title="${owner.displayName}">
@@ -418,15 +412,6 @@ export const PlayersPage = {
                 </span>
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
-              ${hasAnyEditableCharacters ? `
-                <td class="actions">
-                  ${canEdit ? `
-                    <button class="btn-icon" title="Edit" data-action="edit" data-player-id="${player.id}">
-                      ✏️
-                    </button>
-                  ` : ''}
-                </td>
-              ` : ''}
             </tr>
           `;
           }).join('')}
@@ -571,7 +556,6 @@ export const PlayersPage = {
             <th>Armor</th>
             <th>Raids Needed</th>
             <th>Notes</th>
-            ${hasAnyEditableCharacters ? '<th>Actions</th>' : ''}
           </tr>
         </thead>
         <tbody>
@@ -596,7 +580,9 @@ export const PlayersPage = {
 
             return `
             <tr>
-              <td class="player-name" data-label="Name">${player.name}</td>
+              <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
+                ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
+              </td>
               <td data-label="Class">${player.role}</td>
               <td data-label="Weapon">
                 ${player.weapon ? `
@@ -626,15 +612,6 @@ export const PlayersPage = {
                 </span>
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
-              ${hasAnyEditableCharacters ? `
-                <td class="actions">
-                  ${canEdit ? `
-                    <button class="btn-icon" title="Edit" data-action="edit" data-player-id="${player.id}">
-                      ✏️
-                    </button>
-                  ` : ''}
-                </td>
-              ` : ''}
             </tr>
           `;
           }).join('')}
@@ -879,12 +856,10 @@ export const PlayersPage = {
           accountNumber: accountNumber || 1
         });
 
-        // If admin selected an owner, assign it
-        if (isAdmin) {
-          const selectedOwner = document.getElementById('player-owner')?.value;
-          if (selectedOwner && result.data?.id) {
-            await dataService.assignCharacterOwner(result.data.id, selectedOwner);
-          }
+        // If admin, assign to selected owner (or unassign if "No owner" selected)
+        if (isAdmin && result.data?.id) {
+          const selectedOwner = document.getElementById('player-owner')?.value || null;
+          await dataService.assignCharacterOwner(result.data.id, selectedOwner);
         }
 
         document.body.removeChild(modalElement);
@@ -1085,19 +1060,9 @@ export const PlayersPage = {
       }
     });
 
-    // Only show delete button for admins
     const deleteBtn = document.getElementById('delete-player-btn');
-    if (!isAdmin && deleteBtn) {
-      deleteBtn.style.display = 'none';
-    }
-
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async () => {
-        if (!dataService.isAdmin()) {
-          toast.error('Only admins can delete characters');
-          return;
-        }
-
         const confirmed = await modal.confirm(
           `Are you sure you want to delete ${player.name}? This action cannot be undone.`,
           {

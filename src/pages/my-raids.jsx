@@ -159,7 +159,7 @@ export const MyRaidsPage = {
                 <div class="character-info">
                   ${icon ? `<img src="/icons/${icon}" alt="${player.role}" class="class-icon">` : ''}
                   <div>
-                    <span class="character-name">${player.name}</span>
+                    <span class="character-name-link" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>
                     <span class="character-class">${player.role}</span>
                   </div>
                 </div>
@@ -174,7 +174,6 @@ export const MyRaidsPage = {
                         title="Click to toggle">
                     ${!needsClassic ? '✓ ' : ''}CL
                   </span>
-                  <button class="btn-icon edit-character-btn" data-player-id="${player.id}" title="Edit">&#9998;</button>
                 </div>
               </div>
               <div class="character-personal-raids">
@@ -223,9 +222,9 @@ export const MyRaidsPage = {
   },
 
   setupEditCharacterHandlers() {
-    document.querySelectorAll('.edit-character-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const playerId = btn.dataset.playerId;
+    document.querySelectorAll('.character-name-link').forEach(link => {
+      link.addEventListener('click', async () => {
+        const playerId = link.dataset.playerId;
         const player = this._myPlayers.find(p => p.id === playerId);
         if (!player) return;
 
@@ -289,21 +288,20 @@ export const MyRaidsPage = {
 
         html += `
           <div class="personal-raid-card ${isComplete ? 'completed' : ''}" data-raid-id="${raid.id}">
-            <button class="btn-counter btn-decrement" data-raid-id="${raid.id}" ${raid.currentClears <= 0 ? 'disabled' : ''}>-</button>
             <div class="raid-card-body">
               <div class="raid-card-top">
-                <span class="raid-name">${raid.name}</span>
+                <span class="raid-name-link" data-raid-id="${raid.id}">${raid.name}<span class="edit-icon">✎</span></span>
                 <span class="progress-text">${raid.currentClears}/${raid.maxClears}</span>
               </div>
               <div class="progress-bar">
                 <div class="progress-fill ${isComplete ? 'complete' : ''}" style="width: ${progressPct}%"></div>
               </div>
             </div>
-            <button class="btn-counter btn-increment" data-raid-id="${raid.id}" ${isComplete ? 'disabled' : ''}>+</button>
-            <div class="raid-card-actions">
-              <button class="btn-icon raid-edit-btn" data-raid-id="${raid.id}" title="Edit">&#9998;</button>
-              <button class="btn-icon raid-delete-btn" data-raid-id="${raid.id}" title="Delete">&times;</button>
+            <div class="raid-counter-btns">
+              <button class="btn-counter btn-decrement" data-raid-id="${raid.id}" ${raid.currentClears <= 0 ? 'disabled' : ''}>-</button>
+              <button class="btn-counter btn-increment" data-raid-id="${raid.id}" ${isComplete ? 'disabled' : ''}>+</button>
             </div>
+            <button class="btn-icon raid-delete-btn" data-raid-id="${raid.id}" title="Delete">&times;</button>
           </div>
         `;
       });
@@ -348,10 +346,10 @@ export const MyRaidsPage = {
       });
     });
 
-    // Edit
-    document.querySelectorAll('.raid-edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const raidId = btn.dataset.raidId;
+    // Edit (clickable raid name)
+    document.querySelectorAll('.raid-name-link').forEach(link => {
+      link.addEventListener('click', () => {
+        const raidId = link.dataset.raidId;
         const raid = this._personalRaids.find(r => r.id === raidId);
         if (raid) this.showEditRaidForm(raid);
       });
@@ -439,9 +437,9 @@ export const MyRaidsPage = {
       });
     });
 
-    raidsContainer.querySelectorAll('.raid-edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const raidId = btn.dataset.raidId;
+    raidsContainer.querySelectorAll('.raid-name-link').forEach(link => {
+      link.addEventListener('click', () => {
+        const raidId = link.dataset.raidId;
         const raid = this._personalRaids.find(r => r.id === raidId);
         if (raid) this.showEditRaidForm(raid);
       });
@@ -485,101 +483,133 @@ export const MyRaidsPage = {
     this._editingRaidPlayerId = playerId;
 
     // Hide any other open forms first
-    document.querySelectorAll('.add-raid-form-container').forEach(c => { c.innerHTML = ''; });
+    document.querySelectorAll('.personal-raid-card.adding').forEach(c => c.remove());
     document.querySelectorAll('.btn-add-raid').forEach(b => { b.style.display = ''; });
 
-    const container = document.querySelector(`.add-raid-form-container[data-player-id="${playerId}"]`);
-    if (!container) return;
+    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
+    if (!block) return;
 
-    container.innerHTML = `
-      <div class="raid-form">
-        <div class="form-group">
-          <label for="raid-name-input">Raid Name</label>
-          <input type="text" id="raid-name-input" placeholder="e.g. Archbishop Nest" maxlength="50">
+    // Hide the add button
+    const addBtn = block.querySelector('.btn-add-raid');
+    if (addBtn) addBtn.style.display = 'none';
+
+    // Insert the inline add form as a card
+    const raidCards = block.querySelector('.personal-raid-cards');
+    const addFormHTML = `
+      <div class="personal-raid-card adding">
+        <input type="text" class="raid-edit-name-input" placeholder="Raid name" maxlength="50">
+        <div class="raid-edit-max">
+          <span>Max:</span>
+          <input type="number" class="raid-edit-max-input" min="1" max="99" value="1">
         </div>
-        <div class="form-group max-clears-group">
-          <label for="raid-max-input">Max</label>
-          <input type="number" id="raid-max-input" min="1" max="99" value="1">
-        </div>
-        <div class="raid-form-actions">
-          <button class="btn btn-secondary" id="cancel-raid-form">Cancel</button>
-          <button class="btn btn-primary" id="save-raid-form">Add</button>
+        <div class="raid-edit-actions">
+          <button class="btn btn-small btn-secondary raid-add-cancel">Cancel</button>
+          <button class="btn btn-small btn-primary raid-add-save">Add</button>
         </div>
       </div>
     `;
 
-    // Hide the add button for this character
-    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
-    if (block) {
-      const addBtn = block.querySelector('.btn-add-raid');
-      if (addBtn) addBtn.style.display = 'none';
+    if (raidCards) {
+      raidCards.insertAdjacentHTML('beforeend', addFormHTML);
+    } else {
+      // No raids yet, create the container
+      const raidsContainer = block.querySelector('.character-personal-raids');
+      raidsContainer.insertAdjacentHTML('afterbegin', `<div class="personal-raid-cards">${addFormHTML}</div>`);
     }
 
-    document.getElementById('raid-name-input').focus();
+    const addCard = block.querySelector('.personal-raid-card.adding');
+    const nameInput = addCard.querySelector('.raid-edit-name-input');
+    const maxInput = addCard.querySelector('.raid-edit-max-input');
 
-    document.getElementById('cancel-raid-form').addEventListener('click', () => {
-      this.hideRaidForm(playerId);
+    nameInput.focus();
+
+    addCard.querySelector('.raid-add-cancel').addEventListener('click', () => {
+      this.hideAddForm(playerId);
     });
 
-    document.getElementById('save-raid-form').addEventListener('click', () => {
+    addCard.querySelector('.raid-add-save').addEventListener('click', () => {
       this.saveNewRaid();
     });
 
-    document.getElementById('raid-name-input').addEventListener('keydown', (e) => {
+    nameInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.saveNewRaid();
-      if (e.key === 'Escape') this.hideRaidForm(playerId);
+      if (e.key === 'Escape') this.hideAddForm(playerId);
     });
+
+    maxInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.saveNewRaid();
+      if (e.key === 'Escape') this.hideAddForm(playerId);
+    });
+  },
+
+  hideAddForm(playerId) {
+    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
+    if (block) {
+      const addCard = block.querySelector('.personal-raid-card.adding');
+      if (addCard) addCard.remove();
+
+      const addBtn = block.querySelector('.btn-add-raid');
+      if (addBtn) addBtn.style.display = '';
+    }
+    this._editingRaidId = null;
+    this._editingRaidPlayerId = null;
   },
 
   showEditRaidForm(raid) {
     this._editingRaidId = raid.id;
     this._editingRaidPlayerId = raid.playerId;
 
-    // Hide any other open forms first
-    document.querySelectorAll('.add-raid-form-container').forEach(c => { c.innerHTML = ''; });
-    document.querySelectorAll('.btn-add-raid').forEach(b => { b.style.display = ''; });
+    // Find the raid card and replace it with inline edit form
+    const raidCard = document.querySelector(`.personal-raid-card[data-raid-id="${raid.id}"]`);
+    if (!raidCard) return;
 
-    const container = document.querySelector(`.add-raid-form-container[data-player-id="${raid.playerId}"]`);
-    if (!container) return;
+    // Store original HTML to restore on cancel
+    this._originalRaidCardHTML = raidCard.outerHTML;
 
-    container.innerHTML = `
-      <div class="raid-form">
-        <div class="form-group">
-          <label for="raid-name-input">Raid Name</label>
-          <input type="text" id="raid-name-input" value="${raid.name}" maxlength="50">
+    raidCard.outerHTML = `
+      <div class="personal-raid-card editing" data-raid-id="${raid.id}">
+        <input type="text" class="raid-edit-name-input" value="${raid.name}" maxlength="50" placeholder="Raid name">
+        <div class="raid-edit-max">
+          <span>Max:</span>
+          <input type="number" class="raid-edit-max-input" min="1" max="99" value="${raid.maxClears}">
         </div>
-        <div class="form-group max-clears-group">
-          <label for="raid-max-input">Max</label>
-          <input type="number" id="raid-max-input" min="1" max="99" value="${raid.maxClears}">
-        </div>
-        <div class="raid-form-actions">
-          <button class="btn btn-secondary" id="cancel-raid-form">Cancel</button>
-          <button class="btn btn-primary" id="save-raid-form">Save</button>
+        <div class="raid-edit-actions">
+          <button class="btn btn-small btn-secondary raid-edit-cancel">Cancel</button>
+          <button class="btn btn-small btn-primary raid-edit-save">Save</button>
         </div>
       </div>
     `;
 
-    // Hide the add button for this character
-    const block = document.querySelector(`.character-block[data-player-id="${raid.playerId}"]`);
-    if (block) {
-      const addBtn = block.querySelector('.btn-add-raid');
-      if (addBtn) addBtn.style.display = 'none';
-    }
+    const editCard = document.querySelector(`.personal-raid-card[data-raid-id="${raid.id}"]`);
+    const nameInput = editCard.querySelector('.raid-edit-name-input');
+    const maxInput = editCard.querySelector('.raid-edit-max-input');
 
-    document.getElementById('raid-name-input').focus();
+    nameInput.focus();
+    nameInput.select();
 
-    document.getElementById('cancel-raid-form').addEventListener('click', () => {
-      this.hideRaidForm(raid.playerId);
+    editCard.querySelector('.raid-edit-cancel').addEventListener('click', () => {
+      this.cancelInlineEdit(raid);
     });
 
-    document.getElementById('save-raid-form').addEventListener('click', () => {
+    editCard.querySelector('.raid-edit-save').addEventListener('click', () => {
       this.saveEditedRaid();
     });
 
-    document.getElementById('raid-name-input').addEventListener('keydown', (e) => {
+    nameInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.saveEditedRaid();
-      if (e.key === 'Escape') this.hideRaidForm(raid.playerId);
+      if (e.key === 'Escape') this.cancelInlineEdit(raid);
     });
+
+    maxInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.saveEditedRaid();
+      if (e.key === 'Escape') this.cancelInlineEdit(raid);
+    });
+  },
+
+  cancelInlineEdit(raid) {
+    this._editingRaidId = null;
+    this._editingRaidPlayerId = null;
+    this.refreshPlayerRaids(raid.playerId);
   },
 
   hideRaidForm(playerId) {
@@ -598,11 +628,17 @@ export const MyRaidsPage = {
   },
 
   async saveNewRaid() {
-    const nameInput = document.getElementById('raid-name-input');
-    const maxInput = document.getElementById('raid-max-input');
+    const playerId = this._editingRaidPlayerId;
+    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
+    if (!block) return;
+
+    const addCard = block.querySelector('.personal-raid-card.adding');
+    if (!addCard) return;
+
+    const nameInput = addCard.querySelector('.raid-edit-name-input');
+    const maxInput = addCard.querySelector('.raid-edit-max-input');
     const name = nameInput.value.trim();
     const maxClears = parseInt(maxInput.value, 10);
-    const playerId = this._editingRaidPlayerId;
 
     if (!name) {
       toast.error('Raid name cannot be empty');
@@ -619,7 +655,7 @@ export const MyRaidsPage = {
 
     try {
       await dataService.addPersonalRaid(playerId, name, maxClears);
-      this.hideRaidForm(playerId);
+      this.hideAddForm(playerId);
       await this.loadPersonalRaids();
       this.refreshPlayerRaids(playerId);
       toast.success('Raid added!');
@@ -633,8 +669,11 @@ export const MyRaidsPage = {
   },
 
   async saveEditedRaid() {
-    const nameInput = document.getElementById('raid-name-input');
-    const maxInput = document.getElementById('raid-max-input');
+    const editCard = document.querySelector(`.personal-raid-card[data-raid-id="${this._editingRaidId}"]`);
+    if (!editCard) return;
+
+    const nameInput = editCard.querySelector('.raid-edit-name-input');
+    const maxInput = editCard.querySelector('.raid-edit-max-input');
     const name = nameInput.value.trim();
     const maxClears = parseInt(maxInput.value, 10);
     const playerId = this._editingRaidPlayerId;
@@ -655,7 +694,8 @@ export const MyRaidsPage = {
         raid.name = name;
         raid.maxClears = maxClears;
       }
-      this.hideRaidForm(playerId);
+      this._editingRaidId = null;
+      this._editingRaidPlayerId = null;
       this.refreshPlayerRaids(playerId);
       toast.success('Raid updated!');
     } catch (error) {

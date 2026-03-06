@@ -150,10 +150,29 @@
       clip-path: circle(50%);
     }
 
-    .character-name {
+    .character-name-link {
       font-weight: 600;
       color: $primary-color;
       margin-right: 0.5rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.2s ease;
+
+      &:hover {
+        color: lighten($primary-color, 10%);
+
+        .edit-icon {
+          opacity: 1;
+        }
+      }
+
+      .edit-icon {
+        font-size: 0.85em;
+        opacity: 0.4;
+        transition: opacity 0.2s ease;
+      }
     }
 
     .character-class {
@@ -167,24 +186,6 @@
     align-items: center;
     gap: 0.35rem;
     flex-shrink: 0;
-
-    .edit-character-btn {
-      font-size: 0.85rem;
-      padding: 0.15rem 0.35rem;
-      border: none;
-      background: transparent;
-      color: $text-muted;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      line-height: 1;
-      margin-left: 0.25rem;
-
-      &:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: $text-light;
-      }
-    }
   }
 
   // Raid badges (matching players page pattern)
@@ -256,6 +257,74 @@
       border-color: $success-color;
       background-color: rgba($success-color, 0.05);
     }
+
+    &.editing,
+    &.adding {
+      border-color: $primary-color;
+      background-color: rgba($primary-color, 0.08);
+      gap: 0.5rem;
+
+      .raid-edit-name-input {
+        flex: 1;
+        min-width: 0;
+        padding: 0.4rem 0.6rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        background-color: rgba(255, 255, 255, 0.08);
+        color: $text-light;
+        font-size: 0.9rem;
+        font-weight: 600;
+
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+
+        &::placeholder {
+          color: $text-muted;
+          font-weight: 400;
+        }
+      }
+
+      .raid-edit-max {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-shrink: 0;
+
+        span {
+          font-size: 0.8rem;
+          color: $text-muted;
+        }
+
+        .raid-edit-max-input {
+          width: 50px;
+          padding: 0.4rem 0.5rem;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+          background-color: rgba(255, 255, 255, 0.08);
+          color: $text-light;
+          font-size: 0.9rem;
+          text-align: center;
+
+          &:focus {
+            outline: none;
+            border-color: $primary-color;
+          }
+        }
+      }
+
+      .raid-edit-actions {
+        display: flex;
+        gap: 0.35rem;
+        flex-shrink: 0;
+
+        .btn-small {
+          padding: 0.35rem 0.6rem;
+          font-size: 0.8rem;
+        }
+      }
+    }
   }
 
   .raid-card-body {
@@ -270,13 +339,33 @@
     margin-bottom: 0.2rem;
   }
 
-  .raid-name {
+  .raid-name-link {
     font-weight: 600;
     font-size: 0.9rem;
     color: $text-light;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: $primary-color;
+
+      .edit-icon {
+        opacity: 1;
+      }
+    }
+
+    .edit-icon {
+      font-size: 0.85em;
+      opacity: 0.4;
+      transition: opacity 0.2s ease;
+      flex-shrink: 0;
+    }
   }
 
   .progress-text {
@@ -305,68 +394,76 @@
     }
   }
 
-  .raid-card-actions {
-    display: flex;
-    gap: 0.1rem;
+  .raid-delete-btn {
+    font-size: 1rem;
+    padding: 0.1rem 0.4rem;
+    border: none;
+    background: transparent;
+    color: $text-muted;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    line-height: 1;
     flex-shrink: 0;
 
-    .btn-icon {
-      font-size: 0.85rem;
-      padding: 0.1rem 0.3rem;
-      border: none;
-      background: transparent;
-      color: $text-muted;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      line-height: 1;
-
-      &:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: $text-light;
-      }
-
-      &.raid-delete-btn:hover {
-        color: $danger-color;
-      }
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: $danger-color;
     }
   }
 
-  .btn-counter {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-    background-color: rgba(255, 255, 255, 0.05);
-    color: $text-light;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    line-height: 1;
-    padding: 0;
+  .raid-counter-btns {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
 
-    &:hover:not(:disabled) {
-      background-color: rgba(255, 255, 255, 0.12);
+    @media (max-width: 600px) {
+      gap: 0.15rem;
     }
 
-    &:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
+    .btn-counter {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: $text-light;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      line-height: 1;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
 
-    &.btn-increment:hover:not(:disabled) {
-      border-color: $success-color;
-      color: $success-color;
-    }
+      @media (max-width: 600px) {
+        width: 18px;
+        height: 18px;
+        font-size: 0.8rem;
+        border-radius: 2px;
+      }
 
-    &.btn-decrement:hover:not(:disabled) {
-      border-color: $danger-color;
-      color: $danger-color;
+      &:hover:not(:disabled) {
+        background-color: rgba(255, 255, 255, 0.12);
+      }
+
+      &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      &.btn-increment:hover:not(:disabled) {
+        border-color: $success-color;
+        color: $success-color;
+      }
+
+      &.btn-decrement:hover:not(:disabled) {
+        border-color: $danger-color;
+        color: $danger-color;
+      }
     }
   }
 

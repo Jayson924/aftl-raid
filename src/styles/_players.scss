@@ -492,6 +492,30 @@
     .player-name {
       font-weight: 600;
       color: $primary-color;
+
+      &.editable {
+        .player-name-link {
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          transition: $transition;
+
+          &:hover {
+            color: lighten($primary-color, 10%);
+
+            .edit-icon {
+              opacity: 1;
+            }
+          }
+
+          .edit-icon {
+            font-size: 0.85em;
+            opacity: 0.4;
+            transition: $transition;
+          }
+        }
+      }
     }
 
     .player-owner {

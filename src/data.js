@@ -365,7 +365,9 @@ class DataService {
         hardcore_completed: player.hardcoreCompleted || null,
         classic_completed: player.classicCompleted || null,
         classic_ticket_used: player.classicTicketUsed || null,
-        account_number: player.accountNumber || null
+        account_number: player.accountNumber || null,
+        // Auto-assign to the logged-in user
+        discord_id: this._user?.id || null
       })
       .select()
       .single();
