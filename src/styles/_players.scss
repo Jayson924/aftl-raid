@@ -384,6 +384,7 @@
     .players-table {
       border-top-left-radius: 0;
       border-top-right-radius: 0;
+      table-layout: fixed;
 
       thead {
         background-color: transparent;
@@ -396,6 +397,14 @@
           letter-spacing: 0.5px;
           padding: 0.5rem 1rem;
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+          // Fixed column widths for alignment across groups
+          &:nth-child(1) { width: 18%; } // Name
+          &:nth-child(2) { width: 12%; } // Class
+          &:nth-child(3) { width: 18%; } // Weapon
+          &:nth-child(4) { width: 14%; } // Armor
+          &:nth-child(5) { width: 14%; } // Raids Needed
+          &:nth-child(6) { width: 24%; } // Notes
         }
       }
     }
