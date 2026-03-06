@@ -5,6 +5,7 @@ import { PlayersPage } from './pages/players.jsx'
 import { LineupEditorPage } from './pages/lineup-editor.jsx'
 import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
+import { MyRaidsPage } from './pages/my-raids.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
 
@@ -53,6 +54,7 @@ async function initApp() {
   router.register('editor', LineupEditorPage, 'admin'); // Requires admin role only
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // No auth required
+  router.register('my-raids', MyRaidsPage, 'player'); // Any authenticated user
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -99,6 +101,7 @@ function renderNavigation() {
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
+            <a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>
             <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
           ` : `
@@ -118,6 +121,7 @@ function renderNavigation() {
               <div class="dropdown-header">
                 <span class="dropdown-role">${dataService.getUserRole()}</span>
               </div>
+              <button class="dropdown-item" id="my-raids-btn">My Raids</button>
               <button class="dropdown-item" id="change-name-btn">Change Name</button>
               <button class="dropdown-item" id="logout-btn">Logout</button>
             </div>
@@ -188,6 +192,12 @@ function renderNavigation() {
       router.navigate('lineups');
     });
 
+    document.getElementById('my-raids-btn').addEventListener('click', () => {
+      dropdownMenu.classList.remove('open');
+      dropdownToggle.classList.remove('open');
+      router.navigate('my-raids');
+    });
+
     document.getElementById('change-name-btn').addEventListener('click', () => {
       dropdownMenu.classList.remove('open');
       dropdownToggle.classList.remove('open');
@@ -199,6 +209,13 @@ function renderNavigation() {
 
   // Login/Logout buttons (mobile)
   if (isAuthenticated) {
+    document.getElementById('my-raids-btn-mobile').addEventListener('click', (e) => {
+      e.preventDefault();
+      hamburgerBtn.classList.remove('active');
+      navLinks.classList.remove('open');
+      router.navigate('my-raids');
+    });
+
     document.getElementById('change-name-btn-mobile').addEventListener('click', (e) => {
       e.preventDefault();
       hamburgerBtn.classList.remove('active');
@@ -331,6 +348,11 @@ function showLoginModal() {
     }
   });
 }
+
+// Listen for display name changes from other pages (e.g., My Raids)
+window.addEventListener('display-name-changed', () => {
+  renderNavigation();
+});
 
 // Start the app
 initApp();

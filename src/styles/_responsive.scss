@@ -531,6 +531,57 @@
     }
   }
 
+  // My Raids Page
+  .my-raids-page {
+    .section {
+      padding: 1rem;
+    }
+
+    .display-name-form {
+      flex-direction: column;
+
+      input {
+        width: 100%;
+      }
+    }
+
+    .character-card {
+      .character-info {
+        min-width: 0;
+
+        .character-name {
+          font-size: 0.9rem;
+        }
+
+        .character-class {
+          font-size: 0.8rem;
+        }
+      }
+    }
+
+    .raid-form {
+      flex-wrap: wrap;
+
+      .form-group {
+        flex: 1 1 100%;
+      }
+
+      .max-clears-group {
+        flex: 0 0 auto;
+      }
+
+      .raid-form-actions {
+        margin-left: auto;
+      }
+    }
+
+    .btn-counter {
+      min-height: 44px;
+      min-width: 44px;
+      font-size: 1.2rem;
+    }
+  }
+
   // Lineup Editor Page
   .lineup-editor-page {
     .page-header {

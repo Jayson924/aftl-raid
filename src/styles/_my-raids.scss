@@ -1,0 +1,425 @@
+.my-raids-page {
+  max-width: 800px;
+  margin: 0 auto;
+
+  .page-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.5rem;
+    color: $text-light;
+  }
+
+  .section {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: $border-radius;
+
+    h2 {
+      margin: 0 0 1rem 0;
+      font-size: 1.1rem;
+      color: $primary-color;
+    }
+  }
+
+  .empty-state {
+    color: $text-muted;
+    font-style: italic;
+    margin: 0;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+
+    h2 {
+      margin: 0;
+    }
+
+    .btn {
+      font-size: 0.85rem;
+      padding: 0.4rem 0.75rem;
+    }
+  }
+
+  // ============================================
+  // DISPLAY NAME SECTION
+  // ============================================
+
+  .display-name-form {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+
+    input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: $text-light;
+      font-size: 0.9rem;
+
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+      }
+    }
+  }
+
+  // ============================================
+  // MY CHARACTERS SECTION
+  // ============================================
+
+  .account-group {
+    margin-bottom: 1rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .account-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: $text-muted;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .character-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .character-block {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .character-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.07);
+    }
+  }
+
+  .character-personal-raids {
+    padding: 0 0.75rem 0.5rem;
+  }
+
+  .btn-add-raid {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: transparent;
+    color: $text-muted;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 0.25rem;
+
+    &:hover {
+      border-color: $primary-color;
+      color: $primary-color;
+    }
+  }
+
+  .character-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+
+    .class-icon {
+      width: 28px;
+      height: 28px;
+      object-fit: cover;
+      transform: scale(1.6);
+      clip-path: circle(50%);
+    }
+
+    .character-name {
+      font-weight: 600;
+      color: $primary-color;
+      margin-right: 0.5rem;
+    }
+
+    .character-class {
+      font-size: 0.85rem;
+      color: $text-muted;
+    }
+  }
+
+  .character-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+
+    .edit-character-btn {
+      font-size: 0.85rem;
+      padding: 0.15rem 0.35rem;
+      border: none;
+      background: transparent;
+      color: $text-muted;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      line-height: 1;
+      margin-left: 0.25rem;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: $text-light;
+      }
+    }
+  }
+
+  // Raid badges (matching players page pattern)
+  .raid-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    user-select: none;
+
+    &.raid-hardcore {
+      background-color: #d62d49;
+      color: white;
+    }
+
+    &.raid-classic {
+      background-color: #8f5ce0;
+      color: white;
+    }
+
+    &.clickable {
+      cursor: pointer;
+
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+    }
+
+    &.completed {
+      opacity: 0.5;
+      border-color: $success-color;
+
+      &.raid-hardcore {
+        background-color: rgba(214, 45, 73, 0.4);
+      }
+
+      &.raid-classic {
+        background-color: rgba(143, 92, 224, 0.4);
+      }
+    }
+  }
+
+  // ============================================
+  // PERSONAL RAIDS SECTION
+  // ============================================
+
+  .personal-raid-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .personal-raid-card {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    transition: border-color 0.2s ease;
+
+    &.completed {
+      border-color: $success-color;
+      background-color: rgba($success-color, 0.05);
+    }
+  }
+
+  .raid-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .raid-card-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.2rem;
+  }
+
+  .raid-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: $text-light;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .progress-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: $text-muted;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+  }
+
+  .progress-bar {
+    height: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background-color: $primary-color;
+    transition: width 0.3s ease;
+
+    &.complete {
+      background-color: $success-color;
+    }
+  }
+
+  .raid-card-actions {
+    display: flex;
+    gap: 0.1rem;
+    flex-shrink: 0;
+
+    .btn-icon {
+      font-size: 0.85rem;
+      padding: 0.1rem 0.3rem;
+      border: none;
+      background: transparent;
+      color: $text-muted;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      line-height: 1;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: $text-light;
+      }
+
+      &.raid-delete-btn:hover {
+        color: $danger-color;
+      }
+    }
+  }
+
+  .btn-counter {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: $text-light;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover:not(:disabled) {
+      background-color: rgba(255, 255, 255, 0.12);
+    }
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    &.btn-increment:hover:not(:disabled) {
+      border-color: $success-color;
+      color: $success-color;
+    }
+
+    &.btn-decrement:hover:not(:disabled) {
+      border-color: $danger-color;
+      color: $danger-color;
+    }
+  }
+
+  // ============================================
+  // ADD/EDIT RAID FORM
+  // ============================================
+
+  .raid-form {
+    padding: 0.75rem;
+    margin-top: 0.35rem;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+
+    .form-group {
+      flex: 1;
+
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: $text-muted;
+        margin-bottom: 0.25rem;
+      }
+
+      input {
+        width: 100%;
+        padding: 0.4rem 0.6rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        background-color: rgba(255, 255, 255, 0.05);
+        color: $text-light;
+        font-size: 0.9rem;
+        box-sizing: border-box;
+
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+      }
+
+      &.max-clears-group {
+        flex: 0 0 80px;
+      }
+    }
+
+    .raid-form-actions {
+      display: flex;
+      gap: 0.35rem;
+      flex-shrink: 0;
+      margin-bottom: 0.75rem;
+    }
+  }
+}

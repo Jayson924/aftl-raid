@@ -765,6 +765,139 @@ class DataService {
   }
 
   // ============================================
+  // PERSONAL RAIDS
+  // ============================================
+
+  async getPersonalRaids() {
+    if (!this._user) return [];
+
+    const { data, error } = await supabase
+      .from('personal_raids')
+      .select('*')
+      .eq('discord_id', this._user.id)
+      .order('sort_order')
+      .order('created_at');
+
+    if (error) {
+      console.error('Error fetching personal raids:', error);
+      return [];
+    }
+
+    return data.map(r => ({
+      id: r.id,
+      discordId: r.discord_id,
+      playerId: r.player_id,
+      name: r.name,
+      maxClears: r.max_clears,
+      currentClears: r.current_clears,
+      sortOrder: r.sort_order
+    }));
+  }
+
+  async addPersonalRaid(playerId, name, maxClears = 1) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { data: existing } = await supabase
+      .from('personal_raids')
+      .select('sort_order')
+      .eq('player_id', playerId)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
+
+    const { data, error } = await supabase
+      .from('personal_raids')
+      .insert({
+        discord_id: this._user.id,
+        player_id: playerId,
+        name,
+        max_clears: maxClears,
+        current_clears: 0,
+        sort_order: nextOrder
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  }
+
+  async updatePersonalRaid(raidId, updates) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const updateData = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.maxClears !== undefined) updateData.max_clears = updates.maxClears;
+    if (updates.currentClears !== undefined) updateData.current_clears = updates.currentClears;
+    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
+
+    const { error } = await supabase
+      .from('personal_raids')
+      .update(updateData)
+      .eq('id', raidId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async deletePersonalRaid(raidId) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { error } = await supabase
+      .from('personal_raids')
+      .delete()
+      .eq('id', raidId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async incrementPersonalRaid(raidId) {
+    const { data, error: fetchError } = await supabase
+      .from('personal_raids')
+      .select('current_clears, max_clears')
+      .eq('id', raidId)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (data.current_clears >= data.max_clears) {
+      throw new Error('Already at max clears');
+    }
+
+    const { error } = await supabase
+      .from('personal_raids')
+      .update({ current_clears: data.current_clears + 1 })
+      .eq('id', raidId);
+
+    if (error) throw error;
+    return { success: true, newClears: data.current_clears + 1 };
+  }
+
+  async decrementPersonalRaid(raidId) {
+    const { data, error: fetchError } = await supabase
+      .from('personal_raids')
+      .select('current_clears')
+      .eq('id', raidId)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (data.current_clears <= 0) {
+      throw new Error('Already at zero');
+    }
+
+    const { error } = await supabase
+      .from('personal_raids')
+      .update({ current_clears: data.current_clears - 1 })
+      .eq('id', raidId);
+
+    if (error) throw error;
+    return { success: true, newClears: data.current_clears - 1 };
+  }
+
+  // ============================================
   // REAL-TIME SUBSCRIPTIONS (bonus feature!)
   // ============================================
 
