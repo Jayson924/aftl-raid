@@ -23,6 +23,7 @@ export const MyRaidsPage = {
   _personalRaids: [],
   _editingRaidId: null,
   _editingRaidPlayerId: null,
+  _lastAddedRaid: null, // { name, maxClears } - for pre-filling next add form
 
   async render(container) {
     if (!dataService.isAuthenticated()) {
@@ -66,6 +67,7 @@ export const MyRaidsPage = {
     this._personalRaids = [];
     this._editingRaidId = null;
     this._editingRaidPlayerId = null;
+    this._lastAddedRaid = null;
   },
 
   // ============================================
@@ -493,14 +495,31 @@ export const MyRaidsPage = {
     const addBtn = block.querySelector('.btn-add-raid');
     if (addBtn) addBtn.style.display = 'none';
 
+    // Get unique raid names for autocomplete (excluding raids already on this character)
+    const existingRaidsForPlayer = this._personalRaids
+      .filter(r => r.playerId === playerId)
+      .map(r => r.name);
+    const uniqueRaidNames = [...new Set(this._personalRaids.map(r => r.name))]
+      .filter(name => !existingRaidsForPlayer.includes(name))
+      .sort();
+
+    // Pre-fill values from last added raid
+    const prefillName = this._lastAddedRaid?.name || '';
+    const prefillMax = this._lastAddedRaid?.maxClears || 1;
+
+    // Build datalist options
+    const datalistOptions = uniqueRaidNames.map(name => `<option value="${name}">`).join('');
+
     // Insert the inline add form as a card
     const raidCards = block.querySelector('.personal-raid-cards');
     const addFormHTML = `
       <div class="personal-raid-card adding">
-        <input type="text" class="raid-edit-name-input" placeholder="Raid name" maxlength="50">
+        <input type="text" class="raid-edit-name-input" placeholder="Raid name" maxlength="50"
+               value="${prefillName}" list="raid-name-suggestions">
+        <datalist id="raid-name-suggestions">${datalistOptions}</datalist>
         <div class="raid-edit-max">
           <span>Max:</span>
-          <input type="number" class="raid-edit-max-input" min="1" max="99" value="1">
+          <input type="number" class="raid-edit-max-input" min="1" max="99" value="${prefillMax}">
         </div>
         <div class="raid-edit-actions">
           <button class="btn btn-small btn-secondary raid-add-cancel">Cancel</button>
@@ -522,6 +541,7 @@ export const MyRaidsPage = {
     const maxInput = addCard.querySelector('.raid-edit-max-input');
 
     nameInput.focus();
+    nameInput.select(); // Select pre-filled text for easy replacement
 
     addCard.querySelector('.raid-add-cancel').addEventListener('click', () => {
       this.hideAddForm(playerId);
@@ -529,6 +549,15 @@ export const MyRaidsPage = {
 
     addCard.querySelector('.raid-add-save').addEventListener('click', () => {
       this.saveNewRaid();
+    });
+
+    // When user picks from autocomplete, also fill in max clears from that raid
+    nameInput.addEventListener('input', () => {
+      const selectedName = nameInput.value;
+      const existingRaid = this._personalRaids.find(r => r.name === selectedName);
+      if (existingRaid) {
+        maxInput.value = existingRaid.maxClears;
+      }
     });
 
     nameInput.addEventListener('keydown', (e) => {
@@ -655,6 +684,8 @@ export const MyRaidsPage = {
 
     try {
       await dataService.addPersonalRaid(playerId, name, maxClears);
+      // Remember for pre-filling next add form
+      this._lastAddedRaid = { name, maxClears };
       this.hideAddForm(playerId);
       await this.loadPersonalRaids();
       this.refreshPlayerRaids(playerId);
