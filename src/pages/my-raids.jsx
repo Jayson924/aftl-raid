@@ -518,7 +518,7 @@ export const MyRaidsPage = {
                value="${prefillName}" list="raid-name-suggestions">
         <datalist id="raid-name-suggestions">${datalistOptions}</datalist>
         <div class="raid-edit-max">
-          <span>Max:</span>
+          <span>Max</span>
           <input type="number" class="raid-edit-max-input" min="1" max="99" value="${prefillMax}">
         </div>
         <div class="raid-edit-actions">
