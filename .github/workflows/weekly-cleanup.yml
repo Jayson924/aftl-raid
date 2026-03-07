@@ -2,8 +2,8 @@ name: Weekly Lineup Cleanup
 
 on:
   schedule:
-    # Runs every Saturday at 01:00 UTC (Friday 5:00 PM PST / 6:00 PM PDT)
-    - cron: '0 1 * * 6'
+    # Runs daily at 01:00 UTC - job checks if it's Friday PT before running
+    - cron: '0 1 * * *'
 
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
@@ -13,7 +13,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check if Friday in Pacific Time
+        id: check-day
+        run: |
+          # Get current day in Pacific Time (handles PST/PDT automatically)
+          DAY=$(TZ="America/Los_Angeles" date +%u)
+          echo "Day of week (Pacific): $DAY (5=Friday)"
+          if [ "$DAY" = "5" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "Skipping - not Friday in Pacific Time"
+          fi
+
       - name: Weekly Lineup Cleanup
+        if: steps.check-day.outputs.should_run == 'true'
         run: |
           response=$(curl -s -w "\n%{http_code}" -X POST \
             "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/weekly_lineup_cleanup" \
