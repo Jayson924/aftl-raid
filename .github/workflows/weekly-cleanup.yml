@@ -2,7 +2,7 @@ name: Weekly Lineup Cleanup
 
 on:
   schedule:
-    # Runs every Saturday at 01:00 UTC = Friday 5:00 PM PST / 6:00 PM PDT
+    # Runs every Saturday at 01:00 UTC (Friday 5:00 PM PST / 6:00 PM PDT)
     - cron: '0 1 * * 6'
 
   # Allow manual trigger from GitHub Actions tab
