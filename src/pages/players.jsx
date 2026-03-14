@@ -378,7 +378,7 @@ export const PlayersPage = {
               <td class="player-owner" data-label="Owner">
                 ${owner ? `
                   <div class="owner-badge" title="${owner.displayName}">
-                    ${owner.avatarUrl ? `<img src="${owner.avatarUrl}" alt="${owner.displayName}" class="owner-avatar">` : ''}
+                    ${owner.avatarUrl ? `<img src="${owner.avatarUrl}" alt="${owner.displayName}" class="owner-avatar" onerror="this.style.display='none'">` : ''}
                     <span class="owner-name">${owner.displayName}</span>
                   </div>
                 ` : '<span class="no-owner">—</span>'}
@@ -503,7 +503,7 @@ export const PlayersPage = {
     const sortedAccountNums = Object.keys(byAccount).map(n => parseInt(n)).sort((a, b) => a - b);
 
     const ownerName = owner ? owner.displayName : 'Unassigned';
-    const ownerAvatar = owner?.avatarUrl ? `<img src="${owner.avatarUrl}" alt="${ownerName}" class="owner-group-avatar">` : '';
+    const ownerAvatar = owner?.avatarUrl ? `<img src="${owner.avatarUrl}" alt="${ownerName}" class="owner-group-avatar" onerror="this.style.display='none'">` : '';
 
     let html = `
       <div class="owner-group ${isCollapsed ? 'collapsed' : ''}">

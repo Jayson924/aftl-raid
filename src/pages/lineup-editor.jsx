@@ -2323,7 +2323,7 @@ export const LineupEditorPage = {
 
     const avatarsHtml = displayUsers.map(user => {
       if (user.avatar) {
-        return `<img src="${user.avatar}" alt="${user.name}" title="${user.name}" class="presence-avatar">`;
+        return `<img src="${user.avatar}" alt="${user.name}" title="${user.name}" class="presence-avatar" onerror="this.style.display='none'">`;
       }
       // Fallback to initials
       const initials = (user.name || '?').charAt(0).toUpperCase();

@@ -110,7 +110,7 @@ function renderNavigation() {
         ${isAuthenticated ? `
           <div class="user-dropdown" id="user-dropdown">
             <button class="user-dropdown-toggle" id="user-dropdown-toggle" title="${displayName} (${dataService.getUserRole()})">
-              ${avatarUrl ? `<img src="${avatarUrl}" alt="${displayName}" class="user-avatar">` : ''}
+              ${avatarUrl ? `<img src="${avatarUrl}" alt="${displayName}" class="user-avatar" onerror="this.style.display='none'">` : ''}
               <span class="user-name">${displayName}</span>
               <span class="dropdown-arrow">▼</span>
             </button>

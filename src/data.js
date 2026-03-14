@@ -164,6 +164,15 @@ class DataService {
     this._userRole = data?.role || 'player';
     // Store custom display name if it differs from Discord name
     this._customDisplayName = data?.display_name !== this._user.displayName ? data?.display_name : null;
+
+    // Update avatar and username in DB in case they changed on Discord
+    await supabase
+      .from('app_users')
+      .update({
+        username: this._user.username,
+        avatar_url: this._user.avatar
+      })
+      .eq('discord_id', this._user.id);
   }
 
   /**
