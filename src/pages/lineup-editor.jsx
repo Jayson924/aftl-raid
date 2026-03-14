@@ -1,6 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES } from '../constants.js';
+import { showWhosAroundModal } from '../modals/whosaroundmodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
@@ -101,7 +102,10 @@ export const LineupEditorPage = {
           <div class="editor-main">
             <div class="lineup-slots">
               <div class="lineup-slots-header">
-                <h3>Lineup</h3>
+                <div class="lineup-slots-header-left">
+                  <h3>Lineup</h3>
+                  <button id="whos-around-btn" class="btn btn-ghost whos-around-btn">Who's Around</button>
+                </div>
                 <div id="presence-indicator" class="presence-indicator"></div>
               </div>
               <div class="damage-amp-display">
@@ -359,6 +363,10 @@ export const LineupEditorPage = {
 
     document.getElementById('new-lineup-btn').addEventListener('click', () => {
       this.newLineup();
+    });
+
+    document.getElementById('whos-around-btn').addEventListener('click', () => {
+      this.openWhosAround();
     });
 
     // Mobile tap-to-toggle for damage amp tooltips
@@ -897,6 +905,113 @@ export const LineupEditorPage = {
     });
   },
 
+  /**
+   * Render class picker (base class icons → specializations → final classes)
+   * Same pattern used in the add/edit character modal on the Players page.
+   */
+  renderClassPicker(containerId, hiddenInputId, selectedClass) {
+    const container = document.getElementById(containerId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    if (!container) return;
+
+    // Find which family/spec the selected class belongs to
+    let activeFamily = null;
+    let activeSpec = null;
+    if (selectedClass) {
+      for (const [familyKey, family] of Object.entries(CLASS_FAMILIES)) {
+        if (family.classes.includes(selectedClass)) {
+          activeFamily = familyKey;
+          for (const [specKey, spec] of Object.entries(family.specializations)) {
+            if (spec.classes.includes(selectedClass)) {
+              activeSpec = specKey;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    let expandedFamily = activeFamily;
+
+    const render = () => {
+      const family = expandedFamily ? CLASS_FAMILIES[expandedFamily] : null;
+
+      let html = `<div class="modal-class-family-filter">
+        ${Object.entries(CLASS_FAMILIES).map(([key, fam]) => `
+          <button type="button" class="class-family-btn ${expandedFamily === key ? 'expanded' : ''}"
+                  data-family="${key}" title="${fam.name}">
+            <span class="class-icon-wrapper">
+              <img src="/icons/${fam.icon}" alt="${fam.name}">
+            </span>
+          </button>
+        `).join('')}
+      </div>`;
+
+      if (family && family.specializations) {
+        html += `<div class="modal-specialization-filter">
+          ${Object.entries(family.specializations).map(([key, spec]) => `
+            <button type="button" class="specialization-btn ${activeSpec === key ? 'active' : ''}"
+                    data-spec="${key}" title="${spec.name}">
+              <div class="spec-icon-wrapper">
+                <img src="/icons/${spec.icon}" alt="${spec.name}">
+              </div>
+              <span class="spec-name">${spec.name}</span>
+            </button>
+          `).join('')}
+        </div>`;
+
+        if (activeSpec && family.specializations[activeSpec]) {
+          const spec = family.specializations[activeSpec];
+          html += `<div class="class-picker-finals">
+            ${spec.classes.map(cls => `
+              <button type="button" class="final-class-btn ${selectedClass === cls ? 'active' : ''}"
+                      data-class="${cls}">${cls}</button>
+            `).join('')}
+          </div>`;
+        }
+      }
+
+      if (selectedClass) {
+        html += `<div class="class-picker-selected">Selected: <strong>${selectedClass}</strong></div>`;
+      }
+
+      container.innerHTML = html;
+
+      container.querySelectorAll('.class-family-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const familyKey = btn.dataset.family;
+          if (expandedFamily === familyKey) {
+            expandedFamily = null;
+            activeSpec = null;
+          } else {
+            expandedFamily = familyKey;
+            activeSpec = null;
+          }
+          render();
+        });
+      });
+
+      container.querySelectorAll('.specialization-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const specKey = btn.dataset.spec;
+          activeSpec = activeSpec === specKey ? null : specKey;
+          render();
+        });
+      });
+
+      container.querySelectorAll('.final-class-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedClass = btn.dataset.class;
+          hiddenInput.value = selectedClass;
+          render();
+        });
+      });
+    };
+
+    render();
+  },
+
   getEquipmentBackground(player) {
     if (!player) return '';
 
@@ -1390,11 +1505,9 @@ export const LineupEditorPage = {
             <input type="text" id="pub-name" placeholder="Leave empty for placeholder">
           </div>
           <div class="form-group">
-            <label for="pub-class">Class: *</label>
-            <select id="pub-class" required>
-              <option value="">Select a class...</option>
-              ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
-            </select>
+            <label>Class: *</label>
+            <input type="hidden" id="pub-class" value="">
+            <div class="class-picker" id="pub-class-picker"></div>
           </div>
           <div class="modal-actions">
             <button type="submit" class="btn btn-primary">Add to Lineup</button>
@@ -1405,6 +1518,9 @@ export const LineupEditorPage = {
     `;
 
     document.body.appendChild(modalElement);
+
+    // Render the class picker (same pattern as add/edit character modal)
+    this.renderClassPicker('pub-class-picker', 'pub-class', '');
 
     const form = document.getElementById('pub-character-form');
     form.addEventListener('submit', (e) => {
@@ -2378,6 +2494,41 @@ export const LineupEditorPage = {
     const gmt8Time = m.utcOffset(8).format('h:mm A');
     return `${localTime} <span class="raid-time-gmt8">(<span class="raid-time-arrow">${arrow}</span> ${gmt8Time} GMT+8)</span>`;
   },
+
+  /**
+   * Open the "Who's Around" modal and apply the generated lineup
+   */
+  async openWhosAround() {
+    showWhosAroundModal({
+      players: this.players,
+      currentLineup: this.currentLineup,
+      onGenerate: (result) => {
+        // Apply the generated lineup
+        this.currentLineup.players = [];
+        this.currentLineup.ticketSlots = Array(8).fill(false);
+        this.currentLineup.pilotSlots = Array(8).fill('');
+
+        this._clearSlotElements();
+        result.forEach((entry, idx) => {
+          if (entry.isGuest) {
+            this.assignPubPlayerToSlot(idx, '', entry.role);
+          } else {
+            this.assignPlayerToSlot(idx, entry.name);
+          }
+        });
+
+        this.renderAvailablePlayers();
+        this.updateDamageAmpDisplay();
+        this.updateConflictWarnings();
+
+        const { physical, magic } = this.calculateDamageAmp();
+        const guestCount = result.filter(e => e.isGuest).length;
+        const guestMsg = guestCount > 0 ? ` (${guestCount} guest slot${guestCount !== 1 ? 's' : ''})` : '';
+        toast.success(`Lineup generated! Physical: ${physical}%, Magic: ${magic}%${guestMsg}`);
+      }
+    });
+  },
+
 
   /**
    * Cleanup when leaving the page
