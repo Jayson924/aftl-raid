@@ -1,13 +1,8 @@
 /**
  * Supabase Data Service
  *
- * Drop-in replacement for data.js that uses Supabase instead of Google Sheets.
- *
- * To switch from Google Sheets to Supabase:
- * 1. Run the migration script (supabase/migrate.js)
- * 2. Rename this file to data.js (backup the original first)
- *    OR update imports to use data-supabase.js
- * 3. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env
+ * All data operations go through Supabase (PostgreSQL).
+ * Requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -34,16 +29,8 @@ class DataService {
   }
 
   // ============================================
-  // CONFIGURATION (compatibility with old API)
+  // CONFIGURATION
   // ============================================
-
-  configure() {
-    // No-op for compatibility
-  }
-
-  loadConfig() {
-    return true;
-  }
 
   isConfigured() {
     return !!supabaseUrl && !!supabaseAnonKey;
@@ -51,10 +38,6 @@ class DataService {
 
   hasWriteAccess() {
     return this._user !== null;
-  }
-
-  checkPassword() {
-    return true;
   }
 
   // ============================================
@@ -474,24 +457,12 @@ class DataService {
     return this._saveLineup(lineup, false);
   }
 
-  async updateLineup(lineup, oldName) {
-    return this._saveLineup(lineup, true, oldName);
+  async updateLineup(lineup) {
+    return this._saveLineup(lineup, true);
   }
 
-  async _saveLineup(lineup, isUpdate, oldName = null) {
+  async _saveLineup(lineup, isUpdate) {
     let lineupId = lineup.id;
-
-    if (isUpdate && !lineupId) {
-      // Find existing lineup by name and raid type
-      const { data: existing } = await supabase
-        .from('lineups')
-        .select('id')
-        .eq('name', oldName || lineup.name)
-        .eq('raid_type', lineup.raidType)
-        .single();
-
-      lineupId = existing?.id;
-    }
 
     // Upsert lineup
     const lineupData = {

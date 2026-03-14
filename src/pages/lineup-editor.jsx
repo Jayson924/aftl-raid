@@ -35,6 +35,26 @@ export const LineupEditorPage = {
   flatpickrInstance: null, // Flatpickr date/time picker instance
 
   async render(container) {
+    // Reset state when re-entering the page (singleton object persists across navigations)
+    this.currentLineup = {
+      id: null,
+      name: '',
+      raidType: 'Hardcore',
+      status: 'ready',
+      players: [],
+      ticketSlots: Array(8).fill(false),
+      pilotSlots: Array(8).fill(''),
+      completed: false,
+      isTemplate: false,
+      notes: '',
+      raidTime: null
+    };
+    this.selectedClassFamily = null;
+    this.expandedClassFamily = null;
+    this.selectedSpecialization = null;
+    this.nextWeekMode = false;
+    this.viewingUsers = [];
+
     container.innerHTML = `
       <div class="lineup-editor-page">
         <div class="page-header">
@@ -369,7 +389,7 @@ export const LineupEditorPage = {
     const listElement = document.getElementById('available-players-list');
 
     if (!dataService.isConfigured()) {
-      listElement.innerHTML = '<div class="error">Please configure Google Sheets first.</div>';
+      listElement.innerHTML = '<div class="error">Please configure Supabase first.</div>';
       return;
     }
 
@@ -686,8 +706,8 @@ export const LineupEditorPage = {
       let presentInLineup = null;
       if (!this.nextWeekMode && this.allLineups && this.allLineups.length > 0) {
         const otherLineup = this.allLineups.find(lineup => {
-          // Skip the current lineup being edited
-          if (lineup.name === this.currentLineup.name) return false;
+          // Skip the current lineup being edited (by ID if available, otherwise skip none)
+          if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
           // Only check lineups of the same raid type
           const lineupRaidType = lineup.raidType || 'Hardcore';
           if (lineupRaidType !== this.currentLineup.raidType) return false;
@@ -784,8 +804,8 @@ export const LineupEditorPage = {
         let matchesNotInLineup = true;
         if (hideInLineup && !this.nextWeekMode && this.allLineups && this.allLineups.length > 0) {
           const inOtherLineup = this.allLineups.some(lineup => {
-            // Skip the current lineup being edited
-            if (lineup.name === this.currentLineup.name) return false;
+            // Skip the current lineup being edited (by ID if available)
+            if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
             // Only check lineups of the same raid type
             const lineupRaidType = lineup.raidType || 'Hardcore';
             if (lineupRaidType !== this.currentLineup.raidType) return false;
@@ -802,6 +822,27 @@ export const LineupEditorPage = {
 
   filterPlayers() {
     this.renderAvailablePlayers();
+  },
+
+  /**
+   * Lightweight update of player card CSS classes and badges
+   * without rebuilding the entire list (preserves scroll position, no flicker)
+   */
+  updatePlayerCardStates() {
+    const cards = document.querySelectorAll('.player-card[data-player-name]');
+    cards.forEach(card => {
+      const playerName = card.dataset.playerName;
+      if (playerName === '[ADD_PUB]') return;
+
+      const isInLineup = this.currentLineup.players.includes(playerName);
+      card.classList.toggle('in-lineup', isInLineup);
+
+      // Update the "Added" badge
+      const badgeContainer = card.querySelector('.player-card-badges');
+      if (badgeContainer) {
+        badgeContainer.innerHTML = isInLineup ? '<span class="in-lineup-badge">Added</span>' : '';
+      }
+    });
   },
 
   renderSpecializations() {
@@ -1522,7 +1563,7 @@ export const LineupEditorPage = {
     // Remove slot-content border/background so it doesn't create inner rectangle
     slotContent.style.cssText = 'border: none; background: transparent;';
 
-    this.renderAvailablePlayers();
+    this.updatePlayerCardStates();
     this.updateDamageAmpDisplay();
     this.updateConflictWarnings();
   },
@@ -1650,7 +1691,7 @@ export const LineupEditorPage = {
       slotElement.style.cssText = '';
     }
 
-    this.renderAvailablePlayers();
+    this.updatePlayerCardStates();
     this.updateDamageAmpDisplay();
     this.updateConflictWarnings();
   },
@@ -1675,7 +1716,7 @@ export const LineupEditorPage = {
     slotElement.style.cssText = '';
     slotContent.style.cssText = '';
 
-    this.renderAvailablePlayers();
+    this.updatePlayerCardStates();
     this.updateDamageAmpDisplay();
     this.updateConflictWarnings();
   },
@@ -1769,221 +1810,145 @@ export const LineupEditorPage = {
     }
 
     if (!dataService.hasWriteAccess()) {
-      toast.warning(`Write access not configured. Please add lineup manually to Google Sheet (${filledSlots}/8 players) or configure Apps Script URL.`, 5000);
+      toast.warning('You need to be logged in to save lineups.', 5000);
       return;
     }
 
+    const saveBtn = document.getElementById('save-lineup-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
     try {
-      const saveBtn = document.getElementById('save-lineup-btn');
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-
-      // Build clean players array (no suffixes - ticket/pilot stored separately)
-      const players = Array(8).fill('').map((_, idx) => {
-        return this.currentLineup.players[idx] || '';
-      });
-
-      // Build ticketPlayers and pilotPlayers arrays for database
+      const players = Array(8).fill('').map((_, idx) => this.currentLineup.players[idx] || '');
       const ticketPlayers = [...this.currentLineup.ticketSlots];
       const pilotPlayers = [...this.currentLineup.pilotSlots];
-
-      // Check if lineup exists - prefer ID if available, fall back to name
-      const existingLineups = await dataService.getLineups();
       const trimmedName = this.currentLineup.name.trim();
+      const isUpdate = !!this.currentLineup.id;
 
-      // If we have an ID, check if that specific lineup still exists
-      let existingLineup = null;
-      let wasDeletedWhileEditing = false;
+      const lineupData = {
+        name: trimmedName,
+        raidType: this.currentLineup.raidType,
+        status: 'ready',
+        players,
+        ticketPlayers,
+        pilotPlayers,
+        completed: this.currentLineup.completed,
+        isTemplate: this.currentLineup.isTemplate,
+        notes: this.currentLineup.notes,
+        raidTime: this.currentLineup.raidTime
+      };
 
-      if (this.currentLineup.id) {
-        existingLineup = existingLineups.find(l => l.id === this.currentLineup.id);
-        if (!existingLineup) {
-          // Lineup was deleted while we were editing
-          wasDeletedWhileEditing = true;
+      // Get non-guest player names and ticket info for completion tracking
+      const playerNames = [];
+      const ticketPlayerNames = [];
+      players.forEach((p, idx) => {
+        if (p && !p.startsWith('[PUB]')) {
+          playerNames.push(p);
+          if (ticketPlayers[idx]) ticketPlayerNames.push(p);
         }
-      } else {
-        // No ID - check by name and raid type
-        existingLineup = existingLineups.find(l => l.name.trim() === trimmedName && (l.raidType || 'Hardcore') === this.currentLineup.raidType);
-      }
+      });
 
-      // Handle case where lineup was deleted while editing
-      if (wasDeletedWhileEditing) {
-        const saveAsNew = await modal.confirm(
-          `This lineup has been deleted. Save as a new lineup?`,
-          {
-            title: 'Lineup Deleted',
-            confirmText: 'Save as New',
-            cancelText: 'Cancel',
-            danger: false
+      if (isUpdate) {
+        // We have an ID — try to update directly (no confirmation needed)
+        lineupData.id = this.currentLineup.id;
+
+        // We need the previous cleared state for completion tracking
+        // Use the cached version from allLineups instead of re-fetching
+        const cachedLineup = this.allLineups.find(l => l.id === this.currentLineup.id);
+
+        if (!cachedLineup) {
+          // Lineup was deleted while editing
+          const saveAsNew = await modal.confirm(
+            `This lineup has been deleted. Save as a new lineup?`,
+            { title: 'Lineup Deleted', confirmText: 'Save as New', cancelText: 'Cancel' }
+          );
+          if (!saveAsNew) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Lineup';
+            return;
           }
-        );
+          this.currentLineup.id = null;
+          delete lineupData.id;
+          // Fall through to create-new path below
+        } else {
+          await dataService.updateLineup(lineupData);
+          toast.success(`${trimmedName} updated!`);
 
-        if (!saveAsNew) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Lineup';
+          // Handle completion status changes
+          await this._handleCompletionChanges(cachedLineup, playerNames, ticketPlayerNames);
+
+          this._refreshAfterSave(saveBtn);
           return;
         }
-
-        // Clear the ID so it will be created as new
-        this.currentLineup.id = null;
-        existingLineup = null;
       }
 
-      if (existingLineup) {
-        // Confirm before updating existing lineup
-        const confirmed = await modal.confirm(
-          `Overwrite "${this.currentLineup.name}" lineup?`,
-          {
-            title: 'Update Lineup',
-            confirmText: 'Update',
-            cancelText: 'Cancel',
-            danger: false
-          }
-        );
+      // Create new lineup
+      const result = await dataService.addLineup(lineupData);
+      if (result.data?.id) {
+        this.currentLineup.id = result.data.id;
+      }
+      toast.success(`${trimmedName} saved!`);
 
-        if (!confirmed) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Lineup';
-          return;
-        }
-
-        // Check if we're unchecking a previously cleared lineup
-        const wasCleared = existingLineup.completed;
-        const isNowCleared = this.currentLineup.completed;
-
-        console.log('Clear check:', { wasCleared, isNowCleared, lineupName: trimmedName });
-
-        // Update existing lineup - include ID for reliable identification
-        await dataService.updateLineup({
-          id: existingLineup.id,
-          name: trimmedName,
-          raidType: this.currentLineup.raidType,
-          status: 'ready',
-          players,
-          ticketPlayers,
-          pilotPlayers,
-          completed: this.currentLineup.completed,
-          isTemplate: this.currentLineup.isTemplate,
-          notes: this.currentLineup.notes,
-          raidTime: this.currentLineup.raidTime
-        }, existingLineup.name);
-
-        // Update the stored ID in case it was a new match by name
-        this.currentLineup.id = existingLineup.id;
-        toast.success(`${trimmedName} updated!`);
-
-        // Handle player completion status changes
-        // Get non-guest player names and their ticket status by index
-        const playerNames = [];
-        const ticketPlayerNames = [];
-        players.forEach((p, idx) => {
-          if (p && !p.startsWith('[PUB]')) {
-            playerNames.push(p);
-            if (ticketPlayers[idx]) {
-              ticketPlayerNames.push(p);
-            }
-          }
-        });
-
-        if (wasCleared && !isNowCleared && playerNames.length > 0) {
-          // Lineup was cleared but now unchecked - unmark players
-          // Use ORIGINAL ticket info from existingLineup, not current UI state
-          const originalTicketPlayerNames = existingLineup.ticketPlayers
-            ? existingLineup.players
-                .filter((p, idx) => p && !p.startsWith('[PUB]') && existingLineup.ticketPlayers[idx])
-                .map(p => p) // These are already clean names without [T]
-            : [];
-          console.log('Unmarking:', playerNames, 'original tickets:', originalTicketPlayerNames, 'for:', this.currentLineup.raidType);
-          try {
-            const result = await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, trimmedName, originalTicketPlayerNames);
-            console.log(`Unmark result:`, result);
-            console.log(`Unmarked players for ${this.currentLineup.raidType} (lineup unchecked)`);
-          } catch (error) {
-            console.error('Error unmarking players:', error);
-            toast.warning('Saved pero may nangyari sa unmark? Refresh nalang dong');
-          }
-        } else if (!wasCleared && isNowCleared && playerNames.length > 0) {
-          // Lineup was not cleared but now checked - mark players
-          try {
-            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
-            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}, ${ticketPlayerNames.length} tickets used`);
-          } catch (error) {
-            console.error('Error marking players as completed:', error);
-            toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
-          }
-        } else if (isNowCleared && playerNames.length > 0) {
-          // Lineup is still cleared, but players may have changed - mark all players
-          try {
-            await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
-            console.log(`Cleared ${playerNames.length} players for ${this.currentLineup.raidType}, ${ticketPlayerNames.length} tickets used`);
-          } catch (error) {
-            console.error('Error marking players as completed:', error);
-            toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
-          }
-        }
-      } else {
-        // Add new lineup
-        const result = await dataService.addLineup({
-          name: trimmedName,
-          raidType: this.currentLineup.raidType,
-          status: 'ready',
-          players,
-          ticketPlayers,
-          pilotPlayers,
-          completed: this.currentLineup.completed,
-          isTemplate: this.currentLineup.isTemplate,
-          notes: this.currentLineup.notes,
-          raidTime: this.currentLineup.raidTime
-        });
-
-        // Store the new lineup ID for future saves
-        if (result.data?.id) {
-          this.currentLineup.id = result.data.id;
-        }
-
-        toast.success(`${trimmedName} saved!`);
-
-        // If the lineup is marked as cleared, mark all players as completed for this raid type
-        if (this.currentLineup.completed) {
-          // Get non-guest player names and their ticket status by index
-          const newPlayerNames = [];
-          const newTicketPlayerNames = [];
-          players.forEach((p, idx) => {
-            if (p && !p.startsWith('[PUB]')) {
-              newPlayerNames.push(p);
-              if (ticketPlayers[idx]) {
-                newTicketPlayerNames.push(p);
-              }
-            }
-          });
-
-          if (newPlayerNames.length > 0) {
-            try {
-              await dataService.markPlayersCompleted(newPlayerNames, this.currentLineup.raidType, newTicketPlayerNames);
-              console.log(`Cleared ${newPlayerNames.length} players for ${this.currentLineup.raidType}, ${newTicketPlayerNames.length} tickets used`);
-            } catch (error) {
-              console.error('Error marking players as completed:', error);
-              toast.warning('Saved pero may nangyari? Refresh nalang dong');
-            }
-          }
+      // Mark completion if new lineup is already cleared
+      if (this.currentLineup.completed && playerNames.length > 0) {
+        try {
+          await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
+        } catch (error) {
+          console.error('Error marking players as completed:', error);
+          toast.warning('Saved pero may nangyari sa mark? Refresh nalang dong');
         }
       }
 
-      // Refresh player list to show updated completion status and "in lineup" badges
-      this.players = await dataService.getPlayers();
-      this.renderAvailablePlayers();
-
-      // Refresh the lineup carousel
-      this.loadExistingLineups();
-
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Lineup';
+      this._refreshAfterSave(saveBtn);
     } catch (error) {
       toast.error(`Error dong: ${error.message}`);
-      const saveBtn = document.getElementById('save-lineup-btn');
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Lineup';
     }
+  },
+
+  /**
+   * Handle player completion status changes when updating an existing lineup
+   */
+  async _handleCompletionChanges(previousLineup, playerNames, ticketPlayerNames) {
+    const wasCleared = previousLineup.completed;
+    const isNowCleared = this.currentLineup.completed;
+
+    if (playerNames.length === 0) return;
+
+    try {
+      if (wasCleared && !isNowCleared) {
+        // Unchecking cleared — unmark players using ORIGINAL ticket info
+        const originalTicketPlayerNames = previousLineup.ticketPlayers
+          ? previousLineup.players
+              .filter((p, idx) => p && !p.startsWith('[PUB]') && previousLineup.ticketPlayers[idx])
+              .map(p => p)
+          : [];
+        await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, null, originalTicketPlayerNames);
+      } else if (isNowCleared) {
+        // Newly cleared or still cleared with possible player changes — mark all
+        await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
+      }
+    } catch (error) {
+      console.error('Error updating completion status:', error);
+      toast.warning('Saved pero may nangyari sa completion? Refresh nalang dong');
+    }
+  },
+
+  /**
+   * Refresh UI after a successful save (players + carousel in parallel)
+   */
+  async _refreshAfterSave(saveBtn) {
+    // Fetch players and lineups in parallel
+    const [players] = await Promise.all([
+      dataService.getPlayers(),
+      this.loadExistingLineups() // also refreshes this.allLineups internally
+    ]);
+    this.players = players;
+    this.renderAvailablePlayers();
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Lineup';
   },
 
   async deleteLineup(lineupId) {
