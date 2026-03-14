@@ -18,16 +18,15 @@ export const LineupEditorPage = {
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
     pilotSlots: Array(8).fill(''), // Track pilot names per slot (empty string if no pilot)
     completed: false,
-    isTemplate: false,
+    isNextWeek: false,
     notes: '',
     raidTime: null // Scheduled raid time (ISO string)
   },
   selectedClassFamily: null,
   expandedClassFamily: null,
   selectedSpecialization: null,
-  nextWeekMode: false,
   showCarouselLineups: true,
-  showCarouselTemplates: false,
+  showCarouselNextWeek: false,
   lineupSubscription: null, // Supabase realtime subscription
   presenceChannel: null, // Presence channel for showing who's viewing
   viewingUsers: [], // Other users currently viewing this page
@@ -45,14 +44,13 @@ export const LineupEditorPage = {
       ticketSlots: Array(8).fill(false),
       pilotSlots: Array(8).fill(''),
       completed: false,
-      isTemplate: false,
+      isNextWeek: false,
       notes: '',
       raidTime: null
     };
     this.selectedClassFamily = null;
     this.expandedClassFamily = null;
     this.selectedSpecialization = null;
-    this.nextWeekMode = false;
     this.viewingUsers = [];
 
     container.innerHTML = `
@@ -78,12 +76,7 @@ export const LineupEditorPage = {
                 </div>
               </div>
               <div class="lineup-toggles">
-                <label class="template-toggle">
-                  <input type="checkbox" id="template-toggle">
-                  <img src="/icons/group.svg" class="template-checkbox-icon" alt="Template">
-                  <span>Template</span>
-                </label>
-                <label class="template-toggle">
+                <label class="next-week-toggle-label">
                   <input type="checkbox" id="next-week-toggle">
                   <span>Next Week</span>
                 </label>
@@ -144,17 +137,23 @@ export const LineupEditorPage = {
                 `).join('')}
               </div>
               <div class="lineup-actions">
-                <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
-                <label class="toggle-cleared">
-                  <input type="checkbox" id="cleared-toggle">
-                  <span>Cleared</span>
-                </label>
-                <button id="clear-lineup-btn" class="btn btn-secondary">Remove Characters</button>
+                <div class="lineup-actions-primary">
+                  <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
+                  <label class="toggle-cleared">
+                    <input type="checkbox" id="cleared-toggle">
+                    <span>Cleared</span>
+                  </label>
+                </div>
+                <div class="lineup-actions-secondary">
+                  <button id="clear-slots-btn" class="btn btn-ghost">Clear Slots</button>
+                  <span class="actions-divider"></span>
+                  <button id="new-lineup-btn" class="btn btn-ghost">New Lineup</button>
+                </div>
               </div>
               <div class="existing-lineups-section">
                 <div class="carousel-tabs">
                   <button class="carousel-tab active" data-tab="lineups" id="carousel-tab-lineups">Lineups</button>
-                  <button class="carousel-tab" data-tab="templates" id="carousel-tab-templates">Templates</button>
+                  <button class="carousel-tab" data-tab="next-week" id="carousel-tab-next-week">Next Week</button>
                 </div>
                 <div class="carousel-wrapper">
                   <button id="editor-carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
@@ -250,12 +249,8 @@ export const LineupEditorPage = {
       this.currentLineup.completed = e.target.checked;
     });
 
-    document.getElementById('template-toggle').addEventListener('change', (e) => {
-      this.currentLineup.isTemplate = e.target.checked;
-    });
-
     document.getElementById('next-week-toggle').addEventListener('change', (e) => {
-      this.nextWeekMode = e.target.checked;
+      this.currentLineup.isNextWeek = e.target.checked;
       this.renderAvailablePlayers(); // Re-render to show/hide cleared players
     });
 
@@ -264,18 +259,18 @@ export const LineupEditorPage = {
       this.showCarouselLineups = !this.showCarouselLineups;
       e.target.classList.toggle('active', this.showCarouselLineups);
       // Ensure at least one is selected
-      if (!this.showCarouselLineups && !this.showCarouselTemplates) {
-        this.showCarouselTemplates = true;
-        document.getElementById('carousel-tab-templates').classList.add('active');
+      if (!this.showCarouselLineups && !this.showCarouselNextWeek) {
+        this.showCarouselNextWeek = true;
+        document.getElementById('carousel-tab-next-week').classList.add('active');
       }
       this.loadExistingLineups();
     });
 
-    document.getElementById('carousel-tab-templates').addEventListener('click', (e) => {
-      this.showCarouselTemplates = !this.showCarouselTemplates;
-      e.target.classList.toggle('active', this.showCarouselTemplates);
+    document.getElementById('carousel-tab-next-week').addEventListener('click', (e) => {
+      this.showCarouselNextWeek = !this.showCarouselNextWeek;
+      e.target.classList.toggle('active', this.showCarouselNextWeek);
       // Ensure at least one is selected
-      if (!this.showCarouselLineups && !this.showCarouselTemplates) {
+      if (!this.showCarouselLineups && !this.showCarouselNextWeek) {
         this.showCarouselLineups = true;
         document.getElementById('carousel-tab-lineups').classList.add('active');
       }
@@ -358,8 +353,12 @@ export const LineupEditorPage = {
       this.saveLineup();
     });
 
-    document.getElementById('clear-lineup-btn').addEventListener('click', () => {
-      this.clearLineup();
+    document.getElementById('clear-slots-btn').addEventListener('click', () => {
+      this.clearSlots();
+    });
+
+    document.getElementById('new-lineup-btn').addEventListener('click', () => {
+      this.newLineup();
     });
 
     // Mobile tap-to-toggle for damage amp tooltips
@@ -422,8 +421,8 @@ export const LineupEditorPage = {
       const lineups = this.allLineups.filter(lineup => {
         const lineupRaidType = lineup.raidType || 'Hardcore'; // Default to Hardcore if not set
         const matchesRaidType = lineupRaidType === this.currentLineup.raidType;
-        const matchesFilter = (this.showCarouselLineups && !lineup.isTemplate) ||
-                              (this.showCarouselTemplates && lineup.isTemplate);
+        const matchesFilter = (this.showCarouselLineups && !lineup.isNextWeek) ||
+                              (this.showCarouselNextWeek && lineup.isNextWeek);
         return matchesRaidType && matchesFilter;
       });
 
@@ -497,10 +496,10 @@ export const LineupEditorPage = {
         }).join('');
 
         return `
-          <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-id="${lineup.id}">
+          <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isNextWeek ? 'next-week' : ''}" data-lineup-id="${lineup.id}">
             <div class="mini-lineup-header">
               <span class="mini-lineup-name">
-                ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}
+                ${lineup.isNextWeek ? '<span class="next-week-badge-mini">NW</span>' : ''}
                 ${lineup.name}
               </span>
               <div class="mini-lineup-header-actions">
@@ -696,15 +695,15 @@ export const LineupEditorPage = {
 
       // Check completion status based on CURRENT lineup's raid type
       // In Next Week mode, treat all players as needing the raid (ignore current completion status)
-      const needsThisRaid = this.nextWeekMode ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+      const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
       // Check if player has already used their ticket this week (Classic only)
-      const ticketUsed = this.nextWeekMode ? false : dataService.playerTicketUsed(player, this.currentLineup.raidType);
+      const ticketUsed = this.currentLineup.isNextWeek ? false : dataService.playerTicketUsed(player, this.currentLineup.raidType);
 
       // Check if player is in another lineup (not the current one)
       // Don't show this in Next Week mode since current week assignments aren't relevant
       let presentInLineup = null;
-      if (!this.nextWeekMode && this.allLineups && this.allLineups.length > 0) {
+      if (!this.currentLineup.isNextWeek && this.allLineups && this.allLineups.length > 0) {
         const otherLineup = this.allLineups.find(lineup => {
           // Skip the current lineup being edited (by ID if available, otherwise skip none)
           if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
@@ -795,14 +794,14 @@ export const LineupEditorPage = {
         // Hide cleared filter - only hide if checkbox is checked
         // In Next Week mode, don't hide anyone regardless of cleared status
         let matchesCompletion = true;
-        if (hideCleared && !this.nextWeekMode) {
+        if (hideCleared && !this.currentLineup.isNextWeek) {
           // Only show players who need this raid (hide those who already completed)
           matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
         }
 
         // Hide in lineup filter - hide players who are in another lineup of the same raid type
         let matchesNotInLineup = true;
-        if (hideInLineup && !this.nextWeekMode && this.allLineups && this.allLineups.length > 0) {
+        if (hideInLineup && !this.currentLineup.isNextWeek && this.allLineups && this.allLineups.length > 0) {
           const inOtherLineup = this.allLineups.some(lineup => {
             // Skip the current lineup being edited (by ID if available)
             if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
@@ -1160,7 +1159,7 @@ export const LineupEditorPage = {
 
           // Hide cleared filter - respect Next Week mode
           let matchesCompletion = true;
-          if (hideCleared && !this.nextWeekMode) {
+          if (hideCleared && !this.currentLineup.isNextWeek) {
             matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
           }
 
@@ -1184,7 +1183,7 @@ export const LineupEditorPage = {
         const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
         const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
         // In Next Week mode, treat all players as needing the raid
-        const needsThisRaid = this.nextWeekMode ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+        const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
         const equipmentDisplay = [];
         if (player.weapon) {
@@ -1730,24 +1729,40 @@ export const LineupEditorPage = {
     });
   },
 
-  async clearLineup() {
-    const confirmed = await modal.confirm(
-      'Clear confirmation.',
-      {
-        title: 'Clear Lineup',
-        confirmText: 'Clear All',
-        cancelText: 'Cancel',
-        danger: true
-      }
-    );
+  /**
+   * Clear all 8 slots but keep the lineup identity (name, ID, settings)
+   */
+  clearSlots() {
+    this.currentLineup.players = [];
+    this.currentLineup.ticketSlots = Array(8).fill(false);
+    this.currentLineup.pilotSlots = Array(8).fill('');
 
-    if (!confirmed) return;
+    this._clearSlotElements();
+    this.renderAvailablePlayers();
+    this.updateDamageAmpDisplay();
+    this.updateConflictWarnings();
 
-    // Preserve the current raid type when clearing
+    toast.success('Slots cleared.');
+  },
+
+  /**
+   * Start a fresh lineup — resets everything
+   */
+  async newLineup() {
+    // Only confirm if there's something to lose
+    const hasContent = this.currentLineup.id || this.currentLineup.name || this.currentLineup.players.some(p => p);
+    if (hasContent) {
+      const confirmed = await modal.confirm(
+        'Start a new lineup? Unsaved changes will be lost.',
+        { title: 'New Lineup', confirmText: 'New Lineup', cancelText: 'Cancel', danger: true }
+      );
+      if (!confirmed) return;
+    }
+
     const currentRaidType = this.currentLineup.raidType;
 
     this.currentLineup = {
-      id: null, // Clear the ID so next save creates a new lineup
+      id: null,
       name: '',
       raidType: currentRaidType,
       status: 'ready',
@@ -1755,45 +1770,43 @@ export const LineupEditorPage = {
       ticketSlots: Array(8).fill(false),
       pilotSlots: Array(8).fill(''),
       completed: false,
-      isTemplate: false,
+      isNextWeek: false,
       notes: '',
       raidTime: null
     };
 
-    // Clear the lineup name input field and trigger input event to sync state
     const lineupNameInput = document.getElementById('lineup-name');
     lineupNameInput.value = '';
     lineupNameInput.dispatchEvent(new Event('input', { bubbles: true }));
 
     document.getElementById('raid-type').value = currentRaidType;
     document.getElementById('cleared-toggle').checked = false;
-    document.getElementById('template-toggle').checked = false;
+    document.getElementById('next-week-toggle').checked = false;
     document.getElementById('lineup-notes').value = '';
     if (this.flatpickrInstance) {
       this.flatpickrInstance.clear();
     }
     this.updateRaidTimeDisplay();
 
-    document.querySelectorAll('.slot').forEach(slotElement => {
-      const slotContent = slotElement.querySelector('.slot-content');
-      slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';
-      // Remove any remove buttons
-      const removeBtn = slotElement.querySelector('.slot-remove-btn');
-      if (removeBtn) {
-        removeBtn.remove();
-      }
-      // Clear both slot and slot-content styles (for guest character cleanup)
-      slotElement.style.cssText = '';
-      slotContent.style.cssText = '';
-    });
-
+    this._clearSlotElements();
     this.renderAvailablePlayers();
     this.updateDamageAmpDisplay();
 
-    // Leave presence channel when clearing lineup
     this.leaveLineupPresence();
+  },
 
-    toast.success('Lineup cleared! Enter a new name to save as a new lineup.');
+  /**
+   * Reset all slot DOM elements to empty state
+   */
+  _clearSlotElements() {
+    document.querySelectorAll('.slot').forEach(slotElement => {
+      const slotContent = slotElement.querySelector('.slot-content');
+      slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';
+      const removeBtn = slotElement.querySelector('.slot-remove-btn');
+      if (removeBtn) removeBtn.remove();
+      slotElement.style.cssText = '';
+      slotContent.style.cssText = '';
+    });
   },
 
   async saveLineup() {
@@ -1833,7 +1846,7 @@ export const LineupEditorPage = {
         ticketPlayers,
         pilotPlayers,
         completed: this.currentLineup.completed,
-        isTemplate: this.currentLineup.isTemplate,
+        isNextWeek: this.currentLineup.isNextWeek,
         notes: this.currentLineup.notes,
         raidTime: this.currentLineup.raidTime
       };
@@ -2010,7 +2023,7 @@ export const LineupEditorPage = {
       ticketSlots,
       pilotSlots,
       completed: lineup.completed || false,
-      isTemplate: lineup.isTemplate || false,
+      isNextWeek: lineup.isNextWeek || false,
       notes: lineup.notes || '',
       raidTime: lineup.raidTime || null
     };
@@ -2018,13 +2031,12 @@ export const LineupEditorPage = {
     document.getElementById('lineup-name').value = lineup.name;
     document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
-    document.getElementById('template-toggle').checked = lineup.isTemplate || false;
+    document.getElementById('next-week-toggle').checked = lineup.isNextWeek || false;
     document.getElementById('lineup-notes').value = lineup.notes || '';
     if (this.flatpickrInstance) {
       this.flatpickrInstance.setDate(lineup.raidTime ? new Date(lineup.raidTime) : null, false);
     }
     this.updateRaidTimeDisplay();
-    // Don't change Next Week mode when loading a lineup - let user control it
 
     document.querySelectorAll('.slot').forEach(slotElement => {
       const slotContent = slotElement.querySelector('.slot-content');

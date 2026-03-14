@@ -11,7 +11,7 @@ export const LineupsPage = {
   allLineups: [],
   cachedPlayerMap: null,
   pendingTicketChanges: {}, // Track unsaved ticket changes per lineup by ID: { lineupId: [true, false, ...] }
-  showTemplates: false,
+  showNextWeek: false,
   lineupSubscription: null, // Supabase realtime subscription
   pendingToggleId: null, // Track lineup being toggled by current user to skip self-notification
 
@@ -43,9 +43,9 @@ export const LineupsPage = {
           <div class="carousel-area">
             <div class="carousel-header">
               <h3>Lineups</h3>
-              <label class="show-templates-toggle">
-                <input type="checkbox" id="show-templates-checkbox">
-                <span>Show Templates</span>
+              <label class="show-next-week-toggle">
+                <input type="checkbox" id="show-next-week-checkbox">
+                <span>Show Next Week</span>
               </label>
             </div>
             <div class="carousel-wrapper">
@@ -63,7 +63,7 @@ export const LineupsPage = {
     this.setupTabHandlers();
     this.setupShowcaseSwipeHandlers();
     this.setupCarouselDragScroll();
-    this.setupTemplateToggle();
+    this.setupNextWeekToggle();
     this.loadLineups();
 
     // Close damage amp tooltips when clicking elsewhere
@@ -82,11 +82,11 @@ export const LineupsPage = {
     });
   },
 
-  setupTemplateToggle() {
-    const checkbox = document.getElementById('show-templates-checkbox');
+  setupNextWeekToggle() {
+    const checkbox = document.getElementById('show-next-week-checkbox');
     if (checkbox) {
       checkbox.addEventListener('change', (e) => {
-        this.showTemplates = e.target.checked;
+        this.showNextWeek = e.target.checked;
         this.renderCarousel(this.cachedPlayerMap);
         this.setupCarouselHandlers();
       });
@@ -341,11 +341,11 @@ export const LineupsPage = {
     const raidTimeDisplay = this.formatRaidTime(lineup.raidTime);
 
     showcaseContainer.innerHTML = `
-      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isTemplate ? 'template' : ''}">
+      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isNextWeek ? 'next-week' : ''}">
         <div class="lineup-card-header">
           <div class="lineup-card-title">
             <h3>
-              ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon-showcase" style="width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; margin-right: 0.5rem;" title="Template lineup" alt="Template">' : ''}
+              ${lineup.isNextWeek ? '<span class="next-week-badge">Next Week</span>' : ''}
               ${lineup.name}
             </h3>
             ${raidTimeDisplay ? `<span class="raid-time-display"><img src="/icons/calendarclock.svg" alt="" class="raid-time-icon">${raidTimeDisplay}</span>` : ''}
@@ -503,10 +503,10 @@ export const LineupsPage = {
   renderCarousel(playerMap) {
     const carouselContainer = document.getElementById('existing-lineups-container');
 
-    // Filter templates based on toggle
-    const lineupsToShow = this.showTemplates
+    // Filter next-week lineups based on toggle
+    const lineupsToShow = this.showNextWeek
       ? this.allLineups
-      : this.allLineups.filter(l => !l.isTemplate);
+      : this.allLineups.filter(l => !l.isNextWeek);
 
     if (lineupsToShow.length === 0) {
       carouselContainer.innerHTML = `<div class="empty-state">No lineups to show</div>`;
@@ -566,10 +566,10 @@ export const LineupsPage = {
       }).join('');
 
       return `
-        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''} ${lineup.isTemplate ? 'template' : ''}" data-lineup-id="${lineup.id}">
+        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''} ${lineup.isNextWeek ? 'next-week' : ''}" data-lineup-id="${lineup.id}">
           <div class="mini-lineup-header">
             <span class="mini-lineup-name">
-              ${lineup.isTemplate ? '<img src="/icons/group.svg" class="template-icon" style="width: 14px; height: 14px; flex-shrink: 0;" title="Template lineup" alt="Template">' : ''}
+              ${lineup.isNextWeek ? '<span class="next-week-badge-mini">NW</span>' : ''}
               ${lineup.name}
             </span>
             <div class="mini-lineup-header-actions">
@@ -778,8 +778,8 @@ export const LineupsPage = {
           ticketPlayers: ticketPlayers,
           pilotPlayers: lineup.pilotPlayers,
           completed: lineup.completed,
-          isTemplate: lineup.isTemplate
-        }, lineup.name);
+          isNextWeek: lineup.isNextWeek
+        });
 
         // Clear pending changes after saving
         this.clearPendingTicketChanges(lineup);

@@ -79,7 +79,7 @@
       }
     }
 
-    .show-templates-toggle {
+    .show-next-week-toggle {
       display: flex;
       align-items: center;
       gap: 0.4rem;
@@ -187,13 +187,13 @@
         transform: scale(1.05);
         z-index: 10;
 
-        // For non-template cards, add a subtle background
-        &:not(.template) {
+        // For non-next-week cards, add a subtle background
+        &:not(.next-week) {
           background-color: rgba(244, 196, 48, 0.1);
         }
       }
 
-      &.template {
+      &.next-week {
         background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
         border-color: rgba(150, 184, 255, 0.3);
 
@@ -202,9 +202,7 @@
           border-color: rgba(150, 184, 255, 0.5);
         }
 
-        // Selected template keeps its gradient visible
         &.selected {
-          // Gradient is preserved, just add stronger border via parent .selected rule
         }
       }
 
@@ -260,18 +258,16 @@
           min-width: 0;
           overflow: hidden;
 
-          img.template-icon {
-            width: 14px !important;
-            height: 14px !important;
-            min-width: 14px;
-            min-height: 14px;
-            max-width: 14px;
-            max-height: 14px;
+          .next-week-badge-mini {
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: rgba(150, 184, 255, 0.9);
+            background-color: rgba(150, 184, 255, 0.15);
+            border: 1px solid rgba(150, 184, 255, 0.3);
+            border-radius: 3px;
+            padding: 0 3px;
+            line-height: 1.4;
             flex-shrink: 0;
-            filter: none;
-            object-fit: contain;
-            display: block;
-            vertical-align: middle;
           }
 
           span {
@@ -392,6 +388,19 @@
     &.showcase-lineup-card {
       width: 100%;
       max-width: 900px;
+    }
+
+    .next-week-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: rgba(150, 184, 255, 0.9);
+      background-color: rgba(150, 184, 255, 0.15);
+      border: 1px solid rgba(150, 184, 255, 0.3);
+      border-radius: 4px;
+      padding: 2px 6px;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+      letter-spacing: 0.03em;
     }
 
     .lineup-card-header {
@@ -657,7 +666,7 @@
       }
     }
 
-    &.template {
+    &.next-week {
       background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
       border-color: rgba(150, 184, 255, 0.3);
     }
