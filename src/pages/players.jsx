@@ -697,6 +697,116 @@ export const PlayersPage = {
     return selected ? parseInt(selected.dataset.account) : null;
   },
 
+  // Render class picker (base class icons → specializations → final classes)
+  renderClassPicker(containerId, hiddenInputId, selectedClass) {
+    const container = document.getElementById(containerId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    if (!container) return;
+
+    // Find which family/spec the selected class belongs to
+    let activeFamily = null;
+    let activeSpec = null;
+    if (selectedClass) {
+      for (const [familyKey, family] of Object.entries(CLASS_FAMILIES)) {
+        if (family.classes.includes(selectedClass)) {
+          activeFamily = familyKey;
+          for (const [specKey, spec] of Object.entries(family.specializations)) {
+            if (spec.classes.includes(selectedClass)) {
+              activeSpec = specKey;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    let expandedFamily = activeFamily;
+
+    const render = () => {
+      const family = expandedFamily ? CLASS_FAMILIES[expandedFamily] : null;
+
+      // Base class family buttons
+      let html = `<div class="modal-class-family-filter">
+        ${Object.entries(CLASS_FAMILIES).map(([key, fam]) => `
+          <button type="button" class="class-family-btn ${expandedFamily === key ? 'expanded' : ''}"
+                  data-family="${key}" title="${fam.name}">
+            <span class="class-icon-wrapper">
+              <img src="/icons/${fam.icon}" alt="${fam.name}">
+            </span>
+          </button>
+        `).join('')}
+      </div>`;
+
+      // Specialization buttons (when a family is expanded)
+      if (family && family.specializations) {
+        html += `<div class="modal-specialization-filter">
+          ${Object.entries(family.specializations).map(([key, spec]) => `
+            <button type="button" class="specialization-btn ${activeSpec === key ? 'active' : ''}"
+                    data-spec="${key}" title="${spec.name}">
+              <div class="spec-icon-wrapper">
+                <img src="/icons/${spec.icon}" alt="${spec.name}">
+              </div>
+              <span class="spec-name">${spec.name}</span>
+            </button>
+          `).join('')}
+        </div>`;
+
+        // Final class buttons (under the active specialization)
+        if (activeSpec && family.specializations[activeSpec]) {
+          const spec = family.specializations[activeSpec];
+          html += `<div class="class-picker-finals">
+            ${spec.classes.map(cls => `
+              <button type="button" class="final-class-btn ${selectedClass === cls ? 'active' : ''}"
+                      data-class="${cls}">${cls}</button>
+            `).join('')}
+          </div>`;
+        }
+      }
+
+      // Show selected class
+      if (selectedClass) {
+        html += `<div class="class-picker-selected">Selected: <strong>${selectedClass}</strong></div>`;
+      }
+
+      container.innerHTML = html;
+
+      // Attach events
+      container.querySelectorAll('.class-family-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const familyKey = btn.dataset.family;
+          if (expandedFamily === familyKey) {
+            expandedFamily = null;
+            activeSpec = null;
+          } else {
+            expandedFamily = familyKey;
+            activeSpec = null;
+          }
+          // Don't clear selection when browsing families
+          render();
+        });
+      });
+
+      container.querySelectorAll('.specialization-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const specKey = btn.dataset.spec;
+          activeSpec = activeSpec === specKey ? null : specKey;
+          render();
+        });
+      });
+
+      container.querySelectorAll('.final-class-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedClass = btn.dataset.class;
+          hiddenInput.value = selectedClass;
+          render();
+        });
+      });
+    };
+
+    render();
+  },
+
   showAddPlayerModal() {
     const isAdmin = dataService.isAdmin();
     const currentUser = dataService.getUser();
@@ -733,11 +843,9 @@ export const PlayersPage = {
             <div id="account-buttons-container"></div>
           </div>
           <div class="form-group">
-            <label for="player-class">Class:</label>
-            <select id="player-class">
-              <option value="">Select a class...</option>
-              ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
-            </select>
+            <label>Class:</label>
+            <input type="hidden" id="player-class" value="">
+            <div class="class-picker" id="class-picker"></div>
           </div>
           <div class="form-group">
             <label for="player-weapon">
@@ -800,6 +908,9 @@ export const PlayersPage = {
     `;
 
     document.body.appendChild(modalElement);
+
+    // Initialize class picker
+    this.renderClassPicker('class-picker', 'player-class', '');
 
     // Initialize account buttons - default to Account 1 selected
     const selectedOwnerId = isAdmin
@@ -918,11 +1029,9 @@ export const PlayersPage = {
             <div id="edit-account-buttons-container"></div>
           </div>
           <div class="form-group">
-            <label for="edit-player-class">Class:</label>
-            <select id="edit-player-class">
-              <option value="">Select a class...</option>
-              ${CLASSES.map(cls => `<option value="${cls}" ${player.role === cls ? 'selected' : ''}>${cls}</option>`).join('')}
-            </select>
+            <label>Class:</label>
+            <input type="hidden" id="edit-player-class" value="${player.role || ''}">
+            <div class="class-picker" id="edit-class-picker"></div>
           </div>
           <div class="form-group">
             <label for="edit-player-weapon">
@@ -986,6 +1095,9 @@ export const PlayersPage = {
     `;
 
     document.body.appendChild(modalElement);
+
+    // Initialize class picker with current class
+    this.renderClassPicker('edit-class-picker', 'edit-player-class', player.role || '');
 
     // Initialize account buttons with player's current account selected (default to 1 if not set)
     const editMaxAccount = player.discordId ? Math.max(1, maxAccount, player.accountNumber || 1) : 1;

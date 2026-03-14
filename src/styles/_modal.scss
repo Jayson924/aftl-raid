@@ -260,6 +260,55 @@
     }
   }
 
+  .class-picker {
+    .modal-class-family-filter,
+    .modal-specialization-filter {
+      margin-bottom: 0.5rem;
+    }
+  }
+
+  .class-picker-finals {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+
+    .final-class-btn {
+      padding: 0.4rem 0.75rem;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: $border-radius;
+      background-color: rgba(100, 100, 100, 0.25);
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        background-color: rgba(120, 120, 120, 0.35);
+        color: rgba(255, 255, 255, 0.9);
+      }
+
+      &.active {
+        border-color: $success-color;
+        background-color: rgba(40, 167, 69, 0.3);
+        color: #fff;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .class-picker-selected {
+    text-align: center;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+
+    strong {
+      color: $success-color;
+    }
+  }
+
   .modal-hide-cleared-filter {
     display: flex;
     align-items: center;

@@ -20,7 +20,10 @@ export const CLASSES = [
   'Gear Master',
   'Adept',
   'Physician',
-  'Screamer'
+  'Dark Summoner',
+  'Soul Eater',
+  'Blade Dancer',
+  'Spirit Dancer'
 ];
 
 // Damage amplification sources - each source only counts once even if multiple classes provide it
@@ -90,7 +93,7 @@ export const DAMAGE_AMP_SOURCES = {
     name: 'Summon Puppet',
     physical: 18,
     magic: 18,
-    classes: ['Screamer']
+    classes: ['Dark Summoner', 'Soul Eater']
   },
   destroyer: {
     name: 'Flying Swing',
@@ -190,6 +193,23 @@ export const CLASS_FAMILIES = {
         name: 'Alchemist',
         icon: 'Alchemist.png',
         classes: ['Physician', 'Adept']
+      }
+    }
+  },
+  kali: {
+    name: 'Kali',
+    icon: 'kali.png',
+    classes: ['Dark Summoner', 'Soul Eater', 'Blade Dancer', 'Spirit Dancer'],
+    specializations: {
+      screamer: {
+        name: 'Screamer',
+        icon: 'screamer.png',
+        classes: ['Dark Summoner', 'Soul Eater']
+      },
+      dancer: {
+        name: 'Dancer',
+        icon: 'screamer.png',
+        classes: ['Blade Dancer', 'Spirit Dancer']
       }
     }
   }
