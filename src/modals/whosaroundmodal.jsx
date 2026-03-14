@@ -217,7 +217,10 @@ export function generateOptimalLineup(aroundDiscordIds, players, currentLineup) 
     }
 
     const totalScore = scoreLineup(lineup, currentLineup);
-    if (totalScore > bestRealScore) {
+    // Tiebreaker: prefer tanks in priority order (Guardian > Crusader > Destroyer)
+    const seedPriority = TANK_CLASSES.indexOf(seed.role);
+    const bestSeedPriority = bestRealLineup ? TANK_CLASSES.indexOf(bestRealLineup[0].role) : 999;
+    if (totalScore > bestRealScore || (totalScore === bestRealScore && seedPriority !== -1 && seedPriority < bestSeedPriority)) {
       bestRealScore = totalScore;
       bestRealLineup = lineup;
     }
