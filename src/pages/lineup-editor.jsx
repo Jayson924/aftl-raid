@@ -142,16 +142,24 @@ export const LineupEditorPage = {
               </div>
               <div class="lineup-actions">
                 <div class="lineup-actions-primary">
-                  <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
-                  <label class="toggle-cleared">
-                    <input type="checkbox" id="cleared-toggle">
-                    <span>Cleared</span>
-                  </label>
+                  <span class="action-side">
+                    <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
+                  </span>
+                  <span class="action-side">
+                    <label class="toggle-cleared">
+                      <input type="checkbox" id="cleared-toggle">
+                      <span>Cleared</span>
+                    </label>
+                  </span>
                 </div>
                 <div class="lineup-actions-secondary">
-                  <button id="clear-slots-btn" class="btn btn-ghost">Clear Slots</button>
+                  <span class="action-side">
+                    <button id="clear-slots-btn" class="btn btn-ghost">Clear Slots</button>
+                  </span>
                   <span class="actions-divider"></span>
-                  <button id="new-lineup-btn" class="btn btn-ghost">New Lineup</button>
+                  <span class="action-side">
+                    <button id="new-lineup-btn" class="btn btn-ghost">New Lineup</button>
+                  </span>
                 </div>
               </div>
               <div class="existing-lineups-section">

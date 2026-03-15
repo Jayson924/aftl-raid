@@ -664,19 +664,10 @@
     .lineup-actions {
       gap: 0.5rem;
 
-      .lineup-actions-primary {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-
-        .btn {
+      .lineup-actions-primary,
+      .lineup-actions-secondary {
+        .action-side {
           flex: 1;
-          min-width: 100px;
-        }
-
-        .toggle-cleared {
-          width: 100%;
-          order: -1;
-          justify-content: center;
         }
       }
     }

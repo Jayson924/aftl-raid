@@ -450,30 +450,36 @@
       margin-top: 1rem;
       align-items: center;
 
-      .lineup-actions-primary {
-        display: flex;
-        gap: 1rem;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-
-        .btn {
-          flex: 1;
-          max-width: 200px;
-        }
+      .actions-divider {
+        width: 1px;
+        height: 1rem;
+        background-color: rgba(255, 255, 255, 0.15);
+        margin: 0 0.75rem;
       }
 
+      .lineup-actions-primary,
       .lineup-actions-secondary {
         display: flex;
-        gap: 0.25rem;
         justify-content: center;
         align-items: center;
+        gap: 1rem;
 
-        .actions-divider {
-          width: 1px;
-          height: 1rem;
-          background-color: rgba(255, 255, 255, 0.15);
-          margin: 0 0.25rem;
+        .action-side {
+          flex: 1;
+          display: flex;
+          align-items: center;
+
+          &:first-child {
+            justify-content: flex-end;
+          }
+
+          &:last-child {
+            justify-content: flex-start;
+          }
+
+          > * {
+            flex-shrink: 0;
+          }
         }
       }
 
