@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS } from '../constants.js';
 import { modal } from '../modal.js';
 
 export const PlayersPage = {
@@ -54,6 +54,9 @@ export const PlayersPage = {
 
   // Filter for prioritizing uncleared raids { hc: boolean, cl: boolean }
   _raidPriorityFilter: { hc: false, cl: false },
+
+  // Equipment column sort: null, 'weapon', or 'armor'
+  _equipmentSort: null,
 
   // Class family filter state
   _selectedClassFamily: null,
@@ -194,6 +197,21 @@ export const PlayersPage = {
   },
 
   // Sort players by raid priority filter, then alphabetically
+  // Get a numeric score for equipment for sorting (higher = better)
+  _getEquipmentScore(player, type) {
+    const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
+    const levelKey = type === 'weapon' ? 'weaponLevel' : 'armorLevel';
+    const enhanceKey = type === 'weapon' ? 'weaponEnhance' : 'armorEnhance';
+
+    const rarityOrder = { 'legend': 3, 'unique': 2, 'epic': 1, '': 0 };
+    const rarity = rarityOrder[player[rarityKey] || ''] || 0;
+    const level = player[levelKey] ? parseInt(player[levelKey]) : 0;
+    const enhance = parseInt(player[enhanceKey] || '0') || 0;
+
+    // Weighted: rarity is most important, then level, then enhancement
+    return rarity * 10000 + level * 100 + enhance;
+  },
+
   sortPlayersByRaidPriority(players) {
     return [...players].sort((a, b) => {
       const hasFilter = this._raidPriorityFilter.hc || this._raidPriorityFilter.cl;
@@ -220,6 +238,13 @@ export const PlayersPage = {
         // Uncleared (needs raid) comes first
         if (aNeeds && !bNeeds) return -1;
         if (!aNeeds && bNeeds) return 1;
+      }
+
+      // Equipment sort (highest to lowest)
+      if (this._equipmentSort) {
+        const aScore = this._getEquipmentScore(a, this._equipmentSort);
+        const bScore = this._getEquipmentScore(b, this._equipmentSort);
+        if (aScore !== bScore) return bScore - aScore;
       }
 
       // Then sort alphabetically
@@ -306,6 +331,16 @@ export const PlayersPage = {
 
       // Add event listeners for class family filter
       this.attachClassFilterListeners();
+
+      // Add click listeners for sortable column headers
+      document.querySelectorAll('.sortable-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const sortType = header.dataset.sort;
+          // Toggle off if already active, otherwise activate
+          this._equipmentSort = this._equipmentSort === sortType ? null : sortType;
+          this.loadPlayers();
+        });
+      });
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading characters: ${error.message}</div>`;
     }
@@ -328,8 +363,8 @@ export const PlayersPage = {
             <th>Name</th>
             <th>Owner</th>
             <th>Class</th>
-            <th>Weapon</th>
-            <th>Armor</th>
+            <th class="sortable-header ${this._equipmentSort === 'weapon' ? 'sort-active' : ''}" data-sort="weapon">Weapon ${this._equipmentSort === 'weapon' ? '▼' : ''}</th>
+            <th class="sortable-header ${this._equipmentSort === 'armor' ? 'sort-active' : ''}" data-sort="armor">Armor ${this._equipmentSort === 'armor' ? '▼' : ''}</th>
             <th>Raids Needed</th>
             <th>Notes</th>
           </tr>
@@ -386,16 +421,16 @@ export const PlayersPage = {
               <td data-label="Class">${player.role}</td>
               <td data-label="Weapon">
                 ${player.weapon ? `
-                  <span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
+                  <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
+                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                   </span>
                   ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                 ` : '-'}
               </td>
               <td data-label="Armor">
                 ${player.armor ? `
-                  <span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
+                  <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
+                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                   </span>
                 ` : '-'}
               </td>
@@ -586,16 +621,16 @@ export const PlayersPage = {
               <td data-label="Class">${player.role}</td>
               <td data-label="Weapon">
                 ${player.weapon ? `
-                  <span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
+                  <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
+                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                   </span>
                   ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                 ` : '-'}
               </td>
               <td data-label="Armor">
                 ${player.armor ? `
-                  <span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
+                  <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
+                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                   </span>
                 ` : '-'}
               </td>
@@ -695,6 +730,35 @@ export const PlayersPage = {
 
     const selected = container.querySelector('.account-btn.selected');
     return selected ? parseInt(selected.dataset.account) : null;
+  },
+
+  // Initialize level toggle buttons (show/hide based on rarity, handle clicks)
+  initLevelToggles(selectId, groupId) {
+    const raritySelect = document.getElementById(selectId);
+    const levelGroup = document.getElementById(groupId);
+    if (!raritySelect || !levelGroup) return;
+
+    // Show/hide on rarity change
+    raritySelect.addEventListener('change', () => {
+      const val = raritySelect.value;
+      levelGroup.style.display = (val === 'unique' || val === 'legend') ? 'flex' : 'none';
+    });
+
+    // Handle toggle button clicks
+    levelGroup.querySelectorAll('.level-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        levelGroup.querySelectorAll('.level-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  },
+
+  // Get selected level from a level toggle group
+  getSelectedLevel(groupId) {
+    const group = document.getElementById(groupId);
+    if (!group) return '50';
+    const active = group.querySelector('.level-toggle-btn.active');
+    return active ? active.dataset.level : '50';
   },
 
   // Render class picker (base class icons → specializations → final classes)
@@ -859,19 +923,24 @@ export const PlayersPage = {
                   </option>
                 `).join('')}
               </select>
+              <div class="level-toggle-group" id="weapon-level-group" style="display: none;">
+                ${EQUIPMENT_LEVELS.map(level => `
+                  <button type="button" class="level-toggle-btn ${level.value === '50' ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
+                `).join('')}
+              </div>
               <select id="player-weapon-enhance" class="equipment-select enhancement-select">
                 ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}">${level.label}</option>
+                  <option value="${level.value}" ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
                 `).join('')}
               </select>
               <select id="player-suffix1" class="equipment-select">
                 ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}">${suffix.label}</option>
+                  <option value="${suffix.value}" ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
                 `).join('')}
               </select>
               <select id="player-suffix2" class="equipment-select">
                 ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}">${suffix.label}</option>
+                  <option value="${suffix.value}" ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
                 `).join('')}
               </select>
             </div>
@@ -888,9 +957,14 @@ export const PlayersPage = {
                   </option>
                 `).join('')}
               </select>
+              <div class="level-toggle-group" id="armor-level-group" style="display: none;">
+                ${EQUIPMENT_LEVELS.map(level => `
+                  <button type="button" class="level-toggle-btn ${level.value === '50' ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
+                `).join('')}
+              </div>
               <select id="player-armor-enhance" class="equipment-select enhancement-select">
                 ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}">${level.label}</option>
+                  <option value="${level.value}" ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
                 `).join('')}
               </select>
             </div>
@@ -919,6 +993,10 @@ export const PlayersPage = {
     const initialMax = selectedOwnerId ? Math.max(1, this.getMaxAccountForOwner(selectedOwnerId)) : 1;
     this.renderAccountButtons('account-buttons-container', 1, initialMax);
 
+    // Initialize equipment level toggles
+    this.initLevelToggles('player-weapon', 'weapon-level-group');
+    this.initLevelToggles('player-armor', 'armor-level-group');
+
     // Update account buttons when owner changes (admin only)
     if (isAdmin) {
       const ownerSelect = document.getElementById('player-owner');
@@ -940,6 +1018,8 @@ export const PlayersPage = {
       const suffix2 = document.getElementById('player-suffix2').value;
       const armor = document.getElementById('player-armor').value;
       const armorEnhance = document.getElementById('player-armor-enhance').value;
+      const weaponLevel = this.getSelectedLevel('weapon-level-group');
+      const armorLevel = this.getSelectedLevel('armor-level-group');
       const notes = document.getElementById('player-notes').value;
       const accountNumber = this.getSelectedAccount('account-buttons-container');
 
@@ -959,10 +1039,12 @@ export const PlayersPage = {
           role,
           weapon,
           weaponEnhance,
+          weaponLevel: (weapon === 'unique' || weapon === 'legend') ? weaponLevel : null,
           suffix1,
           suffix2,
           armor,
           armorEnhance,
+          armorLevel: (armor === 'unique' || armor === 'legend') ? armorLevel : null,
           notes,
           accountNumber: accountNumber || 1
         });
@@ -1045,19 +1127,24 @@ export const PlayersPage = {
                   </option>
                 `).join('')}
               </select>
+              <div class="level-toggle-group" id="edit-weapon-level-group" style="display: ${player.weapon === 'unique' || player.weapon === 'legend' ? 'flex' : 'none'};">
+                ${EQUIPMENT_LEVELS.map(level => `
+                  <button type="button" class="level-toggle-btn ${(player.weaponLevel || '50') === level.value ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
+                `).join('')}
+              </div>
               <select id="edit-player-weapon-enhance" class="equipment-select enhancement-select">
                 ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}" ${player.weaponEnhance === level.value ? 'selected' : ''}>${level.label}</option>
+                  <option value="${level.value}" ${player.weaponEnhance === level.value ? 'selected' : ''} ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
                 `).join('')}
               </select>
               <select id="edit-player-suffix1" class="equipment-select">
                 ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}" ${player.suffix1 === suffix.value ? 'selected' : ''}>${suffix.label}</option>
+                  <option value="${suffix.value}" ${player.suffix1 === suffix.value ? 'selected' : ''} ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
                 `).join('')}
               </select>
               <select id="edit-player-suffix2" class="equipment-select">
                 ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}" ${player.suffix2 === suffix.value ? 'selected' : ''}>${suffix.label}</option>
+                  <option value="${suffix.value}" ${player.suffix2 === suffix.value ? 'selected' : ''} ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
                 `).join('')}
               </select>
             </div>
@@ -1074,9 +1161,14 @@ export const PlayersPage = {
                   </option>
                 `).join('')}
               </select>
+              <div class="level-toggle-group" id="edit-armor-level-group" style="display: ${player.armor === 'unique' || player.armor === 'legend' ? 'flex' : 'none'};">
+                ${EQUIPMENT_LEVELS.map(level => `
+                  <button type="button" class="level-toggle-btn ${(player.armorLevel || '50') === level.value ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
+                `).join('')}
+              </div>
               <select id="edit-player-armor-enhance" class="equipment-select enhancement-select">
                 ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}" ${player.armorEnhance === level.value ? 'selected' : ''}>${level.label}</option>
+                  <option value="${level.value}" ${player.armorEnhance === level.value ? 'selected' : ''} ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
                 `).join('')}
               </select>
             </div>
@@ -1103,6 +1195,10 @@ export const PlayersPage = {
     const editMaxAccount = player.discordId ? Math.max(1, maxAccount, player.accountNumber || 1) : 1;
     this.renderAccountButtons('edit-account-buttons-container', player.accountNumber || 1, editMaxAccount);
 
+    // Initialize equipment level toggles for edit modal
+    this.initLevelToggles('edit-player-weapon', 'edit-weapon-level-group');
+    this.initLevelToggles('edit-player-armor', 'edit-armor-level-group');
+
     // Update account buttons when owner changes (admin only)
     if (isAdmin) {
       const ownerSelect = document.getElementById('edit-player-owner');
@@ -1124,6 +1220,8 @@ export const PlayersPage = {
       const suffix2 = document.getElementById('edit-player-suffix2').value;
       const armor = document.getElementById('edit-player-armor').value;
       const armorEnhance = document.getElementById('edit-player-armor-enhance').value;
+      const weaponLevel = this.getSelectedLevel('edit-weapon-level-group');
+      const armorLevel = this.getSelectedLevel('edit-armor-level-group');
       const notes = document.getElementById('edit-player-notes').value;
       const accountNumber = this.getSelectedAccount('edit-account-buttons-container');
 
@@ -1148,10 +1246,12 @@ export const PlayersPage = {
           role,
           weapon,
           weaponEnhance,
+          weaponLevel: (weapon === 'unique' || weapon === 'legend') ? weaponLevel : null,
           suffix1,
           suffix2,
           armor,
           armorEnhance,
+          armorLevel: (armor === 'unique' || armor === 'legend') ? armorLevel : null,
           notes,
           accountNumber: accountNumber || 1
         }, player.name);

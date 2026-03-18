@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText } from '../constants.js';
 import { showWhosAroundModal } from '../modals/whosaroundmodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
@@ -706,9 +706,6 @@ export const LineupEditorPage = {
 
     const playerCards = filteredPlayers.map(player => {
       const isInLineup = this.currentLineup.players.includes(player.name);
-      const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-      const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
       // Check completion status based on CURRENT lineup's raid type
       // In Next Week mode, treat all players as needing the raid (ignore current completion status)
       const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
@@ -735,14 +732,10 @@ export const LineupEditorPage = {
       }
 
       const equipmentDisplay = [];
-      if (player.weapon) {
-        const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
-        equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
-      }
-      if (player.armor) {
-        const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
-        equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
-      }
+      const weaponEquip = formatEquipmentText('weapon', player);
+      if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
+      const armorEquip = formatEquipmentText('armor', player);
+      if (armorEquip) equipmentDisplay.push(armorEquip.html);
 
       const suffixDisplay = [];
       if (player.suffix1) {
@@ -1303,20 +1296,14 @@ export const LineupEditorPage = {
       `;
 
       playerList.innerHTML = addGuestCard + filteredPlayers.map(player => {
-        const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-        const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
         // In Next Week mode, treat all players as needing the raid
         const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
         const equipmentDisplay = [];
-        if (player.weapon) {
-          const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
-          equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
-        }
-        if (player.armor) {
-          const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
-          equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
-        }
+        const weaponEquip = formatEquipmentText('weapon', player);
+        if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
+        const armorEquip = formatEquipmentText('armor', player);
+        if (armorEquip) equipmentDisplay.push(armorEquip.html);
 
         const suffixDisplay = [];
         if (player.suffix1) {
@@ -1707,18 +1694,11 @@ export const LineupEditorPage = {
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
 
-    const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-    const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
     const equipmentDisplay = [];
-    if (player.weapon) {
-      const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
-      equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
-    }
-    if (player.armor) {
-      const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
-      equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
-    }
+    const weaponEquip = formatEquipmentText('weapon', player);
+    if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
+    const armorEquip = formatEquipmentText('armor', player);
+    if (armorEquip) equipmentDisplay.push(armorEquip.html);
 
     const suffixDisplay = [];
     if (player.suffix1) {

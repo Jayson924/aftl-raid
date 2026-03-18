@@ -20,17 +20,67 @@
     vertical-align: middle;
     flex-shrink: 0;
   }
+
+  &.level-40 {
+    // Only dim on player cards (lineup editor/lineups), not in character tables
+    .player-card &,
+    .player-slot &,
+    .player-equipment &,
+    .player-equipment-compact & {
+      opacity: 0.6;
+    }
+  }
+}
+
+.equip-level-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  vertical-align: middle;
+  letter-spacing: 0.3px;
 }
 
 .equipment-row {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 
   .equipment-select {
     flex: 1;
 
     &.enhancement-select {
       flex: 0 0 100px;
+    }
+  }
+}
+
+.level-toggle-group {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+
+  .level-toggle-btn {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    &.active {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.95);
     }
   }
 }
@@ -59,6 +109,20 @@
   gap: 0.5rem;
   margin-top: 0.25rem;
   font-size: 0.85rem;
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+
+  &.sort-active {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
 }
 
 .player-suffixes {

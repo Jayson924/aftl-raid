@@ -2,7 +2,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText } from '../constants.js';
 import moment from 'moment';
 
 export const LineupsPage = {
@@ -408,18 +408,11 @@ export const LineupsPage = {
               `;
             }
 
-            const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-            const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
             const equipmentDisplay = [];
-            if (player.weapon) {
-              const weaponText = `${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}`;
-              equipmentDisplay.push(`<span class="equipment-item" style="color: ${weaponRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.weapon} ${weaponText}</span>`);
-            }
-            if (player.armor) {
-              const armorText = `${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}`;
-              equipmentDisplay.push(`<span class="equipment-item" style="color: ${armorRarity?.color || 'inherit'}">${EQUIPMENT_ICONS.armor} ${armorText}</span>`);
-            }
+            const weaponEquip = formatEquipmentText('weapon', player);
+            if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
+            const armorEquip = formatEquipmentText('armor', player);
+            if (armorEquip) equipmentDisplay.push(armorEquip.html);
 
             const suffixDisplay = [];
             if (player.suffix1) {

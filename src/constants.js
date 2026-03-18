@@ -223,9 +223,15 @@ export const EQUIPMENT_RARITIES = [
   { value: 'legend', label: 'Legend', color: '#d62d49' }
 ];
 
+// Equipment levels (for unique/legend rarity)
+export const EQUIPMENT_LEVELS = [
+  { value: '50', label: 'Lv50' },
+  { value: '40', label: 'Lv40' }
+];
+
 // Enhancement levels
 export const ENHANCEMENT_LEVELS = [
-  { value: '', label: 'None' },
+  { value: '', label: '+9' },
   { value: '9', label: '+9' },
   { value: '10', label: '+10' },
   { value: '11', label: '+11' },
@@ -237,7 +243,7 @@ export const ENHANCEMENT_LEVELS = [
 
 // Weapon suffixes
 export const WEAPON_SUFFIXES = [
-  { value: '', label: 'None' },
+  { value: '', label: 'Suffix' },
   { value: 'darkness', label: 'Darkness' },
   { value: 'destruction', label: 'Destruction' },
   { value: 'fire', label: 'Fire' },
@@ -252,6 +258,29 @@ export const WEAPON_SUFFIXES = [
   { value: 'vigor', label: 'Vigor' },
   { value: 'health', label: 'Health' }
 ];
+
+// Format equipment text with level badge for display
+export function formatEquipmentText(type, player) {
+  const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
+  const enhanceKey = type === 'weapon' ? 'weaponEnhance' : 'armorEnhance';
+  const levelKey = type === 'weapon' ? 'weaponLevel' : 'armorLevel';
+
+  if (!player[rarityKey]) return null;
+
+  const rarity = EQUIPMENT_RARITIES.find(r => r.value === player[rarityKey]);
+  const label = rarity?.label || player[rarityKey];
+  const color = rarity?.color || 'inherit';
+  const isHighRarity = player[rarityKey] === 'unique' || player[rarityKey] === 'legend';
+  const levelBadge = isHighRarity && player[levelKey] ? `<span class="equip-level-badge">Lv${player[levelKey]}</span> ` : '';
+  const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
+  const levelClass = player[levelKey] === '40' ? ' level-40' : '';
+
+  return {
+    html: `<span class="equipment-item${levelClass}" style="color: ${color}">${EQUIPMENT_ICONS[type]} ${levelBadge}${label}${enhance}</span>`,
+    color,
+    isLevel40: player[levelKey] === '40'
+  };
+}
 
 // SVG icons for equipment
 export const EQUIPMENT_ICONS = {

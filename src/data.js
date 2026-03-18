@@ -284,6 +284,8 @@ class DataService {
       suffix2: p.suffix2 || '',
       armor: p.armor || '',
       armorEnhance: p.armor_enhance || '',
+      weaponLevel: p.weapon_level || '',
+      armorLevel: p.armor_level || '',
       hardcoreCompleted: p.hardcore_completed || '',
       classicCompleted: p.classic_completed || '',
       classicTicketUsed: p.classic_ticket_used || '',
@@ -354,6 +356,8 @@ class DataService {
         suffix2: player.suffix2,
         armor: player.armor,
         armor_enhance: player.armorEnhance,
+        weapon_level: player.weaponLevel || null,
+        armor_level: player.armorLevel || null,
         hardcore_completed: player.hardcoreCompleted || null,
         classic_completed: player.classicCompleted || null,
         classic_ticket_used: player.classicTicketUsed || null,
@@ -380,6 +384,8 @@ class DataService {
       suffix2: player.suffix2,
       armor: player.armor,
       armor_enhance: player.armorEnhance,
+      weapon_level: (player.weapon === 'unique' || player.weapon === 'legend') ? (player.weaponLevel || null) : null,
+      armor_level: (player.armor === 'unique' || player.armor === 'legend') ? (player.armorLevel || null) : null,
       account_number: player.accountNumber || null
     });
 
