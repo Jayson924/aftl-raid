@@ -271,7 +271,7 @@ export function formatEquipmentText(type, player) {
   const label = rarity?.label || player[rarityKey];
   const color = rarity?.color || 'inherit';
   const isHighRarity = player[rarityKey] === 'unique' || player[rarityKey] === 'legend';
-  const levelBadge = isHighRarity && player[levelKey] ? `<span class="equip-level-badge">Lv${player[levelKey]}</span> ` : '';
+  const levelBadge = isHighRarity && player[levelKey] ? `<span class="equip-level-badge ${player[levelKey] === '50' ? 'level-50' : ''}" style="background: ${color}25; border: 1px solid ${color}40;">Lv${player[levelKey]}</span> ` : '';
   const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
   const levelClass = player[levelKey] === '40' ? ' level-40' : '';
 

@@ -422,7 +422,7 @@ export const PlayersPage = {
               <td data-label="Weapon">
                 ${player.weapon ? `
                   <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
+                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                   </span>
                   ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                 ` : '-'}
@@ -430,7 +430,7 @@ export const PlayersPage = {
               <td data-label="Armor">
                 ${player.armor ? `
                   <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
+                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                   </span>
                 ` : '-'}
               </td>
@@ -622,7 +622,7 @@ export const PlayersPage = {
               <td data-label="Weapon">
                 ${player.weapon ? `
                   <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
+                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                   </span>
                   ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                 ` : '-'}
@@ -630,7 +630,7 @@ export const PlayersPage = {
               <td data-label="Armor">
                 ${player.armor ? `
                   <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
+                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                   </span>
                 ` : '-'}
               </td>
