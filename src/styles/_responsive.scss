@@ -215,6 +215,20 @@
 
   // Players Page - Convert table to cards on mobile
   .players-page {
+    .roster-content {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .roster-chart-container {
+      width: 220px;
+      min-width: 220px;
+    }
+
+    .roster-breakdown {
+      width: 100%;
+    }
+
     .page-header {
       flex-direction: column;
       align-items: flex-start;

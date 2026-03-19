@@ -3,6 +3,9 @@ import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS } from '../constants.js';
 import { modal } from '../modal.js';
+import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
+
+Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
 export const PlayersPage = {
   // Cache for app users (for owner dropdown)
@@ -10,6 +13,22 @@ export const PlayersPage = {
 
   // Group by owner toggle state (persisted in localStorage)
   _groupByOwner: localStorage.getItem('playersGroupByOwner') === 'true',
+
+  // View mode: 'characters' or 'roster'
+  _viewMode: 'characters',
+
+  // Chart instance reference
+  _chartInstance: null,
+
+  // Class family colors for chart
+  _classFamilyColors: {
+    warrior: '#F08A46',
+    archer: '#A8F274',
+    sorceress: '#DF69FF',
+    cleric: '#6CC9EB',
+    academic: '#F7DA6F',
+    kali: '#756EFF'
+  },
 
   // Check if current user can edit a player (using Discord-linked ownership)
   canEditCharacter(player) {
@@ -20,14 +39,18 @@ export const PlayersPage = {
     container.innerHTML = `
       <div class="players-page">
         <div class="page-header">
-          <h1>Characters</h1>
+          <div class="page-title-tabs">
+            <h1 class="view-tab ${this._viewMode === 'characters' ? 'active' : ''}" data-view="characters">Characters</h1>
+            <span class="title-divider">/</span>
+            <h1 class="view-tab ${this._viewMode === 'roster' ? 'active' : ''}" data-view="roster">Roster</h1>
+          </div>
           <div class="page-header-actions">
-            <label class="toggle-switch">
+            <label class="toggle-switch" id="group-by-owner-wrapper" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>
               <input type="checkbox" id="group-by-owner-toggle" ${this._groupByOwner ? 'checked' : ''}>
               <span class="toggle-slider"></span>
               <span class="toggle-label">Group by owner</span>
             </label>
-            <button id="add-player-btn" class="btn btn-primary">+ Add Character</button>
+            <button id="add-player-btn" class="btn btn-primary" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>+ Add Character</button>
           </div>
         </div>
         <div id="players-list" class="players-list">
@@ -44,6 +67,19 @@ export const PlayersPage = {
       this._groupByOwner = e.target.checked;
       localStorage.setItem('playersGroupByOwner', this._groupByOwner);
       this.loadPlayers();
+    });
+
+    // View tab listeners
+    document.querySelectorAll('.view-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        this._viewMode = tab.dataset.view;
+        document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === this._viewMode));
+        // Show/hide character-specific controls
+        const isRoster = this._viewMode === 'roster';
+        document.getElementById('group-by-owner-wrapper').style.display = isRoster ? 'none' : '';
+        document.getElementById('add-player-btn').style.display = isRoster ? 'none' : '';
+        this.loadPlayers();
+      });
     });
 
     this.loadPlayers();
@@ -252,6 +288,15 @@ export const PlayersPage = {
     });
   },
 
+  // Check if a character is "geared" (+11 unique weapon or above)
+  isGeared(player) {
+    const rarityOrder = { 'legend': 3, 'unique': 2, 'epic': 1, '': 0 };
+    const weaponRarity = rarityOrder[player.weapon || ''] || 0;
+    const weaponEnhance = parseInt(player.weaponEnhance || '0') || 0;
+    // Unique +11 or above (includes legend at any enhance)
+    return (weaponRarity === 2 && weaponEnhance >= 11) || weaponRarity >= 3;
+  },
+
   async loadPlayers() {
     const listElement = document.getElementById('players-list');
 
@@ -282,6 +327,12 @@ export const PlayersPage = {
       }
 
       const hasAnyEditableCharacters = players.some(p => this.canEditCharacter(p));
+
+      // Render based on view mode
+      if (this._viewMode === 'roster') {
+        this.renderRosterView(listElement, players, userMap);
+        return;
+      }
 
       // Render based on toggle state
       if (this._groupByOwner) {
@@ -343,6 +394,215 @@ export const PlayersPage = {
       });
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading characters: ${error.message}</div>`;
+    }
+  },
+
+  renderRosterView(listElement, players, userMap) {
+    // Destroy previous chart instance
+    if (this._chartInstance) {
+      this._chartInstance.destroy();
+      this._chartInstance = null;
+    }
+
+    const gearedPlayers = players.filter(p => this.isGeared(p));
+    const totalPlayers = players.length;
+
+    // Count unique owners with at least one geared character
+    const gearedOwners = new Set(gearedPlayers.map(p => p.discordId || p.id));
+    const gearedCount = gearedOwners.size;
+    const totalOwners = new Set(players.map(p => p.discordId || p.id)).size;
+
+    // Format equipment as plain text for tooltips (e.g. "Lv50 Unique +12")
+    const formatEquipText = (player, type) => {
+      const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
+      const enhanceKey = type === 'weapon' ? 'weaponEnhance' : 'armorEnhance';
+      const levelKey = type === 'weapon' ? 'weaponLevel' : 'armorLevel';
+      if (!player[rarityKey]) return '-';
+      const rarity = EQUIPMENT_RARITIES.find(r => r.value === player[rarityKey]);
+      const label = rarity?.label || player[rarityKey];
+      const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
+      const isHighRarity = player[rarityKey] === 'unique' || player[rarityKey] === 'legend';
+      const level = isHighRarity && player[levelKey] ? `Lv${player[levelKey]} ` : '';
+      return `${level}${label}${enhance}`;
+    };
+
+    // Build tooltip HTML for a list of players, grouped by owner
+    const buildTooltipHtml = (clsPlayers) => {
+      // Group by owner
+      const byOwner = {};
+      clsPlayers.forEach(p => {
+        const ownerId = p.discordId || p.id;
+        if (!byOwner[ownerId]) byOwner[ownerId] = [];
+        byOwner[ownerId].push(p);
+      });
+
+      return Object.entries(byOwner).map(([ownerId, ownerPlayers]) => {
+        const owner = userMap[ownerId];
+        const ownerName = owner?.displayName || 'Unassigned';
+        const playerRows = ownerPlayers
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(p => `<div class="roster-tooltip-row"><span class="roster-tooltip-name">${p.name}</span> <span class="roster-tooltip-gear">${EQUIPMENT_ICONS.weapon} ${formatEquipText(p, 'weapon')} ${EQUIPMENT_ICONS.armor} ${formatEquipText(p, 'armor')}</span></div>`)
+          .join('');
+        return `<div class="roster-tooltip-owner">${ownerName}</div>${playerRows}`;
+      }).join('');
+    };
+
+    // Count unique owners per class family and per class
+    const familyCounts = {};
+    const familyPlayers = {}; // Unique owner counts per class
+    const familyPlayersList = {}; // Actual player objects per class
+    Object.entries(CLASS_FAMILIES).forEach(([key, family]) => {
+      const matching = gearedPlayers.filter(p => family.classes.includes(p.role));
+      // Count unique owners for this family
+      const familyOwners = new Set(matching.map(p => p.discordId || p.id));
+      familyCounts[key] = familyOwners.size;
+      // Track per individual class
+      const classCounts = {};
+      const classPlayers = {};
+      family.classes.forEach(cls => {
+        const clsPlayers = matching.filter(p => p.role === cls);
+        if (clsPlayers.length > 0) {
+          const classOwners = new Set(clsPlayers.map(p => p.discordId || p.id));
+          classCounts[cls] = classOwners.size;
+          classPlayers[cls] = clsPlayers;
+        }
+      });
+      familyPlayers[key] = classCounts;
+      familyPlayersList[key] = classPlayers;
+    });
+
+    // All classes that have 0 geared members
+    const allClasses = CLASSES;
+    const gearedClassSet = new Set(gearedPlayers.map(p => p.role));
+    const missingClasses = allClasses.filter(cls => !gearedClassSet.has(cls));
+
+    listElement.innerHTML = `
+      <div class="roster-view">
+        <div class="roster-summary">
+          <div class="roster-stat roster-stat-tip">
+            <span class="roster-stat-value">${gearedPlayers.length}</span>
+            <span class="roster-stat-label">Geared Characters</span>
+            <div class="roster-tooltip">${gearedOwners.size} player${gearedOwners.size !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="roster-stat roster-stat-tip">
+            <span class="roster-stat-value">${totalPlayers}</span>
+            <span class="roster-stat-label">Total Characters</span>
+            <div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+        <div class="roster-content">
+          <div class="roster-chart-container">
+            <canvas id="roster-chart"></canvas>
+            <div class="roster-chart-center">
+              <span class="roster-chart-center-value">${gearedPlayers.length}</span>
+              <span class="roster-chart-center-label">geared</span>
+            </div>
+          </div>
+          <div class="roster-breakdown">
+            <h3>Class Breakdown</h3>
+            ${Object.entries(CLASS_FAMILIES).map(([key, family]) => {
+              const count = familyCounts[key];
+              const classes = familyPlayers[key];
+              return `
+                <div class="roster-family ${count === 0 ? 'missing' : ''}">
+                  <div class="roster-family-header">
+                    <span class="roster-family-dot" style="background: ${this._classFamilyColors[key]}"></span>
+                    <span class="roster-family-icon-wrapper"><img src="/icons/${family.icon}" alt="${family.name}"></span>
+                    <span class="roster-family-name">${family.name}</span>
+                    <span class="roster-family-count">${count}</span>
+                  </div>
+                  ${Object.keys(classes).length > 0 ? `
+                    <div class="roster-class-list">
+                      ${Object.entries(classes).map(([cls, cnt]) => {
+                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span><div class="roster-tooltip">${buildTooltipHtml(familyPlayersList[key][cls] || [])}</div></span>`;
+                      }).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+        ${missingClasses.length > 0 ? `
+          <div class="roster-missing">
+            <h3>Missing Classes</h3>
+            <div class="roster-missing-list">
+              ${missingClasses.map(cls => `<span class="roster-missing-class">${cls}</span>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+        <div class="roster-criteria">Geared = Unique +11 weapon or above</div>
+      </div>
+    `;
+
+    // Toggle tooltip on click (for mobile)
+    const closeAllTooltips = () => {
+      document.querySelectorAll('.tooltip-active').forEach(el => el.classList.remove('tooltip-active'));
+    };
+
+    document.querySelectorAll('.roster-class-item, .roster-stat-tip').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wasActive = item.classList.contains('tooltip-active');
+        closeAllTooltips();
+        if (!wasActive) item.classList.add('tooltip-active');
+      });
+    });
+
+    // Close tooltips when tapping outside
+    document.addEventListener('click', closeAllTooltips);
+
+    // Create the doughnut chart
+    const chartData = Object.entries(CLASS_FAMILIES).map(([key, family]) => ({
+      label: family.name,
+      count: familyCounts[key],
+      color: this._classFamilyColors[key]
+    }));
+
+    // Only show families with members in the chart, plus a "gap" for missing
+    const labels = chartData.map(d => d.label);
+    const data = chartData.map(d => d.count);
+    const colors = chartData.map(d => d.color);
+
+    // If all zeros, show a placeholder
+    const hasData = data.some(d => d > 0);
+
+    const canvas = document.getElementById('roster-chart');
+    if (canvas) {
+      this._chartInstance = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: hasData ? labels : ['No geared characters'],
+          datasets: [{
+            data: hasData ? data : [1],
+            backgroundColor: hasData ? colors : ['rgba(255,255,255,0.1)'],
+            borderColor: 'rgba(0,0,0,0.3)',
+            borderWidth: 2,
+            hoverBorderColor: 'rgba(255,255,255,0.5)',
+            hoverBorderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          cutout: '65%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: hasData,
+              backgroundColor: 'rgba(30,30,30,0.95)',
+              titleColor: '#fff',
+              bodyColor: 'rgba(255,255,255,0.8)',
+              borderColor: 'rgba(255,255,255,0.2)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (ctx) => ` ${ctx.label}: ${ctx.raw} character${ctx.raw !== 1 ? 's' : ''}`
+              }
+            }
+          }
+        }
+      });
     }
   },
 
@@ -1321,6 +1581,13 @@ export const PlayersPage = {
       this.loadPlayers();
     } catch (error) {
       toast.error(`??? Hala ano yan error: ${error.message}`);
+    }
+  },
+
+  destroy() {
+    if (this._chartInstance) {
+      this._chartInstance.destroy();
+      this._chartInstance = null;
     }
   }
 };
