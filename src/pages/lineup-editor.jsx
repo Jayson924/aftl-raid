@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, calculateGearscore, getGearscoreTier } from '../constants.js';
 import { showWhosAroundModal } from '../modals/whosaroundmodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
@@ -758,7 +758,7 @@ export const LineupEditorPage = {
           ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           <div class="player-info">
-            <div class="player-name">${player.name}</div>
+            <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}</div>
             <div class="player-role">${player.role}</div>
             ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
             ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
@@ -1319,7 +1319,7 @@ export const LineupEditorPage = {
           <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
             ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
             <div class="player-info">
-              <div class="player-name">${player.name}</div>
+              <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}</div>
               <div class="player-role">${player.role}</div>
               ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
               ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
@@ -1720,7 +1720,7 @@ export const LineupEditorPage = {
 
     slotContent.innerHTML = `
       <div class="assigned-player">
-        <div class="player-name">${player.name}</div>
+        <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}</div>
         ${pilotDisplay}
         <div class="player-role">${player.role}</div>
         ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}

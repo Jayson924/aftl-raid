@@ -214,6 +214,14 @@
       font-size: 0.7rem;
     }
 
+    .roster-gs-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      margin-left: 0.1rem;
+    }
+
     &:hover .roster-tooltip,
     &.tooltip-active .roster-tooltip {
       opacity: 1;
@@ -262,6 +270,14 @@
   .roster-tooltip-name {
     color: $primary-color;
     font-weight: 600;
+  }
+
+  .roster-tooltip-gs {
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    min-width: 18px;
+    text-align: right;
   }
 
   .roster-tooltip-gear {
@@ -726,12 +742,13 @@
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
           // Fixed column widths for alignment across groups
-          &:nth-child(1) { width: 18%; } // Name
-          &:nth-child(2) { width: 12%; } // Class
-          &:nth-child(3) { width: 18%; } // Weapon
-          &:nth-child(4) { width: 14%; } // Armor
-          &:nth-child(5) { width: 14%; } // Raids Needed
-          &:nth-child(6) { width: 24%; } // Notes
+          &:nth-child(1) { width: 16%; } // Name
+          &:nth-child(2) { width: 11%; } // Class
+          &:nth-child(3) { width: 6%; }  // GS
+          &:nth-child(4) { width: 17%; } // Weapon
+          &:nth-child(5) { width: 13%; } // Armor
+          &:nth-child(6) { width: 13%; } // Raids Needed
+          &:nth-child(7) { width: 24%; } // Notes
         }
       }
     }
@@ -823,6 +840,20 @@
 
     tbody td {
       border-bottom: none;
+    }
+
+    .gs-cell {
+      .gs-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+
     }
 
     .player-name {

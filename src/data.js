@@ -384,8 +384,8 @@ class DataService {
       suffix2: player.suffix2,
       armor: player.armor,
       armor_enhance: player.armorEnhance,
-      weapon_level: (player.weapon === 'unique' || player.weapon === 'legend') ? (player.weaponLevel || null) : null,
-      armor_level: (player.armor === 'unique' || player.armor === 'legend') ? (player.armorLevel || null) : null,
+      weapon_level: player.weapon ? (player.weaponLevel || null) : null,
+      armor_level: player.armor ? (player.armorLevel || null) : null,
       account_number: player.accountNumber || null
     });
 

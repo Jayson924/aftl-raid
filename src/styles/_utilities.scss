@@ -33,6 +33,14 @@
   color: $text-muted;
 }
 
+// Inline gearscore badge (used across lineup editor, lineups, players)
+.gs-inline {
+  font-size: 0.75em;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-left: 0.2rem;
+}
+
 .settings-info {
   margin: 1rem 0;
 

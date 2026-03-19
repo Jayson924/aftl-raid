@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier } from '../constants.js';
 import { modal } from '../modal.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
@@ -276,8 +276,15 @@ export const PlayersPage = {
         if (!aNeeds && bNeeds) return 1;
       }
 
+      // Gearscore sort
+      if (this._equipmentSort === 'gs') {
+        const aGs = calculateGearscore(a);
+        const bGs = calculateGearscore(b);
+        if (aGs !== bGs) return bGs - aGs;
+      }
+
       // Equipment sort (highest to lowest)
-      if (this._equipmentSort) {
+      if (this._equipmentSort === 'weapon' || this._equipmentSort === 'armor') {
         const aScore = this._getEquipmentScore(a, this._equipmentSort);
         const bScore = this._getEquipmentScore(b, this._equipmentSort);
         if (aScore !== bScore) return bScore - aScore;
@@ -421,8 +428,8 @@ export const PlayersPage = {
       const rarity = EQUIPMENT_RARITIES.find(r => r.value === player[rarityKey]);
       const label = rarity?.label || player[rarityKey];
       const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
-      const isHighRarity = player[rarityKey] === 'unique' || player[rarityKey] === 'legend';
-      const level = isHighRarity && player[levelKey] ? `Lv${player[levelKey]} ` : '';
+      const hasLevel = !!player[rarityKey];
+      const level = hasLevel && player[levelKey] ? `Lv${player[levelKey]} ` : '';
       return `${level}${label}${enhance}`;
     };
 
@@ -441,7 +448,11 @@ export const PlayersPage = {
         const ownerName = owner?.displayName || 'Unassigned';
         const playerRows = ownerPlayers
           .sort((a, b) => a.name.localeCompare(b.name))
-          .map(p => `<div class="roster-tooltip-row"><span class="roster-tooltip-name">${p.name}</span> <span class="roster-tooltip-gear">${EQUIPMENT_ICONS.weapon} ${formatEquipText(p, 'weapon')} ${EQUIPMENT_ICONS.armor} ${formatEquipText(p, 'armor')}</span></div>`)
+          .map(p => {
+            const gs = calculateGearscore(p);
+            const tier = getGearscoreTier(gs);
+            return `<div class="roster-tooltip-row"><span class="roster-tooltip-name">${p.name}</span> <span class="roster-tooltip-gs" style="color: ${tier.color}">${gs}</span> <span class="roster-tooltip-gear">${EQUIPMENT_ICONS.weapon} ${formatEquipText(p, 'weapon')} ${EQUIPMENT_ICONS.armor} ${formatEquipText(p, 'armor')}</span></div>`;
+          })
           .join('');
         return `<div class="roster-tooltip-owner">${ownerName}</div>${playerRows}`;
       }).join('');
@@ -476,6 +487,12 @@ export const PlayersPage = {
     const gearedClassSet = new Set(gearedPlayers.map(p => p.role));
     const missingClasses = allClasses.filter(cls => !gearedClassSet.has(cls));
 
+    // Calculate average gearscore for geared players
+    const avgGearscore = gearedPlayers.length > 0
+      ? Math.round(gearedPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / gearedPlayers.length)
+      : 0;
+    const avgTier = getGearscoreTier(avgGearscore);
+
     listElement.innerHTML = `
       <div class="roster-view">
         <div class="roster-summary">
@@ -483,6 +500,10 @@ export const PlayersPage = {
             <span class="roster-stat-value">${gearedPlayers.length}</span>
             <span class="roster-stat-label">Geared Characters</span>
             <div class="roster-tooltip">${gearedOwners.size} player${gearedOwners.size !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="roster-stat">
+            <span class="roster-stat-value" style="color: ${avgTier.color}" title="Gearscore is experimental and may be tweaked">${avgGearscore}</span>
+            <span class="roster-stat-label">Avg Gearscore</span>
           </div>
           <div class="roster-stat roster-stat-tip">
             <span class="roster-stat-value">${totalPlayers}</span>
@@ -514,7 +535,12 @@ export const PlayersPage = {
                   ${Object.keys(classes).length > 0 ? `
                     <div class="roster-class-list">
                       ${Object.entries(classes).map(([cls, cnt]) => {
-                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span><div class="roster-tooltip">${buildTooltipHtml(familyPlayersList[key][cls] || [])}</div></span>`;
+                        const clsPlayers = familyPlayersList[key][cls] || [];
+                        const clsAvgGs = clsPlayers.length > 0
+                          ? Math.round(clsPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / clsPlayers.length)
+                          : 0;
+                        const clsTier = getGearscoreTier(clsAvgGs);
+                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span> <span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};" title="Gearscore is experimental and may be tweaked">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></span>`;
                       }).join('')}
                     </div>
                   ` : ''}
@@ -623,12 +649,14 @@ export const PlayersPage = {
             <th>Name</th>
             <th>Owner</th>
             <th>Class</th>
+            <th class="sortable-header ${this._equipmentSort === 'gs' ? 'sort-active' : ''}" data-sort="gs" title="Gearscore is experimental and may be tweaked">GS ${this._equipmentSort === 'gs' ? '▼' : ''}</th>
             <th class="sortable-header ${this._equipmentSort === 'weapon' ? 'sort-active' : ''}" data-sort="weapon">Weapon ${this._equipmentSort === 'weapon' ? '▼' : ''}</th>
             <th class="sortable-header ${this._equipmentSort === 'armor' ? 'sort-active' : ''}" data-sort="armor">Armor ${this._equipmentSort === 'armor' ? '▼' : ''}</th>
             <th>Raids Needed</th>
             <th>Notes</th>
           </tr>
           <tr class="filter-row">
+            <td></td>
             <td></td>
             <td></td>
             <td></td>
@@ -679,10 +707,13 @@ export const PlayersPage = {
                 ` : '<span class="no-owner">—</span>'}
               </td>
               <td data-label="Class">${player.role}</td>
+              <td class="gs-cell" data-label="GS">
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}
+              </td>
               <td data-label="Weapon">
                 ${player.weapon ? `
                   <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
+                    ${EQUIPMENT_ICONS.weapon} ${player.weapon && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                   </span>
                   ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                 ` : '-'}
@@ -690,7 +721,7 @@ export const PlayersPage = {
               <td data-label="Armor">
                 ${player.armor ? `
                   <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
+                    ${EQUIPMENT_ICONS.armor} ${player.armor && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                   </span>
                 ` : '-'}
               </td>
@@ -847,6 +878,7 @@ export const PlayersPage = {
           <tr>
             <th>Name</th>
             <th>Class</th>
+            <th>GS</th>
             <th>Weapon</th>
             <th>Armor</th>
             <th>Raids Needed</th>
@@ -879,10 +911,13 @@ export const PlayersPage = {
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
               </td>
               <td data-label="Class">${player.role}</td>
+              <td class="gs-cell" data-label="GS">
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}
+              </td>
               <td data-label="Weapon">
                 ${player.weapon ? `
                   <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${(player.weapon === 'unique' || player.weapon === 'legend') && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
+                    ${EQUIPMENT_ICONS.weapon} ${player.weapon && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
                   </span>
                   ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
                 ` : '-'}
@@ -890,7 +925,7 @@ export const PlayersPage = {
               <td data-label="Armor">
                 ${player.armor ? `
                   <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${(player.armor === 'unique' || player.armor === 'legend') && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
+                    ${EQUIPMENT_ICONS.armor} ${player.armor && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
                   </span>
                 ` : '-'}
               </td>
@@ -1001,7 +1036,7 @@ export const PlayersPage = {
     // Show/hide on rarity change
     raritySelect.addEventListener('change', () => {
       const val = raritySelect.value;
-      levelGroup.style.display = (val === 'unique' || val === 'legend') ? 'flex' : 'none';
+      levelGroup.style.display = val ? 'flex' : 'none';
     });
 
     // Handle toggle button clicks
@@ -1299,12 +1334,12 @@ export const PlayersPage = {
           role,
           weapon,
           weaponEnhance,
-          weaponLevel: (weapon === 'unique' || weapon === 'legend') ? weaponLevel : null,
+          weaponLevel: weapon ? weaponLevel : null,
           suffix1,
           suffix2,
           armor,
           armorEnhance,
-          armorLevel: (armor === 'unique' || armor === 'legend') ? armorLevel : null,
+          armorLevel: armor ? armorLevel : null,
           notes,
           accountNumber: accountNumber || 1
         });
@@ -1387,7 +1422,7 @@ export const PlayersPage = {
                   </option>
                 `).join('')}
               </select>
-              <div class="level-toggle-group" id="edit-weapon-level-group" style="display: ${player.weapon === 'unique' || player.weapon === 'legend' ? 'flex' : 'none'};">
+              <div class="level-toggle-group" id="edit-weapon-level-group" style="display: ${player.weapon ? 'flex' : 'none'};">
                 ${EQUIPMENT_LEVELS.map(level => `
                   <button type="button" class="level-toggle-btn ${(player.weaponLevel || '50') === level.value ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
                 `).join('')}
@@ -1421,7 +1456,7 @@ export const PlayersPage = {
                   </option>
                 `).join('')}
               </select>
-              <div class="level-toggle-group" id="edit-armor-level-group" style="display: ${player.armor === 'unique' || player.armor === 'legend' ? 'flex' : 'none'};">
+              <div class="level-toggle-group" id="edit-armor-level-group" style="display: ${player.armor ? 'flex' : 'none'};">
                 ${EQUIPMENT_LEVELS.map(level => `
                   <button type="button" class="level-toggle-btn ${(player.armorLevel || '50') === level.value ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
                 `).join('')}
@@ -1506,12 +1541,12 @@ export const PlayersPage = {
           role,
           weapon,
           weaponEnhance,
-          weaponLevel: (weapon === 'unique' || weapon === 'legend') ? weaponLevel : null,
+          weaponLevel: weapon ? weaponLevel : null,
           suffix1,
           suffix2,
           armor,
           armorEnhance,
-          armorLevel: (armor === 'unique' || armor === 'legend') ? armorLevel : null,
+          armorLevel: armor ? armorLevel : null,
           notes,
           accountNumber: accountNumber || 1
         }, player.name);

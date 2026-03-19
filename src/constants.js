@@ -223,7 +223,7 @@ export const EQUIPMENT_RARITIES = [
   { value: 'legend', label: 'Legend', color: '#d62d49' }
 ];
 
-// Equipment levels (for unique/legend rarity)
+// Equipment levels (for epic/unique/legend rarity)
 export const EQUIPMENT_LEVELS = [
   { value: '50', label: 'Lv50' },
   { value: '40', label: 'Lv40' }
@@ -237,8 +237,8 @@ export const ENHANCEMENT_LEVELS = [
   { value: '11', label: '+11' },
   { value: '12', label: '+12' },
   { value: '13', label: '+13' },
-  { value: '14', label: '+14' }
-
+  { value: '14', label: '+14' },
+  { value: '15', label: '+15' }
 ];
 
 // Weapon suffixes
@@ -259,6 +259,54 @@ export const WEAPON_SUFFIXES = [
   { value: 'health', label: 'Health' }
 ];
 
+// Gearscore calculation
+// Weighted 0-100 scale based on equipment rarity, level, enhancement, and suffixes
+export function calculateGearscore(player) {
+  // Weapon rarity points
+  const weaponRarityPoints = {
+    '': 0,
+    'epic': player.weaponLevel === '50' ? 5 : 3,
+    'unique': player.weaponLevel === '50' ? 15 : 10,
+    'legend': player.weaponLevel === '50' ? 22 : 18
+  };
+
+  // Armor rarity points
+  const armorRarityPoints = {
+    '': 0,
+    'epic': player.armorLevel === '50' ? 4 : 2,
+    'unique': player.armorLevel === '50' ? 12 : 8,
+    'legend': player.armorLevel === '50' ? 18 : 14
+  };
+
+  // Enhancement points (non-linear scaling, +15 is max)
+  const weaponEnhancePoints = { '': 5, '9': 5, '10': 9, '11': 13, '12': 18, '13': 22, '14': 26, '15': 30 };
+  const armorEnhancePoints = { '': 3, '9': 3, '10': 6, '11': 8, '12': 11, '13': 14, '14': 17, '15': 20 };
+
+  const weaponRarity = weaponRarityPoints[player.weapon || ''] || 0;
+  const armorRarity = armorRarityPoints[player.armor || ''] || 0;
+  const weaponEnhance = player.weapon ? (weaponEnhancePoints[player.weaponEnhance || ''] || 5) : 0;
+  const armorEnhance = player.armor ? (armorEnhancePoints[player.armorEnhance || ''] || 3) : 0;
+
+  // Suffix points: 5 each, max 2
+  const suffixCount = [player.suffix1, player.suffix2].filter(s => s && s !== '').length;
+  const suffixPoints = suffixCount * 5;
+
+  return weaponRarity + armorRarity + weaponEnhance + armorEnhance + suffixPoints;
+}
+
+// Gearscore tier thresholds and colors
+export const GEARSCORE_TIERS = [
+  { min: 60, label: 'S', color: '#d62d49', bg: 'rgba(214, 45, 73, 0.15)' },
+  { min: 45, label: 'A', color: '#8f5ce0', bg: 'rgba(143, 92, 224, 0.15)' },
+  { min: 30, label: 'B', color: '#ff9800', bg: 'rgba(255, 152, 0, 0.15)' },
+  { min: 15, label: 'C', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' },
+  { min: 0,  label: 'D', color: '#6c757d', bg: 'rgba(108, 117, 125, 0.15)' }
+];
+
+export function getGearscoreTier(score) {
+  return GEARSCORE_TIERS.find(t => score >= t.min) || GEARSCORE_TIERS[GEARSCORE_TIERS.length - 1];
+}
+
 // Format equipment text with level badge for display
 export function formatEquipmentText(type, player) {
   const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
@@ -270,8 +318,8 @@ export function formatEquipmentText(type, player) {
   const rarity = EQUIPMENT_RARITIES.find(r => r.value === player[rarityKey]);
   const label = rarity?.label || player[rarityKey];
   const color = rarity?.color || 'inherit';
-  const isHighRarity = player[rarityKey] === 'unique' || player[rarityKey] === 'legend';
-  const levelBadge = isHighRarity && player[levelKey] ? `<span class="equip-level-badge ${player[levelKey] === '50' ? 'level-50' : ''}" style="background: ${color}25; border: 1px solid ${color}40;">Lv${player[levelKey]}</span> ` : '';
+  const hasLevel = !!player[rarityKey];
+  const levelBadge = hasLevel && player[levelKey] ? `<span class="equip-level-badge ${player[levelKey] === '50' ? 'level-50' : ''}" style="background: ${color}25; border: 1px solid ${color}40;">Lv${player[levelKey]}</span> ` : '';
   const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
   const levelClass = player[levelKey] === '40' ? ' level-40' : '';
 
