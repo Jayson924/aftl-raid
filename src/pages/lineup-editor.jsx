@@ -35,6 +35,8 @@ export const LineupEditorPage = {
   flatpickrInstance: null, // Flatpickr date/time picker instance
 
   async render(container) {
+    const isAdmin = dataService.isAdmin();
+
     // Reset state when re-entering the page (singleton object persists across navigations)
     this.currentLineup = {
       id: null,
@@ -142,7 +144,7 @@ export const LineupEditorPage = {
               </div>
               <div class="lineup-actions">
                 <div class="lineup-actions-primary">
-                  <span class="action-side">
+                  ${isAdmin ? `<span class="action-side">
                     <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
                   </span>
                   <span class="action-side">
@@ -150,7 +152,7 @@ export const LineupEditorPage = {
                       <input type="checkbox" id="cleared-toggle">
                       <span>Cleared</span>
                     </label>
-                  </span>
+                  </span>` : ''}
                 </div>
                 <div class="lineup-actions-secondary">
                   <span class="action-side">
@@ -257,7 +259,7 @@ export const LineupEditorPage = {
       this.updateRaidTimeDisplay();
     });
 
-    document.getElementById('cleared-toggle').addEventListener('change', (e) => {
+    document.getElementById('cleared-toggle')?.addEventListener('change', (e) => {
       this.currentLineup.completed = e.target.checked;
     });
 
@@ -361,7 +363,7 @@ export const LineupEditorPage = {
       });
     });
 
-    document.getElementById('save-lineup-btn').addEventListener('click', () => {
+    document.getElementById('save-lineup-btn')?.addEventListener('click', () => {
       this.saveLineup();
     });
 
@@ -520,7 +522,7 @@ export const LineupEditorPage = {
               </span>
               <div class="mini-lineup-header-actions">
                 <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
-                <button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>
+                ${dataService.isAdmin() ? `<button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>` : ''}
               </div>
             </div>
             <div class="mini-lineup-grid">
@@ -1881,6 +1883,10 @@ export const LineupEditorPage = {
   },
 
   async saveLineup() {
+    if (!dataService.isAdmin()) {
+      toast.error('Only admins can save lineups.');
+      return;
+    }
     if (!this.currentLineup.name || !this.currentLineup.name.trim()) {
       toast.warning('Lineup name po');
       return;
@@ -2036,6 +2042,10 @@ export const LineupEditorPage = {
   },
 
   async deleteLineup(lineupId) {
+    if (!dataService.isAdmin()) {
+      toast.error('Only admins can delete lineups.');
+      return;
+    }
     // Find the lineup to get its name for the confirmation message
     const lineup = this.allLineups.find(l => l.id === lineupId);
     const lineupName = lineup?.name || 'this lineup';
