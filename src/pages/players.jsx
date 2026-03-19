@@ -502,7 +502,7 @@ export const PlayersPage = {
             <div class="roster-tooltip">${gearedOwners.size} player${gearedOwners.size !== 1 ? 's' : ''}</div>
           </div>
           <div class="roster-stat">
-            <span class="roster-stat-value" style="color: ${avgTier.color}" title="Gearscore is experimental and may be tweaked">${avgGearscore}</span>
+            <span class="roster-stat-value" style="color: ${avgTier.color}" data-tooltip="Gearscore is experimental">${avgGearscore}</span>
             <span class="roster-stat-label">Avg Gearscore</span>
           </div>
           <div class="roster-stat roster-stat-tip">
@@ -540,7 +540,7 @@ export const PlayersPage = {
                           ? Math.round(clsPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / clsPlayers.length)
                           : 0;
                         const clsTier = getGearscoreTier(clsAvgGs);
-                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span> <span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};" title="Gearscore is experimental and may be tweaked">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></span>`;
+                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span> <span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};" data-tooltip="Gearscore is experimental">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></span>`;
                       }).join('')}
                     </div>
                   ` : ''}
@@ -562,8 +562,20 @@ export const PlayersPage = {
     `;
 
     // Toggle tooltip on click (for mobile)
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
     const closeAllTooltips = () => {
-      document.querySelectorAll('.tooltip-active').forEach(el => el.classList.remove('tooltip-active'));
+      document.querySelectorAll('.tooltip-active').forEach(el => {
+        const tooltip = el.querySelector('.roster-tooltip');
+        if (tooltip) {
+          tooltip.classList.remove('mobile-positioned');
+          tooltip.style.left = '';
+          tooltip.style.right = '';
+          tooltip.style.top = '';
+          tooltip.style.transform = '';
+        }
+        el.classList.remove('tooltip-active');
+      });
     };
 
     document.querySelectorAll('.roster-class-item, .roster-stat-tip').forEach(item => {
@@ -571,7 +583,45 @@ export const PlayersPage = {
         e.stopPropagation();
         const wasActive = item.classList.contains('tooltip-active');
         closeAllTooltips();
-        if (!wasActive) item.classList.add('tooltip-active');
+        if (!wasActive) {
+          item.classList.add('tooltip-active');
+          const tooltip = item.querySelector('.roster-tooltip');
+          if (tooltip) {
+            if (isMobile) {
+              tooltip.classList.add('mobile-positioned');
+              const rect = item.getBoundingClientRect();
+              // Position above the tapped element
+              tooltip.style.top = (rect.top - 8) + 'px';
+              tooltip.style.left = '0.75rem';
+              // After rendering, adjust vertical to sit above
+              requestAnimationFrame(() => {
+                const tipRect = tooltip.getBoundingClientRect();
+                let top = rect.top - tipRect.height - 8;
+                // If it would go off the top, put it below instead
+                if (top < 8) top = rect.bottom + 8;
+                tooltip.style.top = top + 'px';
+              });
+            } else {
+              // Desktop: prevent tooltip from clipping outside viewport
+              tooltip.style.left = '';
+              tooltip.style.transform = '';
+              requestAnimationFrame(() => {
+                const tipRect = tooltip.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                if (tipRect.right > viewportWidth - 8) {
+                  // Overflows right — align tooltip's right edge to item's right edge
+                  tooltip.style.left = 'auto';
+                  tooltip.style.right = '0';
+                  tooltip.style.transform = 'translateY(0)';
+                } else if (tipRect.left < 8) {
+                  // Overflows left — align tooltip's left edge to item's left edge
+                  tooltip.style.left = '0';
+                  tooltip.style.transform = 'translateY(0)';
+                }
+              });
+            }
+          }
+        }
       });
     });
 
@@ -649,7 +699,7 @@ export const PlayersPage = {
             <th>Name</th>
             <th>Owner</th>
             <th>Class</th>
-            <th class="sortable-header ${this._equipmentSort === 'gs' ? 'sort-active' : ''}" data-sort="gs" title="Gearscore is experimental and may be tweaked">GS ${this._equipmentSort === 'gs' ? '▼' : ''}</th>
+            <th class="sortable-header ${this._equipmentSort === 'gs' ? 'sort-active' : ''}" data-sort="gs" data-tooltip="Gearscore is experimental">GS ${this._equipmentSort === 'gs' ? '▼' : ''}</th>
             <th class="sortable-header ${this._equipmentSort === 'weapon' ? 'sort-active' : ''}" data-sort="weapon">Weapon ${this._equipmentSort === 'weapon' ? '▼' : ''}</th>
             <th class="sortable-header ${this._equipmentSort === 'armor' ? 'sort-active' : ''}" data-sort="armor">Armor ${this._equipmentSort === 'armor' ? '▼' : ''}</th>
             <th>Raids Needed</th>
@@ -708,7 +758,7 @@ export const PlayersPage = {
               </td>
               <td data-label="Class">${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}
               </td>
               <td data-label="Weapon">
                 ${player.weapon ? `
@@ -912,7 +962,7 @@ export const PlayersPage = {
               </td>
               <td data-label="Class">${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" title="Gearscore is experimental and may be tweaked">${gs}</span>`; })()}
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}
               </td>
               <td data-label="Weapon">
                 ${player.weapon ? `

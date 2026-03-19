@@ -865,4 +865,25 @@
     right: 0;
     left: auto;
   }
+
+  // Keep roster tooltips from overflowing left/right on mobile
+  .players-page .roster-class-item,
+  .players-page .roster-stat-tip {
+    &.tooltip-active .roster-tooltip.mobile-positioned {
+      position: fixed;
+      z-index: 200;
+      white-space: normal;
+      left: 0.75rem !important;
+      right: 0.75rem !important;
+      bottom: auto !important;
+      width: auto;
+      max-width: none;
+      transform: none !important;
+      pointer-events: auto;
+
+      &::after {
+        display: none;
+      }
+    }
+  }
 }

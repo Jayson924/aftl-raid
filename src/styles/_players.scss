@@ -257,6 +257,22 @@
       border: 5px solid transparent;
       border-top-color: rgba(20, 20, 22, 0.95);
     }
+
+    // Hide arrow when repositioned via inline styles (right is set)
+    &[style*="right"] {
+      &::after {
+        left: auto;
+        right: 12px;
+        transform: none;
+      }
+    }
+
+    &[style*="left: 0"] {
+      &::after {
+        left: 12px;
+        transform: none;
+      }
+    }
   }
 
   .roster-tooltip-row {
