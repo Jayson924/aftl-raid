@@ -9,7 +9,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
-import { CLASSES, DAMAGE_AMP_SOURCES } from '../constants.js';
+import { CLASSES, DAMAGE_AMP_SOURCES, calculateGearscore } from '../constants.js';
 
 // Essential roles that a lineup should always contain
 const TANK_CLASSES = ['Guardian', 'Crusader', 'Destroyer'];
@@ -73,6 +73,10 @@ export async function showWhosAroundModal({ players, currentLineup, onGenerate }
       <div class="whos-around-summary" id="whos-around-summary">
         <span>0 players selected</span>
       </div>
+      <label class="whos-around-option">
+        <input type="checkbox" id="include-cleared-cb">
+        <span>Include characters that already cleared</span>
+      </label>
       <div class="modal-actions">
         <button class="btn btn-primary" id="generate-lineup-btn" disabled>Generate Lineup</button>
         <button class="btn btn-secondary" id="cancel-around-btn">Cancel</button>
@@ -116,7 +120,8 @@ export async function showWhosAroundModal({ players, currentLineup, onGenerate }
 
   // Generate lineup button
   document.getElementById('generate-lineup-btn').addEventListener('click', async () => {
-    const result = generateOptimalLineup([...aroundUsers], players, currentLineup);
+    const includeCleared = document.getElementById('include-cleared-cb').checked;
+    const result = generateOptimalLineup([...aroundUsers], players, currentLineup, { includeCleared });
     if (!result) return;
 
     // Check if current lineup has content
@@ -161,9 +166,10 @@ export async function showWhosAroundModal({ players, currentLineup, onGenerate }
  * @param {Object}   currentLineup    - Current lineup state (for raid type)
  * @returns {Array|null} Array of 8 { name, role, isGuest } entries, or null on failure
  */
-export function generateOptimalLineup(aroundDiscordIds, players, currentLineup) {
+export function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { includeCleared = false } = {}) {
   const candidates = players.filter(p =>
     aroundDiscordIds.includes(p.discordId) && p.role
+    && (includeCleared || dataService.playerNeedsRaid(p, currentLineup.raidType))
   );
 
   if (candidates.length === 0) {
@@ -290,23 +296,29 @@ export function generateOptimalLineup(aroundDiscordIds, players, currentLineup) 
 // ============================================
 
 /**
- * Score a lineup of player objects based on damage amp coverage.
- * Higher is better. Max score = 200 (100% physical + 100% magic).
- * Slight bonus for uncleared characters.
+ * Score a lineup of player objects based on damage amp coverage, gearscore, and raid need.
+ * Higher is better.
+ *   - Amp coverage:  0–200 (primary factor)
+ *   - Gearscore:     0–10 per player, ~80 max (secondary tiebreaker)
+ *   - Uncleared:     0.5 per player, ~4 max (minor bonus)
  */
 function scoreLineup(lineup, currentLineup) {
   const roles = lineup.map(p => p.role).filter(Boolean);
   const baseScore = scoreRoles(roles);
 
-  // Small bonus for characters that still need this raid (prefer uncleared)
+  let gearscoreBonus = 0;
   let unclearedBonus = 0;
   for (const player of lineup) {
+    // Prefer higher-geared characters (0-100 scaled to 0-10)
+    gearscoreBonus += calculateGearscore(player) * 0.1;
+
+    // Small bonus for characters that still need this raid (prefer uncleared)
     if (player.discordId && dataService.playerNeedsRaid(player, currentLineup.raidType)) {
       unclearedBonus += 0.5;
     }
   }
 
-  return baseScore + unclearedBonus;
+  return baseScore + gearscoreBonus + unclearedBonus;
 }
 
 /**

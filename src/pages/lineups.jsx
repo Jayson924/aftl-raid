@@ -429,7 +429,7 @@ export const LineupsPage = {
             const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
 
             return `
-            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${isAdmin ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${isAdmin ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
+            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${isAdmin ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${isAdmin ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
                 <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : (() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</span>
@@ -548,7 +548,7 @@ export const LineupsPage = {
         const pilotDisplay = pilotName ? `<span class="pilot-info-mini"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon-mini">${pilotName}</span>` : '';
 
         return `
-          <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>` : ''}
+          <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>` : ''}
             <div class="mini-player-info">
               <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
               ${pilotDisplay}

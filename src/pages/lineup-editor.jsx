@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, calculateGearscore, getGearscoreTier } from '../constants.js';
-import { showWhosAroundModal } from '../modals/whosaroundmodal.jsx';
+import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
@@ -104,7 +104,7 @@ export const LineupEditorPage = {
               <div class="lineup-slots-header">
                 <div class="lineup-slots-header-left">
                   <h3>Lineup</h3>
-                  <button id="whos-around-btn" class="btn btn-ghost whos-around-btn">Who's Around</button>
+                  <button id="generate-lineup-btn" class="btn btn-ghost whos-around-btn">Generate Lineup</button>
                 </div>
                 <div id="presence-indicator" class="presence-indicator"></div>
               </div>
@@ -373,8 +373,8 @@ export const LineupEditorPage = {
       this.newLineup();
     });
 
-    document.getElementById('whos-around-btn').addEventListener('click', () => {
-      this.openWhosAround();
+    document.getElementById('generate-lineup-btn').addEventListener('click', () => {
+      this.openLineupCreator();
     });
 
     // Mobile tap-to-toggle for damage amp tooltips
@@ -1610,10 +1610,6 @@ export const LineupEditorPage = {
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
 
-    // Get current ticket status for this slot (only show for Classic raid)
-    const hasTicket = this.currentLineup.ticketSlots[slotIndex];
-    const showTicketToggle = this.currentLineup.raidType === 'Classic';
-
     // If no name provided, display the class name as the name
     const displayName = name || role;
 
@@ -1622,36 +1618,7 @@ export const LineupEditorPage = {
         <div class="player-name">${displayName} <span class="pub-badge">GUEST</span></div>
         ${name ? `<div class="player-role">${role}</div>` : ''}
       </div>
-      ${showTicketToggle ? `
-        <label class="ticket-toggle" title="Using ticket run">
-          <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
-          <img src="/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
-        </label>
-      ` : ''}
     `;
-
-    // Add ticket checkbox handler (only if shown)
-    if (showTicketToggle) {
-      const ticketToggle = slotContent.querySelector('.ticket-toggle');
-      if (ticketToggle) {
-        // Stop click from bubbling to slot (which opens modal)
-        ticketToggle.addEventListener('click', (e) => {
-          e.stopPropagation();
-        });
-      }
-
-      const ticketCheckbox = slotContent.querySelector('.ticket-checkbox');
-      if (ticketCheckbox) {
-        ticketCheckbox.addEventListener('change', (e) => {
-          e.stopPropagation();
-          this.currentLineup.ticketSlots[slotIndex] = e.target.checked;
-          const icon = slotContent.querySelector('.ticket-toggle-icon');
-          if (icon) {
-            icon.classList.toggle('active', e.target.checked);
-          }
-        });
-      }
-    }
 
     // Add remove button to slot
     let removeBtn = slotElement.querySelector('.slot-remove-btn');
@@ -2484,39 +2451,65 @@ export const LineupEditorPage = {
   },
 
   /**
-   * Open the "Who's Around" modal and apply the generated lineup
+   * Apply a generated lineup result to the editor
    */
-  async openWhosAround() {
-    showWhosAroundModal({
-      players: this.players,
-      currentLineup: this.currentLineup,
-      onGenerate: (result) => {
-        // Apply the generated lineup
-        this.currentLineup.players = [];
-        this.currentLineup.ticketSlots = Array(8).fill(false);
-        this.currentLineup.pilotSlots = Array(8).fill('');
+  applyGeneratedLineup(result, raidType) {
+    // Set raid type if provided
+    if (raidType) {
+      this.currentLineup.raidType = raidType;
+      const raidTypeSelect = document.getElementById('raid-type');
+      if (raidTypeSelect) raidTypeSelect.value = raidType;
+      // Sync editor state for new raid type
+      this.loadExistingLineups();
+    }
 
-        this._clearSlotElements();
-        result.forEach((entry, idx) => {
-          if (entry.isGuest) {
-            this.assignPubPlayerToSlot(idx, '', entry.role);
-          } else {
-            this.assignPlayerToSlot(idx, entry.name);
-          }
-        });
+    this.currentLineup.players = [];
+    this.currentLineup.ticketSlots = Array(8).fill(false);
+    this.currentLineup.pilotSlots = Array(8).fill('');
+    this._clearSlotElements();
 
-        this.renderAvailablePlayers();
-        this.updateDamageAmpDisplay();
-        this.updateConflictWarnings();
+    for (let idx = 0; idx < result.length; idx++) {
+      const entry = result[idx];
+      try {
+        if (entry.isGuest) {
+          this.assignPubPlayerToSlot(idx, '', entry.role);
+        } else {
+          this.assignPlayerToSlot(idx, entry.name);
+        }
+      } catch (e) {
+        console.error(`Failed to assign slot ${idx}:`, entry, e);
+      }
+    }
 
-        const { physical, magic } = this.calculateDamageAmp();
-        const guestCount = result.filter(e => e.isGuest).length;
-        const guestMsg = guestCount > 0 ? ` (${guestCount} guest slot${guestCount !== 1 ? 's' : ''})` : '';
-        toast.success(`Lineup generated! Physical: ${physical}%, Magic: ${magic}%${guestMsg}`);
+    this.renderAvailablePlayers();
+    this.updateDamageAmpDisplay();
+    this.updateConflictWarnings();
+
+    const { physical, magic } = this.calculateDamageAmp();
+    const guestCount = result.filter(e => e.isGuest).length;
+    const guestMsg = guestCount > 0 ? ` (${guestCount} guest slot${guestCount !== 1 ? 's' : ''})` : '';
+    toast.success(`Lineup generated! Physical: ${physical}%, Magic: ${magic}%${guestMsg}`);
+  },
+
+  /**
+   * Open the Lineup Creator modal and apply the generated lineup
+   */
+  async openLineupCreator() {
+    const hasContent = this.currentLineup.players.some(p => p);
+
+    showLineupCreatorModal({
+      onLoadInEditor: async ({ result, raidType }) => {
+        if (hasContent) {
+          const confirmed = await modal.confirm(
+            'This will replace the current lineup slots. Continue?',
+            { title: 'Generate Lineup', confirmText: 'Generate', cancelText: 'Cancel', danger: true }
+          );
+          if (!confirmed) return;
+        }
+        this.applyGeneratedLineup(result, raidType);
       }
     });
   },
-
 
   /**
    * Cleanup when leaving the page

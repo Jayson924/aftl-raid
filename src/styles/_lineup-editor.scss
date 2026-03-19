@@ -1563,7 +1563,24 @@
     font-size: 0.85rem;
     color: rgba(255, 255, 255, 0.6);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.5rem;
+  }
+
+  .whos-around-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
     margin-bottom: 1rem;
+    user-select: none;
+
+    input[type="checkbox"] {
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
   }
 }
 
