@@ -9,8 +9,11 @@
 
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { DAMAGE_AMP_SOURCES, calculateGearscore, getGearscoreTier } from '../constants.js';
-import { generateOptimalLineup } from './whosaroundmodal.jsx';
+import { CLASSES, DAMAGE_AMP_SOURCES, calculateGearscore, getGearscoreTier } from '../constants.js';
+
+// Essential roles that a lineup should always contain
+const TANK_CLASSES = ['Guardian', 'Crusader', 'Destroyer'];
+const HEALER_CLASSES = ['Saint'];
 
 /**
  * Open the Lineup Creator modal.
@@ -304,8 +307,17 @@ function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeClea
 
   const filled = [...result];
 
+  // Check which essential roles are only covered by guest slots
+  const realRoles = filled.filter(e => !e.isGuest).map(e => e.role);
+  const hasTankReal = realRoles.some(r => TANK_CLASSES.includes(r));
+  const hasHealerReal = realRoles.some(r => HEALER_CLASSES.includes(r));
+
   for (let i = 0; i < filled.length; i++) {
     if (!filled[i].isGuest) continue;
+
+    // Don't replace a guest tank/healer if no real one exists — the lineup needs them
+    if (!hasTankReal && TANK_CLASSES.includes(filled[i].role)) continue;
+    if (!hasHealerReal && HEALER_CLASSES.includes(filled[i].role)) continue;
 
     const currentRoles = filled.map(e => e.role).filter(Boolean);
     const currentAmp = scoreRoles(currentRoles);
@@ -335,6 +347,178 @@ function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeClea
   }
 
   return filled;
+}
+
+// ============================================
+// LINEUP GENERATION
+// ============================================
+
+/**
+ * Generate an optimal 8-player lineup from selected users' character pools.
+ * Prioritises getting both physical and magic damage amp close to 100%.
+ * Always includes a tank and healer when real candidates exist; reserves
+ * guest slots for missing essential roles.
+ */
+function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { includeCleared = false } = {}) {
+  const candidates = players.filter(p =>
+    aroundDiscordIds.includes(p.discordId) && p.role
+    && (includeCleared || dataService.playerNeedsRaid(p, currentLineup.raidType))
+  );
+
+  if (candidates.length === 0) {
+    toast.error('No characters found for selected players.');
+    return null;
+  }
+
+  const tankCandidates = candidates.filter(c => TANK_CLASSES.includes(c.role));
+  const healerCandidates = candidates.filter(c => HEALER_CLASSES.includes(c.role));
+
+  // Phase 1: Greedily pick real characters
+  // Try each tank+healer combo as seed pair. If no tanks or no healers available,
+  // those roles will be filled via guest suggestions in Phase 2.
+  const seedPairs = [];
+
+  if (tankCandidates.length > 0 && healerCandidates.length > 0) {
+    for (const tank of tankCandidates) {
+      for (const healer of healerCandidates) {
+        if (tank.discordId === healer.discordId) continue;
+        seedPairs.push([tank, healer]);
+      }
+    }
+  }
+
+  if (tankCandidates.length > 0 && seedPairs.length === 0) {
+    for (const tank of tankCandidates) seedPairs.push([tank]);
+  } else if (healerCandidates.length > 0 && seedPairs.length === 0) {
+    for (const healer of healerCandidates) seedPairs.push([healer]);
+  }
+
+  // Fallback: no tanks or healers at all
+  if (seedPairs.length === 0) {
+    for (const c of candidates) seedPairs.push([c]);
+  }
+
+  // Reserve guest slots for missing essential roles
+  const reservedSlots = (tankCandidates.length === 0 ? 1 : 0) + (healerCandidates.length === 0 ? 1 : 0);
+
+  let bestRealLineup = null;
+  let bestRealScore = -1;
+
+  for (const seedPair of seedPairs) {
+    const lineup = [...seedPair];
+    const usedUsers = new Set(seedPair.map(p => p.discordId));
+
+    const maxSlots = Math.min(aroundDiscordIds.length, 8 - reservedSlots);
+    for (let i = lineup.length; i < maxSlots; i++) {
+      let bestCandidate = null;
+      let bestCandidateScore = -1;
+
+      for (const candidate of candidates) {
+        if (lineup.some(p => p.name === candidate.name)) continue;
+        if (usedUsers.has(candidate.discordId)) continue;
+
+        const testLineup = [...lineup, candidate];
+        const score = scoreLineup(testLineup, currentLineup);
+
+        if (score > bestCandidateScore) {
+          bestCandidateScore = score;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (bestCandidate) {
+        lineup.push(bestCandidate);
+        usedUsers.add(bestCandidate.discordId);
+      } else {
+        break;
+      }
+    }
+
+    const totalScore = scoreLineup(lineup, currentLineup);
+    const tankInLineup = lineup.find(p => TANK_CLASSES.includes(p.role));
+    const seedPriority = tankInLineup ? TANK_CLASSES.indexOf(tankInLineup.role) : 999;
+    const bestTank = bestRealLineup?.find(p => TANK_CLASSES.includes(p.role));
+    const bestSeedPriority = bestTank ? TANK_CLASSES.indexOf(bestTank.role) : 999;
+    if (totalScore > bestRealScore || (totalScore === bestRealScore && seedPriority < bestSeedPriority)) {
+      bestRealScore = totalScore;
+      bestRealLineup = lineup;
+    }
+  }
+
+  if (!bestRealLineup || bestRealLineup.length === 0) {
+    toast.error('Could not generate a lineup from selected players.');
+    return null;
+  }
+
+  // Phase 2: Fill remaining slots with guest class suggestions
+  const result = bestRealLineup.map(p => ({ name: p.name, role: p.role, isGuest: false }));
+  const slotsRemaining = 8 - result.length;
+
+  if (slotsRemaining > 0) {
+    const needsTank = () => !result.some(p => TANK_CLASSES.includes(p.role));
+    const needsHealer = () => !result.some(p => HEALER_CLASSES.includes(p.role));
+
+    for (let i = 0; i < slotsRemaining; i++) {
+      const currentRoles = result.map(p => p.role);
+      const currentScore = scoreRoles(currentRoles);
+      let bestClass = null;
+      let bestClassScore = -Infinity;
+
+      // Force essential roles first: tank, then healer
+      let classPool = CLASSES;
+      if (needsTank()) {
+        classPool = TANK_CLASSES;
+      } else if (needsHealer()) {
+        classPool = HEALER_CLASSES;
+      }
+
+      for (const cls of classPool) {
+        const testRoles = [...currentRoles, cls];
+        const ampScore = scoreRoles(testRoles);
+        const marginalAmp = ampScore - currentScore;
+
+        const isDuplicate = currentRoles.includes(cls);
+        const diversityBonus = isDuplicate ? -10 : 0;
+
+        let newSources = 0;
+        for (const source of Object.values(DAMAGE_AMP_SOURCES)) {
+          const alreadyActive = source.classes.some(c => currentRoles.includes(c));
+          const wouldActivate = source.classes.includes(cls);
+          if (wouldActivate && !alreadyActive) newSources++;
+        }
+
+        const score = marginalAmp + diversityBonus + (newSources * 2);
+        if (score > bestClassScore) {
+          bestClassScore = score;
+          bestClass = cls;
+        }
+      }
+
+      result.push({ name: '', role: bestClass, isGuest: true });
+    }
+  }
+
+  return result;
+}
+
+// ============================================
+// SCORING
+// ============================================
+
+function scoreLineup(lineup, currentLineup) {
+  const roles = lineup.map(p => p.role).filter(Boolean);
+  const baseScore = scoreRoles(roles);
+
+  let gearscoreBonus = 0;
+  let unclearedBonus = 0;
+  for (const player of lineup) {
+    gearscoreBonus += calculateGearscore(player) * 0.1;
+    if (player.discordId && dataService.playerNeedsRaid(player, currentLineup.raidType)) {
+      unclearedBonus += 0.5;
+    }
+  }
+
+  return baseScore + gearscoreBonus + unclearedBonus;
 }
 
 function scoreRoles(roles) {
