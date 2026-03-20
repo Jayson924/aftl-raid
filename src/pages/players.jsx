@@ -20,6 +20,13 @@ export const PlayersPage = {
   // Chart instance reference
   _chartInstance: null,
 
+  // Gearscore filter for roster view (0 = show all)
+  _gsFilter: 0,
+
+  // Cached data for roster re-renders
+  _rosterPlayers: null,
+  _rosterUserMap: null,
+
   // Class family colors for chart
   _classFamilyColors: {
     warrior: '#F08A46',
@@ -405,18 +412,29 @@ export const PlayersPage = {
   },
 
   renderRosterView(listElement, players, userMap) {
+    // Cache for slider re-renders
+    this._rosterPlayers = players;
+    this._rosterUserMap = userMap;
+    this._renderRosterFiltered(listElement);
+  },
+
+  _renderRosterFiltered(listElement) {
+    const allPlayers = this._rosterPlayers;
+    const userMap = this._rosterUserMap;
+    const minGs = this._gsFilter;
+
     // Destroy previous chart instance
     if (this._chartInstance) {
       this._chartInstance.destroy();
       this._chartInstance = null;
     }
 
-    const gearedPlayers = players.filter(p => this.isGeared(p));
-    const totalPlayers = players.length;
+    // Filter by gearscore threshold
+    const players = minGs > 0
+      ? allPlayers.filter(p => calculateGearscore(p) >= minGs)
+      : allPlayers;
 
-    // Count unique owners with at least one geared character
-    const gearedOwners = new Set(gearedPlayers.map(p => p.discordId || p.id));
-    const gearedCount = gearedOwners.size;
+    const totalPlayers = players.length;
     const totalOwners = new Set(players.map(p => p.discordId || p.id)).size;
 
     // Format equipment as plain text for tooltips (e.g. "Lv50 Unique +12")
@@ -463,7 +481,7 @@ export const PlayersPage = {
     const familyPlayers = {}; // Unique owner counts per class
     const familyPlayersList = {}; // Actual player objects per class
     Object.entries(CLASS_FAMILIES).forEach(([key, family]) => {
-      const matching = gearedPlayers.filter(p => family.classes.includes(p.role));
+      const matching = players.filter(p => family.classes.includes(p.role));
       // Count unique owners for this family
       const familyOwners = new Set(matching.map(p => p.discordId || p.id));
       familyCounts[key] = familyOwners.size;
@@ -482,14 +500,14 @@ export const PlayersPage = {
       familyPlayersList[key] = classPlayers;
     });
 
-    // All classes that have 0 geared members
+    // All classes that have 0 members
     const allClasses = CLASSES;
-    const gearedClassSet = new Set(gearedPlayers.map(p => p.role));
-    const missingClasses = allClasses.filter(cls => !gearedClassSet.has(cls));
+    const presentClassSet = new Set(players.map(p => p.role));
+    const missingClasses = allClasses.filter(cls => !presentClassSet.has(cls));
 
-    // Calculate average gearscore for geared players
-    const avgGearscore = gearedPlayers.length > 0
-      ? Math.round(gearedPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / gearedPlayers.length)
+    // Calculate average gearscore
+    const avgGearscore = players.length > 0
+      ? Math.round(players.reduce((sum, p) => sum + calculateGearscore(p), 0) / players.length)
       : 0;
     const avgTier = getGearscoreTier(avgGearscore);
 
@@ -497,27 +515,29 @@ export const PlayersPage = {
       <div class="roster-view">
         <div class="roster-summary">
           <div class="roster-stat roster-stat-tip">
-            <span class="roster-stat-value">${gearedPlayers.length}</span>
-            <span class="roster-stat-label">Geared Characters</span>
-            <div class="roster-tooltip">${gearedOwners.size} player${gearedOwners.size !== 1 ? 's' : ''}</div>
+            <span class="roster-stat-value">${totalPlayers}</span>
+            <span class="roster-stat-label">Characters</span>
+            <div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>
           </div>
           <div class="roster-stat">
             <span class="roster-stat-value" style="color: ${avgTier.color}" data-tooltip="Gearscore is experimental">${avgGearscore}</span>
             <span class="roster-stat-label">Avg Gearscore</span>
           </div>
-          <div class="roster-stat roster-stat-tip">
-            <span class="roster-stat-value">${totalPlayers}</span>
-            <span class="roster-stat-label">Total Characters</span>
-            <div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>
-          </div>
+        </div>
+        <div class="roster-gs-slider">
+          <label>Min Gearscore: <span id="gs-slider-value" style="color: ${getGearscoreTier(minGs).color}">${minGs}</span></label>
+          <input type="range" id="gs-slider" min="0" max="100" value="${minGs}" />
         </div>
         <div class="roster-content">
           <div class="roster-chart-container">
-            <canvas id="roster-chart"></canvas>
-            <div class="roster-chart-center">
-              <span class="roster-chart-center-value">${gearedPlayers.length}</span>
-              <span class="roster-chart-center-label">geared</span>
+            <div class="roster-chart-wrapper">
+              <canvas id="roster-chart"></canvas>
+              <div class="roster-chart-center">
+                <span class="roster-chart-center-value">${totalPlayers}</span>
+                <span class="roster-chart-center-label">total</span>
+              </div>
             </div>
+            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and need +15 weapon and +15 armor.</div>
           </div>
           <div class="roster-breakdown">
             <h3>Class Breakdown</h3>
@@ -557,7 +577,6 @@ export const PlayersPage = {
             </div>
           </div>
         ` : ''}
-        <div class="roster-criteria">Geared = Unique +11 weapon or above</div>
       </div>
     `;
 
@@ -628,6 +647,24 @@ export const PlayersPage = {
     // Close tooltips when tapping outside
     document.addEventListener('click', closeAllTooltips);
 
+    // Gearscore slider
+    const gsSlider = document.getElementById('gs-slider');
+    if (gsSlider) {
+      gsSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        const tier = getGearscoreTier(val);
+        const label = document.getElementById('gs-slider-value');
+        if (label) {
+          label.textContent = val;
+          label.style.color = tier.color;
+        }
+      });
+      gsSlider.addEventListener('change', (e) => {
+        this._gsFilter = parseInt(e.target.value);
+        this._renderRosterFiltered(listElement);
+      });
+    }
+
     // Create the doughnut chart
     const chartData = Object.entries(CLASS_FAMILIES).map(([key, family]) => ({
       label: family.name,
@@ -648,7 +685,7 @@ export const PlayersPage = {
       this._chartInstance = new Chart(canvas, {
         type: 'doughnut',
         data: {
-          labels: hasData ? labels : ['No geared characters'],
+          labels: hasData ? labels : ['No characters'],
           datasets: [{
             data: hasData ? data : [1],
             backgroundColor: hasData ? colors : ['rgba(255,255,255,0.1)'],
