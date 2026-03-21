@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, formatPlayerEquipmentHtml } from '../constants.js';
 import { modal } from '../modal.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
@@ -737,13 +737,11 @@ export const PlayersPage = {
             <th>Owner</th>
             <th>Class</th>
             <th class="sortable-header ${this._equipmentSort === 'gs' ? 'sort-active' : ''}" data-sort="gs" data-tooltip="Gearscore is experimental">GS ${this._equipmentSort === 'gs' ? '▼' : ''}</th>
-            <th class="sortable-header ${this._equipmentSort === 'weapon' ? 'sort-active' : ''}" data-sort="weapon">Weapon ${this._equipmentSort === 'weapon' ? '▼' : ''}</th>
-            <th class="sortable-header ${this._equipmentSort === 'armor' ? 'sort-active' : ''}" data-sort="armor">Armor ${this._equipmentSort === 'armor' ? '▼' : ''}</th>
+            <th>Equipment</th>
             <th>Raids Needed</th>
             <th>Notes</th>
           </tr>
           <tr class="filter-row">
-            <td></td>
             <td></td>
             <td></td>
             <td></td>
@@ -760,23 +758,10 @@ export const PlayersPage = {
         </thead>
         <tbody>
           ${sortedPlayers.map(player => {
-            const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-            const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
             const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
             const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
-
-            const suffixDisplay = [];
-            if (player.suffix1) {
-              const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-              suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-            }
-            if (player.suffix2) {
-              const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-              suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-            }
 
             const owner = player.discordId ? userMap[player.discordId] : null;
 
@@ -797,20 +782,8 @@ export const PlayersPage = {
               <td class="gs-cell" data-label="GS">
                 ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}
               </td>
-              <td data-label="Weapon">
-                ${player.weapon ? `
-                  <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${player.weapon && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
-                  </span>
-                  ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
-                ` : '-'}
-              </td>
-              <td data-label="Armor">
-                ${player.armor ? `
-                  <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${player.armor && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
-                  </span>
-                ` : '-'}
+              <td data-label="Equipment">
+                ${formatPlayerEquipmentHtml(player)}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
                 <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
@@ -966,31 +939,17 @@ export const PlayersPage = {
             <th>Name</th>
             <th>Class</th>
             <th>GS</th>
-            <th>Weapon</th>
-            <th>Armor</th>
+            <th>Equipment</th>
             <th>Raids Needed</th>
             <th>Notes</th>
           </tr>
         </thead>
         <tbody>
           ${sortedPlayers.map(player => {
-            const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-            const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
             const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
             const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
-
-            const suffixDisplay = [];
-            if (player.suffix1) {
-              const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-              suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-            }
-            if (player.suffix2) {
-              const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-              suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-            }
 
             return `
             <tr>
@@ -1001,20 +960,8 @@ export const PlayersPage = {
               <td class="gs-cell" data-label="GS">
                 ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}
               </td>
-              <td data-label="Weapon">
-                ${player.weapon ? `
-                  <span class="equipment-item ${player.weaponLevel === '40' ? 'level-40' : ''}" style="color: ${weaponRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.weapon} ${player.weapon && player.weaponLevel ? `<span class="equip-level-badge ${player.weaponLevel === '50' ? 'level-50' : ''}" style="background: ${weaponRarity?.color || '#fff'}25; border: 1px solid ${weaponRarity?.color || '#fff'}40;">Lv${player.weaponLevel}</span> ` : ''}${weaponRarity?.label || player.weapon}${player.weaponEnhance ? ' +' + player.weaponEnhance : ''}
-                  </span>
-                  ${suffixDisplay.length > 0 ? `<div class="player-suffixes">${suffixDisplay.join(' + ')}</div>` : ''}
-                ` : '-'}
-              </td>
-              <td data-label="Armor">
-                ${player.armor ? `
-                  <span class="equipment-item ${player.armorLevel === '40' ? 'level-40' : ''}" style="color: ${armorRarity?.color || 'inherit'}">
-                    ${EQUIPMENT_ICONS.armor} ${player.armor && player.armorLevel ? `<span class="equip-level-badge ${player.armorLevel === '50' ? 'level-50' : ''}" style="background: ${armorRarity?.color || '#fff'}25; border: 1px solid ${armorRarity?.color || '#fff'}40;">Lv${player.armorLevel}</span> ` : ''}${armorRarity?.label || player.armor}${player.armorEnhance ? ' +' + player.armorEnhance : ''}
-                  </span>
-                ` : '-'}
+              <td data-label="Equipment">
+                ${formatPlayerEquipmentHtml(player)}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
                 <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
@@ -1253,18 +1200,315 @@ export const PlayersPage = {
     render();
   },
 
+  // Helper: generate equipment dropdown row HTML
+  _equipSlotHtml(id, label, rarity, enhancement, showEnhance = true) {
+    const rarityOptions = EQUIPMENT_RARITIES.map(r =>
+      `<option value="${r.value}" ${rarity === r.value ? 'selected' : ''}>${r.label}</option>`
+    ).join('');
+    const enhanceOptions = ENHANCEMENT_LEVELS.map(l =>
+      `<option value="${l.value}" ${String(enhancement) === l.value ? 'selected' : ''} ${!l.value ? 'disabled hidden' : ''}>${l.label}</option>`
+    ).join('');
+    return `
+      <div class="equip-slot-row">
+        <span class="equip-slot-label">${label}</span>
+        <select id="${id}-rarity" class="equipment-select equip-compact">${rarityOptions}</select>
+        ${showEnhance ? `<select id="${id}-enhance" class="equipment-select equip-compact enhancement-select">${enhanceOptions}</select>` : ''}
+      </div>
+    `;
+  },
+
+  // Helper: read equipment form into jsonb object
+  _readEquipmentForm(prefix) {
+    const readSlot = (slotId, hasEnhance) => {
+      const rarity = document.getElementById(`${prefix}-${slotId}-rarity`)?.value || '';
+      const enhancement = hasEnhance ? parseInt(document.getElementById(`${prefix}-${slotId}-enhance`)?.value || '0', 10) : 0;
+      if (!rarity) return {};
+      return { rarity, enhancement };
+    };
+
+    return {
+      helmet: readSlot('helmet', true),
+      top: readSlot('top', true),
+      bottom: readSlot('bottom', true),
+      gloves: readSlot('gloves', true),
+      boots: readSlot('boots', true),
+      mainWeapon: readSlot('mainWeapon', true),
+      subWeapon: readSlot('subWeapon', true),
+      necklace: readSlot('necklace', false),
+      earring: readSlot('earring', false),
+      ring1: readSlot('ring1', false),
+      ring2: readSlot('ring2', false)
+    };
+  },
+
+  // Helper: read stats form
+  _readStatsForm(prefix) {
+    const val = (id) => {
+      const v = document.getElementById(`${prefix}-${id}`)?.value;
+      return v ? parseInt(v, 10) : null;
+    };
+    const stats = {};
+    if (val('atk') != null) stats.attackPower = val('atk');
+    if (val('matk') != null) stats.magicAttack = val('matk');
+    if (val('fd') != null) stats.finalDamage = val('fd');
+    if (val('hp') != null) stats.hp = val('hp');
+    if (val('def') != null) stats.defense = val('def');
+    if (val('mdef') != null) stats.magicDefense = val('mdef');
+    return stats;
+  },
+
+  // Helper: fill equipment form from analyzed data
+  _fillFromScreenshot(prefix, data) {
+    const equip = data.equipment || {};
+    const stats = data.stats || {};
+
+    // Fill name and class if available
+    if (data.name) {
+      const nameInput = document.getElementById(`${prefix}-name`);
+      if (nameInput && !nameInput.value) nameInput.value = data.name;
+    }
+    if (data.class) {
+      const classInput = document.getElementById(`${prefix}-class`);
+      if (classInput) {
+        classInput.value = data.class;
+        // Re-render class picker to show selection
+        const pickerContainer = prefix === 'player' ? 'class-picker' : 'edit-class-picker';
+        this.renderClassPicker(pickerContainer, `${prefix}-class`, data.class);
+      }
+    }
+
+    // Fill equipment dropdowns
+    const fillSlot = (slotId, piece, hasEnhance) => {
+      if (!piece?.rarity) return;
+      const rarityEl = document.getElementById(`${prefix}-${slotId}-rarity`);
+      if (rarityEl) rarityEl.value = piece.rarity;
+      if (hasEnhance && piece.enhancement) {
+        const enhEl = document.getElementById(`${prefix}-${slotId}-enhance`);
+        if (enhEl) enhEl.value = String(piece.enhancement);
+      }
+    };
+
+    fillSlot('helmet', equip.helmet, true);
+    fillSlot('top', equip.top, true);
+    fillSlot('bottom', equip.bottom, true);
+    fillSlot('gloves', equip.gloves, true);
+    fillSlot('boots', equip.boots, true);
+    fillSlot('mainWeapon', equip.mainWeapon, true);
+    fillSlot('subWeapon', equip.subWeapon, true);
+    fillSlot('necklace', equip.necklace, false);
+    fillSlot('earring', equip.earring, false);
+    fillSlot('ring1', equip.ring1, false);
+    fillSlot('ring2', equip.ring2, false);
+
+    // Fill stats
+    if (stats.attackPower) document.getElementById(`${prefix}-atk`).value = stats.attackPower;
+    if (stats.magicAttack) document.getElementById(`${prefix}-matk`).value = stats.magicAttack;
+    if (stats.finalDamage) document.getElementById(`${prefix}-fd`).value = stats.finalDamage;
+    if (stats.hp) document.getElementById(`${prefix}-hp`).value = stats.hp;
+    if (stats.defense) document.getElementById(`${prefix}-def`).value = stats.defense;
+    if (stats.magicDefense) document.getElementById(`${prefix}-mdef`).value = stats.magicDefense;
+  },
+
+  // Helper: setup screenshot upload handlers
+  _setupScreenshotUpload(prefix, modalElement) {
+    const uploadZone = modalElement.querySelector('.modal-upload-zone');
+    const fileInput = modalElement.querySelector(`#${prefix}-screenshot-input`);
+    const analyzeBtn = modalElement.querySelector(`#${prefix}-analyze-btn`);
+    const clearBtn = modalElement.querySelector(`#${prefix}-clear-screenshot`);
+    const analyzeRow = modalElement.querySelector(`#${prefix}-analyze-row`);
+    const preview = modalElement.querySelector(`#${prefix}-screenshot-preview`);
+    const placeholder = modalElement.querySelector('.modal-upload-placeholder');
+    const status = modalElement.querySelector(`#${prefix}-upload-status`);
+
+    let imageData = null;
+    let mimeType = null;
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    const handleFile = (file) => {
+      if (!file.type.startsWith('image/')) return;
+      mimeType = file.type;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+        clearBtn.style.display = 'inline-flex';
+        analyzeRow.style.display = 'flex';
+        analyzeBtn.disabled = false;
+        imageData = e.target.result.split(',')[1];
+      };
+      reader.readAsDataURL(file);
+    };
+
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      imageData = null;
+      preview.style.display = 'none';
+      placeholder.style.display = 'flex';
+      clearBtn.style.display = 'none';
+      analyzeRow.style.display = 'none';
+      analyzeBtn.disabled = true;
+      status.textContent = '';
+      status.style.color = '';
+      fileInput.value = '';
+    });
+
+    analyzeBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!imageData) return;
+      analyzeBtn.disabled = true;
+      status.textContent = 'Analyzing...';
+      try {
+        const response = await fetch('/.netlify/functions/analyze-screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageData, mimeType })
+        });
+        const data = await response.json();
+        if (data.error && !data.raw) {
+          status.textContent = 'Failed: ' + data.error;
+          toast.error('Analysis failed');
+        } else {
+          this._fillFromScreenshot(prefix, data);
+          status.textContent = `Extracted! (${data.confidence || 'unknown'} confidence)`;
+          status.style.color = '#4caf50';
+          toast.success('Screenshot analyzed — review and save');
+        }
+      } catch (err) {
+        status.textContent = 'Error analyzing screenshot';
+        toast.error('Failed to analyze screenshot');
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    });
+  },
+
+  // Helper: generate equipment + stats form HTML
+  _screenshotUploadHtml(prefix) {
+    return `
+      <div class="modal-upload-section">
+        <div class="modal-upload-zone">
+          <div class="modal-upload-placeholder">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span>Upload character screenshot</span>
+          </div>
+          <img id="${prefix}-screenshot-preview" class="modal-screenshot-preview" style="display:none" />
+          <input type="file" id="${prefix}-screenshot-input" accept="image/*" style="display:none" />
+          <button type="button" class="btn-clear-screenshot" id="${prefix}-clear-screenshot" style="display:none">Clear</button>
+        </div>
+        <div class="modal-upload-analyze-row" style="display:none" id="${prefix}-analyze-row">
+          <button type="button" class="btn-analyze" id="${prefix}-analyze-btn" disabled>Analyze Screenshot</button>
+          <span class="upload-status" id="${prefix}-upload-status"></span>
+        </div>
+      </div>
+    `;
+  },
+
+  _equipmentFormHtml(prefix, equipment, stats, suffix1, suffix2) {
+    const eq = equipment || {};
+    const st = stats || {};
+    const s1 = suffix1 || '';
+    const s2 = suffix2 || '';
+    const slot = (id, label, hasEnhance = true) => {
+      const piece = eq[id] || {};
+      return this._equipSlotHtml(`${prefix}-${id}`, label, piece.rarity || '', piece.enhancement || 0, hasEnhance);
+    };
+
+    const suffixSelect = (id, label, selected) => `
+      <div class="equip-slot-row">
+        <span class="equip-slot-label">${label}</span>
+        <select id="${prefix}-${id}" class="equip-compact" required>
+          ${WEAPON_SUFFIXES.map(s =>
+            `<option value="${s.value}" ${s.value === selected ? 'selected' : ''}>${s.label}</option>`
+          ).join('')}
+        </select>
+      </div>
+    `;
+
+    return `
+      <div class="equip-form-section">
+        <div class="equip-form-group">
+          <h4>Armor</h4>
+          ${slot('helmet', 'Helmet')}
+          ${slot('top', 'Top')}
+          ${slot('bottom', 'Bottom')}
+          ${slot('gloves', 'Gloves')}
+          ${slot('boots', 'Boots')}
+        </div>
+        <div class="equip-form-group">
+          <h4>Weapons</h4>
+          ${slot('mainWeapon', 'Main')}
+          ${slot('subWeapon', 'Sub')}
+          <h4>Suffixes</h4>
+          ${suffixSelect('suffix1', 'Main', s1)}
+          ${suffixSelect('suffix2', 'Sub', s2)}
+        </div>
+        <div class="equip-form-group">
+          <h4>Accessories</h4>
+          ${slot('necklace', 'Necklace', false)}
+          ${slot('earring', 'Earring', false)}
+          ${slot('ring1', 'Ring 1', false)}
+          ${slot('ring2', 'Ring 2', false)}
+        </div>
+        <div class="equip-form-group">
+          <h4>Stats</h4>
+          <div class="stats-form-grid">
+            <div class="stat-input-row">
+              <label>ATK</label>
+              <input type="number" id="${prefix}-atk" value="${st.attackPower || ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>MATK</label>
+              <input type="number" id="${prefix}-matk" value="${st.magicAttack || ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>FD</label>
+              <input type="number" id="${prefix}-fd" value="${st.finalDamage || ''}" placeholder="0" required />
+            </div>
+            <div class="stat-input-row">
+              <label>HP</label>
+              <input type="number" id="${prefix}-hp" value="${st.hp || ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Def</label>
+              <input type="number" id="${prefix}-def" value="${st.defense || ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>MDef</label>
+              <input type="number" id="${prefix}-mdef" value="${st.magicDefense || ''}" placeholder="0" />
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
   showAddPlayerModal() {
     const isAdmin = dataService.isAdmin();
     const currentUser = dataService.getUser();
 
-    // Get max account for current user (or first selected owner for admin)
     const initialOwnerId = isAdmin ? (this._appUsers[0]?.discordId || null) : (currentUser?.id || null);
     const maxAccount = initialOwnerId ? this.getMaxAccountForOwner(initialOwnerId) : 0;
 
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     modalElement.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-content modal-equipment">
         <h2>Add New Character</h2>
         <form id="add-player-form">
           <div class="form-group">
@@ -1288,69 +1532,13 @@ export const PlayersPage = {
             <label>Account:</label>
             <div id="account-buttons-container"></div>
           </div>
+          ${this._screenshotUploadHtml('player')}
           <div class="form-group">
             <label>Class:</label>
             <input type="hidden" id="player-class" value="">
             <div class="class-picker" id="class-picker"></div>
           </div>
-          <div class="form-group">
-            <label for="player-weapon">
-              <span class="equipment-label">${EQUIPMENT_ICONS.weapon} Weapon:</span>
-            </label>
-            <div class="equipment-row">
-              <select id="player-weapon" class="equipment-select">
-                ${EQUIPMENT_RARITIES.map(rarity => `
-                  <option value="${rarity.value}" ${rarity.color ? `data-color="${rarity.color}"` : ''}>
-                    ${rarity.label}
-                  </option>
-                `).join('')}
-              </select>
-              <div class="level-toggle-group" id="weapon-level-group" style="display: none;">
-                ${EQUIPMENT_LEVELS.map(level => `
-                  <button type="button" class="level-toggle-btn ${level.value === '50' ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
-                `).join('')}
-              </div>
-              <select id="player-weapon-enhance" class="equipment-select enhancement-select">
-                ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}" ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
-                `).join('')}
-              </select>
-              <select id="player-suffix1" class="equipment-select">
-                ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}" ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
-                `).join('')}
-              </select>
-              <select id="player-suffix2" class="equipment-select">
-                ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}" ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
-                `).join('')}
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="player-armor">
-              <span class="equipment-label">${EQUIPMENT_ICONS.armor} Armor:</span>
-            </label>
-            <div class="equipment-row">
-              <select id="player-armor" class="equipment-select">
-                ${EQUIPMENT_RARITIES.map(rarity => `
-                  <option value="${rarity.value}" ${rarity.color ? `data-color="${rarity.color}"` : ''}>
-                    ${rarity.label}
-                  </option>
-                `).join('')}
-              </select>
-              <div class="level-toggle-group" id="armor-level-group" style="display: none;">
-                ${EQUIPMENT_LEVELS.map(level => `
-                  <button type="button" class="level-toggle-btn ${level.value === '50' ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
-                `).join('')}
-              </div>
-              <select id="player-armor-enhance" class="equipment-select enhancement-select">
-                ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}" ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
-                `).join('')}
-              </select>
-            </div>
-          </div>
+          ${this._equipmentFormHtml('player', {}, {}, '', '')}
           <div class="form-group">
             <label for="player-notes">Notes:</label>
             <textarea id="player-notes" rows="3" maxlength="140"></textarea>
@@ -1368,21 +1556,19 @@ export const PlayersPage = {
     // Initialize class picker
     this.renderClassPicker('class-picker', 'player-class', '');
 
-    // Initialize account buttons - default to Account 1 selected
+    // Initialize account buttons
     const selectedOwnerId = isAdmin
       ? (currentUser?.id || this._appUsers[0]?.discordId || null)
       : (currentUser?.id || null);
     const initialMax = selectedOwnerId ? Math.max(1, this.getMaxAccountForOwner(selectedOwnerId)) : 1;
     this.renderAccountButtons('account-buttons-container', 1, initialMax);
 
-    // Initialize equipment level toggles
-    this.initLevelToggles('player-weapon', 'weapon-level-group');
-    this.initLevelToggles('player-armor', 'armor-level-group');
+    // Setup screenshot upload
+    this._setupScreenshotUpload('player', modalElement);
 
     // Update account buttons when owner changes (admin only)
     if (isAdmin) {
       const ownerSelect = document.getElementById('player-owner');
-
       ownerSelect.addEventListener('change', () => {
         const selectedOwner = ownerSelect.value;
         const ownerMax = selectedOwner ? Math.max(1, this.getMaxAccountForOwner(selectedOwner)) : 1;
@@ -1394,16 +1580,16 @@ export const PlayersPage = {
       e.preventDefault();
       const name = document.getElementById('player-name').value;
       const role = document.getElementById('player-class').value;
-      const weapon = document.getElementById('player-weapon').value;
-      const weaponEnhance = document.getElementById('player-weapon-enhance').value;
-      const suffix1 = document.getElementById('player-suffix1').value;
-      const suffix2 = document.getElementById('player-suffix2').value;
-      const armor = document.getElementById('player-armor').value;
-      const armorEnhance = document.getElementById('player-armor-enhance').value;
-      const weaponLevel = this.getSelectedLevel('weapon-level-group');
-      const armorLevel = this.getSelectedLevel('armor-level-group');
       const notes = document.getElementById('player-notes').value;
       const accountNumber = this.getSelectedAccount('account-buttons-container');
+      const equipment = this._readEquipmentForm('player');
+      const characterStats = this._readStatsForm('player');
+
+      // Legacy fields from main weapon + helmet
+      const weapon = equipment.mainWeapon?.rarity || '';
+      const weaponEnhance = equipment.mainWeapon?.enhancement ? String(equipment.mainWeapon.enhancement) : '';
+      const armor = equipment.helmet?.rarity || '';
+      const armorEnhance = equipment.helmet?.enhancement ? String(equipment.helmet.enhancement) : '';
 
       if (!dataService.hasWriteAccess()) {
         toast.warning('Please log in to add characters.', 5000);
@@ -1416,22 +1602,15 @@ export const PlayersPage = {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
 
+        const suffix1 = document.getElementById('player-suffix1').value;
+        const suffix2 = document.getElementById('player-suffix2').value;
+
         const result = await dataService.addPlayer({
-          name,
-          role,
-          weapon,
-          weaponEnhance,
-          weaponLevel: weapon ? weaponLevel : null,
-          suffix1,
-          suffix2,
-          armor,
-          armorEnhance,
-          armorLevel: armor ? armorLevel : null,
-          notes,
-          accountNumber: accountNumber || 1
+          name, role, weapon, weaponEnhance, suffix1, suffix2,
+          armor, armorEnhance, equipment, characterStats,
+          notes, accountNumber: accountNumber || 1
         });
 
-        // If admin, assign to selected owner (or unassign if "No owner" selected)
         if (isAdmin && result.data?.id) {
           const selectedOwner = document.getElementById('player-owner')?.value || null;
           await dataService.assignCharacterOwner(result.data.id, selectedOwner);
@@ -1461,14 +1640,12 @@ export const PlayersPage = {
 
   showEditPlayerModal(player) {
     const isAdmin = dataService.isAdmin();
-
-    // Get max account for this player's owner
     const maxAccount = player.discordId ? this.getMaxAccountForOwner(player.discordId) : 0;
 
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     modalElement.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-content modal-equipment">
         <h2>Edit Character</h2>
         <form id="edit-player-form">
           <div class="form-group">
@@ -1492,69 +1669,13 @@ export const PlayersPage = {
             <label>Account:</label>
             <div id="edit-account-buttons-container"></div>
           </div>
+          ${this._screenshotUploadHtml('edit-player')}
           <div class="form-group">
             <label>Class:</label>
             <input type="hidden" id="edit-player-class" value="${player.role || ''}">
             <div class="class-picker" id="edit-class-picker"></div>
           </div>
-          <div class="form-group">
-            <label for="edit-player-weapon">
-              <span class="equipment-label">${EQUIPMENT_ICONS.weapon} Weapon:</span>
-            </label>
-            <div class="equipment-row">
-              <select id="edit-player-weapon" class="equipment-select">
-                ${EQUIPMENT_RARITIES.map(rarity => `
-                  <option value="${rarity.value}" ${player.weapon === rarity.value ? 'selected' : ''} ${rarity.color ? `data-color="${rarity.color}"` : ''}>
-                    ${rarity.label}
-                  </option>
-                `).join('')}
-              </select>
-              <div class="level-toggle-group" id="edit-weapon-level-group" style="display: ${player.weapon ? 'flex' : 'none'};">
-                ${EQUIPMENT_LEVELS.map(level => `
-                  <button type="button" class="level-toggle-btn ${(player.weaponLevel || '50') === level.value ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
-                `).join('')}
-              </div>
-              <select id="edit-player-weapon-enhance" class="equipment-select enhancement-select">
-                ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}" ${player.weaponEnhance === level.value ? 'selected' : ''} ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
-                `).join('')}
-              </select>
-              <select id="edit-player-suffix1" class="equipment-select">
-                ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}" ${player.suffix1 === suffix.value ? 'selected' : ''} ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
-                `).join('')}
-              </select>
-              <select id="edit-player-suffix2" class="equipment-select">
-                ${WEAPON_SUFFIXES.map(suffix => `
-                  <option value="${suffix.value}" ${player.suffix2 === suffix.value ? 'selected' : ''} ${!suffix.value ? 'disabled hidden' : ''}>${suffix.label}</option>
-                `).join('')}
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="edit-player-armor">
-              <span class="equipment-label">${EQUIPMENT_ICONS.armor} Armor:</span>
-            </label>
-            <div class="equipment-row">
-              <select id="edit-player-armor" class="equipment-select">
-                ${EQUIPMENT_RARITIES.map(rarity => `
-                  <option value="${rarity.value}" ${player.armor === rarity.value ? 'selected' : ''} ${rarity.color ? `data-color="${rarity.color}"` : ''}>
-                    ${rarity.label}
-                  </option>
-                `).join('')}
-              </select>
-              <div class="level-toggle-group" id="edit-armor-level-group" style="display: ${player.armor ? 'flex' : 'none'};">
-                ${EQUIPMENT_LEVELS.map(level => `
-                  <button type="button" class="level-toggle-btn ${(player.armorLevel || '50') === level.value ? 'active' : ''}" data-level="${level.value}">${level.label}</button>
-                `).join('')}
-              </div>
-              <select id="edit-player-armor-enhance" class="equipment-select enhancement-select">
-                ${ENHANCEMENT_LEVELS.map(level => `
-                  <option value="${level.value}" ${player.armorEnhance === level.value ? 'selected' : ''} ${!level.value ? 'disabled hidden' : ''}>${level.label}</option>
-                `).join('')}
-              </select>
-            </div>
-          </div>
+          ${this._equipmentFormHtml('edit-player', player.equipment || {}, player.characterStats || {}, player.suffix1 || '', player.suffix2 || '')}
           <div class="form-group">
             <label for="edit-player-notes">Notes:</label>
             <textarea id="edit-player-notes" rows="3" maxlength="140">${player.notes}</textarea>
@@ -1570,21 +1691,16 @@ export const PlayersPage = {
 
     document.body.appendChild(modalElement);
 
-    // Initialize class picker with current class
     this.renderClassPicker('edit-class-picker', 'edit-player-class', player.role || '');
 
-    // Initialize account buttons with player's current account selected (default to 1 if not set)
     const editMaxAccount = player.discordId ? Math.max(1, maxAccount, player.accountNumber || 1) : 1;
     this.renderAccountButtons('edit-account-buttons-container', player.accountNumber || 1, editMaxAccount);
 
-    // Initialize equipment level toggles for edit modal
-    this.initLevelToggles('edit-player-weapon', 'edit-weapon-level-group');
-    this.initLevelToggles('edit-player-armor', 'edit-armor-level-group');
+    // Setup screenshot upload
+    this._setupScreenshotUpload('edit-player', modalElement);
 
-    // Update account buttons when owner changes (admin only)
     if (isAdmin) {
       const ownerSelect = document.getElementById('edit-player-owner');
-
       ownerSelect.addEventListener('change', () => {
         const selectedOwner = ownerSelect.value;
         const ownerMax = selectedOwner ? Math.max(1, this.getMaxAccountForOwner(selectedOwner)) : 1;
@@ -1596,18 +1712,16 @@ export const PlayersPage = {
       e.preventDefault();
       const name = document.getElementById('edit-player-name').value;
       const role = document.getElementById('edit-player-class').value;
-      const weapon = document.getElementById('edit-player-weapon').value;
-      const weaponEnhance = document.getElementById('edit-player-weapon-enhance').value;
-      const suffix1 = document.getElementById('edit-player-suffix1').value;
-      const suffix2 = document.getElementById('edit-player-suffix2').value;
-      const armor = document.getElementById('edit-player-armor').value;
-      const armorEnhance = document.getElementById('edit-player-armor-enhance').value;
-      const weaponLevel = this.getSelectedLevel('edit-weapon-level-group');
-      const armorLevel = this.getSelectedLevel('edit-armor-level-group');
       const notes = document.getElementById('edit-player-notes').value;
       const accountNumber = this.getSelectedAccount('edit-account-buttons-container');
+      const equipment = this._readEquipmentForm('edit-player');
+      const characterStats = this._readStatsForm('edit-player');
 
-      // Get owner selection if admin
+      const weapon = equipment.mainWeapon?.rarity || '';
+      const weaponEnhance = equipment.mainWeapon?.enhancement ? String(equipment.mainWeapon.enhancement) : '';
+      const armor = equipment.helmet?.rarity || '';
+      const armorEnhance = equipment.helmet?.enhancement ? String(equipment.helmet.enhancement) : '';
+
       const ownerSelect = document.getElementById('edit-player-owner');
       const newOwnerId = ownerSelect ? ownerSelect.value : null;
 
@@ -1622,23 +1736,16 @@ export const PlayersPage = {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
 
+        const suffix1 = document.getElementById('edit-player-suffix1').value;
+        const suffix2 = document.getElementById('edit-player-suffix2').value;
+
         await dataService.updatePlayer({
-          id: player.id,
-          name,
-          role,
-          weapon,
-          weaponEnhance,
-          weaponLevel: weapon ? weaponLevel : null,
-          suffix1,
-          suffix2,
-          armor,
-          armorEnhance,
-          armorLevel: armor ? armorLevel : null,
-          notes,
-          accountNumber: accountNumber || 1
+          id: player.id, name, role,
+          weapon, weaponEnhance, suffix1, suffix2,
+          armor, armorEnhance, equipment, characterStats,
+          notes, accountNumber: accountNumber || 1
         }, player.name);
 
-        // Update owner if admin changed it
         if (isAdmin && newOwnerId !== player.discordId) {
           await dataService.assignCharacterOwner(player.id, newOwnerId || null);
         }

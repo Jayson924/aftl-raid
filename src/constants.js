@@ -218,6 +218,7 @@ export const CLASS_FAMILIES = {
 // Equipment rarities with color codes
 export const EQUIPMENT_RARITIES = [
   { value: '', label: 'None', color: '' },
+  { value: 'rare', label: 'Rare', color: '#3b82f6' },
   { value: 'epic', label: 'Epic', color: '#ff9800' },
   { value: 'unique', label: 'Unique', color: '#8f5ce0' },
   { value: 'legend', label: 'Legend', color: '#d62d49' }
@@ -261,37 +262,113 @@ export const WEAPON_SUFFIXES = [
 
 // Gearscore calculation
 // Weighted 0-100 scale based on equipment rarity, level, enhancement, and suffixes
+// Gearscore formula: 60% gear, 40% FD
+// Gear: 7 equipment (rarity + enhancement) + 4 accessories (rarity only)
+// FD: percentage of community-found cap, using breakpoint table
+
+const GS_RARITY_PERCENT = { legend: 1.0, unique: 0.65, epic: 0.35, rare: 0.15, magic: 0.05, normal: 0, '': 0 };
+const GS_ENHANCE_PERCENT = { 15: 1.0, 14: 0.85, 13: 0.7, 12: 0.55, 11: 0.4, 10: 0.28, 9: 0.18, 0: 0 };
+
+const GEAR_WEIGHT = 60;
+const FD_WEIGHT = 40;
+const EQUIP_TOTAL = GEAR_WEIGHT * 0.7; // 42 pts for 7 equipment pieces
+const ACCESSORY_TOTAL = GEAR_WEIGHT * 0.3; // 18 pts for 4 accessories
+const PER_EQUIP = EQUIP_TOTAL / 7;
+const PER_ACCESSORY = ACCESSORY_TOTAL / 4;
+
+const DEFAULT_FD_TABLE = [
+  { fd: 1191, pct: 35 }, { fd: 1224, pct: 36 }, { fd: 1260, pct: 37 }, { fd: 1292, pct: 38 },
+  { fd: 1326, pct: 39 }, { fd: 1359, pct: 40 }, { fd: 1394, pct: 41 }, { fd: 1427, pct: 42 },
+  { fd: 1461, pct: 43 }, { fd: 1492, pct: 44 }, { fd: 1529, pct: 45 }, { fd: 1599, pct: 46 },
+  { fd: 1668, pct: 47 }, { fd: 1742, pct: 48 }, { fd: 1842, pct: 49 }, { fd: 1892, pct: 50 },
+  { fd: 1983, pct: 51 }, { fd: 2044, pct: 52 }, { fd: 2128, pct: 53 }, { fd: 2208, pct: 54 },
+  { fd: 2287, pct: 55 }, { fd: 2369, pct: 56 }, { fd: 2453, pct: 57 }, { fd: 2539, pct: 58 },
+  { fd: 2627, pct: 59 }, { fd: 2718, pct: 60 }
+];
+
+// Cached FD table — loaded from Supabase by initGearscoreConfig()
+let _fdTable = DEFAULT_FD_TABLE;
+
+export function setFdTable(table) {
+  if (table && table.length > 0) _fdTable = table;
+}
+
+export function getFdTable() {
+  return _fdTable;
+}
+
+export function fdToPercent(rawFd, fdTable) {
+  if (!rawFd || rawFd <= 0) return 0;
+  const table = fdTable || _fdTable;
+  if (rawFd <= table[0].fd) return (rawFd / table[0].fd) * table[0].pct;
+  const max = table[table.length - 1];
+  if (rawFd >= max.fd) return max.pct;
+  for (let i = 0; i < table.length - 1; i++) {
+    if (rawFd >= table[i].fd && rawFd < table[i + 1].fd) {
+      const range = table[i + 1].fd - table[i].fd;
+      const progress = (rawFd - table[i].fd) / range;
+      return table[i].pct + progress * (table[i + 1].pct - table[i].pct);
+    }
+  }
+  return max.pct;
+}
+
 export function calculateGearscore(player) {
-  // Weapon rarity points
-  const weaponRarityPoints = {
-    '': 0,
-    'epic': player.weaponLevel === '50' ? 5 : 3,
-    'unique': player.weaponLevel === '50' ? 15 : 10,
-    'legend': player.weaponLevel === '50' ? 22 : 18
-  };
+  const equip = player.equipment || {};
+  const stats = player.characterStats || {};
 
-  // Armor rarity points
-  const armorRarityPoints = {
-    '': 0,
-    'epic': player.armorLevel === '50' ? 4 : 2,
-    'unique': player.armorLevel === '50' ? 12 : 8,
-    'legend': player.armorLevel === '50' ? 18 : 14
-  };
+  const equipSlots = ['helmet', 'top', 'bottom', 'gloves', 'boots', 'mainWeapon', 'subWeapon'];
+  const accessorySlots = ['necklace', 'earring', 'ring1', 'ring2'];
 
-  // Enhancement points (non-linear scaling, +15 is max)
+  let gearScore = 0;
+  let hasAnyGear = false;
+
+  // Equipment: rarity (50%) + enhancement (50%) per piece
+  equipSlots.forEach(slot => {
+    const piece = equip[slot];
+    if (!piece?.rarity) return;
+    hasAnyGear = true;
+    const r = GS_RARITY_PERCENT[piece.rarity] || 0;
+    const e = GS_ENHANCE_PERCENT[piece.enhancement] || 0;
+    gearScore += PER_EQUIP * (r * 0.5 + e * 0.5);
+  });
+
+  // Accessories: rarity only
+  accessorySlots.forEach(slot => {
+    const piece = equip[slot];
+    if (!piece?.rarity) return;
+    hasAnyGear = true;
+    gearScore += PER_ACCESSORY * (GS_RARITY_PERCENT[piece.rarity] || 0);
+  });
+
+  // FD portion
+  const fd = stats.finalDamage || 0;
+  const maxPct = _fdTable[_fdTable.length - 1].pct;
+  const fdPct = fdToPercent(fd);
+  const fdScore = FD_WEIGHT * (fdPct / maxPct);
+
+  // If no equipment data at all and no FD, fall back to legacy calculation
+  if (!hasAnyGear && !fd) {
+    return calculateGearscoreLegacy(player);
+  }
+
+  return Math.round(gearScore + fdScore);
+}
+
+// Legacy formula for characters that haven't been updated yet
+function calculateGearscoreLegacy(player) {
+  const weaponRarityPoints = { '': 0, 'epic': 5, 'unique': 15, 'legend': 22 };
+  const armorRarityPoints = { '': 0, 'epic': 4, 'unique': 12, 'legend': 18 };
   const weaponEnhancePoints = { '': 5, '9': 5, '10': 9, '11': 13, '12': 18, '13': 22, '14': 26, '15': 30 };
   const armorEnhancePoints = { '': 3, '9': 3, '10': 6, '11': 8, '12': 11, '13': 14, '14': 17, '15': 20 };
 
-  const weaponRarity = weaponRarityPoints[player.weapon || ''] || 0;
-  const armorRarity = armorRarityPoints[player.armor || ''] || 0;
-  const weaponEnhance = player.weapon ? (weaponEnhancePoints[player.weaponEnhance || ''] || 5) : 0;
-  const armorEnhance = player.armor ? (armorEnhancePoints[player.armorEnhance || ''] || 3) : 0;
-
-  // Suffix points: 5 each, max 2
+  const wr = weaponRarityPoints[player.weapon || ''] || 0;
+  const ar = armorRarityPoints[player.armor || ''] || 0;
+  const we = player.weapon ? (weaponEnhancePoints[player.weaponEnhance || ''] || 5) : 0;
+  const ae = player.armor ? (armorEnhancePoints[player.armorEnhance || ''] || 3) : 0;
   const suffixCount = [player.suffix1, player.suffix2].filter(s => s && s !== '').length;
-  const suffixPoints = suffixCount * 5;
 
-  return weaponRarity + armorRarity + weaponEnhance + armorEnhance + suffixPoints;
+  return wr + ar + we + ae + (suffixCount * 5);
 }
 
 // Gearscore tier thresholds and colors
@@ -307,27 +384,72 @@ export function getGearscoreTier(score) {
   return GEARSCORE_TIERS.find(t => score >= t.min) || GEARSCORE_TIERS[GEARSCORE_TIERS.length - 1];
 }
 
-// Format equipment text with level badge for display
+// Format equipment text for display
+// Uses new equipment jsonb, falls back to legacy fields
 export function formatEquipmentText(type, player) {
-  const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
-  const enhanceKey = type === 'weapon' ? 'weaponEnhance' : 'armorEnhance';
-  const levelKey = type === 'weapon' ? 'weaponLevel' : 'armorLevel';
+  const equip = player.equipment || {};
+  let rarity, enhance;
 
-  if (!player[rarityKey]) return null;
+  if (type === 'weapon') {
+    const mw = equip.mainWeapon || {};
+    rarity = mw.rarity || player.weapon || '';
+    enhance = mw.enhancement != null ? mw.enhancement : (player.weaponEnhance || '');
+  } else {
+    // Use helmet as representative for armor display
+    const helm = equip.helmet || {};
+    rarity = helm.rarity || player.armor || '';
+    enhance = helm.enhancement != null ? helm.enhancement : (player.armorEnhance || '');
+  }
 
-  const rarity = EQUIPMENT_RARITIES.find(r => r.value === player[rarityKey]);
-  const label = rarity?.label || player[rarityKey];
-  const color = rarity?.color || 'inherit';
-  const hasLevel = !!player[rarityKey];
-  const levelBadge = hasLevel && player[levelKey] ? `<span class="equip-level-badge ${player[levelKey] === '50' ? 'level-50' : ''}" style="background: ${color}25; border: 1px solid ${color}40;">Lv${player[levelKey]}</span> ` : '';
-  const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
-  const levelClass = player[levelKey] === '40' ? ' level-40' : '';
+  if (!rarity) return null;
+
+  const rarityInfo = EQUIPMENT_RARITIES.find(r => r.value === rarity);
+  const label = rarityInfo?.label || rarity;
+  const color = rarityInfo?.color || 'inherit';
+  const enhanceStr = enhance ? ' +' + enhance : '';
 
   return {
-    html: `<span class="equipment-item${levelClass}" style="color: ${color}">${EQUIPMENT_ICONS[type]} ${levelBadge}${label}${enhance}</span>`,
+    html: `<span class="equipment-item" style="color: ${color}">${EQUIPMENT_ICONS[type]} ${label}${enhanceStr}</span>`,
     color,
-    isLevel40: player[levelKey] === '40'
+    isLevel40: false
   };
+}
+
+// Generate compact equipment + suffix + FD summary HTML for a player
+// Used across lineups, lineup editor, and player selector
+export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment') {
+  const parts = [];
+
+  const weaponEquip = formatEquipmentText('weapon', player);
+  if (weaponEquip) parts.push(weaponEquip.html);
+  const armorEquip = formatEquipmentText('armor', player);
+  if (armorEquip) parts.push(armorEquip.html);
+
+  // FD display
+  const stats = player.characterStats || {};
+  const fd = stats.finalDamage;
+
+  const suffixes = [];
+  if (player.suffix1) {
+    const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+    suffixes.push(s?.label || player.suffix1);
+  }
+  if (player.suffix2) {
+    const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+    suffixes.push(s?.label || player.suffix2);
+  }
+
+  let html = '';
+  if (parts.length > 0) {
+    html += `<div class="${cssClass}">${parts.join(' ')}${fd ? ` <span class="fd-inline">FD ${fd}</span>` : ''}</div>`;
+  } else if (fd) {
+    html += `<div class="${cssClass}"><span class="fd-inline">FD ${fd}</span></div>`;
+  }
+  if (suffixes.length > 0) {
+    html += `<div class="player-suffixes">${suffixes.join(' + ')}</div>`;
+  }
+
+  return html;
 }
 
 // SVG icons for equipment

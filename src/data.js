@@ -272,26 +272,37 @@ class DataService {
       return [];
     }
 
-    // Transform to match old format
-    return data.map(p => ({
-      id: p.id,
-      name: p.name,
-      role: p.role || '',
-      notes: p.notes || '',
-      weapon: p.weapon || '',
-      weaponEnhance: p.weapon_enhance || '',
-      suffix1: p.suffix1 || '',
-      suffix2: p.suffix2 || '',
-      armor: p.armor || '',
-      armorEnhance: p.armor_enhance || '',
-      weaponLevel: p.weapon_level || '',
-      armorLevel: p.armor_level || '',
-      hardcoreCompleted: p.hardcore_completed || '',
-      classicCompleted: p.classic_completed || '',
-      classicTicketUsed: p.classic_ticket_used || '',
-      discordId: p.discord_id || null,
-      accountNumber: p.account_number || null
-    }));
+    // Transform to match frontend format
+    return data.map(p => {
+      const equip = p.equipment || {};
+      // Backward compat: derive old fields from new equipment jsonb
+      const mainWeapon = equip.mainWeapon || {};
+      const helmet = equip.helmet || {};
+
+      return {
+        id: p.id,
+        name: p.name,
+        role: p.role || '',
+        notes: p.notes || '',
+        // New equipment jsonb
+        equipment: equip,
+        characterStats: p.character_stats || {},
+        // Legacy fields (derived from equipment for backward compat)
+        weapon: mainWeapon.rarity || p.weapon || '',
+        weaponEnhance: mainWeapon.enhancement != null ? String(mainWeapon.enhancement) : (p.weapon_enhance || ''),
+        suffix1: p.suffix1 || '',
+        suffix2: p.suffix2 || '',
+        armor: helmet.rarity || p.armor || '',
+        armorEnhance: helmet.enhancement != null ? String(helmet.enhancement) : (p.armor_enhance || ''),
+        weaponLevel: p.weapon_level || '',
+        armorLevel: p.armor_level || '',
+        hardcoreCompleted: p.hardcore_completed || '',
+        classicCompleted: p.classic_completed || '',
+        classicTicketUsed: p.classic_ticket_used || '',
+        discordId: p.discord_id || null,
+        accountNumber: p.account_number || null
+      };
+    });
   }
 
   /**
@@ -344,27 +355,33 @@ class DataService {
   }
 
   async addPlayer(player) {
+    const insertData = {
+      name: player.name,
+      role: player.role,
+      notes: player.notes,
+      // Legacy fields (kept for backward compat)
+      weapon: player.weapon || '',
+      weapon_enhance: player.weaponEnhance || '',
+      suffix1: player.suffix1 || '',
+      suffix2: player.suffix2 || '',
+      armor: player.armor || '',
+      armor_enhance: player.armorEnhance || '',
+      weapon_level: player.weaponLevel || null,
+      armor_level: player.armorLevel || null,
+      // New jsonb columns
+      equipment: player.equipment || {},
+      character_stats: player.characterStats || {},
+      hardcore_completed: player.hardcoreCompleted || null,
+      classic_completed: player.classicCompleted || null,
+      classic_ticket_used: player.classicTicketUsed || null,
+      account_number: player.accountNumber || null,
+      // Auto-assign to the logged-in user
+      discord_id: this._user?.id || null
+    };
+
     const { data, error } = await supabase
       .from('players')
-      .insert({
-        name: player.name,
-        role: player.role,
-        notes: player.notes,
-        weapon: player.weapon,
-        weapon_enhance: player.weaponEnhance,
-        suffix1: player.suffix1,
-        suffix2: player.suffix2,
-        armor: player.armor,
-        armor_enhance: player.armorEnhance,
-        weapon_level: player.weaponLevel || null,
-        armor_level: player.armorLevel || null,
-        hardcore_completed: player.hardcoreCompleted || null,
-        classic_completed: player.classicCompleted || null,
-        classic_ticket_used: player.classicTicketUsed || null,
-        account_number: player.accountNumber || null,
-        // Auto-assign to the logged-in user
-        discord_id: this._user?.id || null
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -378,14 +395,18 @@ class DataService {
       name: player.name,
       role: player.role,
       notes: player.notes,
-      weapon: player.weapon,
-      weapon_enhance: player.weaponEnhance,
-      suffix1: player.suffix1,
-      suffix2: player.suffix2,
-      armor: player.armor,
-      armor_enhance: player.armorEnhance,
+      // Legacy fields
+      weapon: player.weapon || '',
+      weapon_enhance: player.weaponEnhance || '',
+      suffix1: player.suffix1 || '',
+      suffix2: player.suffix2 || '',
+      armor: player.armor || '',
+      armor_enhance: player.armorEnhance || '',
       weapon_level: player.weapon ? (player.weaponLevel || null) : null,
       armor_level: player.armor ? (player.armorLevel || null) : null,
+      // New jsonb columns
+      equipment: player.equipment || {},
+      character_stats: player.characterStats || {},
       account_number: player.accountNumber || null
     });
 

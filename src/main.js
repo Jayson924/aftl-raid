@@ -9,6 +9,7 @@ import { MyRaidsPage } from './pages/my-raids.jsx'
 import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
+import { setFdTable } from './constants.js'
 
 // Initialize the app
 async function initApp() {
@@ -46,6 +47,14 @@ async function initApp() {
     }
   });
 
+  // Load FD table for gearscore calculations
+  try {
+    const fdTable = await dataService.getAppConfig('fd_table');
+    if (fdTable) setFdTable(fdTable);
+  } catch (e) {
+    console.error('Failed to load FD table:', e);
+  }
+
   // Create navigation
   renderNavigation();
 
@@ -82,7 +91,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.0.22</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.1.00</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>

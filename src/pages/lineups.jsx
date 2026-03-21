@@ -2,7 +2,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, calculateGearscore, getGearscoreTier } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier } from '../constants.js';
 import moment from 'moment';
 
 export const LineupsPage = {
@@ -161,8 +161,12 @@ export const LineupsPage = {
   getEquipmentBackground(player) {
     if (!player) return '';
 
-    const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-    const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
+    const equip = player.equipment || {};
+    const weaponRarityVal = equip.mainWeapon?.rarity || player.weapon || '';
+    const armorRarityVal = equip.helmet?.rarity || player.armor || '';
+
+    const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === weaponRarityVal);
+    const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === armorRarityVal);
 
     const weaponColor = weaponRarity?.color || '';
     const armorColor = armorRarity?.color || '';
@@ -408,22 +412,6 @@ export const LineupsPage = {
               `;
             }
 
-            const equipmentDisplay = [];
-            const weaponEquip = formatEquipmentText('weapon', player);
-            if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
-            const armorEquip = formatEquipmentText('armor', player);
-            if (armorEquip) equipmentDisplay.push(armorEquip.html);
-
-            const suffixDisplay = [];
-            if (player.suffix1) {
-              const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-              suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-            }
-            if (player.suffix2) {
-              const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-              suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-            }
-
             // Check pilot status for this player (only for non-guest)
             const pilotName = !isPub && lineup.pilotPlayers && lineup.pilotPlayers[idx] ? lineup.pilotPlayers[idx] : '';
             const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
@@ -435,8 +423,7 @@ export const LineupsPage = {
                 <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : (() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</span>
                 ${pilotDisplay}
                 ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
-                ${!isPub && equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
-                ${!isPub && suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+                ${!isPub ? formatPlayerEquipmentHtml(player, 'player-equipment-compact') : ''}
               </div>
             </div>
           `;

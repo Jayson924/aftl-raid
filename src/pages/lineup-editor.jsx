@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, calculateGearscore, getGearscoreTier } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier } from '../constants.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
@@ -733,22 +733,6 @@ export const LineupEditorPage = {
         }
       }
 
-      const equipmentDisplay = [];
-      const weaponEquip = formatEquipmentText('weapon', player);
-      if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
-      const armorEquip = formatEquipmentText('armor', player);
-      if (armorEquip) equipmentDisplay.push(armorEquip.html);
-
-      const suffixDisplay = [];
-      if (player.suffix1) {
-        const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-        suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-      }
-      if (player.suffix2) {
-        const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-        suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-      }
-
       // Ticket used badge (only for Classic)
       const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/icons/ticket.svg" alt="T"></span>` : '';
 
@@ -762,8 +746,7 @@ export const LineupEditorPage = {
           <div class="player-info">
             <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</div>
             <div class="player-role">${player.role}</div>
-            ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
-            ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+            ${formatPlayerEquipmentHtml(player)}
           </div>
           <div class="player-card-badges">
             ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}
@@ -1301,30 +1284,13 @@ export const LineupEditorPage = {
         // In Next Week mode, treat all players as needing the raid
         const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
 
-        const equipmentDisplay = [];
-        const weaponEquip = formatEquipmentText('weapon', player);
-        if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
-        const armorEquip = formatEquipmentText('armor', player);
-        if (armorEquip) equipmentDisplay.push(armorEquip.html);
-
-        const suffixDisplay = [];
-        if (player.suffix1) {
-          const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-          suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-        }
-        if (player.suffix2) {
-          const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-          suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-        }
-
         return `
           <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
             ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
             <div class="player-info">
               <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</div>
               <div class="player-role">${player.role}</div>
-              ${equipmentDisplay.length > 0 ? `<div class="player-equipment">${equipmentDisplay.join(' ')}</div>` : ''}
-              ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+              ${formatPlayerEquipmentHtml(player)}
             </div>
           </div>
         `;
@@ -1663,22 +1629,6 @@ export const LineupEditorPage = {
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
 
-    const equipmentDisplay = [];
-    const weaponEquip = formatEquipmentText('weapon', player);
-    if (weaponEquip) equipmentDisplay.push(weaponEquip.html);
-    const armorEquip = formatEquipmentText('armor', player);
-    if (armorEquip) equipmentDisplay.push(armorEquip.html);
-
-    const suffixDisplay = [];
-    if (player.suffix1) {
-      const suffix1Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
-      suffixDisplay.push(suffix1Obj?.label || player.suffix1);
-    }
-    if (player.suffix2) {
-      const suffix2Obj = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
-      suffixDisplay.push(suffix2Obj?.label || player.suffix2);
-    }
-
     // Get current ticket status for this slot (only show for Classic raid)
     const hasTicket = this.currentLineup.ticketSlots[slotIndex];
     const showTicketToggle = this.currentLineup.raidType === 'Classic';
@@ -1692,8 +1642,7 @@ export const LineupEditorPage = {
         <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</div>
         ${pilotDisplay}
         <div class="player-role">${player.role}</div>
-        ${equipmentDisplay.length > 0 ? `<div class="player-equipment-compact">${equipmentDisplay.join(' ')}</div>` : ''}
-        ${suffixDisplay.length > 0 ? `<div class="player-suffixes">Suffix: ${suffixDisplay.join(' + ')}</div>` : ''}
+        ${formatPlayerEquipmentHtml(player, 'player-equipment-compact')}
       </div>
       <div class="slot-toggles">
         ${showTicketToggle ? `

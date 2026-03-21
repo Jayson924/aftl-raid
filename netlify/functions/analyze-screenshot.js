@@ -106,6 +106,8 @@ Return this JSON structure:
     "ring2": { "rarity": "epic", "enhancement": 0 }
   },
   "stats": {
+    "attackPower": 25000,
+    "magicAttack": 25000,
     "hp": 165350,
     "finalDamage": 2104,
     "defense": 8448,
