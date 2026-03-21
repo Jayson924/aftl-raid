@@ -752,6 +752,26 @@ class DataService {
     return { success: true };
   }
 
+  async getAppConfig(key) {
+    const { data, error } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', key)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data?.value || null;
+  }
+
+  async setAppConfig(key, value) {
+    const { error } = await supabase
+      .from('app_config')
+      .upsert({ key, value });
+
+    if (error) throw error;
+    return { success: true };
+  }
+
   // ============================================
   // PERSONAL RAIDS
   // ============================================

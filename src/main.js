@@ -6,6 +6,7 @@ import { LineupEditorPage } from './pages/lineup-editor.jsx'
 import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
+import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
 
@@ -55,6 +56,7 @@ async function initApp() {
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // No auth required
   router.register('my-raids', MyRaidsPage, 'player'); // Any authenticated user
+  router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);

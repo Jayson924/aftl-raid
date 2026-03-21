@@ -12,6 +12,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@supabase/supabase-js@^2.97.0",
+        "npm:chart.js@^4.5.1",
         "npm:flatpickr@^4.6.13",
         "npm:moment@^2.30.1",
         "npm:sass@^1.97.3",
