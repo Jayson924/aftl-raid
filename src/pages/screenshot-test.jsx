@@ -118,7 +118,7 @@ export const ScreenshotTestPage = {
     container.innerHTML = `
       <div class="screenshot-test-page">
         <h2>Screenshot Analyzer <span class="experimental-badge">POC</span></h2>
-        <p class="page-description">Upload a Dragon Nest character sheet screenshot to extract stats automatically.</p>
+        <p class="page-description">Upload a character sheet screenshot to extract stats.</p>
 
         ${isAdmin ? `
         <div class="fd-table-config">
