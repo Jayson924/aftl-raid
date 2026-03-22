@@ -1604,7 +1604,11 @@ export const PlayersPage = {
     fileInput.addEventListener('change', (e) => {
       if (e.target.files[0]) handleFile(e.target.files[0]);
     });
-    modalElement.addEventListener('paste', (e) => {
+    const onPaste = (e) => {
+      if (!document.body.contains(modalElement)) {
+        document.removeEventListener('paste', onPaste);
+        return;
+      }
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const item of items) {
@@ -1614,7 +1618,8 @@ export const PlayersPage = {
           return;
         }
       }
-    });
+    };
+    document.addEventListener('paste', onPaste);
 
     const handleFile = (file) => {
       if (!file.type.startsWith('image/')) return;

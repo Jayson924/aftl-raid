@@ -107,6 +107,7 @@ export const LineupEditorPage = {
                 <div class="lineup-slots-header-left">
                   <h3>Lineup</h3>
                   <button id="generate-lineup-btn" class="btn btn-ghost whos-around-btn">Generate Lineup</button>
+                  <button id="scan-lineup-btn" class="btn btn-ghost whos-around-btn">Lineup Screenshot</button>
                 </div>
                 <div id="presence-indicator" class="presence-indicator"></div>
               </div>
@@ -377,6 +378,10 @@ export const LineupEditorPage = {
 
     document.getElementById('generate-lineup-btn').addEventListener('click', () => {
       this.openLineupCreator();
+    });
+
+    document.getElementById('scan-lineup-btn').addEventListener('click', () => {
+      this.showScanLineupModal();
     });
 
     // Mobile tap-to-toggle for damage amp tooltips
@@ -1453,6 +1458,167 @@ export const LineupEditorPage = {
         toast.error('All slots are full! Remove a player first.');
       }
     });
+  },
+
+  showScanLineupModal() {
+    const modalElement = document.createElement('div');
+    modalElement.className = 'modal';
+
+    modalElement.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <h2>Scan Lineup Screenshot</h2>
+        <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 1rem;">
+          Upload or paste a screenshot of the raid party list. Character names will be matched to existing players — unmatched names will be added as guests.
+        </p>
+        <div class="modal-upload-zone scan-upload-zone" style="margin-bottom: 1rem;">
+          <img id="scan-preview" style="display:none; max-width:100%; max-height:200px; border-radius:4px;" />
+          <div class="modal-upload-placeholder">
+            <span class="upload-icon">📷</span>
+            <span>Click, drag, or paste an image</span>
+          </div>
+          <input type="file" id="scan-file-input" accept="image/*" style="display:none" />
+        </div>
+        <div class="form-actions">
+          <button type="button" id="scan-analyze-btn" class="btn btn-primary" disabled>Analyze</button>
+          <button type="button" class="btn btn-ghost scan-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modalElement);
+
+    const uploadZone = modalElement.querySelector('.scan-upload-zone');
+    const fileInput = modalElement.querySelector('#scan-file-input');
+    const preview = modalElement.querySelector('#scan-preview');
+    const placeholder = modalElement.querySelector('.modal-upload-placeholder');
+    const analyzeBtn = modalElement.querySelector('#scan-analyze-btn');
+    const cancelBtn = modalElement.querySelector('.scan-cancel-btn');
+
+    let imageData = null;
+    let mimeType = null;
+
+    const handleFile = (file) => {
+      if (!file.type.startsWith('image/')) return;
+      mimeType = file.type;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+        imageData = e.target.result.split(',')[1]; // base64 without prefix
+        analyzeBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    uploadZone.addEventListener('click', (e) => {
+      if (e.target === analyzeBtn || e.target === cancelBtn) return;
+      fileInput.click();
+    });
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+    const onPaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          handleFile(item.getAsFile());
+          return;
+        }
+      }
+    };
+    document.addEventListener('paste', onPaste);
+
+    const closeModal = () => {
+      document.removeEventListener('paste', onPaste);
+      if (modalElement.parentNode) document.body.removeChild(modalElement);
+    };
+
+    cancelBtn.addEventListener('click', closeModal);
+    modalElement.addEventListener('click', (e) => {
+      if (e.target === modalElement) closeModal();
+    });
+
+    analyzeBtn.addEventListener('click', async () => {
+      if (!imageData) return;
+
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = 'Analyzing...';
+
+      try {
+        const knownPlayers = this.players.map(p => p.name);
+        const response = await fetch('/.netlify/functions/analyze-lineup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageData, mimeType, knownPlayers })
+        });
+
+        const result = await response.json();
+
+        if (result.error) {
+          toast.error(`Analysis failed: ${result.error}`);
+          analyzeBtn.disabled = false;
+          analyzeBtn.textContent = 'Analyze';
+          return;
+        }
+
+        closeModal();
+        this.processLineupScan(result.players || []);
+      } catch (err) {
+        toast.error(`Analysis failed: ${err.message}`);
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = 'Analyze';
+      }
+    });
+  },
+
+  processLineupScan(scannedPlayers) {
+    if (!scannedPlayers.length) {
+      toast.error('No characters found in the screenshot');
+      return;
+    }
+
+    // Clear current lineup slots
+    for (let i = 0; i < 8; i++) {
+      if (this.currentLineup.players[i]) {
+        this.removePlayerFromSlot(i);
+      }
+    }
+
+    let matched = 0;
+    let guests = 0;
+
+    scannedPlayers.slice(0, 8).forEach((scanned, idx) => {
+      if (!scanned.name) return;
+
+      // Try to match against known players (case-insensitive)
+      const match = this.players.find(p =>
+        p.name.toLowerCase() === scanned.name.toLowerCase()
+      );
+
+      if (match) {
+        this.assignPlayerToSlot(idx, match.name);
+        matched++;
+      } else {
+        // Add as guest — name only, user sets the class
+        this.assignPubPlayerToSlot(idx, scanned.name, '');
+        guests++;
+      }
+    });
+
+    const parts = [];
+    if (matched) parts.push(`${matched} matched`);
+    if (guests) parts.push(`${guests} as guests`);
+    toast.success(`Lineup scanned: ${parts.join(', ')}`);
   },
 
   showPubCharacterModal(slotIndex) {
