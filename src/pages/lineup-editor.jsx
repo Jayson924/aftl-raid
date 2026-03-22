@@ -1468,7 +1468,7 @@ export const LineupEditorPage = {
       <div class="modal-content" style="max-width: 500px;">
         <h2>Scan Lineup Screenshot</h2>
         <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 1rem;">
-          Upload or paste a screenshot of the raid party list. Character names will be matched to existing players — unmatched names will be added as guests.
+          Upload or paste a screenshot of the raid party list. Character names will be matched to existing players; unmatched names will be added as guests.
         </p>
         <div class="modal-upload-zone scan-upload-zone" style="margin-bottom: 1rem;">
           <img id="scan-preview" style="display:none; max-width:100%; max-height:200px; border-radius:4px;" />
