@@ -7,6 +7,20 @@ import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
+// Build a lookup: class name → specialization icon
+const CLASS_ICON_MAP = {};
+Object.values(CLASS_FAMILIES).forEach(family => {
+  Object.values(family.specializations).forEach(spec => {
+    spec.classes.forEach(cls => {
+      CLASS_ICON_MAP[cls] = spec.icon;
+    });
+  });
+});
+
+function getClassIcon(className) {
+  return CLASS_ICON_MAP[className] || null;
+}
+
 export const PlayersPage = {
   // Cache for app users (for owner dropdown)
   _appUsers: [],
@@ -394,6 +408,25 @@ export const PlayersPage = {
         });
       });
 
+      // Add expand/collapse listeners for flat view table rows
+      document.querySelectorAll('.expandable-row').forEach(row => {
+        const arrow = row.querySelector('.expand-arrow');
+        const playerId = row.dataset.playerId;
+        const detailRow = document.querySelector(`.expand-detail-row[data-for="${playerId}"]`);
+        if (!detailRow) {
+          row.classList.add('no-expand');
+          return;
+        }
+
+        row.addEventListener('click', (e) => {
+          // Don't expand if clicking on interactive elements
+          if (e.target.closest('.player-name-link, .raid-badge, a, button')) return;
+          const isOpen = detailRow.classList.toggle('open');
+          arrow.classList.toggle('open', isOpen);
+          row.classList.toggle('expanded', isOpen);
+        });
+      });
+
       // Add event listeners for class family filter
       this.attachClassFilterListeners();
 
@@ -520,7 +553,7 @@ export const PlayersPage = {
             <div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>
           </div>
           <div class="roster-stat">
-            <span class="roster-stat-value" style="color: ${avgTier.color}" data-tooltip="Gearscore is experimental">${avgGearscore}</span>
+            <span class="roster-stat-value" style="color: ${avgTier.color}" data-tooltip="Gearscore">${avgGearscore}</span>
             <span class="roster-stat-label">Avg Gearscore</span>
           </div>
         </div>
@@ -537,7 +570,7 @@ export const PlayersPage = {
                 <span class="roster-chart-center-label">total</span>
               </div>
             </div>
-            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and need +15 weapon and +15 armor.</div>
+            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and would need 2718 FD, +15 weapon, and +15 armor.</div>
           </div>
           <div class="roster-breakdown">
             <h3>Class Breakdown</h3>
@@ -560,7 +593,7 @@ export const PlayersPage = {
                           ? Math.round(clsPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / clsPlayers.length)
                           : 0;
                         const clsTier = getGearscoreTier(clsAvgGs);
-                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span> <span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};" data-tooltip="Gearscore is experimental">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></span>`;
+                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span> <span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};" data-tooltip="Gearscore">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></span>`;
                       }).join('')}
                     </div>
                   ` : ''}
@@ -730,18 +763,20 @@ export const PlayersPage = {
         <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
         <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
       </div>
-      <table class="players-table">
+      <table class="players-table expandable-table">
         <thead>
           <tr>
+            <th class="expand-col"></th>
             <th>Name</th>
             <th>Owner</th>
             <th>Class</th>
-            <th class="sortable-header ${this._equipmentSort === 'gs' ? 'sort-active' : ''}" data-sort="gs" data-tooltip="Gearscore is experimental">GS ${this._equipmentSort === 'gs' ? '▼' : ''}</th>
+            <th class="sortable-header ${this._equipmentSort === 'gs' ? 'sort-active' : ''}" data-sort="gs" data-tooltip="Gearscore">GS ${this._equipmentSort === 'gs' ? '▼' : ''}</th>
             <th>Equipment</th>
             <th>Raids Needed</th>
             <th>Notes</th>
           </tr>
           <tr class="filter-row">
+            <td></td>
             <td></td>
             <td></td>
             <td></td>
@@ -762,11 +797,13 @@ export const PlayersPage = {
             const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
+            const detailHtml = this._buildEquipDetailHtml(player);
 
             const owner = player.discordId ? userMap[player.discordId] : null;
 
             return `
-            <tr>
+            <tr class="expandable-row" data-player-id="${player.id}">
+              <td class="expand-toggle-cell">${detailHtml ? '<span class="expand-arrow">▶</span>' : ''}</td>
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
               </td>
@@ -780,10 +817,10 @@ export const PlayersPage = {
               </td>
               <td data-label="Class">${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}
               </td>
               <td data-label="Equipment">
-                ${formatPlayerEquipmentHtml(player)}
+                ${this._buildEquipSummaryHtml(player)}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
                 <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
@@ -799,10 +836,56 @@ export const PlayersPage = {
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
             </tr>
+            ${detailHtml ? `<tr class="expand-detail-row" data-for="${player.id}"><td colspan="8"><div class="expand-detail-content">${detailHtml}</div></td></tr>` : ''}
           `;
           }).join('')}
         </tbody>
       </table>
+      <div class="flat-mobile-cards">
+        ${sortedPlayers.map(player => {
+          const gs = calculateGearscore(player);
+          const tier = getGearscoreTier(gs);
+          const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
+          const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
+          const canEdit = this.canEditCharacter(player);
+          const canToggleRaid = canEdit || dataService.isAdmin();
+          const icon = getClassIcon(player.role);
+          const owner = player.discordId ? userMap[player.discordId] : null;
+          const detailHtml = this._buildEquipDetailHtml(player);
+
+          return `
+            <div class="char-card">
+              <div class="char-card-header">
+                <div class="char-card-identity">
+                  ${icon ? `<div class="char-card-icon-wrap"><img src="/icons/${icon}" alt="${player.role}" class="char-card-icon"></div>` : ''}
+                  <div class="char-card-name-block">
+                    <span class="char-card-name ${canEdit ? 'editable' : ''}">
+                      ${canEdit
+                        ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
+                        : player.name}
+                    </span>
+                    <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
+                  </div>
+                </div>
+                <div class="char-card-badges">
+                  <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
+                        title="${canToggleRaid ? 'Click to toggle' : ''}">
+                    ${!needsHardcore ? '✓ ' : ''}HC
+                  </span>
+                  <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
+                        title="${canToggleRaid ? 'Click to toggle' : ''}">
+                    ${!needsClassic ? '✓ ' : ''}CL
+                  </span>
+                </div>
+              </div>
+              ${owner ? `<div class="char-card-owner"><img src="${owner.avatarUrl || ''}" alt="" class="char-card-owner-avatar" onerror="this.style.display='none'"><span>${owner.displayName}</span></div>` : ''}
+              ${detailHtml}
+              ${player.notes ? `<div class="char-card-notes">${player.notes}</div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
     `;
   },
 
@@ -912,12 +995,12 @@ export const PlayersPage = {
           html += `
             <div class="account-group" data-account="${accountNum}">
               <div class="account-divider"><span class="account-num" data-account="${accountNum}">${accountNum}</span></div>
-              ${this.renderPlayersTable(accountPlayers, hasAnyEditableCharacters, userMap)}
+              ${this.renderCharacterCards(accountPlayers, hasAnyEditableCharacters, userMap)}
             </div>
           `;
         } else {
           // Single account - no indicator needed
-          html += this.renderPlayersTable(accountPlayers, hasAnyEditableCharacters, userMap);
+          html += this.renderCharacterCards(accountPlayers, hasAnyEditableCharacters, userMap);
         }
       });
 
@@ -928,14 +1011,145 @@ export const PlayersPage = {
     return html;
   },
 
+  // Compact equipment summary for table columns
+  // Weapons: highest enhancement + count of highest rarity, e.g. "+13 (Legend ×2)"
+  // Armor: avg enhancement + count of highest rarity, e.g. "+11 (Legend ×5)"
+  _buildEquipSummaryHtml(player) {
+    const equip = player.equipment || {};
+    const rarityOrder = { 'legend': 4, 'unique': 3, 'epic': 2, 'rare': 1, '': 0 };
+
+    const summarize = (slotIds, useAvg) => {
+      const pieces = slotIds.map(id => equip[id]).filter(p => p?.rarity);
+      if (!pieces.length) return '';
+
+      // Find highest rarity
+      let maxRarityVal = 0;
+      pieces.forEach(p => {
+        const val = rarityOrder[p.rarity] || 0;
+        if (val > maxRarityVal) maxRarityVal = val;
+      });
+      const topRarity = Object.entries(rarityOrder).find(([, v]) => v === maxRarityVal)?.[0];
+      const rInfo = EQUIPMENT_RARITIES.find(r => r.value === topRarity);
+      const topCount = pieces.filter(p => p.rarity === topRarity).length;
+
+      // Enhancement
+      const enhValues = pieces.map(p => parseInt(p.enhancement) || 0);
+      let enhDisplay;
+      if (useAvg) {
+        const avg = Math.round(enhValues.reduce((a, b) => a + b, 0) / enhValues.length);
+        enhDisplay = `+${avg}`;
+      } else {
+        enhDisplay = `+${Math.max(...enhValues)}`;
+      }
+
+      const color = rInfo?.color || 'inherit';
+      return `<span class="equip-summary-line"><span style="color: ${color}">${enhDisplay}</span> <span style="color: ${color}">(${rInfo?.label} ×${topCount})</span></span>`;
+    };
+
+    const weaponHtml = summarize(['mainWeapon', 'subWeapon'], false);
+    const armorHtml = summarize(['helmet', 'top', 'bottom', 'gloves', 'boots'], true);
+
+    // Suffixes
+    const suffixes = [];
+    if (player.suffix1) {
+      const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+      suffixes.push(s?.label || player.suffix1);
+    }
+    if (player.suffix2) {
+      const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+      suffixes.push(s?.label || player.suffix2);
+    }
+
+    if (!weaponHtml && !armorHtml) return '';
+
+    return `
+      <div class="equip-summary">
+        ${weaponHtml ? `<div class="equip-summary-row">${EQUIPMENT_ICONS.weapon} ${weaponHtml}</div>` : ''}
+        ${armorHtml ? `<div class="equip-summary-row">${EQUIPMENT_ICONS.armor} ${armorHtml}</div>` : ''}
+        ${suffixes.length > 0 ? `<div class="equip-summary-suffixes">${suffixes.join(' + ')}</div>` : ''}
+      </div>
+    `;
+  },
+
+  // Shared helper: builds the 2x2 equipment detail grid for a player
+  _buildEquipDetailHtml(player) {
+    const equip = player.equipment || {};
+
+    const renderSlot = (id, label) => {
+      const piece = equip[id];
+      if (!piece?.rarity) return `<div class="equip-cell empty"><span class="equip-cell-label">${label}</span><span class="equip-cell-value">—</span></div>`;
+      const rInfo = EQUIPMENT_RARITIES.find(r => r.value === piece.rarity);
+      const color = rInfo?.color || 'inherit';
+      const enh = piece.enhancement ? ` +${piece.enhancement}` : '';
+      const lvl = piece.level === '40' ? 'Lv40' : 'Lv50';
+      return `<div class="equip-cell"><span class="equip-cell-label">${label}</span><span class="equip-cell-value" style="color: ${color}"><span class="equip-cell-lv">${lvl}</span> ${rInfo?.label || piece.rarity}${enh}</span></div>`;
+    };
+
+    const hasEquip = ['mainWeapon','subWeapon','helmet','top','bottom','gloves','boots','necklace','earring','ring1','ring2'].some(id => equip[id]?.rarity);
+
+    const suffixes = [];
+    if (player.suffix1) {
+      const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
+      suffixes.push(s?.label || player.suffix1);
+    }
+    if (player.suffix2) {
+      const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
+      suffixes.push(s?.label || player.suffix2);
+    }
+
+    const stats = player.characterStats || {};
+    const statRows = [];
+    if (stats.attackPower) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">ATK</span><span class="equip-cell-value stat-value">${stats.attackPower.toLocaleString()}</span></div>`);
+    if (stats.magicAttack) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MATK</span><span class="equip-cell-value stat-value">${stats.magicAttack.toLocaleString()}</span></div>`);
+    if (stats.finalDamage) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">FD</span><span class="equip-cell-value stat-value">${stats.finalDamage.toLocaleString()}</span></div>`);
+    if (stats.hp) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">HP</span><span class="equip-cell-value stat-value">${stats.hp.toLocaleString()}</span></div>`);
+    if (stats.defense) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">Def</span><span class="equip-cell-value stat-value">${stats.defense.toLocaleString()}</span></div>`);
+    if (stats.magicDefense) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MDef</span><span class="equip-cell-value stat-value">${stats.magicDefense.toLocaleString()}</span></div>`);
+
+    if (!hasEquip && statRows.length === 0) return '';
+
+    return `
+      <div class="char-card-equip-section">
+        <div class="equip-group-card">
+          <div class="equip-group-title">Armor</div>
+          ${renderSlot('helmet', 'Helmet')}
+          ${renderSlot('top', 'Top')}
+          ${renderSlot('bottom', 'Bottom')}
+          ${renderSlot('gloves', 'Gloves')}
+          ${renderSlot('boots', 'Boots')}
+        </div>
+        <div class="equip-group-card">
+          <div class="equip-group-title">Weapons</div>
+          ${renderSlot('mainWeapon', 'Main')}
+          ${renderSlot('subWeapon', 'Sub')}
+          ${suffixes.length > 0 ? `<div class="equip-group-title" style="margin-top: 0.3rem">Suffixes</div><div class="equip-cell"><span class="equip-cell-value suffix-value">${suffixes.join(' · ')}</span></div>` : ''}
+        </div>
+        <div class="equip-group-card">
+          <div class="equip-group-title">Accessories</div>
+          ${renderSlot('necklace', 'Necklace')}
+          ${renderSlot('earring', 'Earring')}
+          ${renderSlot('ring1', 'Ring 1')}
+          ${renderSlot('ring2', 'Ring 2')}
+        </div>
+        ${statRows.length > 0 ? `
+          <div class="equip-group-card">
+            <div class="equip-group-title">Stats</div>
+            ${statRows.join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  },
+
   renderPlayersTable(players, hasAnyEditableCharacters, userMap, accountBadge = null) {
     // Sort players by raid priority then alphabetically
     const sortedPlayers = this.sortPlayersByRaidPriority(players);
 
     return `
-      <table class="players-table">
+      <table class="players-table expandable-table">
         <thead>
           <tr>
+            <th></th>
             <th>Name</th>
             <th>Class</th>
             <th>GS</th>
@@ -950,15 +1164,17 @@ export const PlayersPage = {
             const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
+            const detailHtml = this._buildEquipDetailHtml(player);
 
             return `
-            <tr>
+            <tr class="expandable-row" data-player-id="${player.id}">
+              <td class="expand-toggle-cell">${detailHtml ? '<span class="expand-arrow">▶</span>' : ''}</td>
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
               </td>
               <td data-label="Class">${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}
               </td>
               <td data-label="Equipment">
                 ${formatPlayerEquipmentHtml(player)}
@@ -977,10 +1193,62 @@ export const PlayersPage = {
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
             </tr>
+            ${detailHtml ? `<tr class="expand-detail-row" data-for="${player.id}"><td colspan="7"><div class="expand-detail-content">${detailHtml}</div></td></tr>` : ''}
           `;
           }).join('')}
         </tbody>
       </table>
+    `;
+  },
+
+  renderCharacterCards(players, hasAnyEditableCharacters, userMap) {
+    const sortedPlayers = this.sortPlayersByRaidPriority(players);
+
+    return `
+      <div class="character-card-grid">
+        ${sortedPlayers.map(player => {
+          const gs = calculateGearscore(player);
+          const tier = getGearscoreTier(gs);
+          const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
+          const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
+          const canEdit = this.canEditCharacter(player);
+          const canToggleRaid = canEdit || dataService.isAdmin();
+          const icon = getClassIcon(player.role);
+
+          const detailHtml = this._buildEquipDetailHtml(player);
+
+          return `
+            <div class="char-card">
+              <div class="char-card-header">
+                <div class="char-card-identity">
+                  ${icon ? `<div class="char-card-icon-wrap"><img src="/icons/${icon}" alt="${player.role}" class="char-card-icon"></div>` : ''}
+                  <div class="char-card-name-block">
+                    <span class="char-card-name ${canEdit ? 'editable' : ''}">
+                      ${canEdit
+                        ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
+                        : player.name}
+                    </span>
+                    <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
+                  </div>
+                </div>
+                <div class="char-card-badges">
+                  <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
+                        title="${canToggleRaid ? 'Click to toggle' : ''}">
+                    ${!needsHardcore ? '✓ ' : ''}HC
+                  </span>
+                  <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
+                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
+                        title="${canToggleRaid ? 'Click to toggle' : ''}">
+                    ${!needsClassic ? '✓ ' : ''}CL
+                  </span>
+                </div>
+              </div>
+              ${detailHtml}
+              ${player.notes ? `<div class="char-card-notes">${player.notes}</div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
     `;
   },
 
@@ -1201,7 +1469,7 @@ export const PlayersPage = {
   },
 
   // Helper: generate equipment dropdown row HTML
-  _equipSlotHtml(id, label, rarity, enhancement, showEnhance = true) {
+  _equipSlotHtml(id, label, rarity, enhancement, showEnhance = true, level = '50') {
     const rarityOptions = EQUIPMENT_RARITIES.map(r =>
       `<option value="${r.value}" ${rarity === r.value ? 'selected' : ''}>${r.label}</option>`
     ).join('');
@@ -1211,6 +1479,7 @@ export const PlayersPage = {
     return `
       <div class="equip-slot-row">
         <span class="equip-slot-label">${label}</span>
+        <button type="button" class="equip-level-toggle ${level === '40' ? 'level-40' : ''}" id="${id}-level" data-level="${level}" title="Equipment level">Lv${level === '40' ? '40' : '50'}</button>
         <select id="${id}-rarity" class="equipment-select equip-compact">${rarityOptions}</select>
         ${showEnhance ? `<select id="${id}-enhance" class="equipment-select equip-compact enhancement-select">${enhanceOptions}</select>` : ''}
       </div>
@@ -1222,8 +1491,9 @@ export const PlayersPage = {
     const readSlot = (slotId, hasEnhance) => {
       const rarity = document.getElementById(`${prefix}-${slotId}-rarity`)?.value || '';
       const enhancement = hasEnhance ? parseInt(document.getElementById(`${prefix}-${slotId}-enhance`)?.value || '0', 10) : 0;
+      const level = document.getElementById(`${prefix}-${slotId}-level`)?.dataset?.level || '50';
       if (!rarity) return {};
-      return { rarity, enhancement };
+      return { rarity, enhancement, level };
     };
 
     return {
@@ -1394,7 +1664,21 @@ export const PlayersPage = {
     });
   },
 
-  // Helper: generate equipment + stats form HTML
+  // Helper: setup per-piece equipment level toggle buttons
+  _setupEquipLevelButtons(prefix, modalElement) {
+    modalElement.querySelectorAll('.equip-level-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const current = btn.dataset.level;
+        const next = current === '50' ? '40' : '50';
+        btn.dataset.level = next;
+        btn.textContent = `Lv${next}`;
+        btn.classList.toggle('level-40', next === '40');
+      });
+    });
+  },
+
+  // Helper: generate screenshot upload HTML
   _screenshotUploadHtml(prefix) {
     return `
       <div class="modal-upload-section">
@@ -1426,7 +1710,7 @@ export const PlayersPage = {
     const s2 = suffix2 || '';
     const slot = (id, label, hasEnhance = true) => {
       const piece = eq[id] || {};
-      return this._equipSlotHtml(`${prefix}-${id}`, label, piece.rarity || '', piece.enhancement || 0, hasEnhance);
+      return this._equipSlotHtml(`${prefix}-${id}`, label, piece.rarity || '', piece.enhancement || 0, hasEnhance, piece.level || '50');
     };
 
     const suffixSelect = (id, label, selected) => `
@@ -1563,8 +1847,9 @@ export const PlayersPage = {
     const initialMax = selectedOwnerId ? Math.max(1, this.getMaxAccountForOwner(selectedOwnerId)) : 1;
     this.renderAccountButtons('account-buttons-container', 1, initialMax);
 
-    // Setup screenshot upload
+    // Setup screenshot upload and equip level buttons
     this._setupScreenshotUpload('player', modalElement);
+    this._setupEquipLevelButtons('player', modalElement);
 
     // Update account buttons when owner changes (admin only)
     if (isAdmin) {
@@ -1604,7 +1889,6 @@ export const PlayersPage = {
 
         const suffix1 = document.getElementById('player-suffix1').value;
         const suffix2 = document.getElementById('player-suffix2').value;
-
         const result = await dataService.addPlayer({
           name, role, weapon, weaponEnhance, suffix1, suffix2,
           armor, armorEnhance, equipment, characterStats,
@@ -1696,8 +1980,9 @@ export const PlayersPage = {
     const editMaxAccount = player.discordId ? Math.max(1, maxAccount, player.accountNumber || 1) : 1;
     this.renderAccountButtons('edit-account-buttons-container', player.accountNumber || 1, editMaxAccount);
 
-    // Setup screenshot upload
+    // Setup screenshot upload and equip level buttons
     this._setupScreenshotUpload('edit-player', modalElement);
+    this._setupEquipLevelButtons('edit-player', modalElement);
 
     if (isAdmin) {
       const ownerSelect = document.getElementById('edit-player-owner');
@@ -1738,7 +2023,6 @@ export const PlayersPage = {
 
         const suffix1 = document.getElementById('edit-player-suffix1').value;
         const suffix2 = document.getElementById('edit-player-suffix2').value;
-
         await dataService.updatePlayer({
           id: player.id, name, role,
           weapon, weaponEnhance, suffix1, suffix2,

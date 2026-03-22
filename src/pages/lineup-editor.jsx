@@ -744,7 +744,7 @@ export const LineupEditorPage = {
           ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           <div class="player-info">
-            <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</div>
+            <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
             <div class="player-role">${player.role}</div>
             ${formatPlayerEquipmentHtml(player)}
           </div>
@@ -1288,7 +1288,7 @@ export const LineupEditorPage = {
           <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
             ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
             <div class="player-info">
-              <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</div>
+              <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
               <div class="player-role">${player.role}</div>
               ${formatPlayerEquipmentHtml(player)}
             </div>
@@ -1639,7 +1639,7 @@ export const LineupEditorPage = {
 
     slotContent.innerHTML = `
       <div class="assigned-player">
-        <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</div>
+        <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
         ${pilotDisplay}
         <div class="player-role">${player.role}</div>
         ${formatPlayerEquipmentHtml(player, 'player-equipment-compact')}

@@ -420,7 +420,7 @@ export const LineupsPage = {
             <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${isAdmin ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${isAdmin ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
-                <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : (() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}" data-tooltip="Gearscore is experimental">${gs}</span>`; })()}</span>
+                <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : (() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</span>
                 ${pilotDisplay}
                 ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
                 ${!isPub ? formatPlayerEquipmentHtml(player, 'player-equipment-compact') : ''}

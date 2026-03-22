@@ -79,10 +79,10 @@ Rarity colors from highest to lowest:
 COLOR COMPARISON TIPS:
 - Orange (Epic) vs Red (Legend): Orange has a warm, yellowish tint. Red is a pure, cool-toned red with no orange.
 - Purple (Unique) vs Orange (Epic): Purple has a COOL blue-ish/violet tone. Orange has a WARM yellow-ish tone. If you see a cooler-toned border compared to warm orange equipment, it is purple/Unique.
-- Compare accessories (bottom row) to armor/weapons — they often differ in rarity. Look at whether the border colors actually match or are different hues.
+- IMPORTANT: Every single equipment piece can have a DIFFERENT rarity — armor, weapons, AND accessories. Do NOT assume any pieces match each other. A character might have a Legend helmet, Epic top, Unique gloves, Epic main weapon, Rare necklace, Unique ring, etc. Evaluate each of the 11 slots independently by its own border color.
 - When in doubt between two adjacent rarities, lean toward the LOWER one (e.g., Epic over Legend, Unique over Epic).
 
-Enhancement levels appear as small "+X" numbers on or near equipment icons.
+Enhancement levels appear as small "+X" numbers overlaid on each equipment icon, typically in the bottom-right or center of the icon. They are small white or yellow text. Look carefully at each icon — most equipped items WILL have an enhancement number. Common values range from +9 to +15. If you can make out any number on the icon, report it. If the number is hard to read, give your best guess rather than leaving it as 0. Only use 0 for accessories (which have no enhancement).
 
 Valid class names (use EXACTLY one of these):
 Gladiator, Moon Lord, Barbarian, Destroyer, Sniper, Artillery, Tempest, Wind Walker, Saleana, Elestra, Smasher, Majesty, Guardian, Crusader, Saint, Inquisitor, Shooting Star, Gear Master, Adept, Physician, Dark Summoner, Soul Eater, Blade Dancer, Spirit Dancer

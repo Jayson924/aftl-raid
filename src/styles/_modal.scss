@@ -482,7 +482,7 @@
 
 // Equipment modal styles
 .modal-equipment {
-  max-width: 650px;
+  max-width: 800px;
 }
 
 .modal-upload-section {
@@ -592,6 +592,33 @@
 .upload-status {
   font-size: 0.8em;
   color: $text-muted;
+}
+
+.equip-level-toggle {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.7em;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: $text-muted;
+  cursor: pointer;
+  transition: $transition;
+  font-family: inherit;
+  min-width: 26px;
+  text-align: center;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: $text-light;
+  }
+
+  &.level-40 {
+    color: rgba(255, 165, 0, 0.8);
+    border-color: rgba(255, 165, 0, 0.4);
+    background: rgba(255, 165, 0, 0.1);
+  }
 }
 
 .equip-form-section {

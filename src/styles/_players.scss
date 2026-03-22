@@ -1068,6 +1068,340 @@
   }
 }
 
+// Mobile cards for flat view — hidden on desktop, shown on mobile
+.flat-mobile-cards {
+  display: none;
+}
+
+// Owner line inside cards (flat view mobile)
+.char-card-owner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: $text-muted;
+}
+
+.char-card-owner-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+// Compact equipment summary for table cells
+.equip-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.equip-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+}
+
+.equip-summary-line {
+  font-weight: 600;
+}
+
+.equip-summary-suffixes {
+  font-size: 0.8rem;
+  color: $text-muted;
+  font-style: italic;
+}
+
+// Expandable table rows for flat view
+.expandable-table {
+  .expandable-row {
+    cursor: pointer;
+  }
+
+  .expand-col {
+    width: 2rem;
+  }
+
+  .expand-toggle-cell {
+    width: 2rem;
+    padding-right: 0 !important;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .expand-arrow {
+    display: inline-block;
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.35);
+    transition: transform 0.2s ease;
+
+    &.open {
+      transform: rotate(90deg);
+      color: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  .expand-detail-row {
+    display: none;
+    background: none !important;
+
+    &.open {
+      display: table-row;
+    }
+
+    > td {
+      padding: 0.5rem 1rem 1.25rem !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  }
+
+  .expand-detail-content {
+    .char-card-equip-section {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+}
+
+// Character cards for grouped view
+.character-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 0.75rem;
+
+  @media (max-width: 400px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.char-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $border-radius;
+  padding: 0.85rem 1rem;
+  transition: $transition;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.char-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.char-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.char-card-icon-wrap {
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.char-card-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.6);
+}
+
+.char-card-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.char-card-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: $primary-color;
+
+  &.editable .player-name-link {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+
+    &:hover {
+      color: $primary-hover;
+
+      .edit-icon {
+        opacity: 1;
+      }
+    }
+
+    .edit-icon {
+      font-size: 0.8em;
+      opacity: 0.3;
+      transition: $transition;
+    }
+  }
+}
+
+.char-card-class {
+  font-size: 0.8rem;
+  color: $text-muted;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.char-card-gs {
+  font-weight: 700;
+  font-size: 0.75em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.char-card-badges {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+
+  .raid-badge {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+
+    &.raid-hardcore {
+      background-color: rgba(214, 45, 73, 0.8);
+      color: white;
+    }
+
+    &.raid-classic {
+      background-color: rgba(143, 92, 224, 0.8);
+      color: white;
+    }
+
+    &.clickable {
+      cursor: pointer;
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+
+    &.completed {
+      opacity: 0.5;
+      border: 1px solid $success-color;
+
+      &.raid-hardcore {
+        background-color: rgba(214, 45, 73, 0.4);
+      }
+
+      &.raid-classic {
+        background-color: rgba(143, 92, 224, 0.4);
+      }
+    }
+  }
+}
+
+// Equipment section — 2x2 grid of group cards (matches modal layout)
+.char-card-equip-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+
+  @media (max-width: 400px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.equip-group-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+}
+
+.equip-group-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.3rem;
+}
+
+.equip-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.15rem 0;
+  gap: 0.4rem;
+
+  &.empty {
+    .equip-cell-value {
+      color: rgba(255, 255, 255, 0.15);
+    }
+  }
+}
+
+.equip-cell-label {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.equip-cell-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
+
+  &.suffix-value {
+    font-style: italic;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.75rem;
+  }
+}
+
+.equip-cell-lv {
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.stat-value {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.char-card-notes {
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
 // Guest character badges
 .pub-badge {
   background-color: #ffc107;

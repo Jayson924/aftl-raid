@@ -232,7 +232,16 @@ export const EQUIPMENT_LEVELS = [
 
 // Enhancement levels
 export const ENHANCEMENT_LEVELS = [
-  { value: '', label: '+9' },
+  { value: '', label: 'Enh' },
+  { value: '0', label: '+0' },
+  { value: '1', label: '+1' },
+  { value: '2', label: '+2' },
+  { value: '3', label: '+3' },
+  { value: '4', label: '+4' },
+  { value: '5', label: '+5' },
+  { value: '6', label: '+6' },
+  { value: '7', label: '+7' },
+  { value: '8', label: '+8' },
   { value: '9', label: '+9' },
   { value: '10', label: '+10' },
   { value: '11', label: '+11' },
@@ -425,10 +434,6 @@ export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment')
   const armorEquip = formatEquipmentText('armor', player);
   if (armorEquip) parts.push(armorEquip.html);
 
-  // FD display
-  const stats = player.characterStats || {};
-  const fd = stats.finalDamage;
-
   const suffixes = [];
   if (player.suffix1) {
     const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix1);
@@ -441,9 +446,7 @@ export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment')
 
   let html = '';
   if (parts.length > 0) {
-    html += `<div class="${cssClass}">${parts.join(' ')}${fd ? ` <span class="fd-inline">FD ${fd}</span>` : ''}</div>`;
-  } else if (fd) {
-    html += `<div class="${cssClass}"><span class="fd-inline">FD ${fd}</span></div>`;
+    html += `<div class="${cssClass}">${parts.join(' ')}</div>`;
   }
   if (suffixes.length > 0) {
     html += `<div class="player-suffixes">${suffixes.join(' + ')}</div>`;

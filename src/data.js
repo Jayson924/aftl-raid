@@ -366,8 +366,6 @@ class DataService {
       suffix2: player.suffix2 || '',
       armor: player.armor || '',
       armor_enhance: player.armorEnhance || '',
-      weapon_level: player.weaponLevel || null,
-      armor_level: player.armorLevel || null,
       // New jsonb columns
       equipment: player.equipment || {},
       character_stats: player.characterStats || {},
@@ -402,8 +400,6 @@ class DataService {
       suffix2: player.suffix2 || '',
       armor: player.armor || '',
       armor_enhance: player.armorEnhance || '',
-      weapon_level: player.weapon ? (player.weaponLevel || null) : null,
-      armor_level: player.armor ? (player.armorLevel || null) : null,
       // New jsonb columns
       equipment: player.equipment || {},
       character_stats: player.characterStats || {},
