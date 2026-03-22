@@ -900,10 +900,8 @@ export const LineupEditorPage = {
    * Render class picker (base class icons → specializations → final classes)
    * Same pattern used in the add/edit character modal on the Players page.
    */
-  renderClassPicker(containerId, hiddenInputId, selectedClass) {
-    const container = document.getElementById(containerId);
-    const hiddenInput = document.getElementById(hiddenInputId);
-    if (!container) return;
+  renderClassPickerEl(container, hiddenInput, selectedClass) {
+    if (!container || !hiddenInput) return;
 
     // Find which family/spec the selected class belongs to
     let activeFamily = null;
@@ -1001,6 +999,12 @@ export const LineupEditorPage = {
     };
 
     render();
+  },
+
+  renderClassPicker(containerId, hiddenInputId, selectedClass) {
+    const container = document.getElementById(containerId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    this.renderClassPickerEl(container, hiddenInput, selectedClass);
   },
 
   getEquipmentBackground(player) {
@@ -1628,20 +1632,24 @@ export const LineupEditorPage = {
     modalElement.innerHTML = `
       <div class="modal-content" style="max-width: 450px;">
         <h2>Set Class for ${guestName || 'Guest'}</h2>
-        <input type="hidden" id="guest-class-value" value="">
-        <div class="class-picker" id="guest-class-picker"></div>
+        <input type="hidden" class="guest-class-value" value="">
+        <div class="class-picker guest-class-picker"></div>
         <div class="modal-actions" style="margin-top: 1rem;">
-          <button type="button" id="guest-class-confirm" class="btn btn-primary" disabled>Confirm</button>
-          <button type="button" id="guest-class-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="button" class="btn btn-primary guest-class-confirm" disabled>Confirm</button>
+          <button type="button" class="btn btn-ghost guest-class-cancel">Cancel</button>
         </div>
       </div>
     `;
 
     document.body.appendChild(modalElement);
-    this.renderClassPicker('guest-class-picker', 'guest-class-value', '');
 
-    const hiddenInput = document.getElementById('guest-class-value');
-    const confirmBtn = document.getElementById('guest-class-confirm');
+    const pickerEl = modalElement.querySelector('.guest-class-picker');
+    const hiddenInput = modalElement.querySelector('.guest-class-value');
+    const confirmBtn = modalElement.querySelector('.guest-class-confirm');
+    const cancelBtn = modalElement.querySelector('.guest-class-cancel');
+
+    // Render class picker using element references (not IDs)
+    this.renderClassPickerEl(pickerEl, hiddenInput, '');
 
     // Watch for class selection
     const observer = new MutationObserver(() => {
@@ -1650,7 +1658,7 @@ export const LineupEditorPage = {
     observer.observe(hiddenInput, { attributes: true, attributeFilter: ['value'] });
 
     // Also listen for clicks on the picker to check value
-    document.getElementById('guest-class-picker').addEventListener('click', () => {
+    pickerEl.addEventListener('click', () => {
       setTimeout(() => { confirmBtn.disabled = !hiddenInput.value; }, 0);
     });
 
@@ -1668,7 +1676,7 @@ export const LineupEditorPage = {
       this.assignPubPlayerToSlot(slotIndex, guestName, role);
     });
 
-    document.getElementById('guest-class-cancel').addEventListener('click', () => {
+    cancelBtn.addEventListener('click', () => {
       observer.disconnect();
       document.body.removeChild(modalElement);
     });
@@ -1818,7 +1826,7 @@ export const LineupEditorPage = {
     if (!role) {
       const classClickHandler = (e) => {
         if (e.target.closest('.slot-remove-btn')) return;
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         this.showGuestClassPicker(slotIndex, name);
       };
       slotElement._guestClassHandler = classClickHandler;
