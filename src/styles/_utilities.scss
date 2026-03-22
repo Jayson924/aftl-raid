@@ -57,10 +57,10 @@
     visibility: hidden;
     pointer-events: none;
     transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
-    z-index: 100;
+    z-index: 1000;
   }
 
-  // Tooltip box
+  // Tooltip box — appears above by default
   &::before {
     content: attr(data-tooltip);
     bottom: calc(100% + 8px);
@@ -75,6 +75,7 @@
     color: rgba(255, 255, 255, 0.7);
     white-space: nowrap;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    line-height: 1.4;
   }
 
   // Arrow
@@ -92,6 +93,56 @@
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);
+  }
+
+  // Multiline tooltip variant — wraps text, wider box
+  &.tooltip-wrap::before {
+    white-space: pre-wrap;
+    max-width: 250px;
+    min-width: 120px;
+    text-align: left;
+  }
+
+  // Below variant — tooltip appears below the element
+  &.tooltip-below {
+    &::before {
+      bottom: auto;
+      top: calc(100% + 8px);
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    &::after {
+      bottom: auto;
+      top: calc(100% + -2px);
+      transform: translateX(-50%) translateY(-4px);
+      border-top-color: transparent;
+      border-bottom-color: rgba(20, 20, 22, 0.95);
+    }
+
+    &:hover::before,
+    &:hover::after {
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  // Right-aligned variant — anchors tooltip to the right edge
+  &.tooltip-right {
+    &::before {
+      left: auto;
+      right: 0;
+      transform: translateY(4px);
+    }
+
+    &::after {
+      left: auto;
+      right: 0.5rem;
+      transform: translateY(4px);
+    }
+
+    &:hover::before,
+    &:hover::after {
+      transform: translateY(0);
+    }
   }
 }
 

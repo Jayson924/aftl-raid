@@ -745,7 +745,7 @@ export const LineupEditorPage = {
         <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''}"
              data-player-name="${player.name}"
              draggable="true">
-          ${player.notes ? `<span class="note-icon" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
+          ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
           ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           <div class="player-info">
@@ -1621,6 +1621,66 @@ export const LineupEditorPage = {
     toast.success(`Lineup scanned: ${parts.join(', ')}`);
   },
 
+  showGuestClassPicker(slotIndex, guestName) {
+    const modalElement = document.createElement('div');
+    modalElement.className = 'modal';
+
+    modalElement.innerHTML = `
+      <div class="modal-content" style="max-width: 450px;">
+        <h2>Set Class for ${guestName || 'Guest'}</h2>
+        <input type="hidden" id="guest-class-value" value="">
+        <div class="class-picker" id="guest-class-picker"></div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+          <button type="button" id="guest-class-confirm" class="btn btn-primary" disabled>Confirm</button>
+          <button type="button" id="guest-class-cancel" class="btn btn-ghost">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modalElement);
+    this.renderClassPicker('guest-class-picker', 'guest-class-value', '');
+
+    const hiddenInput = document.getElementById('guest-class-value');
+    const confirmBtn = document.getElementById('guest-class-confirm');
+
+    // Watch for class selection
+    const observer = new MutationObserver(() => {
+      confirmBtn.disabled = !hiddenInput.value;
+    });
+    observer.observe(hiddenInput, { attributes: true, attributeFilter: ['value'] });
+
+    // Also listen for clicks on the picker to check value
+    document.getElementById('guest-class-picker').addEventListener('click', () => {
+      setTimeout(() => { confirmBtn.disabled = !hiddenInput.value; }, 0);
+    });
+
+    confirmBtn.addEventListener('click', () => {
+      const role = hiddenInput.value;
+      if (!role) return;
+      observer.disconnect();
+      document.body.removeChild(modalElement);
+      // Remove the old capture handler before reassigning
+      const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
+      if (slotElement._guestClassHandler) {
+        slotElement.removeEventListener('click', slotElement._guestClassHandler, true);
+        delete slotElement._guestClassHandler;
+      }
+      this.assignPubPlayerToSlot(slotIndex, guestName, role);
+    });
+
+    document.getElementById('guest-class-cancel').addEventListener('click', () => {
+      observer.disconnect();
+      document.body.removeChild(modalElement);
+    });
+
+    modalElement.addEventListener('click', (e) => {
+      if (e.target === modalElement) {
+        observer.disconnect();
+        document.body.removeChild(modalElement);
+      }
+    });
+  },
+
   showPubCharacterModal(slotIndex) {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
@@ -1745,14 +1805,31 @@ export const LineupEditorPage = {
     const slotContent = slotElement.querySelector('.slot-content');
 
     // If no name provided, display the class name as the name
-    const displayName = name || role;
+    const displayName = name || role || 'Guest';
 
     slotContent.innerHTML = `
       <div class="assigned-player pub-player">
         <div class="player-name">${displayName} <span class="pub-badge">GUEST</span></div>
-        ${name ? `<div class="player-role">${role}</div>` : ''}
+        ${role ? `<div class="player-role">${role}</div>` : `<div class="player-role no-class">Click to set class</div>`}
       </div>
     `;
+
+    // If no class set, clicking the slot opens class picker instead of player selector
+    if (!role) {
+      const classClickHandler = (e) => {
+        if (e.target.closest('.slot-remove-btn')) return;
+        e.stopPropagation();
+        this.showGuestClassPicker(slotIndex, name);
+      };
+      slotElement._guestClassHandler = classClickHandler;
+      slotElement.addEventListener('click', classClickHandler, true);
+    } else {
+      // Remove handler if previously set
+      if (slotElement._guestClassHandler) {
+        slotElement.removeEventListener('click', slotElement._guestClassHandler, true);
+        delete slotElement._guestClassHandler;
+      }
+    }
 
     // Add remove button to slot
     let removeBtn = slotElement.querySelector('.slot-remove-btn');
@@ -1889,6 +1966,11 @@ export const LineupEditorPage = {
     this.currentLineup.pilotSlots[slotIndex] = ''; // Clear pilot
 
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
+    // Clean up guest class click handler if present
+    if (slotElement._guestClassHandler) {
+      slotElement.removeEventListener('click', slotElement._guestClassHandler, true);
+      delete slotElement._guestClassHandler;
+    }
     const slotContent = slotElement.querySelector('.slot-content');
 
     slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';

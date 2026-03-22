@@ -1107,6 +1107,13 @@
           text-shadow: none;
         }
 
+        .no-class {
+          color: rgba(255, 193, 7, 0.7);
+          font-style: italic;
+          font-size: 0.75rem;
+          cursor: pointer;
+        }
+
         .completion-badge {
           position: absolute;
           bottom: 0.5rem;

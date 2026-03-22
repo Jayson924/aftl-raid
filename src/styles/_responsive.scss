@@ -802,13 +802,6 @@
     cursor: pointer;
   }
 
-  // Adjust tooltip for mobile
-  .note-icon::after {
-    max-width: 200px;
-    right: 0;
-    left: auto;
-  }
-
   // Keep roster tooltips from overflowing left/right on mobile
   .players-page .roster-class-item,
   .players-page .roster-stat-tip {
