@@ -1604,6 +1604,17 @@ export const PlayersPage = {
     fileInput.addEventListener('change', (e) => {
       if (e.target.files[0]) handleFile(e.target.files[0]);
     });
+    modalElement.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          handleFile(item.getAsFile());
+          return;
+        }
+      }
+    });
 
     const handleFile = (file) => {
       if (!file.type.startsWith('image/')) return;
