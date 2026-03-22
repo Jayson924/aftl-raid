@@ -21,14 +21,25 @@ const HEALER_CLASSES = ['Saint'];
  * @param {Function} opts.onLoadInEditor - Callback with { result, raidType }
  */
 export async function showLineupCreatorModal({ onLoadInEditor }) {
-  const [players, appUsers] = await Promise.all([
+  const [players, appUsers, lineups] = await Promise.all([
     dataService.getPlayers(),
-    dataService.getAppUsers()
+    dataService.getAppUsers(),
+    dataService.getLineups()
   ]);
+
+  // Build set of character names already in any lineup
+  const namesInLineups = new Set();
+  for (const lineup of lineups) {
+    if (lineup.completed) continue;
+    for (const name of lineup.players) {
+      if (name) namesInLineups.add(name);
+    }
+  }
 
   // State
   let poolMode = 'all'; // 'all' or 'select'
   let includeCleared = false;
+  let includeInExisting = false;
   let selectedUsersOnly = false;
   let raidType = 'Hardcore';
   const selectedUsers = new Set();
@@ -96,6 +107,10 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
           <label class="whos-around-option">
             <input type="checkbox" id="creator-include-cleared" ${includeCleared ? 'checked' : ''}>
             <span>Include cleared</span>
+          </label>
+          <label class="whos-around-option">
+            <input type="checkbox" id="creator-include-existing" ${includeInExisting ? 'checked' : ''}>
+            <span>Include in existing lineup</span>
           </label>
           <label class="whos-around-option">
             <input type="checkbox" id="creator-selected-only" ${selectedUsersOnly ? 'checked' : ''}>
@@ -218,6 +233,15 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
       });
     }
 
+    // Include in existing lineup checkbox
+    const existingCb = document.getElementById('creator-include-existing');
+    if (existingCb) {
+      existingCb.addEventListener('change', (e) => {
+        includeInExisting = e.target.checked;
+        generatedResult = null;
+      });
+    }
+
     // Selected users only checkbox
     const selectedOnlyCb = document.getElementById('creator-selected-only');
     if (selectedOnlyCb) {
@@ -240,11 +264,12 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
         }
 
         const lineupState = { raidType, players: [] };
-        generatedResult = generateOptimalLineup(activeIds, players, lineupState, { includeCleared });
+        const excludeNames = includeInExisting ? null : namesInLineups;
+        generatedResult = generateOptimalLineup(activeIds, players, lineupState, { includeCleared, excludeNames });
 
         // Fill guest slots with real characters from all users (unless restricted)
         if (generatedResult && !selectedUsersOnly) {
-          generatedResult = fillGuestSlotsWithPlayers(generatedResult, players, lineupState, { includeCleared });
+          generatedResult = fillGuestSlotsWithPlayers(generatedResult, players, lineupState, { includeCleared, excludeNames });
         }
 
         if (generatedResult) {
@@ -290,10 +315,11 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
  * Replace guest slots with real characters from ALL users (not just selected).
  * One character per user. Greedy by amp + gearscore.
  */
-function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeCleared = false } = {}) {
+function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeCleared = false, excludeNames = null } = {}) {
   const candidates = players.filter(p =>
     p.discordId && p.role
     && (includeCleared || dataService.playerNeedsRaid(p, currentLineup.raidType))
+    && (!excludeNames || !excludeNames.has(p.name))
   );
 
   const usedUsers = new Set();
@@ -359,10 +385,11 @@ function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeClea
  * Always includes a tank and healer when real candidates exist; reserves
  * guest slots for missing essential roles.
  */
-function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { includeCleared = false } = {}) {
+function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { includeCleared = false, excludeNames = null } = {}) {
   const candidates = players.filter(p =>
     aroundDiscordIds.includes(p.discordId) && p.role
     && (includeCleared || dataService.playerNeedsRaid(p, currentLineup.raidType))
+    && (!excludeNames || !excludeNames.has(p.name))
   );
 
   if (candidates.length === 0) {
