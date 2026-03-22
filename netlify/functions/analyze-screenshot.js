@@ -118,7 +118,9 @@ Return this JSON structure:
 }
 
 For rarity, use lowercase: "legend", "unique", "epic", "rare", "magic", "normal".
-Use null for any field you cannot determine. For enhancement, use the number only (e.g., 12 not "+12").`;
+Use null for any field you cannot determine. For enhancement, use the number only (e.g., 12 not "+12").
+
+IMPORTANT: Atk Power and Magic Atk are displayed as ranges (e.g., "17103-19194"). Always use the HIGHER number (the one after the dash). For example, "17103-19194" → attackPower: 19194, "6548-7943" → magicAttack: 7943.`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
