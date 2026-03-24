@@ -14,6 +14,7 @@ import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, MATCH_STATUS } from './are
 export const ArenaMatchPage = {
   _match: null,
   _matchSubscription: null,
+  _roundSubscription: null,
   _combat: null,
   _presenceChannel: null,
   _spectatorCount: 0,
@@ -118,6 +119,14 @@ export const ArenaMatchPage = {
       this._onMatchUpdate(payload);
     });
 
+    // Subscribe to round changes (for character send phase)
+    if (this._currentRound) {
+      if (this._roundSubscription) arenaData.unsubscribe(this._roundSubscription);
+      this._roundSubscription = arenaData.subscribeToRounds(matchId, (payload) => {
+        this._onRoundUpdate(payload);
+      });
+    }
+
     // Join presence
     if (currentUser) {
       this._presenceChannel = arenaData.joinMatchPresence(matchId, currentUser, (users) => {
@@ -161,6 +170,12 @@ export const ArenaMatchPage = {
 
     const isComplete = m.status === 'complete';
     const isTiebreaker = m.status === 'tiebreaker';
+
+    // Check if we need to send a character for this round
+    const needsCharacterSend = this._isPlayer && round && !isComplete && !isTiebreaker &&
+      !round[`${this._playerSide}_character`];
+    const waitingForOpponentChar = this._isPlayer && round && !isComplete && !isTiebreaker &&
+      round[`${this._playerSide}_character`] && !this._currentTurn;
 
     container.innerHTML = `
       <div class="match-scoreboard">
@@ -229,6 +244,13 @@ export const ArenaMatchPage = {
         </div>
       </div>
 
+      ${needsCharacterSend ? this._renderCharacterSelect() : ''}
+      ${waitingForOpponentChar ? `
+        <div class="match-action-panel" id="action-panel">
+          <div class="action-waiting">Waiting for opponent to pick their character...</div>
+        </div>
+      ` : ''}
+
       ${this._isPlayer && !isComplete && !isTiebreaker && this._currentRound && this._currentTurn ? `
         <div class="match-action-panel" id="action-panel">
           <div class="action-timer" id="action-timer">${this._timeLeft}s</div>
@@ -270,7 +292,7 @@ export const ArenaMatchPage = {
     `;
 
     this._attachListeners(container);
-    if (!this._committed && !isComplete && !isTiebreaker) {
+    if (!this._committed && !isComplete && !isTiebreaker && this._currentTurn) {
       this._startActionTimer();
     }
   },
@@ -287,7 +309,78 @@ export const ArenaMatchPage = {
     return getAbilityForClass(char.className);
   },
 
+  _renderCharacterSelect() {
+    const draft = this._match[`${this._playerSide}_draft`] || [];
+    if (draft.length === 0) {
+      return `<div class="match-action-panel"><div class="action-waiting">No characters drafted</div></div>`;
+    }
+
+    // Figure out which characters have already been used in previous rounds
+    // (we'll check this asynchronously, for now show all drafted characters)
+    return `
+      <div class="match-action-panel" id="char-select-panel">
+        <h3 class="char-select-title">Send a Character for Round ${this._currentRound?.round_number || '?'}</h3>
+        <div class="char-select-grid">
+          ${draft.map((c, i) => {
+            const ability = getAbilityForClass(c.className);
+            return `
+              <button class="arena-btn char-select-card" data-char-index="${i}">
+                <span class="char-select-name">${c.playerName}</span>
+                <span class="char-select-class">${c.className}</span>
+                ${ability ? `<span class="char-select-ability">${ability.icon} ${ability.name}</span>` : ''}
+                ${c.isHired ? '<span class="char-select-hired">Hired</span>' : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  },
+
   _attachListeners(container) {
+    // Character select buttons
+    container.querySelectorAll('.char-select-card').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const index = parseInt(btn.dataset.charIndex);
+        const draft = this._match[`${this._playerSide}_draft`] || [];
+        const character = draft[index];
+        if (!character) return;
+
+        // Disable all char select buttons
+        container.querySelectorAll('.char-select-card').forEach(b => {
+          b.disabled = true;
+          b.classList.remove('selected');
+        });
+        btn.classList.add('selected');
+        btn.textContent = 'Sending...';
+
+        try {
+          const result = await arenaData.sendCharacter(
+            this._match.id,
+            this._currentRound.id,
+            this._myParticipant.discord_id,
+            character
+          );
+
+          // Reload round data to get updated character fields
+          const rounds = await arenaData.getRounds(this._match.id);
+          this._currentRound = rounds[rounds.length - 1] || null;
+
+          if (result.bothReady && this._currentRound) {
+            // Both characters sent — a turn should now exist
+            const turns = await arenaData.getTurns(this._currentRound.id);
+            this._currentTurn = turns.find(t => !t.resolved) || null;
+          }
+
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed to send character: ' + err.message);
+          container.querySelectorAll('.char-select-card').forEach(b => b.disabled = false);
+          btn.textContent = character.playerName;
+        }
+      });
+    });
+
     // Action buttons
     container.querySelectorAll('.action-btn[data-action]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -374,6 +467,30 @@ export const ArenaMatchPage = {
     }, 1000);
   },
 
+  _onRoundUpdate(payload) {
+    const updatedRound = payload.new;
+    if (!updatedRound || updatedRound.id !== this._currentRound?.id) return;
+
+    this._currentRound = updatedRound;
+
+    // If both characters are now set but no turn exists yet, check for new turn
+    if (updatedRound.player1_character && updatedRound.player2_character && !this._currentTurn) {
+      arenaData.getTurns(updatedRound.id).then(turns => {
+        const unresolved = turns.find(t => !t.resolved);
+        if (unresolved) {
+          this._currentTurn = unresolved;
+          this._combat.subscribeToTurns(updatedRound.id);
+          const content = document.querySelector('.arena-match');
+          if (content) this._renderContent(content);
+        }
+      });
+    } else {
+      // Re-render to update character display / HP
+      const content = document.querySelector('.arena-match');
+      if (content) this._renderContent(content);
+    }
+  },
+
   _onCombatEvent(event, data) {
     if (event === 'turn_resolved') {
       // Turn resolved — update HP, refresh UI
@@ -443,6 +560,10 @@ export const ArenaMatchPage = {
     if (this._matchSubscription) {
       arenaData.unsubscribe(this._matchSubscription);
       this._matchSubscription = null;
+    }
+    if (this._roundSubscription) {
+      arenaData.unsubscribe(this._roundSubscription);
+      this._roundSubscription = null;
     }
     if (this._combat) {
       this._combat.destroy();
