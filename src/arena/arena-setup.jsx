@@ -72,6 +72,14 @@ export const ArenaSetupPage = {
               `).join('')}
             </div>
           </div>
+          <div class="arena-form-group">
+            <label>Match Format</label>
+            <div class="arena-bracket-count-row">
+              ${[1, 2, 3].map(n => `
+                <button class="arena-btn format-btn ${n === 1 ? 'arena-btn-primary' : ''}" data-format="${n}">${n}v${n}</button>
+              `).join('')}
+            </div>
+          </div>
           <button class="arena-btn arena-btn-primary" id="create-tournament-btn" style="width: 100%; margin-top: 1rem;">
             Create Tournament
           </button>
@@ -80,11 +88,19 @@ export const ArenaSetupPage = {
     `;
 
     let selectedCount = 4;
+    let selectedFormat = 1;
     container.querySelectorAll('.bracket-count-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         container.querySelectorAll('.bracket-count-btn').forEach(b => b.classList.remove('arena-btn-primary'));
         btn.classList.add('arena-btn-primary');
         selectedCount = parseInt(btn.dataset.count);
+      });
+    });
+    container.querySelectorAll('.format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.format-btn').forEach(b => b.classList.remove('arena-btn-primary'));
+        btn.classList.add('arena-btn-primary');
+        selectedFormat = parseInt(btn.dataset.format);
       });
     });
 
@@ -95,7 +111,7 @@ export const ArenaSetupPage = {
         return;
       }
       try {
-        this._tournament = await arenaData.createTournament(name, selectedCount);
+        this._tournament = await arenaData.createTournament(name, selectedCount, selectedFormat);
         this._participants = [];
         toast.success('Tournament created!');
         this._renderContent(container);

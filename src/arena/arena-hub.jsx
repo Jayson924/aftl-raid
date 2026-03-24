@@ -607,6 +607,12 @@ export const ArenaHubPage = {
             ${users.map(u => `<option value="${u.discord_id}">${u.display_name || u.username}</option>`).join('')}
           </select>
         </div>
+        <div class="quick-match-format" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.5rem;">
+          <span style="color: rgba(255,255,255,0.5); align-self: center; font-size: 0.85rem;">Format:</span>
+          ${[1, 2, 3].map(n => `
+            <button class="arena-btn arena-btn-small qm-format-btn ${n === 1 ? 'arena-btn-primary' : ''}" data-format="${n}">${n}v${n}</button>
+          `).join('')}
+        </div>
         <button class="arena-btn arena-btn-primary" id="qm-start-btn" style="width: 100%; margin-top: 0.75rem;">
           Start Quick Match
         </button>
@@ -617,6 +623,16 @@ export const ArenaHubPage = {
   _attachQuickMatchListener(container) {
     const startBtn = container.querySelector('#qm-start-btn');
     if (!startBtn) return;
+
+    // Format buttons
+    let qmFormat = 1;
+    container.querySelectorAll('.qm-format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.qm-format-btn').forEach(b => b.classList.remove('arena-btn-primary'));
+        btn.classList.add('arena-btn-primary');
+        qmFormat = parseInt(btn.dataset.format);
+      });
+    });
 
     startBtn.addEventListener('click', async () => {
       const p1Select = document.getElementById('qm-player1');
@@ -637,7 +653,7 @@ export const ArenaHubPage = {
       startBtn.textContent = 'Creating...';
 
       try {
-        const result = await arenaData.createQuickMatch(p1Id, p2Id);
+        const result = await arenaData.createQuickMatch(p1Id, p2Id, qmFormat);
         toast.success('Quick match created!');
 
         const currentUser = dataService.getUser();

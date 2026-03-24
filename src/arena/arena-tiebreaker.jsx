@@ -3,11 +3,12 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
-import { TIEBREAKER_START_LEVEL, TIEBREAKER_TARGET_LEVEL, TIEBREAKER_RATES, TIMERS } from './arena-constants.js';
+import { TIEBREAKER_START_LEVEL, TIEBREAKER_TARGET_LEVEL, TIEBREAKER_RATES } from './arena-constants.js';
 
 /**
- * Arena Tiebreaker — Enhancement Race.
- * Both players tap to enhance from +9 to +13. First to +13 wins.
+ * Arena Tiebreaker — Auto Enhancement Race.
+ * Both players auto-enhance from +9 to +13. Fewest taps wins.
+ * Either player triggers the roll — server simulates both runs at once.
  * Route: /arena-tiebreaker?match=<id>
  */
 export const ArenaTiebreakerPage = {
@@ -19,7 +20,9 @@ export const ArenaTiebreakerPage = {
   _appUsers: null,
   _isPlayer: false,
   _playerSide: null,
-  _tapping: false, // prevent double-tap during suspense
+  _rolling: false,
+  _animating: false,
+  _animationTimer: null,
 
   async render(container) {
     ArenaShell.activate();
@@ -75,20 +78,20 @@ export const ArenaTiebreakerPage = {
       this._playerSide = 'player2';
     }
 
-    // Subscribe to tiebreaker changes
+    // Subscribe to tiebreaker changes (for the other player / spectators)
     if (this._tbSubscription) arenaData.unsubscribe(this._tbSubscription);
     this._tbSubscription = arenaData.subscribeToTiebreaker(matchId, (payload) => {
       this._tiebreaker = payload.new;
-      const content = document.querySelector('.arena-tiebreaker');
-      if (content) this._renderContent(content);
+      if (!this._animating) {
+        const content = document.querySelector('.arena-tiebreaker');
+        if (content) this._renderContent(content);
+      }
     });
 
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
     this._matchSubscription = arenaData.subscribeToMatch(matchId, (payload) => {
       this._match = payload.new;
-      if (this._match?.status === 'complete') {
-        const winnerName = this._match.winner_id ? this._getParticipantName(this._match.winner_id) : null;
-        toast.success(winnerName ? `${winnerName} wins the tiebreaker!` : 'Tiebreaker complete!');
+      if (!this._animating) {
         const content = document.querySelector('.arena-tiebreaker');
         if (content) this._renderContent(content);
       }
@@ -111,43 +114,51 @@ export const ArenaTiebreakerPage = {
     const tb = this._tiebreaker;
     const p1Name = this._getParticipantName(m.player1_id);
     const p2Name = this._getParticipantName(m.player2_id);
-    const isComplete = m.status === 'complete';
+    const isComplete = tb.winner_id || m.status === 'complete';
+    const p1Taps = tb.player1_taps || [];
+    const p2Taps = tb.player2_taps || [];
+    const canRoll = this._isPlayer && !isComplete && !this._rolling && p1Taps.length === 0;
 
     container.innerHTML = `
       <div class="tb-header arena-panel">
         <h2>Enhancement Race</h2>
-        <p>First to <strong>+${TIEBREAKER_TARGET_LEVEL}</strong> wins!</p>
+        <p>Auto-enhance from <strong>+${TIEBREAKER_START_LEVEL}</strong> to <strong>+${TIEBREAKER_TARGET_LEVEL}</strong> — fewest taps wins!</p>
       </div>
 
       <div class="tb-arena">
         <div class="tb-player">
           <div class="tb-player-name">${p1Name}</div>
-          ${this._renderEnhanceDisplay(tb.player1_level, tb.player1_taps || [])}
-          ${this._isPlayer && this._playerSide === 'player1' && !isComplete && !tb.winner_id ?
-            `<button class="arena-btn arena-btn-primary tb-enhance-btn" id="enhance-btn" ${this._tapping ? 'disabled' : ''}>
-              Enhance!
-            </button>` : ''
-          }
+          ${this._renderEnhanceDisplay('p1', tb.player1_level, p1Taps)}
         </div>
 
         <div class="tb-vs">VS</div>
 
         <div class="tb-player">
           <div class="tb-player-name">${p2Name}</div>
-          ${this._renderEnhanceDisplay(tb.player2_level, tb.player2_taps || [])}
-          ${this._isPlayer && this._playerSide === 'player2' && !isComplete && !tb.winner_id ?
-            `<button class="arena-btn arena-btn-primary tb-enhance-btn" id="enhance-btn" ${this._tapping ? 'disabled' : ''}>
-              Enhance!
-            </button>` : ''
-          }
+          ${this._renderEnhanceDisplay('p2', tb.player2_level, p2Taps)}
         </div>
       </div>
 
-      ${isComplete || tb.winner_id ? `
+      ${canRoll ? `
+        <div class="tb-action arena-panel">
+          <button class="arena-btn arena-btn-primary tb-enhance-btn" id="roll-btn">
+            Roll Enhancement Race!
+          </button>
+        </div>
+      ` : ''}
+
+      ${!isComplete && !canRoll && p1Taps.length === 0 ? `
+        <div class="tb-action arena-panel">
+          <div class="tb-waiting">Waiting for a player to start the race...</div>
+        </div>
+      ` : ''}
+
+      ${isComplete ? `
         <div class="tb-result arena-panel">
           <div class="result-label">Winner</div>
           <div class="result-winner">${this._getParticipantName(tb.winner_id || m.winner_id)}</div>
-          <button class="arena-btn" onclick="window.history.back()">Back to Arena</button>
+          <div class="tb-result-detail">${p1Name}: ${p1Taps.length} taps — ${p2Name}: ${p2Taps.length} taps</div>
+          <button class="arena-btn" id="back-btn" style="margin-top: 0.75rem;">Back to Arena</button>
         </div>
       ` : ''}
 
@@ -155,97 +166,186 @@ export const ArenaTiebreakerPage = {
         <div class="arena-panel-header">
           <h3>Enhancement Log</h3>
         </div>
-        <div class="tb-log">
+        <div class="tb-log" id="tb-log">
           ${this._renderLog(tb, p1Name, p2Name)}
         </div>
       </div>
     `;
 
-    const enhanceBtn = document.getElementById('enhance-btn');
-    if (enhanceBtn) {
-      enhanceBtn.addEventListener('click', () => this._tap());
+    const rollBtn = document.getElementById('roll-btn');
+    if (rollBtn) {
+      rollBtn.addEventListener('click', () => this._startRace());
+    }
+
+    const backBtn = document.getElementById('back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => router.navigate('arena'));
     }
   },
 
-  _renderEnhanceDisplay(level, taps) {
+  _renderEnhanceDisplay(id, level, taps) {
     const progress = ((level - TIEBREAKER_START_LEVEL) / (TIEBREAKER_TARGET_LEVEL - TIEBREAKER_START_LEVEL)) * 100;
-    const lastTap = taps[taps.length - 1];
-    const lastResult = lastTap ? (lastTap.success ? 'SUCCESS' : 'FAILED') : '';
 
     return `
       <div class="tb-enhance-display">
-        <div class="tb-level">+${level}</div>
+        <div class="tb-level" id="${id}-level">+${level}</div>
         <div class="tb-progress-bar">
-          <div class="tb-progress-fill" style="width: ${progress}%"></div>
+          <div class="tb-progress-fill" id="${id}-progress" style="width: ${progress}%"></div>
         </div>
         <div class="tb-level-markers">
           ${[9, 10, 11, 12, 13].map(l => `
-            <span class="tb-marker ${level >= l ? 'reached' : ''}">${l}</span>
+            <span class="tb-marker ${level >= l ? 'reached' : ''}" id="${id}-marker-${l}">${l}</span>
           `).join('')}
         </div>
-        ${lastResult ? `
-          <div class="tb-last-result ${lastTap?.success ? 'success' : 'fail'}">
-            ${lastResult}
-          </div>
-        ` : ''}
-        <div class="tb-rate">
-          ${level < TIEBREAKER_TARGET_LEVEL ? `Next: ${TIEBREAKER_RATES[level + 1]?.success || 0}% chance` : 'MAX!'}
-        </div>
+        <div class="tb-tap-count" id="${id}-taps">${taps.length > 0 ? `${taps.length} taps` : ''}</div>
       </div>
     `;
   },
 
   _renderLog(tb, p1Name, p2Name) {
-    const allTaps = [
-      ...(tb.player1_taps || []).map(t => ({ ...t, player: p1Name })),
-      ...(tb.player2_taps || []).map(t => ({ ...t, player: p2Name }))
-    ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const p1Taps = tb.player1_taps || [];
+    const p2Taps = tb.player2_taps || [];
 
-    if (allTaps.length === 0) return '<p style="text-align: center; opacity: 0.5;">No taps yet</p>';
+    if (p1Taps.length === 0 && p2Taps.length === 0) {
+      return '<p style="text-align: center; opacity: 0.5;">No taps yet</p>';
+    }
 
-    return allTaps.map(t => `
-      <div class="tb-log-entry ${t.success ? 'success' : 'fail'}">
-        <span class="tb-log-player">${t.player}</span>
-        <span>+${t.fromLevel} → +${t.toLevel}</span>
-        <span class="tb-log-result">${t.success ? 'SUCCESS' : 'FAILED'}</span>
-      </div>
-    `).join('');
+    // Interleave taps: show both players' attempts side by side by index
+    const maxLen = Math.max(p1Taps.length, p2Taps.length);
+    const rows = [];
+    for (let i = maxLen - 1; i >= 0; i--) {
+      const t1 = p1Taps[i];
+      const t2 = p2Taps[i];
+      rows.push(`
+        <div class="tb-log-row">
+          <span class="tb-log-tap-num">#${i + 1}</span>
+          <span class="tb-log-entry ${t1 ? (t1.success ? 'success' : 'fail') : 'empty'}">
+            ${t1 ? `${p1Name}: +${t1.fromLevel} → +${t1.toLevel}` : '—'}
+          </span>
+          <span class="tb-log-entry ${t2 ? (t2.success ? 'success' : 'fail') : 'empty'}">
+            ${t2 ? `${p2Name}: +${t2.fromLevel} → +${t2.toLevel}` : '—'}
+          </span>
+        </div>
+      `);
+    }
+    return rows.join('');
   },
 
-  async _tap() {
-    if (this._tapping) return;
-    this._tapping = true;
+  async _startRace() {
+    if (this._rolling) return;
+    this._rolling = true;
+    this._animating = true;
 
-    const enhanceBtn = document.getElementById('enhance-btn');
-    if (enhanceBtn) enhanceBtn.disabled = true;
+    const rollBtn = document.getElementById('roll-btn');
+    if (rollBtn) {
+      rollBtn.disabled = true;
+      rollBtn.textContent = 'Rolling...';
+    }
 
     try {
       const currentUser = dataService.getUser();
       const result = await arenaData.submitTiebreakerTap(this._match.id, currentUser.id);
 
-      // Suspense delay
-      await new Promise(resolve => setTimeout(resolve, TIMERS.TIEBREAKER_SUSPENSE * 1000));
+      // Animate the results step by step
+      await this._animateRace(result.player1Taps, result.player2Taps, result.winnerId);
 
-      if (result.tap.success) {
-        toast.success(`+${result.newLevel}! SUCCESS!`);
-      } else {
-        toast.error(`Failed! Dropped to +${result.newLevel}`);
-      }
+      // Refresh data and re-render final state
+      this._tiebreaker = await arenaData.getTiebreaker(this._match.id);
+      this._match = await arenaData.getMatch(this._match.id);
 
-      if (result.won) {
-        toast.success('You reached +13! YOU WIN!');
-      }
+      const content = document.querySelector('.arena-tiebreaker');
+      if (content) this._renderContent(content);
+
+      const winnerName = this._getParticipantName(result.winnerId);
+      toast.success(`${winnerName} wins with ${result.winnerId === this._match.player1_id ? result.player1Total : result.player2Total} taps!`);
     } catch (err) {
-      toast.error('Tap failed: ' + err.message);
+      toast.error('Race failed: ' + err.message);
     } finally {
-      this._tapping = false;
-      // Re-render will happen from subscription
+      this._rolling = false;
+      this._animating = false;
+    }
+  },
+
+  /**
+   * Animate both players' enhancement sequences side by side.
+   * Steps through taps one at a time with delays.
+   */
+  _animateRace(p1Taps, p2Taps, winnerId) {
+    return new Promise(resolve => {
+      const winnerLen = Math.min(p1Taps.length, p2Taps.length);
+      const maxLen = Math.max(p1Taps.length, p2Taps.length);
+      let step = 0;
+      let resolved = false;
+      const TAP_DELAY = 150; // ms per tap
+
+      const tick = () => {
+        if (step >= maxLen) {
+          if (!resolved) resolve();
+          return;
+        }
+
+        const t1 = p1Taps[step];
+        const t2 = p2Taps[step];
+
+        if (t1) this._updateDisplay('p1', t1.toLevel, step + 1, t1.success);
+        if (t2) this._updateDisplay('p2', t2.toLevel, step + 1, t2.success);
+
+        step++;
+
+        // Resolve as soon as the winner's sequence finishes
+        if (!resolved && step >= winnerLen) {
+          resolved = true;
+          resolve();
+        }
+
+        // Keep animating the loser's remaining taps in the background
+        if (step < maxLen) {
+          this._animationTimer = setTimeout(tick, TAP_DELAY);
+        }
+      };
+
+      tick();
+    });
+  },
+
+  /**
+   * Update one player's display during animation.
+   */
+  _updateDisplay(id, level, tapCount, success) {
+    const levelEl = document.getElementById(`${id}-level`);
+    const progressEl = document.getElementById(`${id}-progress`);
+    const tapsEl = document.getElementById(`${id}-taps`);
+
+    if (levelEl) {
+      levelEl.textContent = `+${level}`;
+      // Flash effect
+      levelEl.classList.remove('tb-flash-success', 'tb-flash-fail');
+      void levelEl.offsetWidth; // reflow to restart animation
+      levelEl.classList.add(success ? 'tb-flash-success' : 'tb-flash-fail');
+    }
+
+    if (progressEl) {
+      const progress = ((level - TIEBREAKER_START_LEVEL) / (TIEBREAKER_TARGET_LEVEL - TIEBREAKER_START_LEVEL)) * 100;
+      progressEl.style.width = `${progress}%`;
+    }
+
+    if (tapsEl) {
+      tapsEl.textContent = `${tapCount} taps`;
+    }
+
+    // Update markers
+    for (let l = TIEBREAKER_START_LEVEL; l <= TIEBREAKER_TARGET_LEVEL; l++) {
+      const marker = document.getElementById(`${id}-marker-${l}`);
+      if (marker) {
+        marker.classList.toggle('reached', level >= l);
+      }
     }
   },
 
   destroy() {
     if (this._tbSubscription) arenaData.unsubscribe(this._tbSubscription);
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
+    if (this._animationTimer) clearTimeout(this._animationTimer);
     ArenaShell.deactivate();
   }
 };

@@ -211,14 +211,14 @@
 }
 
 .arena-challenge-popup {
-  background: $arena-panel;
+  background: linear-gradient(180deg, $arena-panel-lighter 0%, $arena-stone-dark 100%);
   border: 2px solid $arena-gold;
   border-radius: $arena-radius;
   padding: 2rem;
   min-width: 320px;
   max-width: 400px;
   text-align: center;
-  box-shadow: 0 0 40px rgba($arena-gold, 0.2);
+  box-shadow: 0 0 40px rgba($arena-gold, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   animation: popup-in 0.3s ease-out;
 
   .challenge-popup-header {

@@ -90,6 +90,30 @@ export const CLASS_ABILITIES = {
   }
 };
 
+// Class name → base class icon file mapping
+const CLASS_TO_ICON = {};
+const ICON_MAP = {
+  warrior: 'warrior.png',
+  archer: 'archer.png',
+  sorceress: 'sorceress.png',
+  cleric: 'cleric.png',
+  academic: 'academic.png',
+  kali: 'kali.png'
+};
+for (const [family, data] of Object.entries(CLASS_ABILITIES)) {
+  for (const cls of data.classes) {
+    CLASS_TO_ICON[cls] = ICON_MAP[family];
+  }
+}
+
+/**
+ * Get the base class icon path for a class name
+ */
+export function getClassIconPath(className) {
+  const file = CLASS_TO_ICON[className];
+  return file ? `/icons/${file}` : null;
+}
+
 /**
  * Get the ability for a given class name
  */
@@ -137,11 +161,26 @@ export const MATCH_STATUS = {
   COMPLETE: 'complete'
 };
 
-// Draft constraints
+// Match formats — how many characters each player drafts / rounds to win
+export const MATCH_FORMATS = {
+  1: { label: '1v1', charsPerDraft: 1, roundsToWin: 1, maxHired: 1 },
+  2: { label: '2v2', charsPerDraft: 2, roundsToWin: 2, maxHired: 1 },
+  3: { label: '3v3', charsPerDraft: 3, roundsToWin: 2, maxHired: 2 }
+};
+export const DEFAULT_MATCH_FORMAT = 1;
+
+// Draft constraints (legacy convenience — use getMatchFormat() for format-aware values)
 export const DRAFT_RULES = {
   CHARACTERS_PER_DRAFT: 3,
-  MAX_HIRED: 1
+  MAX_HIRED: 2
 };
+
+/**
+ * Get format config for a match format number (1, 2, or 3)
+ */
+export function getMatchFormat(format) {
+  return MATCH_FORMATS[format] || MATCH_FORMATS[DEFAULT_MATCH_FORMAT];
+}
 
 // Enhancement race (tiebreaker) rates — uses protection jelly rates
 export const TIEBREAKER_RATES = {

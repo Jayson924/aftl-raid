@@ -36,12 +36,13 @@ class ArenaDataService {
     return data;
   }
 
-  async createTournament(name, bracketCount, prizes = null) {
+  async createTournament(name, bracketCount, matchFormat = 1, prizes = null) {
     const { data, error } = await supabase
       .from('arena_tournaments')
       .insert({
         name,
         bracket_count: bracketCount,
+        match_format: matchFormat,
         prizes,
         status: 'setup',
         current_phase: 'setup'
@@ -102,13 +103,14 @@ class ArenaDataService {
    * Create a standalone quick match: makes a throwaway tournament, adds both players,
    * creates a match in 'drafting' status, and returns the match ID.
    */
-  async createQuickMatch(player1DiscordId, player2DiscordId) {
+  async createQuickMatch(player1DiscordId, player2DiscordId, matchFormat = 1) {
     // Create a throwaway tournament
     const { data: tournament, error: tErr } = await supabase
       .from('arena_tournaments')
       .insert({
         name: `Quick Match`,
         bracket_count: 1,
+        match_format: matchFormat,
         status: 'active',
         current_phase: 'group_stage'
       })
@@ -137,6 +139,7 @@ class ArenaDataService {
         phase: 'group_stage',
         player1_id: p1.id,
         player2_id: p2.id,
+        match_format: matchFormat,
         status: 'drafting',
         player1_rounds_won: 0,
         player2_rounds_won: 0
@@ -236,7 +239,12 @@ class ArenaDataService {
     return data;
   }
 
-  async createMatch(tournamentId, phase, player1Id, player2Id) {
+  async createMatch(tournamentId, phase, player1Id, player2Id, matchFormat = null) {
+    // If no format specified, look it up from the tournament
+    if (matchFormat == null) {
+      const { data: t } = await supabase.from('arena_tournaments').select('match_format').eq('id', tournamentId).single();
+      matchFormat = t?.match_format || 1;
+    }
     const { data, error } = await supabase
       .from('arena_matches')
       .insert({
@@ -244,6 +252,7 @@ class ArenaDataService {
         phase,
         player1_id: player1Id,
         player2_id: player2Id,
+        match_format: matchFormat,
         status: 'pending',
         player1_rounds_won: 0,
         player2_rounds_won: 0

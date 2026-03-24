@@ -1,7 +1,9 @@
 /**
- * Arena Tiebreaker Tap — Enhancement race RNG.
- * Uses protection jelly rates: +10 (30%), +11 (25%), +12 (20%), +13 (15%).
- * First to +13 wins.
+ * Arena Tiebreaker — Auto Enhancement Race.
+ * Both players auto-enhance from +9 to +13 using protection jelly rates.
+ * Winner = fewest taps. If tied, both re-roll until one wins.
+ *
+ * Either player triggers this once — server simulates both runs.
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -16,7 +18,12 @@ const sbHeaders = {
 
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: sbHeaders });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbGet ${table} failed:`, data);
+    throw new Error(`DB read failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPatch(table, query, body) {
@@ -25,7 +32,12 @@ async function sbPatch(table, query, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPatch ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB update failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 const RATES = {
@@ -36,6 +48,35 @@ const RATES = {
 };
 const START_LEVEL = 9;
 const TARGET_LEVEL = 13;
+
+/**
+ * Simulate one player auto-enhancing from +9 to +13.
+ * Returns array of taps and total tap count.
+ */
+function simulateAutoEnhance() {
+  let level = START_LEVEL;
+  const taps = [];
+
+  while (level < TARGET_LEVEL) {
+    const targetLevel = level + 1;
+    const rate = RATES[targetLevel];
+    const roll = Math.random() * 100;
+    const success = roll < rate.success;
+    const newLevel = success ? targetLevel : Math.max(START_LEVEL, level - rate.failDowngrade);
+
+    taps.push({
+      fromLevel: level,
+      toLevel: newLevel,
+      targetLevel,
+      success,
+      roll: Math.round(roll * 100) / 100
+    });
+
+    level = newLevel;
+  }
+
+  return { taps, totalTaps: taps.length, finalLevel: level };
+}
 
 const headers = {
   'Access-Control-Allow-Origin': '*',
@@ -72,76 +113,55 @@ export async function handler(event) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Tiebreaker already complete' }) };
     }
 
-    // Determine side
+    // Verify caller is a player
     const participants = await sbGet('arena_participants', `id=in.(${match.player1_id},${match.player2_id})&select=*`);
     const p1 = participants.find(p => p.id === match.player1_id);
     const p2 = participants.find(p => p.id === match.player2_id);
 
-    let playerSide;
-    if (p1?.discord_id === discordId) playerSide = 'player1';
-    else if (p2?.discord_id === discordId) playerSide = 'player2';
-    else {
+    if (p1?.discord_id !== discordId && p2?.discord_id !== discordId) {
       return { statusCode: 403, headers, body: JSON.stringify({ error: 'Not a player' }) };
     }
 
-    const levelField = `${playerSide}_level`;
-    const tapsField = `${playerSide}_taps`;
-    const currentLevel = tb[levelField];
-    const taps = tb[tapsField] || [];
+    // Simulate both players auto-enhancing
+    let p1Result, p2Result;
+    // Keep re-rolling if tied, until one player wins
+    do {
+      p1Result = simulateAutoEnhance();
+      p2Result = simulateAutoEnhance();
+    } while (p1Result.totalTaps === p2Result.totalTaps);
 
-    if (currentLevel >= TARGET_LEVEL) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Already at max level' }) };
-    }
+    const winnerId = p1Result.totalTaps < p2Result.totalTaps ? match.player1_id : match.player2_id;
+    const loserId = winnerId === match.player1_id ? match.player2_id : match.player1_id;
 
-    const targetLevel = currentLevel + 1;
-    const rate = RATES[targetLevel];
-    if (!rate) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid enhancement level' }) };
-    }
+    // Write tiebreaker result
+    await sbPatch('arena_tiebreakers', `id=eq.${tb.id}`, {
+      player1_level: TARGET_LEVEL,
+      player2_level: TARGET_LEVEL,
+      player1_taps: p1Result.taps,
+      player2_taps: p2Result.taps,
+      winner_id: winnerId
+    });
 
-    // Roll
-    const roll = Math.random() * 100;
-    const success = roll < rate.success;
-    const newLevel = success ? targetLevel : Math.max(START_LEVEL, currentLevel - rate.failDowngrade);
+    // Update match
+    await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'complete', winner_id: winnerId });
 
-    const tap = {
-      fromLevel: currentLevel,
-      toLevel: newLevel,
-      targetLevel,
-      success,
-      roll: Math.round(roll * 100) / 100,
-      timestamp: new Date().toISOString()
-    };
-    taps.push(tap);
-
-    const update = {
-      [levelField]: newLevel,
-      [tapsField]: taps
-    };
-
-    // Check if won
-    let winner = null;
-    if (newLevel >= TARGET_LEVEL) {
-      const winnerId = playerSide === 'player1' ? match.player1_id : match.player2_id;
-      const loserId = playerSide === 'player1' ? match.player2_id : match.player1_id;
-      update.winner_id = winnerId;
-      winner = winnerId;
-
-      await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'complete', winner_id: winnerId });
-
-      // Update stats
-      const winRows = await sbGet('arena_participants', `id=eq.${winnerId}&select=wins`);
-      await sbPatch('arena_participants', `id=eq.${winnerId}`, { wins: (winRows[0]?.wins || 0) + 1 });
-      const loseRows = await sbGet('arena_participants', `id=eq.${loserId}&select=losses`);
-      await sbPatch('arena_participants', `id=eq.${loserId}`, { losses: (loseRows[0]?.losses || 0) + 1 });
-    }
-
-    await sbPatch('arena_tiebreakers', `id=eq.${tb.id}`, update);
+    // Update stats
+    const winRows = await sbGet('arena_participants', `id=eq.${winnerId}&select=wins`);
+    await sbPatch('arena_participants', `id=eq.${winnerId}`, { wins: (winRows[0]?.wins || 0) + 1 });
+    const loseRows = await sbGet('arena_participants', `id=eq.${loserId}&select=losses`);
+    await sbPatch('arena_participants', `id=eq.${loserId}`, { losses: (loseRows[0]?.losses || 0) + 1 });
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, tap, newLevel, won: !!winner })
+      body: JSON.stringify({
+        success: true,
+        player1Taps: p1Result.taps,
+        player2Taps: p2Result.taps,
+        player1Total: p1Result.totalTaps,
+        player2Total: p2Result.totalTaps,
+        winnerId
+      })
     };
   } catch (err) {
     console.error('Arena tiebreaker error:', err);

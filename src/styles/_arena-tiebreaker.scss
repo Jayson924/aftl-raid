@@ -58,6 +58,17 @@
     font-weight: 900;
     color: $arena-gold-light;
     text-shadow: 0 0 10px rgba($arena-gold, 0.3);
+    transition: color 0.15s ease;
+
+    &.tb-flash-success {
+      animation: tb-level-success 0.2s ease;
+      color: $arena-green;
+    }
+
+    &.tb-flash-fail {
+      animation: tb-level-fail 0.2s ease;
+      color: $arena-red;
+    }
   }
 
   .tb-progress-bar {
@@ -72,7 +83,7 @@
       height: 100%;
       background: linear-gradient(90deg, $arena-gold-dim, $arena-gold-light);
       border-radius: 6px;
-      transition: width 0.5s ease;
+      transition: width 0.15s ease;
     }
   }
 
@@ -82,54 +93,50 @@
     font-size: 0.75rem;
     color: $arena-text-muted;
 
-    .tb-marker.reached {
-      color: $arena-gold;
-      font-weight: 700;
+    .tb-marker {
+      transition: color 0.15s ease;
+
+      &.reached {
+        color: $arena-gold;
+        font-weight: 700;
+      }
     }
   }
 
-  .tb-last-result {
+  .tb-tap-count {
     margin-top: 0.5rem;
+    font-size: 0.9rem;
     font-weight: 700;
-    font-size: 1rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-
-    &.success {
-      color: $arena-green;
-      background: rgba($arena-green, 0.15);
-      animation: result-flash 0.3s ease;
-    }
-
-    &.fail {
-      color: $arena-red;
-      background: rgba($arena-red, 0.15);
-      animation: result-shake 0.3s ease;
-    }
-  }
-
-  .tb-rate {
-    margin-top: 0.25rem;
-    font-size: 0.8rem;
     color: $arena-text-muted;
+    min-height: 1.2em;
   }
+}
+
+@keyframes tb-level-success {
+  0% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+@keyframes tb-level-fail {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+// Action panel (roll button / waiting)
+.tb-action {
+  text-align: center;
+  padding: 1rem;
 }
 
 .tb-enhance-btn {
   font-size: 1.2rem !important;
   padding: 0.75rem 2rem !important;
-  margin-top: 0.5rem;
 }
 
-@keyframes result-flash {
-  0% { transform: scale(1.3); }
-  100% { transform: scale(1); }
-}
-
-@keyframes result-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
+.tb-waiting {
+  color: $arena-text-muted;
+  font-size: 1rem;
 }
 
 // Result
@@ -149,47 +156,56 @@
     color: $arena-gold;
     margin: 0.5rem 0;
   }
+
+  .tb-result-detail {
+    font-size: 0.9rem;
+    color: $arena-text-muted;
+    margin-bottom: 0.5rem;
+  }
 }
 
-// Log
+// Log — side-by-side rows
 .tb-log {
-  max-height: 250px;
+  max-height: 300px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
-.tb-log-entry {
-  display: flex;
-  justify-content: space-between;
+.tb-log-row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 1fr;
+  gap: 0.5rem;
   align-items: center;
-  padding: 0.35rem 0.75rem;
-  border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 
-  &.success {
-    background: rgba($arena-green, 0.05);
-    border-left: 3px solid $arena-green;
+  .tb-log-tap-num {
+    color: $arena-text-muted;
+    font-size: 0.7rem;
+    text-align: center;
   }
 
-  &.fail {
-    background: rgba($arena-red, 0.05);
-    border-left: 3px solid $arena-red;
-  }
+  .tb-log-entry {
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    text-align: center;
 
-  .tb-log-player {
-    font-weight: 600;
-    color: $arena-gold;
-  }
+    &.success {
+      color: $arena-green;
+      background: rgba($arena-green, 0.08);
+    }
 
-  .tb-log-result {
-    font-weight: 700;
-    font-size: 0.75rem;
-  }
+    &.fail {
+      color: $arena-red;
+      background: rgba($arena-red, 0.08);
+    }
 
-  &.success .tb-log-result { color: $arena-green; }
-  &.fail .tb-log-result { color: $arena-red; }
+    &.empty {
+      color: $arena-text-muted;
+      opacity: 0.3;
+    }
+  }
 }
 
 @media (max-width: 768px) {
@@ -204,5 +220,10 @@
 
   .tb-enhance-display .tb-level {
     font-size: 2rem;
+  }
+
+  .tb-log-row {
+    grid-template-columns: 2rem 1fr 1fr;
+    font-size: 0.7rem;
   }
 }

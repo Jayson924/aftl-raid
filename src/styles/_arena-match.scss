@@ -10,8 +10,8 @@
 .match-scoreboard {
   text-align: center;
   padding: 0.75rem;
-  background: $arena-panel;
-  border: 1px solid $arena-border;
+  background: linear-gradient(180deg, $arena-panel 0%, $arena-stone-dark 100%);
+  border: 1px solid $arena-stone;
   border-radius: $arena-radius;
 
   .match-score-display {
@@ -35,6 +35,22 @@
     }
   }
 
+  .score-you {
+    position: relative;
+  }
+
+  .you-badge {
+    font-size: 0.6rem;
+    background: $arena-gold;
+    color: #1a1a1a;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    margin-left: 0.25rem;
+  }
+
   .match-round-label {
     color: $arena-text-muted;
     font-size: 0.85rem;
@@ -48,13 +64,107 @@
   }
 }
 
-// Main arena layout
+// Main arena layout — 5-column: bench | fighter | VS | fighter | bench
 .match-arena {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 1.5rem;
+  grid-template-columns: auto 1fr auto 1fr auto;
+  gap: 1rem;
   align-items: center;
   min-height: 300px;
+
+  // 1v1: no bench cards, 3-column layout
+  &.match-arena-1v1 {
+    grid-template-columns: 1fr auto 1fr;
+  }
+}
+
+// Bench cards (remaining drafted characters on the sides)
+.bench {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &.bench-left {
+    justify-self: end;
+  }
+
+  &.bench-right {
+    justify-self: start;
+  }
+}
+
+.bench-card {
+  width: 80px;
+  padding: 0.5rem;
+  background: $arena-panel;
+  border: 1px solid rgba($arena-border, 0.5);
+  border-radius: $arena-radius;
+  text-align: center;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  .bench-card-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin: 0 auto 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(2.2);
+    }
+  }
+
+  .bench-card-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: $arena-text;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bench-card-class {
+    font-size: 0.6rem;
+    color: $arena-text-muted;
+  }
+
+  .bench-hired {
+    display: inline-block;
+    font-size: 0.55rem;
+    color: $arena-gold;
+    background: rgba($arena-gold, 0.15);
+    padding: 0.05rem 0.3rem;
+    border-radius: 2px;
+    margin-top: 0.15rem;
+  }
+
+  &.bench-lost {
+    border-color: $arena-red;
+    background: rgba($arena-red, 0.15);
+    opacity: 0.5;
+  }
+
+  &.bench-won {
+    border-color: $arena-green;
+    background: rgba($arena-green, 0.12);
+  }
+
+  &.bench-draw {
+    border-color: $arena-gold-dim;
+    background: rgba($arena-gold, 0.1);
+    opacity: 0.6;
+  }
 }
 
 .match-fighter {
@@ -65,15 +175,16 @@
   gap: 0.5rem;
 
   .fighter-portrait {
-    width: 120px;
-    height: 160px;
-    border: 3px solid $arena-border;
+    width: 140px;
+    height: 187px;
+    border: 3px solid $arena-stone;
     border-radius: $arena-radius;
-    background: $arena-panel;
+    background: linear-gradient(180deg, $arena-panel-lighter 0%, $arena-stone-dark 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.3);
 
     .fighter-portrait-inner {
       display: flex;
@@ -81,19 +192,30 @@
       justify-content: center;
       width: 100%;
       height: 100%;
+      overflow: hidden;
 
       .fighter-class-icon {
-        font-size: 3rem;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scale(2.2);
       }
     }
   }
 
   &.match-fighter-left .fighter-portrait {
     border-color: $arena-blue;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 16px rgba($arena-blue, 0.25);
   }
 
   &.match-fighter-right .fighter-portrait {
     border-color: $arena-red;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 16px rgba($arena-red, 0.25);
+  }
+
+  &.your-side .fighter-portrait {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 20px rgba($arena-gold, 0.3);
+    border-color: $arena-gold-dim;
   }
 
   .fighter-name {
@@ -113,6 +235,11 @@
     background: rgba($arena-purple, 0.1);
     padding: 0.2rem 0.5rem;
     border-radius: 3px;
+
+    &.ability-used {
+      opacity: 0.35;
+      text-decoration: line-through;
+    }
   }
 
   .fighter-status-effect {
@@ -128,6 +255,169 @@
 @keyframes status-glow {
   from { box-shadow: 0 0 4px rgba($arena-gold, 0.2); }
   to { box-shadow: 0 0 8px rgba($arena-gold, 0.5); }
+}
+
+// ═══════════════════════════════════════
+// Turn reveal animations
+// ═══════════════════════════════════════
+
+// Action label that appears over the fighter portrait
+.reveal-action-label {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+  animation: reveal-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+
+  &.action-attack { background: rgba($arena-attack, 0.9); color: #fff; }
+  &.action-defend { background: rgba($arena-defend, 0.9); color: #fff; }
+  &.action-strong { background: rgba($arena-strong, 0.9); color: #1a1a1a; }
+}
+
+@keyframes reveal-pop {
+  0% { transform: translateX(-50%) scale(0); opacity: 0; }
+  60% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+// Floating damage number
+.reveal-damage {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.8rem;
+  font-weight: 900;
+  z-index: 12;
+  pointer-events: none;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  animation: float-up-damage 1.2s ease-out forwards;
+
+  &.damage-number { color: $arena-red; }
+  &.heal-number { color: $arena-green; }
+  &.clash-number { color: $arena-gold; }
+}
+
+@keyframes float-up-damage {
+  0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(0.5); }
+  20% { opacity: 1; transform: translateX(-50%) translateY(-10px) scale(1.2); }
+  40% { opacity: 1; transform: translateX(-50%) translateY(-20px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-60px) scale(0.8); }
+}
+
+// Fighter shake on damage
+.fighter-hit {
+  animation: fighter-shake 0.4s ease-in-out;
+}
+
+@keyframes fighter-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(5px); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+// Fighter flash on win/lose
+.fighter-flash-red .fighter-portrait {
+  animation: flash-red 0.5s ease;
+}
+.fighter-flash-green .fighter-portrait {
+  animation: flash-green 0.5s ease;
+}
+
+@keyframes flash-red {
+  0% { box-shadow: inset 0 0 0 rgba($arena-red, 0); }
+  30% { box-shadow: inset 0 0 30px rgba($arena-red, 0.5), 0 0 20px rgba($arena-red, 0.4); }
+  100% { box-shadow: inset 0 0 0 rgba($arena-red, 0); }
+}
+@keyframes flash-green {
+  0% { box-shadow: inset 0 0 0 rgba($arena-green, 0); }
+  30% { box-shadow: inset 0 0 30px rgba($arena-green, 0.5), 0 0 20px rgba($arena-green, 0.4); }
+  100% { box-shadow: inset 0 0 0 rgba($arena-green, 0); }
+}
+
+// Heal glow on fighter
+.fighter-heal .fighter-portrait {
+  animation: heal-glow 0.8s ease;
+}
+
+@keyframes heal-glow {
+  0% { box-shadow: 0 0 0 rgba($arena-green, 0); }
+  40% { box-shadow: 0 0 24px rgba($arena-green, 0.6), inset 0 0 16px rgba($arena-green, 0.3); }
+  100% { box-shadow: 0 0 0 rgba($arena-green, 0); }
+}
+
+// Clash flash on VS badge
+.vs-clash .match-vs-badge {
+  animation: vs-clash-pulse 0.6s ease;
+}
+
+@keyframes vs-clash-pulse {
+  0% { transform: scale(1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+  30% { transform: scale(1.4); box-shadow: 0 0 24px rgba($arena-gold, 0.6); background: rgba($arena-gold, 0.3); }
+  100% { transform: scale(1); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+}
+
+// KO effect
+.fighter-ko .fighter-portrait {
+  animation: ko-shake 0.6s ease-in-out;
+}
+.fighter-ko::after {
+  content: 'KO';
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  font-size: 3rem;
+  font-weight: 900;
+  color: $arena-red;
+  text-shadow: 0 0 12px rgba($arena-red, 0.6), 0 2px 4px rgba(0, 0, 0, 0.5);
+  z-index: 15;
+  animation: ko-stamp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes ko-shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-8px) rotate(-2deg); }
+  20% { transform: translateX(7px) rotate(1deg); }
+  30% { transform: translateX(-6px) rotate(-1deg); }
+  40% { transform: translateX(5px); }
+  50% { transform: translateX(-3px); }
+}
+
+@keyframes ko-stamp {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+  70% { transform: translate(-50%, -50%) scale(0.95); }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+// Highlander save effect
+.fighter-highlander .fighter-portrait {
+  animation: highlander-flash 0.8s ease;
+}
+
+@keyframes highlander-flash {
+  0% { box-shadow: 0 0 0 rgba($arena-gold, 0); }
+  25% { box-shadow: 0 0 30px rgba($arena-gold, 0.8), inset 0 0 20px rgba($arena-gold, 0.4); border-color: $arena-gold; }
+  50% { box-shadow: 0 0 20px rgba($arena-gold, 0.4), inset 0 0 10px rgba($arena-gold, 0.2); }
+  75% { box-shadow: 0 0 30px rgba($arena-gold, 0.6), inset 0 0 15px rgba($arena-gold, 0.3); border-color: $arena-gold; }
+  100% { box-shadow: 0 0 0 rgba($arena-gold, 0); }
+}
+
+// Make fighter positions relative for floating elements
+.match-fighter {
+  position: relative;
 }
 
 // HP bar
@@ -173,15 +463,16 @@
   .match-vs-badge {
     font-size: 1.5rem;
     font-weight: 800;
-    color: $arena-text-muted;
-    background: $arena-panel;
-    border: 2px solid $arena-border;
+    color: $arena-stone-light;
+    background: linear-gradient(180deg, $arena-panel-lighter, $arena-stone-dark);
+    border: 2px solid $arena-stone;
     border-radius: 50%;
     width: 50px;
     height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -243,9 +534,9 @@
 }
 
 .action-btn {
-  padding: 1rem 1.5rem !important;
+  flex: 1;
+  padding: 1rem 0.5rem !important;
   font-size: 1rem !important;
-  min-width: 120px;
   transition: all 0.2s ease;
 
   &[data-action="attack"] {
@@ -288,21 +579,27 @@
   display: block;
   width: 100%;
   margin-bottom: 0.75rem;
-  padding: 0.75rem !important;
+  padding: 0.6rem 0.75rem !important;
   border-color: $arena-ability !important;
   color: $arena-ability !important;
   position: relative;
 
-  &:hover, &.active {
+  &:hover:not(.used), &.active {
     background: rgba($arena-ability, 0.2) !important;
     box-shadow: 0 0 16px rgba($arena-ability, 0.4);
+  }
+
+  &.used {
+    opacity: 0.35;
+    border-style: dashed !important;
+    cursor: not-allowed;
   }
 
   .ability-desc {
     display: block;
     font-size: 0.75rem;
     opacity: 0.7;
-    margin-top: 0.25rem;
+    margin-top: 0.15rem;
   }
 }
 
@@ -341,6 +638,15 @@
     border-color: $arena-gold-light !important;
   }
 
+  &.used {
+    opacity: 0.35;
+    border-style: dashed !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
   .char-select-name {
     font-weight: 700;
     font-size: 1rem;
@@ -363,6 +669,12 @@
     background: rgba($arena-gold, 0.15);
     padding: 0.1rem 0.4rem;
     border-radius: 3px;
+  }
+
+  .char-select-used {
+    font-size: 0.7rem;
+    color: $arena-text-muted;
+    font-style: italic;
   }
 }
 
@@ -430,26 +742,43 @@
 // Responsive
 @media (max-width: 768px) {
   .match-arena {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    grid-template-columns: auto 1fr auto 1fr auto;
+    gap: 0.4rem;
+  }
 
-    .match-center {
-      order: -1;
+  .bench-card {
+    width: 55px;
+    padding: 0.3rem;
+
+    .bench-card-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .bench-card-name {
+      font-size: 0.6rem;
+    }
+
+    .bench-card-class {
+      display: none;
     }
   }
 
   .match-fighter .fighter-portrait {
-    width: 80px;
-    height: 107px;
+    width: 90px;
+    height: 120px;
+
+    .fighter-portrait-inner .fighter-class-icon {
+      font-size: 2.5rem;
+    }
   }
 
-  .action-buttons {
-    flex-direction: column;
-    align-items: center;
+  .match-fighter .fighter-name {
+    font-size: 0.9rem;
   }
 
   .action-btn {
-    width: 100%;
-    max-width: 300px;
+    font-size: 0.85rem !important;
+    padding: 0.75rem 0.25rem !important;
   }
 }

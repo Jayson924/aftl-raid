@@ -94,6 +94,8 @@ export class ArenaCombat {
         return `${event.player} used <strong>${this.getActionLabel(event.action)}</strong>`;
       case 'ability_activate':
         return `${event.player} activated <strong>${event.abilityName}</strong>!`;
+      case 'rps_win':
+        return `<strong>${event.winner}</strong>'s ${this.getActionLabel(event.winAction)} beats ${event.loser}'s ${this.getActionLabel(event.loseAction)}`;
       case 'damage_dealt':
         return `${event.player} dealt <strong>${event.amount} damage</strong>`;
       case 'damage_received':
@@ -104,6 +106,8 @@ export class ArenaCombat {
         return `${event.player}'s <strong>Highlander</strong> prevented lethal damage!`;
       case 'food_dispenser_result':
         return `Food Dispenser: ${event.label}`;
+      case 'clash':
+        return event.message || 'Clash! Both used the same action!';
       case 'ko':
         return `${event.player} has been knocked out!`;
       default:
@@ -117,7 +121,7 @@ export class ArenaCombat {
   buildHistoryHtml(p1Name, p2Name) {
     if (this.turnHistory.length === 0) return '<p class="history-empty">No turns yet</p>';
 
-    return this.turnHistory.map(turn => {
+    return [...this.turnHistory].reverse().map(turn => {
       const log = turn.resolution_log;
       const events = log?.events || [];
 

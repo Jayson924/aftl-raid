@@ -15,7 +15,12 @@ const sbHeaders = {
 
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: sbHeaders });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbGet ${table} failed:`, data);
+    throw new Error(`DB read failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPatch(table, query, body) {
@@ -24,7 +29,12 @@ async function sbPatch(table, query, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPatch ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB update failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPost(table, body) {
@@ -33,7 +43,12 @@ async function sbPost(table, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPost ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB insert failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 const headers = {
@@ -54,16 +69,11 @@ export async function handler(event) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing required fields' }) };
     }
 
-    if (!Array.isArray(characters) || characters.length !== 3) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Must pick exactly 3 characters' }) };
+    if (!Array.isArray(characters) || characters.length === 0) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Must pick at least 1 character' }) };
     }
 
-    const hiredCount = characters.filter(c => c.isHired).length;
-    if (hiredCount > 1) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Max 1 hired character' }) };
-    }
-
-    // Get match
+    // Get match (need match_format for validation)
     const matches = await sbGet('arena_matches', `id=eq.${matchId}&select=*`);
     const match = matches[0];
     if (!match) {
@@ -72,6 +82,23 @@ export async function handler(event) {
 
     if (match.status !== 'drafting') {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Match not in drafting phase' }) };
+    }
+
+    // Validate character count based on match format
+    const FORMAT_RULES = {
+      1: { chars: 1, maxHired: 1 },
+      2: { chars: 2, maxHired: 1 },
+      3: { chars: 3, maxHired: 2 }
+    };
+    const format = FORMAT_RULES[match.match_format] || FORMAT_RULES[1];
+
+    if (characters.length !== format.chars) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: `Must pick exactly ${format.chars} character${format.chars > 1 ? 's' : ''}` }) };
+    }
+
+    const hiredCount = characters.filter(c => c.isHired).length;
+    if (hiredCount > format.maxHired) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: `Max ${format.maxHired} hired character${format.maxHired > 1 ? 's' : ''}` }) };
     }
 
     // Get participants

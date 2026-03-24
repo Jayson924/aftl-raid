@@ -15,7 +15,12 @@ const sbHeaders = {
 
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: sbHeaders });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbGet ${table} failed:`, data);
+    throw new Error(`DB read failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPatch(table, query, body) {
@@ -24,7 +29,12 @@ async function sbPatch(table, query, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPatch ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB update failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPost(table, body) {
@@ -33,7 +43,12 @@ async function sbPost(table, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPost ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB insert failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 const headers = {
@@ -77,6 +92,15 @@ export async function handler(event) {
     const draft = match[`${playerSide}_draft`];
     if (!draft?.some(c => c.playerId === character.playerId)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Character not in your draft' }) };
+    }
+
+    // Check character wasn't already used in a previous round
+    const allRounds = await sbGet('arena_rounds', `match_id=eq.${matchId}&select=${playerSide}_character&id=neq.${roundId}`);
+    const usedPlayerIds = allRounds
+      .map(r => r[`${playerSide}_character`]?.playerId)
+      .filter(Boolean);
+    if (usedPlayerIds.includes(character.playerId)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Character already used in a previous round' }) };
     }
 
     // Set character on round

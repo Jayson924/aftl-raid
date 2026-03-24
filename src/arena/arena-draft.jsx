@@ -3,7 +3,7 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
-import { TIMERS, DRAFT_RULES, CLASS_ABILITIES, getAbilityForClass } from './arena-constants.js';
+import { TIMERS, DRAFT_RULES, CLASS_ABILITIES, getAbilityForClass, getMatchFormat } from './arena-constants.js';
 
 /**
  * Arena Draft — Character selection phase before a match.
@@ -22,6 +22,11 @@ export const ArenaDraftPage = {
   _timeLeft: TIMERS.DRAFT_PHASE,
   _locked: false,
   _participants: null,
+
+  _getFormatRules() {
+    const fmt = getMatchFormat(this._match?.match_format);
+    return { charsPerDraft: fmt.charsPerDraft, maxHired: fmt.maxHired, label: fmt.label };
+  },
 
   async render(container) {
     ArenaShell.activate();
@@ -57,8 +62,13 @@ export const ArenaDraftPage = {
     const currentUser = dataService.getUser();
     if (!currentUser) throw new Error('Not logged in');
 
-    // Get participants
-    this._participants = await arenaData.getParticipants(this._match.tournament_id);
+    // Get participants and app users for display names
+    const [participants, appUsers] = await Promise.all([
+      arenaData.getParticipants(this._match.tournament_id),
+      arenaData.getAllAppUsers()
+    ]);
+    this._participants = participants;
+    this._appUsers = appUsers;
     const p1 = this._participants.find(p => p.id === this._match.player1_id);
     const p2 = this._participants.find(p => p.id === this._match.player2_id);
 
@@ -129,20 +139,20 @@ export const ArenaDraftPage = {
           <span class="timer-value">${this._timeLeft}s</span>
         </div>
         <div class="draft-status">
-          Pick ${DRAFT_RULES.CHARACTERS_PER_DRAFT} characters for battle
+          Pick ${this._getFormatRules().charsPerDraft} character${this._getFormatRules().charsPerDraft > 1 ? 's' : ''} for battle
           ${this._locked ? ' — <strong>Locked in!</strong> Waiting for opponent...' : ''}
         </div>
       </div>
 
       <div class="draft-selected arena-panel" id="draft-selected">
         <div class="arena-panel-header">
-          <h3>Your Team (${this._selectedCharacters.length}/${DRAFT_RULES.CHARACTERS_PER_DRAFT})</h3>
-          <button class="arena-btn arena-btn-primary" id="lock-in-btn" ${this._selectedCharacters.length !== DRAFT_RULES.CHARACTERS_PER_DRAFT || this._locked ? 'disabled' : ''}>
+          <h3>Your Team (${this._selectedCharacters.length}/${this._getFormatRules().charsPerDraft})</h3>
+          <button class="arena-btn arena-btn-primary" id="lock-in-btn" ${this._selectedCharacters.length !== this._getFormatRules().charsPerDraft || this._locked ? 'disabled' : ''}>
             ${this._locked ? 'Locked In' : 'Lock In'}
           </button>
         </div>
         <div class="draft-selected-slots">
-          ${[0, 1, 2].map(i => {
+          ${Array.from({ length: this._getFormatRules().charsPerDraft }, (_, i) => i).map(i => {
             const char = this._selectedCharacters[i];
             if (char) {
               const ability = getAbilityForClass(char.role);
@@ -163,7 +173,7 @@ export const ArenaDraftPage = {
 
       <div class="draft-tabs">
         <button class="arena-btn draft-tab active" data-tab="my-chars">My Characters</button>
-        <button class="arena-btn draft-tab" data-tab="hire">Hire (${hiredCount}/${DRAFT_RULES.MAX_HIRED})</button>
+        <button class="arena-btn draft-tab" data-tab="hire">Hire (${hiredCount}/${this._getFormatRules().maxHired})</button>
       </div>
 
       <div class="draft-character-list arena-panel" id="draft-my-chars">
@@ -189,7 +199,7 @@ export const ArenaDraftPage = {
           const isSelected = this._selectedCharacters.some(s => s.id === c.id);
           const ability = getAbilityForClass(c.role);
           const hiredCount = this._selectedCharacters.filter(s => s.isHired).length;
-          const cantHire = isHire && hiredCount >= DRAFT_RULES.MAX_HIRED && !isSelected;
+          const cantHire = isHire && hiredCount >= this._getFormatRules().maxHired && !isSelected;
 
           return `
             <div class="draft-card ${isSelected ? 'selected' : ''} ${cantHire ? 'disabled' : ''} ${this._locked ? 'locked' : ''}"
@@ -250,13 +260,13 @@ export const ArenaDraftPage = {
     if (existingIndex >= 0) {
       this._selectedCharacters.splice(existingIndex, 1);
     } else {
-      if (this._selectedCharacters.length >= DRAFT_RULES.CHARACTERS_PER_DRAFT) {
-        toast.error(`Max ${DRAFT_RULES.CHARACTERS_PER_DRAFT} characters`);
+      if (this._selectedCharacters.length >= this._getFormatRules().charsPerDraft) {
+        toast.error(`Max ${this._getFormatRules().charsPerDraft} characters`);
         return;
       }
       const hiredCount = this._selectedCharacters.filter(c => c.isHired).length;
-      if (isHire && hiredCount >= DRAFT_RULES.MAX_HIRED) {
-        toast.error(`Max ${DRAFT_RULES.MAX_HIRED} hired character`);
+      if (isHire && hiredCount >= this._getFormatRules().maxHired) {
+        toast.error(`Max ${this._getFormatRules().maxHired} hired characters`);
         return;
       }
 
@@ -270,7 +280,7 @@ export const ArenaDraftPage = {
   },
 
   async _lockIn(container) {
-    if (this._selectedCharacters.length !== DRAFT_RULES.CHARACTERS_PER_DRAFT) return;
+    if (this._selectedCharacters.length !== this._getFormatRules().charsPerDraft) return;
     if (this._locked) return;
 
     this._locked = true;
@@ -320,18 +330,33 @@ export const ArenaDraftPage = {
   },
 
   async _autoRandomDraft(container) {
-    // Auto-pick random characters
+    // Auto-pick random characters from own roster + hireable if needed
     const available = [...this._myCharacters];
     this._selectedCharacters = [];
-    for (let i = 0; i < DRAFT_RULES.CHARACTERS_PER_DRAFT && available.length > 0; i++) {
+
+    // Pick from own characters first
+    while (this._selectedCharacters.length < this._getFormatRules().charsPerDraft && available.length > 0) {
       const idx = Math.floor(Math.random() * available.length);
       this._selectedCharacters.push({ ...available[idx], isHired: false });
       available.splice(idx, 1);
     }
 
-    if (this._selectedCharacters.length > 0) {
-      toast.info('Time\'s up! Auto-picked random characters.');
+    // If still not enough, pick from hireable (up to max hired limit)
+    if (this._selectedCharacters.length < this._getFormatRules().charsPerDraft && this._hireableCharacters.length > 0) {
+      const hirePool = [...this._hireableCharacters];
+      const hiredCount = this._selectedCharacters.filter(c => c.isHired).length;
+      while (this._selectedCharacters.length < this._getFormatRules().charsPerDraft && hirePool.length > 0 && hiredCount < this._getFormatRules().maxHired) {
+        const idx = Math.floor(Math.random() * hirePool.length);
+        this._selectedCharacters.push({ ...hirePool[idx], isHired: true });
+        hirePool.splice(idx, 1);
+      }
+    }
+
+    if (this._selectedCharacters.length === this._getFormatRules().charsPerDraft) {
+      toast.info("Time's up! Auto-picked random characters.");
       await this._lockIn(container);
+    } else {
+      toast.error(`Time's up! Not enough characters to auto-draft (need ${this._getFormatRules().charsPerDraft}, have ${this._myCharacters.length}).`);
     }
   },
 
@@ -352,9 +377,9 @@ export const ArenaDraftPage = {
   },
 
   _getDisplayName(discordId) {
-    const user = this._participants?.find(p => p.discord_id === discordId);
-    // Fall back to data service
-    return discordId;
+    if (!this._appUsers) return discordId;
+    const user = this._appUsers.find(u => u.discord_id === discordId);
+    return user?.display_name || user?.username || discordId;
   },
 
   destroy() {

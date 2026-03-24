@@ -4,7 +4,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { ArenaCombat } from './arena-combat.js';
-import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, MATCH_STATUS } from './arena-constants.js';
+import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassIconPath, MATCH_STATUS, getMatchFormat } from './arena-constants.js';
 
 /**
  * Arena Match — The main combat screen.
@@ -31,6 +31,8 @@ export const ArenaMatchPage = {
   _timeLeft: TIMERS.ACTION_PICK,
   _isPlayer: false,
   _playerSide: null, // 'player1' or 'player2'
+  _revealInProgress: false,
+  _autoSending: false,
 
   async render(container) {
     ArenaShell.activate();
@@ -91,8 +93,9 @@ export const ArenaMatchPage = {
       this._opponentParticipant = null;
     }
 
-    // Load current round
+    // Load all rounds (need history for used-character tracking)
     const rounds = await arenaData.getRounds(matchId);
+    this._allRounds = rounds;
     this._currentRound = rounds[rounds.length - 1] || null;
 
     // Init combat display
@@ -154,6 +157,7 @@ export const ArenaMatchPage = {
 
   _renderContent(container) {
     const m = this._match;
+    const fmt = getMatchFormat(m.match_format);
     const p1Name = this._getParticipantName(m.player1_id);
     const p2Name = this._getParticipantName(m.player2_id);
     const round = this._currentRound;
@@ -172,27 +176,105 @@ export const ArenaMatchPage = {
     const isTiebreaker = m.status === 'tiebreaker';
 
     // Check if we need to send a character for this round
-    const needsCharacterSend = this._isPlayer && round && !isComplete && !isTiebreaker &&
+    let needsCharacterSend = this._isPlayer && round && !isComplete && !isTiebreaker &&
       !round[`${this._playerSide}_character`];
     const waitingForOpponentChar = this._isPlayer && round && !isComplete && !isTiebreaker &&
       round[`${this._playerSide}_character`] && !this._currentTurn;
 
+    // Auto-send for 1v1 (only 1 character available)
+    if (needsCharacterSend && fmt.charsPerDraft === 1) {
+      const draft = m[`${this._playerSide}_draft`] || [];
+      if (draft.length === 1 && !this._autoSending) {
+        this._autoSending = true;
+        needsCharacterSend = false; // Don't show select UI
+        arenaData.sendCharacter(m.id, round.id, this._myParticipant.discord_id, draft[0]).then(async (result) => {
+          const rounds = await arenaData.getRounds(m.id);
+          this._allRounds = rounds;
+          this._currentRound = rounds[rounds.length - 1] || null;
+          if (result.bothReady && this._currentRound) {
+            const turns = await arenaData.getTurns(this._currentRound.id);
+            this._currentTurn = turns.find(t => !t.resolved) || null;
+          }
+          this._autoSending = false;
+          this._renderContent(container);
+        }).catch(() => { this._autoSending = false; });
+      }
+    }
+
+    // Build bench characters (drafted but not currently fighting)
+    const p1Draft = m.player1_draft || [];
+    const p2Draft = m.player2_draft || [];
+    const p1Bench = p1Draft.filter(c => c.playerName !== p1Char?.playerName);
+    const p2Bench = p2Draft.filter(c => c.playerName !== p2Char?.playerName);
+
+    // Build outcome map: playerId → 'won' | 'lost' | 'draw' from previous rounds
+    const charOutcomes = {};
+    const previousRounds = (this._allRounds || []).filter(r => r.id !== this._currentRound?.id);
+    for (const pr of previousRounds) {
+      const p1c = pr.player1_character;
+      const p2c = pr.player2_character;
+      if (!p1c || !p2c) continue;
+      if (!pr.winner_id) {
+        // Draw round (double KO)
+        if (p1c.playerId) charOutcomes[p1c.playerId] = 'draw';
+        if (p2c.playerId) charOutcomes[p2c.playerId] = 'draw';
+      } else if (pr.winner_id === m.player1_id) {
+        if (p1c.playerId) charOutcomes[p1c.playerId] = 'won';
+        if (p2c.playerId) charOutcomes[p2c.playerId] = 'lost';
+      } else {
+        if (p1c.playerId) charOutcomes[p1c.playerId] = 'lost';
+        if (p2c.playerId) charOutcomes[p2c.playerId] = 'won';
+      }
+    }
+
     container.innerHTML = `
       <div class="match-scoreboard">
         <div class="match-score-display">
-          <span class="score-player">${p1Name}</span>
-          <span class="score-rounds">${m.player1_rounds_won} - ${m.player2_rounds_won}</span>
-          <span class="score-player">${p2Name}</span>
+          <span class="score-player ${this._playerSide === 'player1' ? 'score-you' : ''}">${p1Name}${this._playerSide === 'player1' ? ' <span class="you-badge">YOU</span>' : ''}</span>
+          ${fmt.charsPerDraft > 1 ? `<span class="score-rounds">${m.player1_rounds_won} - ${m.player2_rounds_won}</span>` : '<span class="score-rounds">VS</span>'}
+          <span class="score-player ${this._playerSide === 'player2' ? 'score-you' : ''}">${p2Name}${this._playerSide === 'player2' ? ' <span class="you-badge">YOU</span>' : ''}</span>
         </div>
-        ${round ? `<div class="match-round-label">Round ${round.round_number}</div>` : ''}
+        ${fmt.charsPerDraft > 1 && round ? `<div class="match-round-label">Round ${round.round_number} &middot; ${fmt.label}</div>` : ''}
+        ${fmt.charsPerDraft === 1 ? `<div class="match-round-label">${fmt.label}</div>` : ''}
         <div class="match-spectators" id="spectator-count">${this._spectatorCount} watching</div>
       </div>
 
-      <div class="match-arena">
-        <div class="match-fighter match-fighter-left">
+      ${isComplete ? `
+        <div class="match-result-banner">
+          <div class="result-label">${m.winner_id ? 'Winner' : 'Draw'}</div>
+          ${m.winner_id ? `<div class="result-winner">${this._getParticipantName(m.winner_id)}</div>` : ''}
+          <button class="arena-btn arena-btn-primary" id="back-to-hub-btn" style="margin-top: 0.75rem;">Back to Arena</button>
+        </div>
+      ` : ''}
+      ${isTiebreaker ? `
+        <div class="match-result-banner">
+          <div class="result-label">Tiebreaker!</div>
+          <button class="arena-btn arena-btn-primary" id="go-tiebreaker-btn">Enter Enhancement Race</button>
+        </div>
+      ` : ''}
+
+      <div class="match-arena ${fmt.charsPerDraft === 1 ? 'match-arena-1v1' : ''}">
+        ${fmt.charsPerDraft > 1 ? `
+          <div class="bench bench-left ${this._playerSide === 'player1' ? 'your-side' : ''}">
+            ${p1Bench.map(c => {
+              const outcome = charOutcomes[c.playerId] || '';
+              const iconPath = getClassIconPath(c.className);
+              return `
+                <div class="bench-card ${outcome ? 'bench-' + outcome : ''}">
+                  ${iconPath ? `<div class="bench-card-icon"><img src="${iconPath}" alt="${c.className}"></div>` : ''}
+                  <div class="bench-card-name">${c.playerName}</div>
+                  <div class="bench-card-class">${c.className}</div>
+                  ${c.isHired ? '<span class="bench-hired">Hired</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+
+        <div class="match-fighter match-fighter-left ${this._playerSide === 'player1' ? 'your-side' : ''}">
           <div class="fighter-portrait">
             <div class="fighter-portrait-inner">
-              ${p1Char ? `<span class="fighter-class-icon">${p1Ability?.icon || ''}</span>` : ''}
+              ${p1Char ? `<img class="fighter-class-icon" src="${getClassIconPath(p1Char.className) || ''}" alt="${p1Char.className}">` : ''}
             </div>
           </div>
           <div class="fighter-name">${p1Char?.playerName || p1Name}</div>
@@ -201,33 +283,21 @@ export const ArenaMatchPage = {
             <div class="hp-bar" style="width: ${p1HpPct}%" data-hp="${p1Hp}"></div>
             <span class="hp-text">${p1Hp} / ${MAX_HP}</span>
           </div>
-          ${p1Ability && !round?.player1_ability_used ? `
-            <div class="fighter-ability-ready">${p1Ability.icon} ${p1Ability.name}</div>
+          ${p1Ability ? `
+            <div class="fighter-ability-ready ${round?.player1_ability_used ? 'ability-used' : ''}">${p1Ability.icon} ${p1Ability.name}</div>
           ` : ''}
           ${round?.player1_status?.highlander ? '<div class="fighter-status-effect">Highlander Active</div>' : ''}
           ${round?.player1_status?.chargedMissile ? '<div class="fighter-status-effect">Charged! (x2 next)</div>' : ''}
         </div>
 
         <div class="match-center">
-          ${isComplete ? `
-            <div class="match-result-banner">
-              <div class="result-label">${m.winner_id ? 'Winner' : 'Draw'}</div>
-              ${m.winner_id ? `<div class="result-winner">${this._getParticipantName(m.winner_id)}</div>` : ''}
-            </div>
-          ` : isTiebreaker ? `
-            <div class="match-result-banner">
-              <div class="result-label">Tiebreaker!</div>
-              <button class="arena-btn arena-btn-primary" id="go-tiebreaker-btn">Enter Enhancement Race</button>
-            </div>
-          ` : `
-            <div class="match-vs-badge">VS</div>
-          `}
+          <div class="match-vs-badge">VS</div>
         </div>
 
-        <div class="match-fighter match-fighter-right">
+        <div class="match-fighter match-fighter-right ${this._playerSide === 'player2' ? 'your-side' : ''}">
           <div class="fighter-portrait">
             <div class="fighter-portrait-inner">
-              ${p2Char ? `<span class="fighter-class-icon">${p2Ability?.icon || ''}</span>` : ''}
+              ${p2Char ? `<img class="fighter-class-icon" src="${getClassIconPath(p2Char.className) || ''}" alt="${p2Char.className}">` : ''}
             </div>
           </div>
           <div class="fighter-name">${p2Char?.playerName || p2Name}</div>
@@ -236,12 +306,29 @@ export const ArenaMatchPage = {
             <div class="hp-bar" style="width: ${p2HpPct}%" data-hp="${p2Hp}"></div>
             <span class="hp-text">${p2Hp} / ${MAX_HP}</span>
           </div>
-          ${p2Ability && !round?.player2_ability_used ? `
-            <div class="fighter-ability-ready">${p2Ability.icon} ${p2Ability.name}</div>
+          ${p2Ability ? `
+            <div class="fighter-ability-ready ${round?.player2_ability_used ? 'ability-used' : ''}">${p2Ability.icon} ${p2Ability.name}</div>
           ` : ''}
           ${round?.player2_status?.highlander ? '<div class="fighter-status-effect">Highlander Active</div>' : ''}
           ${round?.player2_status?.chargedMissile ? '<div class="fighter-status-effect">Charged! (x2 next)</div>' : ''}
         </div>
+
+        ${fmt.charsPerDraft > 1 ? `
+          <div class="bench bench-right ${this._playerSide === 'player2' ? 'your-side' : ''}">
+            ${p2Bench.map(c => {
+              const outcome = charOutcomes[c.playerId] || '';
+              const iconPath = getClassIconPath(c.className);
+              return `
+                <div class="bench-card ${outcome ? 'bench-' + outcome : ''}">
+                  ${iconPath ? `<div class="bench-card-icon"><img src="${iconPath}" alt="${c.className}"></div>` : ''}
+                  <div class="bench-card-name">${c.playerName}</div>
+                  <div class="bench-card-class">${c.className}</div>
+                  ${c.isHired ? '<span class="bench-hired">Hired</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
       </div>
 
       ${needsCharacterSend ? this._renderCharacterSelect() : ''}
@@ -257,23 +344,23 @@ export const ArenaMatchPage = {
           ${this._committed ? `
             <div class="action-waiting">Waiting for opponent...</div>
           ` : `
-            <div class="action-buttons">
-              <button class="arena-btn action-btn action-btn-attack ${this._myAction === 'attack' ? 'selected' : ''}" data-action="attack">
-                Attack<br><span class="action-damage">${TIMERS.ACTION_PICK > 0 ? '12 dmg' : ''}</span>
+            ${this._getMyAbility() ? `
+              <button class="arena-btn action-btn-ability ${this._myAbility ? 'active' : ''} ${!this._canUseAbility() ? 'used' : ''}" id="ability-btn" ${!this._canUseAbility() ? 'disabled' : ''}>
+                ${this._getMyAbility().icon} ${this._getMyAbility().name}
+                <span class="ability-desc">${!this._canUseAbility() ? 'Already used' : this._getMyAbility().description}</span>
               </button>
-              <button class="arena-btn action-btn action-btn-defend ${this._myAction === 'defend' ? 'selected' : ''}" data-action="defend">
+            ` : ''}
+            <div class="action-buttons">
+              <button class="arena-btn action-btn ${this._myAction === 'attack' ? 'selected' : ''}" data-action="attack">
+                Attack<br><span class="action-damage">12 dmg</span>
+              </button>
+              <button class="arena-btn action-btn ${this._myAction === 'defend' ? 'selected' : ''}" data-action="defend">
                 Defend<br><span class="action-damage">8 counter</span>
               </button>
-              <button class="arena-btn action-btn action-btn-strong ${this._myAction === 'strong_attack' ? 'selected' : ''}" data-action="strong_attack">
+              <button class="arena-btn action-btn ${this._myAction === 'strong_attack' ? 'selected' : ''}" data-action="strong_attack">
                 Strong Attack<br><span class="action-damage">16 dmg</span>
               </button>
             </div>
-            ${this._canUseAbility() ? `
-              <button class="arena-btn action-btn-ability ${this._myAbility ? 'active' : ''}" id="ability-btn">
-                ${this._getMyAbility()?.icon || ''} ${this._getMyAbility()?.name || 'Ability'}
-                <span class="ability-desc">${this._getMyAbility()?.description || ''}</span>
-              </button>
-            ` : ''}
             <button class="arena-btn arena-btn-primary" id="commit-action-btn" ${!this._myAction ? 'disabled' : ''}>
               Commit Action
             </button>
@@ -297,6 +384,183 @@ export const ArenaMatchPage = {
     }
   },
 
+  /**
+   * Play the turn reveal animation sequence.
+   * Steps through resolution events with timed delays, then calls callback.
+   */
+  _playRevealSequence(turnData, callback) {
+    if (this._revealInProgress) {
+      // Another reveal is already playing — don't call callback,
+      // the running reveal's callback will handle the post-reveal refresh.
+      return;
+    }
+    this._revealInProgress = true;
+
+    const events = turnData.resolution_log?.events || [];
+    const p1Fighter = document.querySelector('.match-fighter-left');
+    const p2Fighter = document.querySelector('.match-fighter-right');
+    const vsCenter = document.querySelector('.match-center');
+
+    if (!p1Fighter || !p2Fighter) {
+      this._revealInProgress = false;
+      if (callback) callback();
+      return;
+    }
+
+    const p1Name = this._currentRound?.player1_character?.playerName;
+    const p2Name = this._currentRound?.player2_character?.playerName;
+
+    // Helper: which fighter element does a player name map to?
+    const getFighterEl = (name) => {
+      if (name === p1Name) return p1Fighter;
+      if (name === p2Name) return p2Fighter;
+      return null;
+    };
+    const getSide = (name) => name === p1Name ? 'left' : 'right';
+
+    // Helper: show floating number over a fighter
+    const showFloating = (fighterEl, text, cssClass) => {
+      const el = document.createElement('div');
+      el.className = `reveal-damage ${cssClass}`;
+      el.textContent = text;
+      fighterEl.appendChild(el);
+      setTimeout(() => el.remove(), 1300);
+    };
+
+    // Helper: show action label over a fighter
+    const showActionLabel = (fighterEl, action) => {
+      const labels = { attack: 'Attack', defend: 'Defend', strong_attack: 'Strong Attack' };
+      const classes = { attack: 'action-attack', defend: 'action-defend', strong_attack: 'action-strong' };
+      const el = document.createElement('div');
+      el.className = `reveal-action-label ${classes[action] || ''}`;
+      el.textContent = labels[action] || action;
+      fighterEl.appendChild(el);
+      setTimeout(() => el.remove(), 2000);
+    };
+
+    // Helper: add and auto-remove a CSS class
+    const flashClass = (el, cls, duration = 800) => {
+      if (!el) return;
+      el.classList.add(cls);
+      setTimeout(() => el.classList.remove(cls), duration);
+    };
+
+    // Build a timeline of effects from events
+    let delay = 0;
+    const schedule = (fn, extraDelay) => {
+      delay += extraDelay;
+      setTimeout(fn, delay);
+    };
+
+    // Step 1: Show action labels (action_reveal events)
+    const actionReveals = events.filter(e => e.type === 'action_reveal');
+    if (actionReveals.length >= 2) {
+      schedule(() => {
+        showActionLabel(p1Fighter, actionReveals[0].action);
+        showActionLabel(p2Fighter, actionReveals[1].action);
+      }, 200);
+    }
+
+    // Step 2: Process combat result events
+    for (const event of events) {
+      if (event.type === 'action_reveal') continue; // already handled
+
+      switch (event.type) {
+        case 'rps_win':
+          schedule(() => {
+            const winnerEl = getFighterEl(event.winner);
+            const loserEl = getFighterEl(event.loser);
+            flashClass(winnerEl, 'fighter-flash-green', 600);
+            flashClass(loserEl, 'fighter-flash-red', 600);
+          }, 600);
+          break;
+
+        case 'clash':
+          schedule(() => {
+            if (vsCenter) flashClass(vsCenter, 'vs-clash', 700);
+          }, 600);
+          break;
+
+        case 'damage_received':
+          schedule(() => {
+            const el = getFighterEl(event.player);
+            if (el) {
+              flashClass(el, 'fighter-hit', 500);
+              showFloating(el, `-${event.amount}`, 'damage-number');
+            }
+          }, 500);
+          break;
+
+        case 'heal':
+          schedule(() => {
+            const el = getFighterEl(event.player);
+            if (el) {
+              flashClass(el, 'fighter-heal', 800);
+              showFloating(el, `+${event.amount}`, 'heal-number');
+            }
+          }, 500);
+          break;
+
+        case 'ability_activate':
+          schedule(() => {
+            const el = getFighterEl(event.player);
+            if (el) {
+              showFloating(el, event.abilityName, 'clash-number');
+            }
+          }, 400);
+          break;
+
+        case 'highlander_trigger':
+          schedule(() => {
+            const el = getFighterEl(event.player);
+            if (el) {
+              flashClass(el, 'fighter-highlander', 900);
+              showFloating(el, '1 HP!', 'heal-number');
+            }
+          }, 500);
+          break;
+
+        case 'food_dispenser_result':
+          // Shown via ability_activate, skip separate animation
+          break;
+
+        case 'ko':
+          schedule(() => {
+            const el = getFighterEl(event.player);
+            if (el) {
+              flashClass(el, 'fighter-ko', 1200);
+            }
+          }, 600);
+          break;
+      }
+    }
+
+    // Step 3: After all animations, update HP bars smoothly then callback
+    schedule(() => {
+      // Animate HP bars to final values
+      const p1HpAfter = turnData.player1_hp_after;
+      const p2HpAfter = turnData.player2_hp_after;
+      if (p1HpAfter != null) {
+        const bar = p1Fighter.querySelector('.hp-bar');
+        const text = p1Fighter.querySelector('.hp-text');
+        if (bar) bar.style.width = `${Math.max(0, (p1HpAfter / MAX_HP) * 100)}%`;
+        if (text) text.textContent = `${Math.max(0, p1HpAfter)} / ${MAX_HP}`;
+      }
+      if (p2HpAfter != null) {
+        const bar = p2Fighter.querySelector('.hp-bar');
+        const text = p2Fighter.querySelector('.hp-text');
+        if (bar) bar.style.width = `${Math.max(0, (p2HpAfter / MAX_HP) * 100)}%`;
+        if (text) text.textContent = `${Math.max(0, p2HpAfter)} / ${MAX_HP}`;
+      }
+    }, 400);
+
+    // Step 4: Finish — re-render with fresh data
+    schedule(() => {
+      this._revealInProgress = false;
+      if (callback) callback();
+    }, 800);
+  },
+
   _canUseAbility() {
     if (!this._currentRound || !this._playerSide) return false;
     return !this._currentRound[`${this._playerSide}_ability_used`];
@@ -315,20 +579,26 @@ export const ArenaMatchPage = {
       return `<div class="match-action-panel"><div class="action-waiting">No characters drafted</div></div>`;
     }
 
-    // Figure out which characters have already been used in previous rounds
-    // (we'll check this asynchronously, for now show all drafted characters)
+    // Characters already used in previous rounds can't be picked again
+    const previousRounds = (this._allRounds || []).filter(r => r.id !== this._currentRound?.id);
+    const usedPlayerIds = previousRounds
+      .map(r => r[`${this._playerSide}_character`]?.playerId)
+      .filter(Boolean);
+
     return `
       <div class="match-action-panel" id="char-select-panel">
         <h3 class="char-select-title">Send a Character for Round ${this._currentRound?.round_number || '?'}</h3>
         <div class="char-select-grid">
           ${draft.map((c, i) => {
             const ability = getAbilityForClass(c.className);
+            const alreadyUsed = usedPlayerIds.includes(c.playerId);
             return `
-              <button class="arena-btn char-select-card" data-char-index="${i}">
+              <button class="arena-btn char-select-card ${alreadyUsed ? 'used' : ''}" data-char-index="${i}" ${alreadyUsed ? 'disabled' : ''}>
                 <span class="char-select-name">${c.playerName}</span>
                 <span class="char-select-class">${c.className}</span>
                 ${ability ? `<span class="char-select-ability">${ability.icon} ${ability.name}</span>` : ''}
                 ${c.isHired ? '<span class="char-select-hired">Hired</span>' : ''}
+                ${alreadyUsed ? '<span class="char-select-used">Already fought</span>' : ''}
               </button>
             `;
           }).join('')}
@@ -364,6 +634,7 @@ export const ArenaMatchPage = {
 
           // Reload round data to get updated character fields
           const rounds = await arenaData.getRounds(this._match.id);
+          this._allRounds = rounds;
           this._currentRound = rounds[rounds.length - 1] || null;
 
           if (result.bothReady && this._currentRound) {
@@ -416,6 +687,14 @@ export const ArenaMatchPage = {
         router.navigate(`arena-tiebreaker?match=${this._match.id}`);
       });
     }
+
+    // Back to hub button
+    const hubBtn = document.getElementById('back-to-hub-btn');
+    if (hubBtn) {
+      hubBtn.addEventListener('click', () => {
+        router.navigate('arena');
+      });
+    }
   },
 
   async _commitAction(container) {
@@ -423,7 +702,7 @@ export const ArenaMatchPage = {
     this._committed = true;
 
     try {
-      await arenaData.submitAction(
+      const result = await arenaData.submitAction(
         this._match.id,
         this._currentRound.id,
         this._currentTurn.id,
@@ -433,7 +712,46 @@ export const ArenaMatchPage = {
       );
 
       if (this._timerInterval) clearInterval(this._timerInterval);
-      this._renderContent(container);
+
+      if (result.resolved) {
+        // Turn was resolved immediately (we were the second to commit).
+        // Build a turn-like object from the response for the reveal sequence.
+        const revealTurn = {
+          player1_hp_after: result.p1Hp,
+          player2_hp_after: result.p2Hp,
+          resolution_log: { events: result.events || [] }
+        };
+
+        // Play reveal animation, then fetch fresh state
+        this._playRevealSequence(revealTurn, async () => {
+          this._committed = false;
+          this._myAction = null;
+          this._myAbility = false;
+
+          const rounds = await arenaData.getRounds(this._match.id);
+          this._allRounds = rounds;
+          this._currentRound = rounds[rounds.length - 1] || null;
+
+          if (this._currentRound) {
+            this._combat.subscribeToTurns(this._currentRound.id);
+
+            const turns = await arenaData.getTurns(this._currentRound.id);
+            this._currentTurn = turns.find(t => !t.resolved) || null;
+
+            if (!this._currentTurn) {
+              await new Promise(r => setTimeout(r, 600));
+              const retryTurns = await arenaData.getTurns(this._currentRound.id);
+              this._currentTurn = retryTurns.find(t => !t.resolved) || null;
+            }
+          }
+
+          this._match = await arenaData.getMatch(this._match.id);
+          this._renderContent(container);
+        });
+      } else {
+        // Waiting for opponent — just re-render with "Waiting..."
+        this._renderContent(container);
+      }
     } catch (err) {
       this._committed = false;
       toast.error('Failed: ' + err.message);
@@ -473,6 +791,9 @@ export const ArenaMatchPage = {
 
     this._currentRound = updatedRound;
 
+    // Don't re-render during reveal animation
+    if (this._revealInProgress) return;
+
     // If both characters are now set but no turn exists yet, check for new turn
     if (updatedRound.player1_character && updatedRound.player2_character && !this._currentTurn) {
       arenaData.getTurns(updatedRound.id).then(turns => {
@@ -493,27 +814,58 @@ export const ArenaMatchPage = {
 
   _onCombatEvent(event, data) {
     if (event === 'turn_resolved') {
-      // Turn resolved — update HP, refresh UI
-      this._committed = false;
-      this._myAction = null;
-      this._myAbility = false;
+      // Turn resolved — play reveal animation, then refresh
+      const turnData = data; // the resolved turn from Realtime
 
-      // Reload round data for updated HP
-      arenaData.getRounds(this._match.id).then(rounds => {
-        this._currentRound = rounds[rounds.length - 1] || null;
+      this._playRevealSequence(turnData, () => {
+        this._committed = false;
+        this._myAction = null;
+        this._myAbility = false;
 
-        // Check for new unresolved turn
-        if (this._currentRound) {
-          arenaData.getTurns(this._currentRound.id).then(turns => {
-            this._currentTurn = turns.find(t => !t.resolved) || null;
-            const content = document.querySelector('.arena-match');
-            if (content) this._renderContent(content);
-          });
-        }
+        arenaData.getRounds(this._match.id).then(rounds => {
+          this._allRounds = rounds;
+          this._currentRound = rounds[rounds.length - 1] || null;
+
+          if (this._currentRound) {
+            arenaData.getTurns(this._currentRound.id).then(turns => {
+              this._currentTurn = turns.find(t => !t.resolved) || null;
+              const content = document.querySelector('.arena-match');
+              if (content) this._renderContent(content);
+
+              if (!this._currentTurn) {
+                setTimeout(() => {
+                  arenaData.getTurns(this._currentRound.id).then(retryTurns => {
+                    const newTurn = retryTurns.find(t => !t.resolved);
+                    if (newTurn && !this._currentTurn) {
+                      this._currentTurn = newTurn;
+                      const c = document.querySelector('.arena-match');
+                      if (c) this._renderContent(c);
+                    }
+                  });
+                }, 500);
+              }
+            });
+          }
+        });
       });
     } else if (event === 'turn_update') {
-      // Partial update (e.g., opponent committed)
-      this._currentTurn = data;
+      // New turn inserted or opponent committed
+      if (this._revealInProgress) {
+        // Store for after reveal finishes
+        this._currentTurn = data;
+        return;
+      }
+      if (data && !data.resolved && !this._currentTurn) {
+        // New unresolved turn arrived — we were waiting for it
+        this._currentTurn = data;
+        this._committed = false;
+        this._myAction = null;
+        this._myAbility = false;
+        const content = document.querySelector('.arena-match');
+        if (content) this._renderContent(content);
+      } else {
+        this._currentTurn = data;
+      }
     }
   },
 
@@ -522,7 +874,15 @@ export const ArenaMatchPage = {
     if (!newMatch) return;
 
     const oldStatus = this._match.status;
+    const oldP1Rounds = this._match.player1_rounds_won;
+    const oldP2Rounds = this._match.player2_rounds_won;
     this._match = newMatch;
+
+    // Don't re-render during reveal animation (data is still updated above)
+    if (this._revealInProgress) return;
+
+    const roundScoreChanged = newMatch.player1_rounds_won !== oldP1Rounds ||
+      newMatch.player2_rounds_won !== oldP2Rounds;
 
     if (newMatch.status === 'complete') {
       if (this._timerInterval) clearInterval(this._timerInterval);
@@ -534,17 +894,25 @@ export const ArenaMatchPage = {
       toast.info('Match tied 1-1! Enhancement race tiebreaker!');
       const content = document.querySelector('.arena-match');
       if (content) this._renderContent(content);
-    } else if (oldStatus !== newMatch.status) {
-      // Status changed — reload rounds
+    } else if (oldStatus !== newMatch.status || roundScoreChanged) {
+      // Status changed or round score changed (KO → new round) — reload rounds
       arenaData.getRounds(this._match.id).then(rounds => {
+        this._allRounds = rounds;
         const newRound = rounds[rounds.length - 1];
         if (newRound && newRound.id !== this._currentRound?.id) {
           this._currentRound = newRound;
+          this._currentTurn = null;
           this._combat.loadTurnHistory(newRound.id);
           this._combat.subscribeToTurns(newRound.id);
           this._committed = false;
           this._myAction = null;
           this._myAbility = false;
+
+          // Subscribe to round changes for the new round
+          if (this._roundSubscription) arenaData.unsubscribe(this._roundSubscription);
+          this._roundSubscription = arenaData.subscribeToRounds(this._match.id, (p) => {
+            this._onRoundUpdate(p);
+          });
 
           arenaData.getTurns(newRound.id).then(turns => {
             this._currentTurn = turns.find(t => !t.resolved) || null;

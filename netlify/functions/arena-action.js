@@ -22,7 +22,12 @@ const sbHeaders = {
 
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: sbHeaders });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbGet ${table} failed:`, data);
+    throw new Error(`DB read failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPatch(table, query, body) {
@@ -31,7 +36,12 @@ async function sbPatch(table, query, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPatch ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB update failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 async function sbPost(table, body) {
@@ -40,7 +50,12 @@ async function sbPost(table, body) {
     headers: sbHeaders,
     body: JSON.stringify(body)
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`sbPost ${table} failed:`, data, 'body:', body);
+    throw new Error(`DB insert failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
 }
 
 // Damage values
@@ -48,7 +63,12 @@ const DAMAGE = { ATTACK: 12, STRONG_ATTACK: 16, DEFEND_COUNTER: 8 };
 const MAX_HP = 120;
 
 function resolveRPS(action1, action2) {
-  if (action1 === action2) return { winner: 0, damage: 0 };
+  if (action1 === action2) {
+    if (action1 === 'defend') return { winner: 0, damage: 0 };
+    // Same attack — both take half damage
+    const dmg = action1 === 'attack' ? DAMAGE.ATTACK : DAMAGE.STRONG_ATTACK;
+    return { winner: 0, damage: Math.floor(dmg / 2) };
+  }
 
   const beats = {
     attack: 'strong_attack',
@@ -312,16 +332,35 @@ export async function handler(event) {
     let p1DamageDealt = 0;
     let p2DamageDealt = 0;
 
-    if (rps.winner === 1) {
+    const p1Name = round.player1_character?.playerName || 'P1';
+    const p2Name = round.player2_character?.playerName || 'P2';
+
+    if (rps.winner === 0 && rps.damage > 0) {
+      // Draw — both deal half damage to each other
       p1DamageDealt = Math.floor((rps.damage + p1FoodBonus.dmgBoost) * p1DmgMultiplier);
       p1DamageDealt = Math.max(0, p1DamageDealt - p2FoodBonus.dmgReduce);
-      events.push({ type: 'damage_dealt', player: round.player1_character?.playerName, amount: p1DamageDealt });
+      p2DamageDealt = Math.floor((rps.damage + p2FoodBonus.dmgBoost) * p2DmgMultiplier);
+      p2DamageDealt = Math.max(0, p2DamageDealt - p1FoodBonus.dmgReduce);
+      events.push({ type: 'clash', message: 'Both used the same action — mutual damage!' });
+      events.push({ type: 'damage_received', player: p2Name, amount: p1DamageDealt });
+      events.push({ type: 'damage_received', player: p1Name, amount: p2DamageDealt });
+      p2Hp -= p1DamageDealt;
+      p1Hp -= p2DamageDealt;
+    } else if (rps.winner === 1) {
+      p1DamageDealt = Math.floor((rps.damage + p1FoodBonus.dmgBoost) * p1DmgMultiplier);
+      p1DamageDealt = Math.max(0, p1DamageDealt - p2FoodBonus.dmgReduce);
+      events.push({ type: 'rps_win', winner: p1Name, loser: p2Name, winAction: p1Action, loseAction: p2Action });
+      events.push({ type: 'damage_received', player: p2Name, amount: p1DamageDealt });
       p2Hp -= p1DamageDealt;
     } else if (rps.winner === 2) {
       p2DamageDealt = Math.floor((rps.damage + p2FoodBonus.dmgBoost) * p2DmgMultiplier);
       p2DamageDealt = Math.max(0, p2DamageDealt - p1FoodBonus.dmgReduce);
-      events.push({ type: 'damage_dealt', player: round.player2_character?.playerName, amount: p2DamageDealt });
+      events.push({ type: 'rps_win', winner: p2Name, loser: p1Name, winAction: p2Action, loseAction: p1Action });
+      events.push({ type: 'damage_received', player: p1Name, amount: p2DamageDealt });
       p1Hp -= p2DamageDealt;
+    } else {
+      // Both defend — no damage
+      events.push({ type: 'clash', message: 'Both defended — no damage!' });
     }
 
     // --- Highlander check ---
@@ -351,7 +390,10 @@ export async function handler(event) {
     p2Hp = Math.max(0, Math.min(MAX_HP, p2Hp));
 
     // --- Write resolved turn ---
+    // Update actions to reflect ability overrides (e.g. Charged Missile forces Defend)
     await sbPatch('arena_turns', `id=eq.${turnId}`, {
+      player1_action: p1Action,
+      player2_action: p2Action,
       player1_damage_dealt: p1DamageDealt,
       player2_damage_dealt: p2DamageDealt,
       player1_hp_after: p1Hp,
@@ -371,16 +413,57 @@ export async function handler(event) {
     });
 
     // --- Check for KO ---
+    const p1Ko = p1Hp <= 0;
+    const p2Ko = p2Hp <= 0;
+    const doubleKo = p1Ko && p2Ko;
+
     let roundWinnerId = null;
-    if (p1Hp <= 0) {
+    if (doubleKo) {
+      // Both KO'd — round is a draw (no winner)
+      events.push({ type: 'ko', player: round.player1_character?.playerName });
+      events.push({ type: 'ko', player: round.player2_character?.playerName });
+      events.push({ type: 'clash', message: 'Double KO — round is a draw!' });
+    } else if (p1Ko) {
       roundWinnerId = match.player2_id;
       events.push({ type: 'ko', player: round.player1_character?.playerName });
-    } else if (p2Hp <= 0) {
+    } else if (p2Ko) {
       roundWinnerId = match.player1_id;
       events.push({ type: 'ko', player: round.player2_character?.playerName });
     }
 
-    if (roundWinnerId) {
+    // Format-aware win conditions
+    const FORMAT_RULES = { 1: { roundsToWin: 1 }, 2: { roundsToWin: 2 }, 3: { roundsToWin: 2 } };
+    const roundsToWin = (FORMAT_RULES[match.match_format] || FORMAT_RULES[1]).roundsToWin;
+    const maxRounds = match.match_format || 1; // max characters = max possible rounds
+
+    if (doubleKo) {
+      // Double KO — draw round, no points. Start a new round.
+      await sbPatch('arena_rounds', `id=eq.${roundId}`, { winner_id: null });
+
+      const p1Rounds = match.player1_rounds_won;
+      const p2Rounds = match.player2_rounds_won;
+      const totalDecided = p1Rounds + p2Rounds + 1; // +1 for this draw
+
+      // Tiebreaker if all rounds exhausted and tied
+      if (totalDecided >= maxRounds && p1Rounds === p2Rounds) {
+        await sbPost('arena_tiebreakers', {
+          match_id: matchId,
+          player1_level: 9,
+          player2_level: 9,
+          player1_taps: [],
+          player2_taps: []
+        });
+        await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'tiebreaker' });
+      } else {
+        // Start next round with fresh HP
+        await sbPost('arena_rounds', {
+          match_id: matchId,
+          round_number: round.round_number + 1,
+          player1_hp: 120,
+          player2_hp: 120
+        });
+      }
+    } else if (roundWinnerId) {
       await sbPatch('arena_rounds', `id=eq.${roundId}`, { winner_id: roundWinnerId });
 
       const isP1Winner = roundWinnerId === match.player1_id;
@@ -392,32 +475,39 @@ export async function handler(event) {
         player2_rounds_won: newP2Rounds
       };
 
-      if (newP1Rounds >= 2) {
+      if (newP1Rounds >= roundsToWin) {
         matchUpdate.status = 'complete';
         matchUpdate.winner_id = match.player1_id;
         await incrementStat(match.player1_id, 'wins');
         await incrementStat(match.player2_id, 'losses');
-      } else if (newP2Rounds >= 2) {
+      } else if (newP2Rounds >= roundsToWin) {
         matchUpdate.status = 'complete';
         matchUpdate.winner_id = match.player2_id;
         await incrementStat(match.player2_id, 'wins');
         await incrementStat(match.player1_id, 'losses');
-      } else if (newP1Rounds === 1 && newP2Rounds === 1 && round.round_number >= 3) {
-        matchUpdate.status = 'tiebreaker';
-        await sbPost('arena_tiebreakers', {
-          match_id: matchId,
-          player1_level: 9,
-          player2_level: 9,
-          player1_taps: [],
-          player2_taps: []
-        });
       } else {
-        await sbPost('arena_rounds', {
-          match_id: matchId,
-          round_number: round.round_number + 1,
-          player1_hp: 120,
-          player2_hp: 120
-        });
+        const totalDecided = newP1Rounds + newP2Rounds;
+        // Check if remaining rounds can't break the tie → tiebreaker
+        const roundsLeft = maxRounds - totalDecided;
+        const p1CanWin = newP1Rounds + roundsLeft >= roundsToWin;
+        const p2CanWin = newP2Rounds + roundsLeft >= roundsToWin;
+        if (!p1CanWin && !p2CanWin && newP1Rounds === newP2Rounds) {
+          matchUpdate.status = 'tiebreaker';
+          await sbPost('arena_tiebreakers', {
+            match_id: matchId,
+            player1_level: 9,
+            player2_level: 9,
+            player1_taps: [],
+            player2_taps: []
+          });
+        } else {
+          await sbPost('arena_rounds', {
+            match_id: matchId,
+            round_number: round.round_number + 1,
+            player1_hp: 120,
+            player2_hp: 120
+          });
+        }
       }
 
       await sbPatch('arena_matches', `id=eq.${matchId}`, matchUpdate);
