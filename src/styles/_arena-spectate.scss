@@ -1,0 +1,97 @@
+@import 'arena-variables';
+
+.arena-spectate {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.spectate-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.2rem 0.75rem;
+  background: rgba($arena-red, 0.15);
+  color: $arena-red;
+  border: 1px solid rgba($arena-red, 0.3);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.spectate-choosing {
+  font-size: 1.2rem;
+  color: $arena-text-muted;
+  animation: choosing-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes choosing-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+// Reaction bar
+.spectate-reactions {
+  position: relative;
+  text-align: center;
+  padding: 0.75rem;
+  background: $arena-panel;
+  border: 1px solid $arena-border;
+  border-radius: $arena-radius;
+
+  .reaction-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .reaction-btn {
+    font-size: 1.5rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba($arena-bg, 0.5);
+    border: 1px solid rgba($arena-border, 0.3);
+    border-radius: $arena-radius;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      transform: scale(1.2);
+      background: rgba($arena-gold, 0.1);
+      border-color: $arena-gold-dim;
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+}
+
+// Floating reaction bubbles
+.reaction-bubbles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.reaction-bubble {
+  position: absolute;
+  bottom: 0;
+  font-size: 1.8rem;
+  animation: reaction-float 2s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes reaction-float {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120px) scale(0.6);
+    opacity: 0;
+  }
+}

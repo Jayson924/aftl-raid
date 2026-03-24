@@ -1,0 +1,204 @@
+@import 'arena-variables';
+
+.arena-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.draft-header {
+  text-align: center;
+
+  .draft-matchup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+
+    .draft-player-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: $arena-gold;
+    }
+
+    .draft-vs {
+      color: $arena-text-muted;
+      font-size: 0.9rem;
+    }
+  }
+
+  .draft-timer {
+    font-size: 2rem;
+    font-weight: 700;
+    color: $arena-gold-light;
+    margin-bottom: 0.5rem;
+
+    &.timer-urgent {
+      color: $arena-red;
+      animation: timer-pulse 0.5s ease-in-out infinite alternate;
+    }
+  }
+
+  .draft-status {
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+  }
+}
+
+@keyframes timer-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+
+// Selected team slots
+.draft-selected-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.draft-slot {
+  position: relative;
+  padding: 1rem;
+  border-radius: $arena-radius;
+  text-align: center;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+
+  &.empty {
+    border: 2px dashed rgba($arena-border, 0.4);
+    color: $arena-text-muted;
+    font-size: 0.85rem;
+  }
+
+  &.filled {
+    border: 2px solid $arena-gold-dim;
+    background: rgba($arena-gold, 0.05);
+  }
+
+  .draft-slot-name {
+    font-weight: 600;
+    color: $arena-gold;
+  }
+
+  .draft-slot-class {
+    font-size: 0.8rem;
+    color: $arena-text-muted;
+  }
+
+  .draft-slot-ability {
+    font-size: 0.75rem;
+    color: $arena-purple;
+  }
+
+  .draft-remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: none;
+    border: none;
+    color: $arena-red;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    line-height: 1;
+
+    &:hover {
+      background: rgba($arena-red, 0.15);
+      border-radius: 3px;
+    }
+  }
+}
+
+// Tabs
+.draft-tabs {
+  display: flex;
+  gap: 0.5rem;
+
+  .draft-tab {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+// Character grid
+.draft-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.draft-card {
+  padding: 0.75rem;
+  border: 1px solid rgba($arena-border, 0.3);
+  border-radius: $arena-radius;
+  background: rgba($arena-bg, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  position: relative;
+
+  &:hover:not(.disabled):not(.locked) {
+    border-color: $arena-gold-dim;
+    background: rgba($arena-gold, 0.08);
+  }
+
+  &.selected {
+    border-color: $arena-gold;
+    background: rgba($arena-gold, 0.12);
+    box-shadow: 0 0 8px rgba($arena-gold, 0.2);
+  }
+
+  &.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  &.locked {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  .draft-card-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .draft-card-class {
+    font-size: 0.8rem;
+    color: $arena-text-muted;
+  }
+
+  .draft-card-ability {
+    font-size: 0.75rem;
+    color: $arena-purple;
+    margin-top: 0.25rem;
+  }
+
+  .draft-card-hire-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+    background: rgba($arena-gold, 0.2);
+    color: $arena-gold;
+    border-radius: 3px;
+  }
+}
+
+@media (max-width: 768px) {
+  .draft-selected-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .draft-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}

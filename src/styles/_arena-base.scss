@@ -1,0 +1,248 @@
+// Arena base styles — applied when body.arena-mode is active
+@import 'arena-variables';
+
+body.arena-mode {
+  background-color: $arena-bg;
+  color: $arena-text;
+
+  #app {
+    max-width: 1200px;
+  }
+}
+
+// Arena layout shell
+.arena-shell {
+  width: 100%;
+}
+
+.arena-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(180deg, $arena-panel-lighter 0%, $arena-panel 100%);
+  border-bottom: 2px solid $arena-border;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+
+  .arena-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: $arena-gold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .arena-title-icon {
+      font-size: 1.2rem;
+    }
+  }
+
+  .arena-nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .arena-nav-link {
+    color: $arena-text-muted;
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: $arena-radius;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+
+    &:hover {
+      color: $arena-gold-light;
+      background: rgba($arena-gold, 0.1);
+    }
+
+    &.active {
+      color: $arena-gold;
+      background: rgba($arena-gold, 0.15);
+      border: 1px solid $arena-border;
+    }
+  }
+
+  .arena-back-link {
+    color: $arena-text-muted;
+    text-decoration: none;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: $arena-gold-light;
+    }
+
+    .back-arrow {
+      font-size: 1rem;
+    }
+  }
+
+  .arena-user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: $arena-text-muted;
+    font-size: 0.85rem;
+
+    .arena-user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid $arena-border;
+    }
+  }
+}
+
+// Arena panels (reusable)
+.arena-panel {
+  background: $arena-panel;
+  border: 1px solid $arena-border;
+  border-radius: $arena-radius;
+  box-shadow: $arena-panel-shadow;
+  padding: 1.25rem;
+}
+
+.arena-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba($arena-border, 0.5);
+
+  h2, h3 {
+    margin: 0;
+    color: $arena-gold;
+    font-weight: 600;
+  }
+}
+
+// Arena buttons
+.arena-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid $arena-border;
+  border-radius: $arena-radius;
+  background: $arena-panel-lighter;
+  color: $arena-text;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+
+  &:hover {
+    background: rgba($arena-gold, 0.15);
+    border-color: $arena-gold-dim;
+    color: $arena-gold-light;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &.arena-btn-primary {
+    background: linear-gradient(180deg, $arena-gold 0%, $arena-gold-dim 100%);
+    color: #1a1209;
+    border-color: $arena-gold;
+    font-weight: 600;
+
+    &:hover {
+      background: linear-gradient(180deg, $arena-gold-light 0%, $arena-gold 100%);
+    }
+  }
+
+  &.arena-btn-danger {
+    border-color: $arena-red;
+    color: $arena-red;
+
+    &:hover {
+      background: rgba($arena-red, 0.15);
+    }
+  }
+
+  &.arena-btn-small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+// Arena badges
+.arena-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  &.badge-gold {
+    background: rgba($arena-gold, 0.2);
+    color: $arena-gold;
+    border: 1px solid rgba($arena-gold, 0.3);
+  }
+
+  &.badge-red {
+    background: rgba($arena-red, 0.2);
+    color: $arena-red;
+    border: 1px solid rgba($arena-red, 0.3);
+  }
+
+  &.badge-green {
+    background: rgba($arena-green, 0.2);
+    color: $arena-green;
+    border: 1px solid rgba($arena-green, 0.3);
+  }
+
+  &.badge-blue {
+    background: rgba($arena-blue, 0.2);
+    color: $arena-blue;
+    border: 1px solid rgba($arena-blue, 0.3);
+  }
+}
+
+// Arena loading/empty states
+.arena-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: $arena-text-muted;
+
+  h3 {
+    color: $arena-gold-dim;
+    margin-bottom: 0.5rem;
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .arena-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+
+    .arena-title {
+      font-size: 1.1rem;
+    }
+
+    .arena-nav {
+      gap: 0.5rem;
+      order: 3;
+      width: 100%;
+      overflow-x: auto;
+    }
+  }
+}

@@ -7,6 +7,13 @@ import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
 import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
+import { ArenaHubPage } from './arena/arena-hub.jsx'
+import { ArenaSetupPage } from './arena/arena-setup.jsx'
+import { ArenaDraftPage } from './arena/arena-draft.jsx'
+import { ArenaMatchPage } from './arena/arena-match.jsx'
+import { ArenaSpectatePage } from './arena/arena-spectate.jsx'
+import { ArenaTiebreakerPage } from './arena/arena-tiebreaker.jsx'
+import { ArenaResultsPage } from './arena/arena-results.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
 import { setFdTable } from './constants.js'
@@ -66,6 +73,13 @@ async function initApp() {
   router.register('lavish', SpendingGuidePage); // No auth required
   router.register('my-raids', MyRaidsPage, 'player'); // Any authenticated user
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
+  router.register('arena', ArenaHubPage); // Arena hub - anyone can view
+  router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
+  router.register('arena-draft', ArenaDraftPage, 'player'); // Draft phase - players only
+  router.register('arena-match', ArenaMatchPage); // Match screen - anyone can view (actions gated)
+  router.register('arena-spectate', ArenaSpectatePage); // Spectator view
+  router.register('arena-tiebreaker', ArenaTiebreakerPage); // Tiebreaker race
+  router.register('arena-results', ArenaResultsPage); // Results page
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -105,6 +119,7 @@ function renderNavigation() {
         <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
             <a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>

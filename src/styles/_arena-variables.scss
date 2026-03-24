@@ -1,0 +1,32 @@
+// Arena theme variables — dark brown/gold fantasy style
+$arena-bg: #1a1209;
+$arena-bg-lighter: #231a0e;
+$arena-panel: #2a1f10;
+$arena-panel-lighter: #342814;
+$arena-gold: #c9a12a;
+$arena-gold-light: #e8c84a;
+$arena-gold-dim: #8a6e1a;
+$arena-border: #5a4320;
+$arena-border-light: #7a6330;
+$arena-text: rgba(255, 245, 220, 0.9);
+$arena-text-muted: rgba(255, 245, 220, 0.5);
+$arena-red: #de435f;
+$arena-green: #3ab54a;
+$arena-blue: #4a8fd4;
+$arena-purple: #9b59b6;
+
+// HP bar colors
+$arena-hp-full: #3ab54a;
+$arena-hp-mid: #e8c84a;
+$arena-hp-low: #de435f;
+$arena-hp-bg: rgba(0, 0, 0, 0.4);
+
+// Action button colors
+$arena-attack: #de435f;
+$arena-defend: #4a8fd4;
+$arena-strong: #e8c84a;
+$arena-ability: #9b59b6;
+
+// Panel styling
+$arena-radius: 6px;
+$arena-panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);

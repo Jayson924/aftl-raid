@@ -1,0 +1,348 @@
+@import 'arena-variables';
+
+.arena-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.arena-tournament-header {
+  .tournament-info {
+    display: flex;
+    gap: 1.5rem;
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+  }
+}
+
+// Bracket panels grid
+.arena-brackets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.arena-bracket-panel {
+  .arena-standings-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid rgba($arena-border, 0.3);
+    }
+
+    th {
+      color: $arena-text-muted;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .standings-wins {
+      color: $arena-green;
+      font-weight: 600;
+    }
+
+    .standings-losses {
+      color: $arena-red;
+      font-weight: 600;
+    }
+
+    .standings-leader {
+      td {
+        color: $arena-gold;
+      }
+    }
+  }
+}
+
+// Match list
+.arena-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.arena-match-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba($arena-bg, 0.5);
+  border: 1px solid rgba($arena-border, 0.3);
+  border-radius: $arena-radius;
+
+  &.match-live {
+    border-color: $arena-red;
+    background: rgba($arena-red, 0.05);
+  }
+
+  &.match-complete {
+    opacity: 0.7;
+  }
+
+  .match-players {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+  }
+
+  .match-vs {
+    color: $arena-text-muted;
+    font-size: 0.8rem;
+  }
+
+  .match-score {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: $arena-gold;
+    min-width: 3rem;
+    text-align: center;
+  }
+
+  .match-winner {
+    color: $arena-gold;
+  }
+
+  .match-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .match-winner-label {
+      font-size: 0.8rem;
+      color: $arena-green;
+    }
+  }
+
+  .match-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+}
+
+// Live matches section
+.arena-live-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+// Challenge panel
+.arena-challenge-panel {
+  .challenge-desc {
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .challenge-picker {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+
+    select {
+      flex: 1;
+    }
+  }
+
+  .challenge-status {
+    margin-top: 0.75rem;
+    min-height: 1.5rem;
+  }
+
+  .challenge-waiting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: rgba($arena-gold, 0.08);
+    border: 1px solid rgba($arena-gold, 0.25);
+    border-radius: $arena-radius;
+    color: $arena-gold;
+    font-size: 0.9rem;
+    animation: challenge-pulse 1.5s ease-in-out infinite;
+  }
+
+  .challenge-waiting-timer {
+    font-weight: 700;
+    font-size: 1.1rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .challenge-result-declined {
+    color: $arena-red;
+    font-size: 0.9rem;
+  }
+
+  .challenge-result-expired {
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+  }
+}
+
+@keyframes challenge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+// Challenge incoming overlay
+.arena-challenge-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: overlay-in 0.2s ease-out;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.arena-challenge-popup {
+  background: $arena-panel;
+  border: 2px solid $arena-gold;
+  border-radius: $arena-radius;
+  padding: 2rem;
+  min-width: 320px;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 0 40px rgba($arena-gold, 0.2);
+  animation: popup-in 0.3s ease-out;
+
+  .challenge-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+
+    .challenge-swords {
+      font-size: 1.5rem;
+    }
+
+    h3 {
+      color: $arena-gold;
+      font-size: 1.4rem;
+      margin: 0;
+    }
+  }
+
+  .challenge-popup-text {
+    font-size: 1.1rem;
+    margin-bottom: 1.25rem;
+    color: $arena-text;
+
+    strong {
+      color: $arena-gold;
+    }
+  }
+
+  .challenge-popup-timer {
+    height: 6px;
+    background: rgba($arena-border, 0.3);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+  }
+
+  .challenge-timer-bar {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, $arena-red, $arena-gold);
+    border-radius: 3px;
+    transition: width 1s linear;
+  }
+
+  .challenge-timer-text {
+    display: block;
+    font-size: 0.85rem;
+    color: $arena-text-muted;
+    margin-bottom: 1.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .challenge-popup-actions {
+    display: flex;
+    gap: 0.75rem;
+
+    button {
+      flex: 1;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+  }
+}
+
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+// Quick match panel
+.arena-quick-match-panel {
+  .quick-match-desc {
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .quick-match-pickers {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+
+    select {
+      flex: 1;
+    }
+
+    .quick-match-vs {
+      color: $arena-text-muted;
+      font-weight: 600;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .arena-match-card {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    .match-players {
+      width: 100%;
+    }
+
+    .match-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+
+  .challenge-picker,
+  .quick-match-pickers {
+    flex-direction: column;
+  }
+
+  .arena-challenge-popup {
+    min-width: auto;
+    margin: 1rem;
+  }
+}

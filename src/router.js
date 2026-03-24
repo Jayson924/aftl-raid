@@ -22,17 +22,29 @@ class Router {
     this.onAuthRequired = handler;
   }
 
+  isArenaRoute(path) {
+    return path && path.startsWith('arena');
+  }
+
   // Get route from current URL path
   getRouteFromUrl() {
     const path = window.location.pathname;
     // Remove leading slash and get the route name
-    const route = path.replace(/^\//, '') || this.defaultRoute;
+    let route = path.replace(/^\//, '') || this.defaultRoute;
+    // Preserve query string for arena routes (e.g. arena-match?match=xxx)
+    if (this.isArenaRoute(route) && window.location.search) {
+      route = route + window.location.search;
+    }
+    // Extract base route for lookup (strip query params)
+    const baseRoute = route.split('?')[0];
     // Check if route exists, otherwise return default
-    return this.routes[route] ? route : this.defaultRoute;
+    return this.routes[baseRoute] ? route : this.defaultRoute;
   }
 
   navigate(path, updateHistory = true) {
-    const requiredRole = this.routePermissions[path];
+    // Extract base route and query params
+    const [basePath, queryString] = path.split('?');
+    const requiredRole = this.routePermissions[basePath];
 
     if (requiredRole) {
       if (!authService.isAuthenticated()) {
@@ -50,19 +62,20 @@ class Router {
       }
     }
 
-    const component = this.routes[path];
+    const component = this.routes[basePath];
     if (component) {
       // Call destroy on the current component before switching
       if (this.currentComponent && typeof this.currentComponent.destroy === 'function') {
         this.currentComponent.destroy();
       }
 
-      this.currentPage = path;
+      this.currentPage = basePath;
       this.currentComponent = component;
 
       // Update URL without triggering popstate
       if (updateHistory) {
-        const urlPath = path === this.defaultRoute ? '/' : `/${path}`;
+        let urlPath = basePath === this.defaultRoute ? '/' : `/${basePath}`;
+        if (queryString) urlPath += '?' + queryString;
         window.history.pushState({ route: path }, '', urlPath);
       }
 
@@ -71,8 +84,16 @@ class Router {
       component.render(appElement);
 
       document.querySelectorAll('.nav-link').forEach(link => {
-        link.classList.toggle('active', link.dataset.route === path);
+        link.classList.toggle('active', link.dataset.route === basePath);
       });
+    }
+  }
+
+  refresh() {
+    if (this.currentPage && this.currentComponent) {
+      const appElement = document.querySelector('#app');
+      appElement.innerHTML = '';
+      this.currentComponent.render(appElement);
     }
   }
 

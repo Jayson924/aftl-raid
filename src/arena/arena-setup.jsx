@@ -1,0 +1,460 @@
+import { ArenaShell } from './arena-shell.jsx';
+import { arenaData } from './arena-data.js';
+import { dataService } from '../data.js';
+import { toast } from '../toast.js';
+import { router } from '../router.js';
+import { TOURNAMENT_PHASES } from './arena-constants.js';
+
+/**
+ * Arena Setup — Admin-only tournament setup page.
+ * Create tournament, manage brackets, add participants, randomize seeding.
+ * Route: /arena-setup
+ */
+export const ArenaSetupPage = {
+  _tournament: null,
+  _participants: null,
+  _appUsers: null,
+  _allPlayers: null,
+
+  async render(container) {
+    ArenaShell.activate();
+    container.innerHTML = '';
+    ArenaShell.renderHeader(container, 'arena-setup');
+
+    const content = document.createElement('div');
+    content.className = 'arena-setup';
+    content.innerHTML = '<div class="arena-empty"><p>Loading...</p></div>';
+    container.appendChild(content);
+
+    try {
+      await this._loadData();
+      this._renderContent(content);
+    } catch (err) {
+      console.error('Arena setup error:', err);
+      this._renderCreateForm(content);
+    }
+  },
+
+  async _loadData() {
+    const tournaments = await arenaData.getTournaments();
+    this._tournament = tournaments.find(t => t.status !== 'complete') || null;
+
+    this._appUsers = await arenaData.getAllAppUsers();
+
+    if (this._tournament) {
+      this._participants = await arenaData.getParticipants(this._tournament.id);
+    } else {
+      this._participants = [];
+    }
+  },
+
+  _getDisplayName(discordId) {
+    const user = this._appUsers?.find(u => u.discord_id === discordId);
+    return user?.display_name || user?.username || discordId;
+  },
+
+  _renderCreateForm(container) {
+    container.innerHTML = `
+      <div class="arena-panel" style="max-width: 500px; margin: 2rem auto;">
+        <div class="arena-panel-header">
+          <h2>Create Tournament</h2>
+        </div>
+        <div class="arena-form">
+          <div class="arena-form-group">
+            <label>Tournament Name</label>
+            <input type="text" id="tournament-name" class="arena-input" placeholder="e.g. AFTL Arena Season 1" maxlength="64">
+          </div>
+          <div class="arena-form-group">
+            <label>Number of Brackets</label>
+            <div class="arena-bracket-count-row">
+              ${[2, 3, 4, 5, 6].map(n => `
+                <button class="arena-btn bracket-count-btn ${n === 4 ? 'arena-btn-primary' : ''}" data-count="${n}">${n}</button>
+              `).join('')}
+            </div>
+          </div>
+          <button class="arena-btn arena-btn-primary" id="create-tournament-btn" style="width: 100%; margin-top: 1rem;">
+            Create Tournament
+          </button>
+        </div>
+      </div>
+    `;
+
+    let selectedCount = 4;
+    container.querySelectorAll('.bracket-count-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.bracket-count-btn').forEach(b => b.classList.remove('arena-btn-primary'));
+        btn.classList.add('arena-btn-primary');
+        selectedCount = parseInt(btn.dataset.count);
+      });
+    });
+
+    document.getElementById('create-tournament-btn').addEventListener('click', async () => {
+      const name = document.getElementById('tournament-name').value.trim();
+      if (!name) {
+        toast.error('Enter a tournament name');
+        return;
+      }
+      try {
+        this._tournament = await arenaData.createTournament(name, selectedCount);
+        this._participants = [];
+        toast.success('Tournament created!');
+        this._renderContent(container);
+      } catch (err) {
+        toast.error('Failed: ' + err.message);
+      }
+    });
+  },
+
+  _renderContent(container) {
+    const t = this._tournament;
+    const phaseName = t.current_phase?.replace(/_/g, ' ') || 'setup';
+    const isSetup = t.current_phase === 'setup';
+
+    const isActive = !isSetup && t.current_phase !== 'complete';
+
+    container.innerHTML = `
+      <div class="arena-setup-header arena-panel">
+        <div class="arena-panel-header">
+          <h2>${t.name}</h2>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="arena-badge badge-gold">${phaseName}</span>
+            ${isActive ? `<button class="arena-btn arena-btn-danger arena-btn-small" id="stop-tournament-btn">Stop Tournament</button>` : ''}
+            <button class="arena-btn arena-btn-danger arena-btn-small" id="delete-tournament-btn">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      ${isSetup ? this._renderParticipantManager() : ''}
+      ${isSetup ? this._renderBracketEditor() : this._renderPhaseControls()}
+    `;
+
+    this._attachEventListeners(container);
+  },
+
+  _renderParticipantManager() {
+    const participantIds = new Set(this._participants.map(p => p.discord_id));
+    const availableUsers = this._appUsers.filter(u => !participantIds.has(u.discord_id));
+
+    return `
+      <div class="arena-panel" style="margin-top: 1rem;">
+        <div class="arena-panel-header">
+          <h3>Participants (${this._participants.length})</h3>
+        </div>
+        <div class="arena-participant-controls">
+          <select id="add-participant-select" class="arena-input">
+            <option value="">Add player...</option>
+            ${availableUsers.map(u => `
+              <option value="${u.discord_id}">${u.display_name || u.username}</option>
+            `).join('')}
+          </select>
+          <button class="arena-btn arena-btn-primary arena-btn-small" id="add-participant-btn">Add</button>
+        </div>
+        <div class="arena-participant-list" id="participant-list">
+          ${this._participants.length === 0 ? '<p style="color: var(--arena-text-muted, #8a7a5a);">No participants added yet.</p>' : ''}
+          ${this._participants.map(p => `
+            <div class="arena-participant-item" data-id="${p.id}">
+              <span>${this._getDisplayName(p.discord_id)}</span>
+              <span class="arena-badge badge-blue">Bracket ${p.bracket_number || '?'}</span>
+              <button class="arena-btn arena-btn-danger arena-btn-small remove-participant-btn" data-id="${p.id}">&times;</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  },
+
+  _renderBracketEditor() {
+    const bracketCount = this._tournament.bracket_count || 4;
+    const brackets = {};
+    for (let i = 1; i <= bracketCount; i++) brackets[i] = [];
+    for (const p of this._participants) {
+      const bn = p.bracket_number || 0;
+      if (brackets[bn]) brackets[bn].push(p);
+      else {
+        // Unassigned
+        if (!brackets[0]) brackets[0] = [];
+        brackets[0].push(p);
+      }
+    }
+
+    return `
+      <div class="arena-panel" style="margin-top: 1rem;">
+        <div class="arena-panel-header">
+          <h3>Brackets</h3>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="arena-btn arena-btn-small" id="randomize-btn">Randomize</button>
+            <button class="arena-btn arena-btn-primary arena-btn-small" id="start-group-stage-btn" ${this._participants.length < 2 ? 'disabled' : ''}>Start Group Stage</button>
+          </div>
+        </div>
+        <div class="arena-bracket-grid">
+          ${Object.entries(brackets).filter(([bn]) => bn > 0).map(([bn, players]) => `
+            <div class="arena-bracket-column" data-bracket="${bn}">
+              <h4>Bracket ${bn} <span class="arena-badge badge-blue">${players.length}</span></h4>
+              <div class="arena-bracket-players" data-bracket="${bn}">
+                ${players.map(p => `
+                  <div class="arena-bracket-player" data-participant-id="${p.id}" draggable="true">
+                    ${this._getDisplayName(p.discord_id)}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  },
+
+  _renderPhaseControls() {
+    const t = this._tournament;
+    const phase = t.current_phase;
+
+    let actionHtml = '';
+    if (phase === 'group_stage') {
+      actionHtml = `<button class="arena-btn arena-btn-primary" id="advance-semifinals-btn">Advance to Semifinals</button>`;
+    } else if (phase === 'semifinals') {
+      actionHtml = `<button class="arena-btn arena-btn-primary" id="advance-finals-btn">Advance to Finals</button>`;
+    } else if (phase === 'finals') {
+      actionHtml = `<button class="arena-btn arena-btn-primary" id="complete-tournament-btn">Complete Tournament</button>`;
+    }
+
+    return `
+      <div class="arena-panel" style="margin-top: 1rem;">
+        <div class="arena-panel-header">
+          <h3>Phase Controls</h3>
+        </div>
+        <p>Current phase: <strong>${phase?.replace(/_/g, ' ')}</strong></p>
+        ${actionHtml}
+      </div>
+    `;
+  },
+
+  _attachEventListeners(container) {
+    // Add participant
+    const addBtn = document.getElementById('add-participant-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', async () => {
+        const select = document.getElementById('add-participant-select');
+        const discordId = select.value;
+        if (!discordId) return;
+
+        try {
+          // Auto-assign to smallest bracket
+          const bracketCount = this._tournament.bracket_count || 4;
+          const bracketSizes = {};
+          for (let i = 1; i <= bracketCount; i++) bracketSizes[i] = 0;
+          for (const p of this._participants) {
+            if (p.bracket_number) bracketSizes[p.bracket_number] = (bracketSizes[p.bracket_number] || 0) + 1;
+          }
+          const smallestBracket = Object.entries(bracketSizes).sort((a, b) => a[1] - b[1])[0][0];
+
+          const participant = await arenaData.addParticipant(
+            this._tournament.id,
+            discordId,
+            parseInt(smallestBracket),
+            (bracketSizes[smallestBracket] || 0) + 1
+          );
+          this._participants.push(participant);
+          toast.success('Player added');
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Remove participant buttons
+    container.querySelectorAll('.remove-participant-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        try {
+          await arenaData.removeParticipant(id);
+          this._participants = this._participants.filter(p => p.id !== id);
+          toast.success('Player removed');
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    });
+
+    // Randomize
+    const randomizeBtn = document.getElementById('randomize-btn');
+    if (randomizeBtn) {
+      randomizeBtn.addEventListener('click', async () => {
+        const bracketCount = this._tournament.bracket_count || 4;
+        const shuffled = [...this._participants].sort(() => Math.random() - 0.5);
+
+        const updates = shuffled.map((p, i) => ({
+          id: p.id,
+          bracket_number: (i % bracketCount) + 1,
+          seed_position: Math.floor(i / bracketCount) + 1
+        }));
+
+        try {
+          await arenaData.bulkUpdateParticipants(updates);
+          // Update local state
+          for (const u of updates) {
+            const p = this._participants.find(p => p.id === u.id);
+            if (p) {
+              p.bracket_number = u.bracket_number;
+              p.seed_position = u.seed_position;
+            }
+          }
+          toast.success('Brackets randomized!');
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Start group stage
+    const startBtn = document.getElementById('start-group-stage-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', async () => {
+        if (!confirm('Start the group stage? This will generate all bracket matches.')) return;
+        try {
+          await arenaData.generateGroupMatches(this._tournament.id);
+          toast.success('Group stage started! Matches generated.');
+          router.navigate('arena');
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Phase advancement buttons
+    const semisBtn = document.getElementById('advance-semifinals-btn');
+    if (semisBtn) {
+      semisBtn.addEventListener('click', async () => {
+        if (!confirm('Advance to semifinals?')) return;
+        try {
+          await arenaData.generateSemifinalMatches(this._tournament.id);
+          toast.success('Semifinals generated!');
+          this._loadData().then(() => this._renderContent(container));
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    const finalsBtn = document.getElementById('advance-finals-btn');
+    if (finalsBtn) {
+      finalsBtn.addEventListener('click', async () => {
+        if (!confirm('Advance to finals?')) return;
+        try {
+          await arenaData.generateFinalMatch(this._tournament.id);
+          toast.success('Final match generated!');
+          this._loadData().then(() => this._renderContent(container));
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    const completeBtn = document.getElementById('complete-tournament-btn');
+    if (completeBtn) {
+      completeBtn.addEventListener('click', async () => {
+        if (!confirm('Complete the tournament?')) return;
+        try {
+          await arenaData.updateTournament(this._tournament.id, {
+            status: 'complete',
+            current_phase: 'complete'
+          });
+          toast.success('Tournament complete!');
+          router.navigate('arena');
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Stop tournament (revert to setup, delete all matches/rounds/turns)
+    const stopBtn = document.getElementById('stop-tournament-btn');
+    if (stopBtn) {
+      stopBtn.addEventListener('click', async () => {
+        if (!confirm('Stop this tournament? All matches, rounds, and results will be deleted. Participants and brackets are kept.')) return;
+        try {
+          await arenaData.stopTournament(this._tournament.id);
+          toast.success('Tournament stopped — back to setup');
+          await this._loadData();
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Delete tournament
+    const deleteBtn = document.getElementById('delete-tournament-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm('Delete this tournament entirely? This cannot be undone.')) return;
+        try {
+          await arenaData.deleteTournament(this._tournament.id);
+          toast.success('Tournament deleted');
+          this._tournament = null;
+          this._participants = [];
+          this._renderCreateForm(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Drag and drop for bracket players
+    this._initDragDrop(container);
+  },
+
+  _initDragDrop(container) {
+    const players = container.querySelectorAll('.arena-bracket-player');
+    const dropZones = container.querySelectorAll('.arena-bracket-players');
+
+    let draggedEl = null;
+
+    players.forEach(el => {
+      el.addEventListener('dragstart', (e) => {
+        draggedEl = el;
+        el.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', () => {
+        el.classList.remove('dragging');
+        draggedEl = null;
+        dropZones.forEach(z => z.classList.remove('drag-over'));
+      });
+    });
+
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        zone.classList.add('drag-over');
+      });
+      zone.addEventListener('dragleave', () => {
+        zone.classList.remove('drag-over');
+      });
+      zone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        if (!draggedEl) return;
+
+        const participantId = draggedEl.dataset.participantId;
+        const newBracket = parseInt(zone.dataset.bracket);
+
+        try {
+          await arenaData.updateParticipant(participantId, { bracket_number: newBracket });
+          const p = this._participants.find(p => p.id === participantId);
+          if (p) p.bracket_number = newBracket;
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed to move player: ' + err.message);
+        }
+      });
+    });
+  },
+
+  destroy() {
+    ArenaShell.deactivate();
+  }
+};

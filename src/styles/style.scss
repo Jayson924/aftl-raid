@@ -26,5 +26,15 @@
 @import 'my-raids';
 @import 'screenshot-test';
 
+// Arena styles
+@import 'arena-base';
+@import 'arena-hub';
+@import 'arena-setup';
+@import 'arena-draft';
+@import 'arena-match';
+@import 'arena-spectate';
+@import 'arena-tiebreaker';
+@import 'arena-results';
+
 // Responsive styles (should be last to override other styles)
 @import 'responsive';

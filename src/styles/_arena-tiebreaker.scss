@@ -1,0 +1,208 @@
+@import 'arena-variables';
+
+.arena-tiebreaker {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tb-header {
+  text-align: center;
+
+  h2 {
+    color: $arena-gold;
+    margin: 0 0 0.25rem 0;
+  }
+
+  p {
+    color: $arena-text-muted;
+    margin: 0;
+  }
+}
+
+.tb-arena {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.tb-vs {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: $arena-text-muted;
+  align-self: center;
+  padding-top: 2rem;
+}
+
+.tb-player {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  .tb-player-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: $arena-gold;
+  }
+}
+
+.tb-enhance-display {
+  width: 100%;
+  max-width: 250px;
+
+  .tb-level {
+    font-size: 3rem;
+    font-weight: 900;
+    color: $arena-gold-light;
+    text-shadow: 0 0 10px rgba($arena-gold, 0.3);
+  }
+
+  .tb-progress-bar {
+    height: 12px;
+    background: $arena-hp-bg;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+    border: 1px solid rgba($arena-border, 0.5);
+
+    .tb-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, $arena-gold-dim, $arena-gold-light);
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+  }
+
+  .tb-level-markers {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: $arena-text-muted;
+
+    .tb-marker.reached {
+      color: $arena-gold;
+      font-weight: 700;
+    }
+  }
+
+  .tb-last-result {
+    margin-top: 0.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+
+    &.success {
+      color: $arena-green;
+      background: rgba($arena-green, 0.15);
+      animation: result-flash 0.3s ease;
+    }
+
+    &.fail {
+      color: $arena-red;
+      background: rgba($arena-red, 0.15);
+      animation: result-shake 0.3s ease;
+    }
+  }
+
+  .tb-rate {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: $arena-text-muted;
+  }
+}
+
+.tb-enhance-btn {
+  font-size: 1.2rem !important;
+  padding: 0.75rem 2rem !important;
+  margin-top: 0.5rem;
+}
+
+@keyframes result-flash {
+  0% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+@keyframes result-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+// Result
+.tb-result {
+  text-align: center;
+  border-color: $arena-gold;
+
+  .result-label {
+    color: $arena-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .result-winner {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: $arena-gold;
+    margin: 0.5rem 0;
+  }
+}
+
+// Log
+.tb-log {
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tb-log-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+
+  &.success {
+    background: rgba($arena-green, 0.05);
+    border-left: 3px solid $arena-green;
+  }
+
+  &.fail {
+    background: rgba($arena-red, 0.05);
+    border-left: 3px solid $arena-red;
+  }
+
+  .tb-log-player {
+    font-weight: 600;
+    color: $arena-gold;
+  }
+
+  .tb-log-result {
+    font-weight: 700;
+    font-size: 0.75rem;
+  }
+
+  &.success .tb-log-result { color: $arena-green; }
+  &.fail .tb-log-result { color: $arena-red; }
+}
+
+@media (max-width: 768px) {
+  .tb-arena {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .tb-vs {
+    padding-top: 0;
+  }
+
+  .tb-enhance-display .tb-level {
+    font-size: 2rem;
+  }
+}
