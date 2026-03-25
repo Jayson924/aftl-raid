@@ -36,6 +36,40 @@
   gap: 0.5rem;
 }
 
+// Prize pool inline editor
+.setup-prize-pool {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba($arena-border, 0.2);
+  font-size: 0.9rem;
+
+  label {
+    color: $arena-text-muted;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  input {
+    width: 120px;
+    text-align: right;
+  }
+
+  .prize-pool-gold {
+    color: $arena-gold;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  .prize-pool-current {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.8rem;
+    margin-left: 0.25rem;
+  }
+}
+
 // ============================================
 // DRAG-AND-DROP LAYOUT
 // Brackets on left, player pool on right

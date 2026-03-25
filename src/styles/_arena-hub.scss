@@ -487,6 +487,47 @@
   flex-shrink: 0;
 }
 
+// Tournament prize pool label
+.tournament-prize-pool-label {
+  color: $arena-gold;
+  font-weight: 600;
+}
+
+// Prize breakdown row
+.tournament-prize-breakdown {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  font-size: 0.8rem;
+}
+
+.prize-tier {
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.prize-1st {
+  background: rgba($arena-gold, 0.15);
+  color: $arena-gold;
+}
+
+.prize-2nd {
+  background: rgba(192, 192, 192, 0.15);
+  color: #c0c0c0;
+}
+
+.prize-3rd, .prize-4th {
+  background: rgba(205, 127, 50, 0.15);
+  color: #cd7f32;
+}
+
+.prize-participation {
+  background: rgba(255, 255, 255, 0.08);
+  color: $arena-text-muted;
+}
+
 // Player picker (custom dropdown with avatars)
 .arena-player-picker {
   position: relative;

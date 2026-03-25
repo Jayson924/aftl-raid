@@ -341,6 +341,21 @@ class ArenaDataService {
   }
 
   /**
+   * Subscribe to tournament changes (e.g. prize pool updates).
+   */
+  subscribeToTournament(tournamentId, callback) {
+    return supabase
+      .channel(`arena-tournament-${tournamentId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'arena_tournaments',
+        filter: `id=eq.${tournamentId}`
+      }, callback)
+      .subscribe();
+  }
+
+  /**
    * Subscribe to ALL arena match changes (not scoped to a tournament).
    */
   subscribeToAllMatches(callback) {
@@ -386,6 +401,21 @@ class ArenaDataService {
       .single();
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Check if a participant is currently in an active match (drafting, in_progress, tiebreaker, roster_reveal).
+   * Returns the active match if found, null otherwise.
+   */
+  async getActiveMatchForParticipant(participantId) {
+    const { data, error } = await supabase
+      .from('arena_matches')
+      .select('*')
+      .or(`player1_id.eq.${participantId},player2_id.eq.${participantId}`)
+      .in('status', ['drafting', 'roster_reveal', 'in_progress', 'tiebreaker'])
+      .limit(1);
+    if (error) throw error;
+    return data?.[0] || null;
   }
 
   async updateMatch(matchId, updates) {

@@ -172,6 +172,10 @@ export const ArenaSetupPage = {
               `).join('')}
             </div>
           </div>
+          <div class="arena-form-group">
+            <label>Prize Pool (Gold) <span style="color: rgba(255,255,255,0.4); font-weight: 400;">— optional</span></label>
+            <input type="number" id="tournament-prize-pool" class="arena-input" placeholder="e.g. 50000" min="0" step="1000">
+          </div>
           <button class="arena-btn arena-btn-primary" id="create-tournament-btn" style="width: 100%; margin-top: 1rem;">
             Create Tournament
           </button>
@@ -202,8 +206,11 @@ export const ArenaSetupPage = {
         toast.error('Enter a tournament name');
         return;
       }
+      const poolInput = document.getElementById('tournament-prize-pool').value;
+      const prizePool = poolInput ? parseInt(poolInput) : 0;
+      const prizes = prizePool > 0 ? { pool: prizePool } : null;
       try {
-        this._tournament = await arenaData.createTournament(name, selectedCount, selectedFormat);
+        this._tournament = await arenaData.createTournament(name, selectedCount, selectedFormat, prizes);
         this._participants = [];
         this._signups = [];
         toast.success('Tournament created! Registration is now open.');
@@ -221,6 +228,8 @@ export const ArenaSetupPage = {
     const isSetup = t.current_phase === 'setup';
     const isActive = !isSetup && !isRegistration && t.current_phase !== 'complete';
 
+    const currentPool = t.prizes?.pool || 0;
+
     container.innerHTML = `
       <a href="#" class="arena-back-link" data-route="arena">&larr; Back to Arena</a>
       <div class="arena-setup-header arena-panel">
@@ -231,6 +240,13 @@ export const ArenaSetupPage = {
             ${isActive ? `<button class="arena-btn arena-btn-danger arena-btn-small" id="stop-tournament-btn">Stop Tournament</button>` : ''}
             <button class="arena-btn arena-btn-danger arena-btn-small" id="delete-tournament-btn">Delete</button>
           </div>
+        </div>
+        <div class="setup-prize-pool">
+          <label>Prize Pool:</label>
+          <input type="number" id="prize-pool-input" class="arena-input" value="${currentPool || ''}" placeholder="0" min="0" step="1000" style="width: 120px;">
+          <span class="prize-pool-gold">Gold</span>
+          <button class="arena-btn arena-btn-small" id="save-prize-pool-btn">Save</button>
+          ${currentPool > 0 ? `<span class="prize-pool-current">${currentPool.toLocaleString()} Gold</span>` : ''}
         </div>
       </div>
 
@@ -807,6 +823,24 @@ export const ArenaSetupPage = {
           const participant = await arenaData.addParticipant(this._tournament.id, discordId, null, null);
           this._participants.push(participant);
           toast.success('Player added to pool');
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Save prize pool
+    const savePrizeBtn = document.getElementById('save-prize-pool-btn');
+    if (savePrizeBtn) {
+      savePrizeBtn.addEventListener('click', async () => {
+        const poolInput = document.getElementById('prize-pool-input');
+        const pool = parseInt(poolInput?.value) || 0;
+        try {
+          const prizes = pool > 0 ? { pool } : null;
+          await arenaData.updateTournament(this._tournament.id, { prizes });
+          this._tournament.prizes = prizes;
+          toast.success(pool > 0 ? `Prize pool set to ${pool.toLocaleString()} Gold` : 'Prize pool removed');
           this._renderContent(container);
         } catch (err) {
           toast.error('Failed: ' + err.message);

@@ -3,6 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { arenaConfirm } from './arena-confirm.js';
+import { distributePrizePool } from './arena-constants.js';
 
 /**
  * Arena Hub — Challenge-first landing page.
@@ -12,6 +13,7 @@ import { arenaConfirm } from './arena-confirm.js';
 export const ArenaHubPage = {
   _matchSubscription: null,
   _signupSubscription: null,
+  _tournamentSubscription: null,
   _challengeSubscription: null,
   _challengeUpdateSub: null,
   _challengeTimer: null,
@@ -77,6 +79,16 @@ export const ArenaHubPage = {
           this._refreshSignups();
         });
       }
+
+      // Subscribe to tournament changes (e.g. prize pool updates)
+      if (this._tournamentSubscription) arenaData.unsubscribe(this._tournamentSubscription);
+      this._tournamentSubscription = arenaData.subscribeToTournament(this._tournament.id, (payload) => {
+        if (payload.new) {
+          this._tournament = payload.new;
+          const content = document.querySelector('.arena-hub');
+          if (content) this._renderContent(content);
+        }
+      });
     }
 
     // Subscribe to match changes
@@ -625,9 +637,30 @@ export const ArenaHubPage = {
     container.querySelectorAll('.arena-start-match-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const matchId = btn.dataset.matchId;
+        const match = this._recentMatches?.find(m => m.id === matchId);
+        if (!match) return;
+
         btn.disabled = true;
-        btn.textContent = 'Starting...';
+        btn.textContent = 'Checking...';
         try {
+          // Check if either player is already in an active match
+          const [p1Active, p2Active] = await Promise.all([
+            arenaData.getActiveMatchForParticipant(match.player1_id),
+            arenaData.getActiveMatchForParticipant(match.player2_id)
+          ]);
+
+          const busyPlayers = [];
+          if (p1Active) busyPlayers.push(this._getParticipantName(match.player1_id));
+          if (p2Active) busyPlayers.push(this._getParticipantName(match.player2_id));
+
+          if (busyPlayers.length > 0) {
+            toast.error(`Can't start — ${busyPlayers.join(' and ')} already in an active match`);
+            btn.disabled = false;
+            btn.textContent = 'Start Match';
+            return;
+          }
+
+          btn.textContent = 'Starting...';
           await arenaData.updateMatch(matchId, { status: 'drafting' });
           router.navigate(`arena-draft?match=${matchId}`);
         } catch (err) {
@@ -780,6 +813,8 @@ export const ArenaHubPage = {
     const phaseName = t.current_phase?.replace(/_/g, ' ') || 'setup';
     const participants = this._tournamentParticipants || [];
     const matches = this._tournamentMatches || [];
+    const pool = t.prizes?.pool || 0;
+    const prizeDistribution = pool > 0 ? distributePrizePool(pool, participants.length) : null;
 
     // Group participants by bracket
     const brackets = {};
@@ -800,7 +835,17 @@ export const ArenaHubPage = {
         <div class="tournament-info">
           <span>${participants.length} players</span>
           <span>${matches.filter(m => m.status === 'complete').length}/${matches.length} matches done</span>
+          ${pool > 0 ? `<span class="tournament-prize-pool-label">${pool.toLocaleString()} Gold Prize Pool</span>` : ''}
         </div>
+        ${pool > 0 && prizeDistribution ? `
+          <div class="tournament-prize-breakdown">
+            ${prizeDistribution['1st'] ? `<span class="prize-tier prize-1st">1st: ${prizeDistribution['1st'].toLocaleString()}G</span>` : ''}
+            ${prizeDistribution['2nd'] ? `<span class="prize-tier prize-2nd">2nd: ${prizeDistribution['2nd'].toLocaleString()}G</span>` : ''}
+            ${prizeDistribution['3rd'] ? `<span class="prize-tier prize-3rd">3rd: ${prizeDistribution['3rd'].toLocaleString()}G</span>` : ''}
+            ${prizeDistribution['4th'] ? `<span class="prize-tier prize-4th">4th: ${prizeDistribution['4th'].toLocaleString()}G</span>` : ''}
+            ${prizeDistribution['participation'] ? `<span class="prize-tier prize-participation">Participation: ${prizeDistribution['participation'].toLocaleString()}G</span>` : ''}
+          </div>
+        ` : ''}
         ${bracketNumbers.length > 0 ? `
           <div class="arena-brackets-mini">
             ${bracketNumbers.map(bn => {
@@ -914,6 +959,10 @@ export const ArenaHubPage = {
     if (this._signupSubscription) {
       arenaData.unsubscribe(this._signupSubscription);
       this._signupSubscription = null;
+    }
+    if (this._tournamentSubscription) {
+      arenaData.unsubscribe(this._tournamentSubscription);
+      this._tournamentSubscription = null;
     }
     if (this._challengeSubscription) {
       arenaData.unsubscribe(this._challengeSubscription);

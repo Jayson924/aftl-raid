@@ -207,7 +207,7 @@ export const TIEBREAKER_TARGET_LEVEL = 13;
 export const REACTIONS = ['👍', '👎', '😂', '😢', '😮'];
 export const REACTION_COOLDOWN_MS = 2000;
 
-// Prize distribution (default for ~20 players)
+// Prize distribution (default fixed amounts, used when no pool is set)
 export const DEFAULT_PRIZES = {
   '1st': 6000,
   '2nd': 3000,
@@ -215,3 +215,56 @@ export const DEFAULT_PRIZES = {
   '4th': 2000,
   'participation': 500
 };
+
+// Prize pool distribution percentages
+const PRIZE_PERCENTAGES = {
+  '1st': 0.40,
+  '2nd': 0.20,
+  '3rd': 0.125,
+  '4th': 0.125,
+  'rest': 0.15   // split evenly among remaining participants
+};
+
+/**
+ * Distribute a prize pool by placement.
+ * Returns { '1st': N, '2nd': N, '3rd': N, '4th': N, 'participation': N }
+ * All values are rounded integers (remainder goes to 1st place).
+ */
+export function distributePrizePool(pool, participantCount) {
+  if (!pool || pool <= 0) return null;
+
+  const prizes = {};
+  const pct = PRIZE_PERCENTAGES;
+
+  if (participantCount <= 2) {
+    prizes['1st'] = Math.round(pool * 0.60);
+    prizes['2nd'] = pool - prizes['1st'];
+    return prizes;
+  }
+  if (participantCount <= 3) {
+    prizes['1st'] = Math.round(pool * 0.50);
+    prizes['2nd'] = Math.round(pool * 0.30);
+    prizes['3rd'] = pool - prizes['1st'] - prizes['2nd'];
+    return prizes;
+  }
+  if (participantCount <= 4) {
+    prizes['1st'] = Math.round(pool * 0.40);
+    prizes['2nd'] = Math.round(pool * 0.25);
+    prizes['3rd'] = Math.round(pool * 0.175);
+    prizes['4th'] = pool - prizes['1st'] - prizes['2nd'] - prizes['3rd'];
+    return prizes;
+  }
+
+  // 5+ participants: standard distribution
+  prizes['1st'] = Math.round(pool * pct['1st']);
+  prizes['2nd'] = Math.round(pool * pct['2nd']);
+  prizes['3rd'] = Math.round(pool * pct['3rd']);
+  prizes['4th'] = Math.round(pool * pct['4th']);
+
+  const topTotal = prizes['1st'] + prizes['2nd'] + prizes['3rd'] + prizes['4th'];
+  const restPool = pool - topTotal;
+  const restCount = participantCount - 4;
+  prizes['participation'] = restCount > 0 ? Math.floor(restPool / restCount) : 0;
+
+  return prizes;
+}

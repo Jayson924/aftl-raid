@@ -2,7 +2,7 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { router } from '../router.js';
 import { ArenaCombat } from './arena-combat.js';
-import { DEFAULT_PRIZES } from './arena-constants.js';
+import { DEFAULT_PRIZES, distributePrizePool } from './arena-constants.js';
 
 /**
  * Arena Results — Final standings, prize distribution, match history replay.
@@ -66,7 +66,10 @@ export const ArenaResultsPage = {
 
   _renderContent(container) {
     const t = this._tournament;
-    const prizes = t.prizes || DEFAULT_PRIZES;
+    const pool = t.prizes?.pool || 0;
+    const prizes = pool > 0
+      ? distributePrizePool(pool, this._participants.length)
+      : (t.prizes || DEFAULT_PRIZES);
 
     // Sort participants by placement
     const finalMatch = this._matches.find(m => m.phase === 'finals' && m.status === 'complete');
