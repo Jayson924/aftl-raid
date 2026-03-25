@@ -1,13 +1,11 @@
-import { ArenaShell } from './arena-shell.jsx';
 import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
-import { MATCH_STATUS, TOURNAMENT_PHASES } from './arena-constants.js';
 
 /**
- * Arena Hub — Tournament overview, bracket panels, standings, live match links.
- * Includes player-to-player challenge system and admin Quick Match.
+ * Arena Hub — Challenge-first landing page.
+ * Shows challenge system, recent/active matches, and active tournament (if any).
  * Route: /arena
  */
 export const ArenaHubPage = {
@@ -17,71 +15,76 @@ export const ArenaHubPage = {
   _challengeTimer: null,
   _pendingChallenge: null,
   _outgoingChallenge: null,
-  _tournament: null,
-  _participants: null,
-  _matches: null,
+  _recentMatches: null,
+  _allParticipants: null,
   _appUsers: null,
+  _tournament: null,
+  _tournamentParticipants: null,
+  _tournamentMatches: null,
 
   async render(container) {
-    ArenaShell.activate();
     container.innerHTML = '';
-    ArenaShell.renderHeader(container, 'arena');
 
     const content = document.createElement('div');
     content.className = 'arena-hub';
     content.innerHTML = '<div class="arena-empty"><p>Loading arena...</p></div>';
     container.appendChild(content);
 
-    // Always load app users
-    try {
-      this._appUsers = await arenaData.getAllAppUsers();
-    } catch (e) {
-      this._appUsers = [];
-    }
-
-    // Start listening for incoming challenges
-    this._startChallengeListener();
-
     try {
       await this._loadData();
       this._renderContent(content);
     } catch (err) {
       console.error('Arena hub error:', err);
-      content.innerHTML = `
-        <div class="arena-empty">
-          <h3>No Active Tournament</h3>
-          <p>There are no tournaments to display yet.</p>
-          ${dataService.isAdmin() ? '<p>Go to <strong>Setup</strong> to create one.</p>' : ''}
-        </div>
-        ${this._renderChallengeSection()}
-        ${dataService.isAdmin() ? this._renderQuickMatchButton() : ''}
-      `;
-      this._attachChallengeListeners(content);
-      this._attachQuickMatchListener(content);
+      content.innerHTML = '<div class="arena-empty"><h3>Failed to load arena</h3></div>';
     }
   },
 
   async _loadData() {
-    const tournaments = await arenaData.getTournaments();
-    // Get the most recent active tournament (or most recent overall)
-    this._tournament = tournaments.find(t => t.status !== 'complete') || tournaments[0];
-    if (!this._tournament) throw new Error('No tournament');
-
-    const [participants, matches, appUsers] = await Promise.all([
-      arenaData.getParticipants(this._tournament.id),
-      arenaData.getMatches(this._tournament.id),
-      arenaData.getAllAppUsers()
+    // Load everything in parallel
+    const [appUsers, recentMatches, allParticipants, tournaments] = await Promise.all([
+      arenaData.getAllAppUsers(),
+      arenaData.getRecentMatches(20),
+      arenaData.getAllParticipants(),
+      arenaData.getTournaments()
     ]);
 
-    this._participants = participants;
-    this._matches = matches;
     this._appUsers = appUsers;
+    this._recentMatches = recentMatches;
+    this._allParticipants = allParticipants;
+
+    // Find a real tournament (not a "Quick Match" throwaway)
+    this._tournament = tournaments.find(t =>
+      t.status !== 'complete' && t.name !== 'Quick Match'
+    ) || null;
+
+    if (this._tournament) {
+      const [tParticipants, tMatches] = await Promise.all([
+        arenaData.getParticipants(this._tournament.id),
+        arenaData.getMatches(this._tournament.id)
+      ]);
+      this._tournamentParticipants = tParticipants;
+      this._tournamentMatches = tMatches;
+    }
 
     // Subscribe to match changes
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
-    this._matchSubscription = arenaData.subscribeToMatches(this._tournament.id, (payload) => {
-      this._onMatchUpdate(payload);
+    this._matchSubscription = arenaData.subscribeToAllMatches(() => {
+      this._refreshMatches();
     });
+
+    // Start listening for incoming challenges
+    this._startChallengeListener();
+  },
+
+  async _refreshMatches() {
+    try {
+      this._recentMatches = await arenaData.getRecentMatches(20);
+      this._allParticipants = await arenaData.getAllParticipants();
+      const content = document.querySelector('.arena-hub');
+      if (content) this._renderContent(content);
+    } catch (e) {
+      console.error('Failed to refresh matches:', e);
+    }
   },
 
   _getDisplayName(discordId) {
@@ -90,7 +93,7 @@ export const ArenaHubPage = {
   },
 
   _getParticipantName(participantId) {
-    const p = this._participants?.find(p => p.id === participantId);
+    const p = this._allParticipants?.find(p => p.id === participantId);
     if (!p) return 'Unknown';
     return this._getDisplayName(p.discord_id);
   },
@@ -103,7 +106,6 @@ export const ArenaHubPage = {
     const currentUser = dataService.getUser();
     if (!currentUser) return;
 
-    // Subscribe to challenges where I am the target
     if (this._challengeSubscription) arenaData.unsubscribe(this._challengeSubscription);
     this._challengeSubscription = arenaData.subscribeToChallenges(currentUser.id, (payload) => {
       if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
@@ -113,13 +115,11 @@ export const ArenaHubPage = {
   },
 
   _showIncomingChallenge(challenge) {
-    // Don't show if we already have a pending challenge popup
     if (this._pendingChallenge) return;
     this._pendingChallenge = challenge;
 
     const challengerName = this._getDisplayName(challenge.challenger_discord_id);
 
-    // Create overlay
     const overlay = document.createElement('div');
     overlay.className = 'arena-challenge-overlay';
     overlay.id = 'challenge-overlay';
@@ -129,7 +129,7 @@ export const ArenaHubPage = {
           <span class="challenge-swords">&#9876;</span>
           <h3>Challenge!</h3>
         </div>
-        <p class="challenge-popup-text"><strong>${challengerName}</strong> challenges you to a fight!</p>
+        <p class="challenge-popup-text"><strong>${challengerName}</strong> challenges you to a <strong>${challenge.match_format || 1}v${challenge.match_format || 1}</strong> fight!</p>
         <div class="challenge-popup-timer">
           <div class="challenge-timer-bar" id="challenge-timer-bar"></div>
         </div>
@@ -142,7 +142,6 @@ export const ArenaHubPage = {
     `;
     document.body.appendChild(overlay);
 
-    // Timer countdown
     let remaining = 15;
     const timerBar = document.getElementById('challenge-timer-bar');
     const timerText = document.getElementById('challenge-timer-text');
@@ -157,19 +156,16 @@ export const ArenaHubPage = {
       }
     }, 1000);
 
-    // Accept
     document.getElementById('challenge-accept-btn')?.addEventListener('click', () => {
       this._respondToChallenge(challenge.id, 'accepted');
     });
 
-    // Decline
     document.getElementById('challenge-decline-btn')?.addEventListener('click', () => {
       this._respondToChallenge(challenge.id, 'declined');
     });
   },
 
   async _respondToChallenge(challengeId, status) {
-    // Clean up popup
     clearInterval(this._challengeTimer);
     this._challengeTimer = null;
     const overlay = document.getElementById('challenge-overlay');
@@ -185,18 +181,107 @@ export const ArenaHubPage = {
         toast.success('Challenge accepted! Creating match...');
         const result = await arenaData.createQuickMatch(
           challenge.challenger_discord_id,
-          challenge.challenged_discord_id
+          challenge.challenged_discord_id,
+          challenge.match_format || 1
         );
-        // Link match to challenge
         await arenaData.updateChallenge(challengeId, { match_id: result.matchId });
         router.navigate(`arena-draft?match=${result.matchId}`);
       } else if (status === 'declined') {
         toast.info('Challenge declined');
       }
-      // 'expired' — silent, no toast
     } catch (err) {
       toast.error('Failed: ' + err.message);
     }
+  },
+
+  // ============================================
+  // PLAYER PICKER (custom dropdown with avatars)
+  // ============================================
+
+  _renderPlayerPicker(id, placeholder, users) {
+    const sorted = [...users].sort((a, b) => {
+      const nameA = (a.display_name || a.username || '').toLowerCase();
+      const nameB = (b.display_name || b.username || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    return `
+      <div class="arena-player-picker" id="${id}">
+        <div class="picker-selected" data-value="">
+          <span class="picker-placeholder">${placeholder}</span>
+          <span class="picker-arrow">&#9662;</span>
+        </div>
+        <div class="picker-dropdown">
+          ${sorted.map(u => `
+            <div class="picker-option" data-value="${u.discord_id}">
+              ${u.avatar_url
+                ? `<img src="${u.avatar_url}" alt="" class="picker-avatar" onerror="this.style.display='none'">`
+                : '<span class="picker-avatar picker-avatar-placeholder"></span>'}
+              <span class="picker-name">${u.display_name || u.username}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  },
+
+  _attachPickerListeners(container) {
+    container.querySelectorAll('.arena-player-picker').forEach(picker => {
+      const selected = picker.querySelector('.picker-selected');
+      const dropdown = picker.querySelector('.picker-dropdown');
+
+      selected.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close other open pickers
+        container.querySelectorAll('.arena-player-picker.open').forEach(p => {
+          if (p !== picker) p.classList.remove('open');
+        });
+        picker.classList.toggle('open');
+      });
+
+      dropdown.querySelectorAll('.picker-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const value = opt.dataset.value;
+          selected.dataset.value = value;
+          selected.innerHTML = opt.innerHTML + '<span class="picker-arrow">&#9662;</span>';
+          selected.classList.add('has-value');
+          picker.classList.remove('open');
+        });
+      });
+    });
+
+    // Close on outside click
+    document.addEventListener('click', () => {
+      container.querySelectorAll('.arena-player-picker.open').forEach(p => p.classList.remove('open'));
+    });
+  },
+
+  _getPickerValue(id) {
+    const picker = document.getElementById(id);
+    return picker?.querySelector('.picker-selected')?.dataset.value || '';
+  },
+
+  // ============================================
+  // RENDER
+  // ============================================
+
+  _renderContent(container) {
+    const currentUser = dataService.getUser();
+    const isAdmin = dataService.isAdmin();
+
+    container.innerHTML = `
+      ${this._renderChallengeSection()}
+      ${isAdmin ? this._renderQuickMatchButton() : ''}
+      ${this._renderMatchList()}
+      ${this._tournament ? this._renderTournamentPanel() : ''}
+      ${isAdmin ? '<div class="arena-panel" style="text-align: center;"><a href="#" class="arena-btn" data-route="arena-setup">Tournament Setup</a></div>' : ''}
+    `;
+
+    this._attachPickerListeners(container);
+    this._attachChallengeListeners(container);
+    this._attachQuickMatchListener(container);
+    this._attachMatchListeners(container);
   },
 
   _renderChallengeSection() {
@@ -214,11 +299,14 @@ export const ArenaHubPage = {
         </div>
         <p class="challenge-desc">Pick an opponent and send a challenge. They have 15 seconds to accept.</p>
         <div class="challenge-picker">
-          <select id="challenge-target" class="arena-input">
-            <option value="">Choose opponent...</option>
-            ${users.map(u => `<option value="${u.discord_id}">${u.display_name || u.username}</option>`).join('')}
-          </select>
+          ${this._renderPlayerPicker('challenge-target', 'Choose opponent...', users)}
           <button class="arena-btn arena-btn-primary" id="challenge-send-btn">Challenge</button>
+        </div>
+        <div class="challenge-format">
+          <span class="challenge-format-label">Format:</span>
+          ${[1, 2, 3].map(n => `
+            <button class="arena-btn arena-btn-small challenge-format-btn ${n === 1 ? 'arena-btn-primary' : ''}" data-format="${n}">${n}v${n}</button>
+          `).join('')}
         </div>
         <div class="challenge-status" id="challenge-status"></div>
       </div>
@@ -229,9 +317,18 @@ export const ArenaHubPage = {
     const sendBtn = container.querySelector('#challenge-send-btn');
     if (!sendBtn) return;
 
+    // Format buttons
+    let challengeFormat = 1;
+    container.querySelectorAll('.challenge-format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.challenge-format-btn').forEach(b => b.classList.remove('arena-btn-primary'));
+        btn.classList.add('arena-btn-primary');
+        challengeFormat = parseInt(btn.dataset.format);
+      });
+    });
+
     sendBtn.addEventListener('click', async () => {
-      const select = document.getElementById('challenge-target');
-      const targetId = select?.value;
+      const targetId = this._getPickerValue('challenge-target');
       const currentUser = dataService.getUser();
 
       if (!targetId) {
@@ -247,7 +344,7 @@ export const ArenaHubPage = {
       sendBtn.textContent = 'Sending...';
 
       try {
-        const challenge = await arenaData.createChallenge(currentUser.id, targetId);
+        const challenge = await arenaData.createChallenge(currentUser.id, targetId, challengeFormat);
         this._outgoingChallenge = challenge;
 
         const targetName = this._getDisplayName(targetId);
@@ -261,7 +358,6 @@ export const ArenaHubPage = {
           `;
         }
 
-        // Countdown for outgoing challenge
         let remaining = 15;
         const outgoingInterval = setInterval(() => {
           remaining--;
@@ -273,7 +369,6 @@ export const ArenaHubPage = {
           }
         }, 1000);
 
-        // Subscribe to this challenge for accept/decline
         if (this._challengeUpdateSub) arenaData.unsubscribe(this._challengeUpdateSub);
         this._challengeUpdateSub = arenaData.subscribeToChallengeUpdates(challenge.id, (payload) => {
           const updated = payload.new;
@@ -304,11 +399,8 @@ export const ArenaHubPage = {
 
     toast.success('Challenge accepted!');
 
-    // The accepting player creates the match and stores match_id on the challenge.
-    // Poll briefly to get the match_id.
     let matchId = challenge.match_id;
     if (!matchId) {
-      // Small delay for the acceptor to create the match
       await new Promise(r => setTimeout(r, 1500));
       try {
         const updated = await arenaData.getChallenge(challenge.id);
@@ -319,7 +411,6 @@ export const ArenaHubPage = {
     if (matchId) {
       router.navigate(`arena-draft?match=${matchId}`);
     } else {
-      // Fallback: refresh page
       const statusEl = document.getElementById('challenge-status');
       if (statusEl) statusEl.innerHTML = '<p style="color: var(--arena-green, #4ade80);">Match created! Redirecting...</p>';
       setTimeout(() => router.navigate('arena'), 2000);
@@ -350,108 +441,16 @@ export const ArenaHubPage = {
   },
 
   // ============================================
-  // RENDER
+  // MATCH LIST (all recent matches)
   // ============================================
 
-  _renderContent(container) {
-    const t = this._tournament;
-    const phaseName = t.current_phase?.replace(/_/g, ' ') || 'setup';
+  _renderMatchList() {
+    const matches = this._recentMatches || [];
 
-    container.innerHTML = `
-      <div class="arena-tournament-header">
-        <div class="arena-panel">
-          <div class="arena-panel-header">
-            <h2>${t.name || 'Tournament'}</h2>
-            <span class="arena-badge badge-gold">${phaseName}</span>
-          </div>
-          <div class="tournament-info">
-            <span>${this._participants?.length || 0} players</span>
-            <span>${t.bracket_count || 0} brackets</span>
-            <span>${this._matches?.filter(m => m.status === 'complete').length || 0}/${this._matches?.length || 0} matches done</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="arena-brackets" id="arena-brackets"></div>
-
-      <div class="arena-live-matches" id="arena-live-matches"></div>
-
-      ${this._renderChallengeSection()}
-      ${dataService.isAdmin() ? this._renderQuickMatchButton() : ''}
-    `;
-
-    this._renderBrackets();
-    this._renderLiveMatches();
-    this._attachChallengeListeners(container);
-    this._attachQuickMatchListener(container);
-  },
-
-  _renderBrackets() {
-    const bracketsContainer = document.getElementById('arena-brackets');
-    if (!bracketsContainer) return;
-
-    // Group participants by bracket
-    const brackets = {};
-    for (const p of this._participants) {
-      const bn = p.bracket_number || 0;
-      if (!brackets[bn]) brackets[bn] = [];
-      brackets[bn].push(p);
-    }
-
-    const bracketNumbers = Object.keys(brackets).sort((a, b) => a - b);
-
-    if (bracketNumbers.length === 0) {
-      bracketsContainer.innerHTML = '<div class="arena-empty"><p>No brackets set up yet.</p></div>';
-      return;
-    }
-
-    bracketsContainer.innerHTML = bracketNumbers.map(bn => {
-      const players = brackets[bn].sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins;
-        return a.losses - b.losses;
-      });
-
-      return `
-        <div class="arena-panel arena-bracket-panel">
-          <div class="arena-panel-header">
-            <h3>Bracket ${bn}</h3>
-            <span class="arena-badge badge-blue">${players.length} players</span>
-          </div>
-          <table class="arena-standings-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Player</th>
-                <th>W</th>
-                <th>L</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${players.map((p, i) => `
-                <tr class="${i === 0 && p.wins > 0 ? 'standings-leader' : ''}">
-                  <td>${i + 1}</td>
-                  <td>${this._getDisplayName(p.discord_id)}</td>
-                  <td class="standings-wins">${p.wins}</td>
-                  <td class="standings-losses">${p.losses}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }).join('');
-  },
-
-  _renderLiveMatches() {
-    const liveContainer = document.getElementById('arena-live-matches');
-    if (!liveContainer) return;
-
-    const liveMatches = this._matches?.filter(m =>
+    const liveMatches = matches.filter(m =>
       m.status !== 'complete' && m.status !== 'pending'
-    ) || [];
-
-    const pendingMatches = this._matches?.filter(m => m.status === 'pending') || [];
-    const completedMatches = this._matches?.filter(m => m.status === 'complete') || [];
+    );
+    const completedMatches = matches.filter(m => m.status === 'complete');
 
     let html = '';
 
@@ -459,7 +458,7 @@ export const ArenaHubPage = {
       html += `
         <div class="arena-panel">
           <div class="arena-panel-header">
-            <h3>Live Matches</h3>
+            <h3>Active Matches</h3>
             <span class="arena-badge badge-red">${liveMatches.length} in progress</span>
           </div>
           <div class="arena-match-list">
@@ -469,25 +468,11 @@ export const ArenaHubPage = {
       `;
     }
 
-    if (pendingMatches.length > 0) {
-      html += `
-        <div class="arena-panel">
-          <div class="arena-panel-header">
-            <h3>Upcoming Matches</h3>
-            <span class="arena-badge badge-gold">${pendingMatches.length} pending</span>
-          </div>
-          <div class="arena-match-list">
-            ${pendingMatches.map(m => this._renderMatchCard(m, false)).join('')}
-          </div>
-        </div>
-      `;
-    }
-
     if (completedMatches.length > 0) {
       html += `
         <div class="arena-panel">
           <div class="arena-panel-header">
-            <h3>Completed Matches</h3>
+            <h3>Recent Matches</h3>
           </div>
           <div class="arena-match-list">
             ${completedMatches.map(m => this._renderMatchCard(m, false)).join('')}
@@ -497,64 +482,21 @@ export const ArenaHubPage = {
     }
 
     if (!html) {
-      html = '<div class="arena-empty"><p>No matches scheduled yet.</p></div>';
+      html = `
+        <div class="arena-panel">
+          <div class="arena-empty" style="padding: 1.5rem;">
+            <p>No matches yet. Challenge someone to get started!</p>
+          </div>
+        </div>
+      `;
     }
 
-    liveContainer.innerHTML = html;
-
-    // Attach watch/spectate button listeners
-    liveContainer.querySelectorAll('.arena-watch-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const matchId = btn.dataset.matchId;
-        const match = this._matches.find(m => m.id === matchId);
-        if (!match) return;
-
-        const currentUser = dataService.getUser();
-        const isPlayer = currentUser &&
-          (this._participants.find(p => p.id === match.player1_id)?.discord_id === currentUser.id ||
-           this._participants.find(p => p.id === match.player2_id)?.discord_id === currentUser.id);
-
-        if (isPlayer) {
-          if (match.status === 'drafting') {
-            router.navigate(`arena-draft?match=${matchId}`);
-          } else {
-            router.navigate(`arena-match?match=${matchId}`);
-          }
-        } else {
-          router.navigate(`arena-spectate?match=${matchId}`);
-        }
-      });
-    });
-
-    // Admin start-match buttons
-    liveContainer.querySelectorAll('.arena-start-match-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const matchId = btn.dataset.matchId;
-        try {
-          await arenaData.updateMatch(matchId, { status: 'drafting' });
-          toast.success('Match started — draft phase begun!');
-
-          const match = this._matches.find(m => m.id === matchId);
-          const currentUser = dataService.getUser();
-          if (match && currentUser) {
-            const isParticipant =
-              this._participants.find(p => p.id === match.player1_id)?.discord_id === currentUser.id ||
-              this._participants.find(p => p.id === match.player2_id)?.discord_id === currentUser.id;
-            if (isParticipant) {
-              router.navigate(`arena-draft?match=${matchId}`);
-            }
-          }
-        } catch (err) {
-          toast.error('Failed to start match: ' + err.message);
-        }
-      });
-    });
+    return html;
   },
 
   _renderMatchCard(match, isLive) {
     const p1Name = this._getParticipantName(match.player1_id);
     const p2Name = this._getParticipantName(match.player2_id);
-    const isAdmin = dataService.isAdmin();
     const statusLabel = match.status.replace(/_/g, ' ');
 
     const scoreHtml = match.status !== 'pending' ?
@@ -576,15 +518,98 @@ export const ArenaHubPage = {
         </div>
         <div class="match-actions">
           ${isLive ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">Watch</button>` : ''}
-          ${match.status === 'pending' && isAdmin ? `<button class="arena-btn arena-btn-primary arena-btn-small arena-start-match-btn" data-match-id="${match.id}">Start</button>` : ''}
-          ${match.status === 'complete' ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">Replay</button>` : ''}
+          ${match.status === 'complete' ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">View</button>` : ''}
         </div>
       </div>
     `;
   },
 
+  _attachMatchListeners(container) {
+    container.querySelectorAll('.arena-watch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        const match = this._recentMatches?.find(m => m.id === matchId);
+        if (!match) return;
+
+        const currentUser = dataService.getUser();
+        const p1 = this._allParticipants?.find(p => p.id === match.player1_id);
+        const p2 = this._allParticipants?.find(p => p.id === match.player2_id);
+        const isPlayer = currentUser && (p1?.discord_id === currentUser.id || p2?.discord_id === currentUser.id);
+
+        if (isPlayer) {
+          if (match.status === 'drafting') {
+            router.navigate(`arena-draft?match=${matchId}`);
+          } else if (match.status === 'tiebreaker') {
+            router.navigate(`arena-tiebreaker?match=${matchId}`);
+          } else {
+            router.navigate(`arena-match?match=${matchId}`);
+          }
+        } else {
+          router.navigate(`arena-spectate?match=${matchId}`);
+        }
+      });
+    });
+  },
+
   // ============================================
-  // ADMIN QUICK MATCH (kept separate)
+  // TOURNAMENT PANEL (only if a real tournament exists)
+  // ============================================
+
+  _renderTournamentPanel() {
+    const t = this._tournament;
+    const phaseName = t.current_phase?.replace(/_/g, ' ') || 'setup';
+    const participants = this._tournamentParticipants || [];
+    const matches = this._tournamentMatches || [];
+
+    // Group participants by bracket
+    const brackets = {};
+    for (const p of participants) {
+      const bn = p.bracket_number || 0;
+      if (!brackets[bn]) brackets[bn] = [];
+      brackets[bn].push(p);
+    }
+
+    const bracketNumbers = Object.keys(brackets).sort((a, b) => a - b).filter(bn => bn > 0);
+
+    return `
+      <div class="arena-panel arena-tournament-panel">
+        <div class="arena-panel-header">
+          <h3>${t.name || 'Tournament'}</h3>
+          <span class="arena-badge badge-gold">${phaseName}</span>
+        </div>
+        <div class="tournament-info">
+          <span>${participants.length} players</span>
+          <span>${matches.filter(m => m.status === 'complete').length}/${matches.length} matches done</span>
+        </div>
+        ${bracketNumbers.length > 0 ? `
+          <div class="arena-brackets-mini">
+            ${bracketNumbers.map(bn => {
+              const players = brackets[bn].sort((a, b) => {
+                if (b.wins !== a.wins) return b.wins - a.wins;
+                return a.losses - b.losses;
+              });
+              return `
+                <div class="arena-bracket-mini">
+                  <h4>Bracket ${bn}</h4>
+                  <div class="bracket-mini-list">
+                    ${players.map((p, i) => `
+                      <div class="bracket-mini-row ${i === 0 && p.wins > 0 ? 'standings-leader' : ''}">
+                        <span>${this._getDisplayName(p.discord_id)}</span>
+                        <span class="bracket-mini-record">${p.wins}W ${p.losses}L</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  },
+
+  // ============================================
+  // ADMIN QUICK MATCH
   // ============================================
 
   _renderQuickMatchButton() {
@@ -597,15 +622,9 @@ export const ArenaHubPage = {
         </div>
         <p class="quick-match-desc">Force-start a match between any two players (no challenge needed).</p>
         <div class="quick-match-pickers">
-          <select id="qm-player1" class="arena-input">
-            <option value="">Player 1...</option>
-            ${users.map(u => `<option value="${u.discord_id}">${u.display_name || u.username}</option>`).join('')}
-          </select>
+          ${this._renderPlayerPicker('qm-player1', 'Player 1...', users)}
           <span class="quick-match-vs">vs</span>
-          <select id="qm-player2" class="arena-input">
-            <option value="">Player 2...</option>
-            ${users.map(u => `<option value="${u.discord_id}">${u.display_name || u.username}</option>`).join('')}
-          </select>
+          ${this._renderPlayerPicker('qm-player2', 'Player 2...', users)}
         </div>
         <div class="quick-match-format" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.5rem;">
           <span style="color: rgba(255,255,255,0.5); align-self: center; font-size: 0.85rem;">Format:</span>
@@ -624,7 +643,6 @@ export const ArenaHubPage = {
     const startBtn = container.querySelector('#qm-start-btn');
     if (!startBtn) return;
 
-    // Format buttons
     let qmFormat = 1;
     container.querySelectorAll('.qm-format-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -635,10 +653,8 @@ export const ArenaHubPage = {
     });
 
     startBtn.addEventListener('click', async () => {
-      const p1Select = document.getElementById('qm-player1');
-      const p2Select = document.getElementById('qm-player2');
-      const p1Id = p1Select?.value;
-      const p2Id = p2Select?.value;
+      const p1Id = this._getPickerValue('qm-player1');
+      const p2Id = this._getPickerValue('qm-player2');
 
       if (!p1Id || !p2Id) {
         toast.error('Pick both players');
@@ -670,13 +686,6 @@ export const ArenaHubPage = {
     });
   },
 
-  _onMatchUpdate(payload) {
-    this._loadData().then(() => {
-      const content = document.querySelector('.arena-hub');
-      if (content) this._renderContent(content);
-    });
-  },
-
   destroy() {
     if (this._matchSubscription) {
       arenaData.unsubscribe(this._matchSubscription);
@@ -694,12 +703,10 @@ export const ArenaHubPage = {
       clearInterval(this._challengeTimer);
       this._challengeTimer = null;
     }
-    // Clean up any popup overlay
     const overlay = document.getElementById('challenge-overlay');
     if (overlay) overlay.remove();
 
     this._pendingChallenge = null;
     this._outgoingChallenge = null;
-    ArenaShell.deactivate();
   }
 };

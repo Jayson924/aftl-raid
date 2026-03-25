@@ -1,4 +1,3 @@
-import { ArenaShell } from './arena-shell.jsx';
 import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
@@ -17,9 +16,7 @@ export const ArenaSetupPage = {
   _allPlayers: null,
 
   async render(container) {
-    ArenaShell.activate();
     container.innerHTML = '';
-    ArenaShell.renderHeader(container, 'arena-setup');
 
     const content = document.createElement('div');
     content.className = 'arena-setup';
@@ -37,7 +34,10 @@ export const ArenaSetupPage = {
 
   async _loadData() {
     const tournaments = await arenaData.getTournaments();
-    this._tournament = tournaments.find(t => t.status !== 'complete') || null;
+    // Only show real tournaments — skip throwaway "Quick Match" ones from challenges
+    this._tournament = tournaments.find(t =>
+      t.status !== 'complete' && t.name !== 'Quick Match'
+    ) || null;
 
     this._appUsers = await arenaData.getAllAppUsers();
 
@@ -471,6 +471,6 @@ export const ArenaSetupPage = {
   },
 
   destroy() {
-    ArenaShell.deactivate();
+    // cleanup done
   }
 };

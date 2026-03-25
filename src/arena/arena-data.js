@@ -229,6 +229,46 @@ class ArenaDataService {
     return data || [];
   }
 
+  /**
+   * Get all recent matches across all tournaments (for the hub).
+   * Returns newest first, limited to `limit` matches.
+   */
+  async getRecentMatches(limit = 20) {
+    const { data, error } = await supabase
+      .from('arena_matches')
+      .select('*, arena_tournaments!inner(name)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Get all participants across all tournaments (keyed by participant ID).
+   * Used to resolve player names for recent matches.
+   */
+  async getAllParticipants() {
+    const { data, error } = await supabase
+      .from('arena_participants')
+      .select('*');
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Subscribe to ALL arena match changes (not scoped to a tournament).
+   */
+  subscribeToAllMatches(callback) {
+    return supabase
+      .channel('arena-all-matches')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'arena_matches'
+      }, callback)
+      .subscribe();
+  }
+
   async getMatch(matchId) {
     const { data, error } = await supabase
       .from('arena_matches')
@@ -566,7 +606,7 @@ class ArenaDataService {
   // CHALLENGES
   // ============================================
 
-  async createChallenge(challengerDiscordId, challengedDiscordId) {
+  async createChallenge(challengerDiscordId, challengedDiscordId, matchFormat = 1) {
     // Clean up any stale pending challenges from this challenger
     await supabase
       .from('arena_challenges')
@@ -579,6 +619,7 @@ class ArenaDataService {
       .insert({
         challenger_discord_id: challengerDiscordId,
         challenged_discord_id: challengedDiscordId,
+        match_format: matchFormat,
         status: 'pending'
       })
       .select()

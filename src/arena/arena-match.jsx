@@ -1,4 +1,3 @@
-import { ArenaShell } from './arena-shell.jsx';
 import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
@@ -35,9 +34,7 @@ export const ArenaMatchPage = {
   _autoSending: false,
 
   async render(container) {
-    ArenaShell.activate();
     container.innerHTML = '';
-    ArenaShell.renderHeader(container, 'arena');
 
     const content = document.createElement('div');
     content.className = 'arena-match';
@@ -945,6 +942,6 @@ export const ArenaMatchPage = {
       clearInterval(this._timerInterval);
       this._timerInterval = null;
     }
-    ArenaShell.deactivate();
+    // cleanup done
   }
 };

@@ -1,37 +1,40 @@
-// Arena theme — site colors with colosseum stone accents
-$arena-bg: #1e1e1e;
+// Arena variables — mapped to main app variables for visual consistency
+@import 'variables';
+
+// Core colors (mapped from main app)
+$arena-bg: $background-dark;
 $arena-bg-lighter: #2a2a2a;
 $arena-panel: #2f2f2f;
 $arena-panel-lighter: #383838;
-$arena-gold: #f4c430;
-$arena-gold-light: #ffdb58;
-$arena-gold-dim: #c9a12a;
+$arena-gold: $primary-color;
+$arena-gold-light: $primary-hover;
+$arena-gold-dim: $primary-dark;
 $arena-border: #4a4a4a;
 $arena-border-light: #5c5c5c;
-$arena-text: rgba(255, 255, 255, 0.87);
+$arena-text: $text-light;
 $arena-text-muted: rgba(255, 255, 255, 0.5);
-$arena-red: #dc3545;
-$arena-green: #28a745;
+$arena-red: $danger-color;
+$arena-green: $success-color;
 $arena-blue: #4a8fd4;
 $arena-purple: #9b59b6;
 
-// Stone accents
+// Stone accents (arena-specific, used for portrait frames, VS badge)
 $arena-stone: #6b6560;
 $arena-stone-light: #8a8480;
 $arena-stone-dark: #3d3835;
 
 // HP bar colors
-$arena-hp-full: #28a745;
-$arena-hp-mid: #f4c430;
-$arena-hp-low: #dc3545;
+$arena-hp-full: $success-color;
+$arena-hp-mid: $primary-color;
+$arena-hp-low: $danger-color;
 $arena-hp-bg: rgba(0, 0, 0, 0.4);
 
 // Action button colors
-$arena-attack: #dc3545;
+$arena-attack: $danger-color;
 $arena-defend: #4a8fd4;
-$arena-strong: #f4c430;
+$arena-strong: $primary-color;
 $arena-ability: #9b59b6;
 
 // Panel styling
-$arena-radius: 8px;
+$arena-radius: $border-radius;
 $arena-panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);

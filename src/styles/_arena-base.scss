@@ -1,108 +1,5 @@
-// Arena base styles — applied when body.arena-mode is active
+// Arena base styles — reusable components for arena pages
 @import 'arena-variables';
-
-body.arena-mode {
-  background-color: $arena-bg;
-  color: $arena-text;
-
-  #app {
-    max-width: 1200px;
-  }
-}
-
-// Arena layout shell
-.arena-shell {
-  width: 100%;
-}
-
-.arena-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(180deg, $arena-panel-lighter 0%, $arena-stone-dark 100%);
-  border-bottom: 2px solid $arena-stone;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-
-  .arena-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: $arena-gold;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-
-    .arena-title-icon {
-      font-size: 1.2rem;
-    }
-  }
-
-  .arena-nav {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .arena-nav-link {
-    color: $arena-text-muted;
-    text-decoration: none;
-    font-size: 0.9rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: $arena-radius;
-    transition: all 0.2s ease;
-    cursor: pointer;
-    background: none;
-    border: none;
-    font-family: inherit;
-
-    &:hover {
-      color: $arena-gold-light;
-      background: rgba($arena-gold, 0.1);
-    }
-
-    &.active {
-      color: $arena-gold;
-      background: rgba($arena-gold, 0.15);
-      border: 1px solid $arena-border;
-    }
-  }
-
-  .arena-back-link {
-    color: $arena-text-muted;
-    text-decoration: none;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    transition: color 0.2s ease;
-
-    &:hover {
-      color: $arena-gold-light;
-    }
-
-    .back-arrow {
-      font-size: 1rem;
-    }
-  }
-
-  .arena-user-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: $arena-text-muted;
-    font-size: 0.85rem;
-
-    .arena-user-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 2px solid $arena-stone;
-    }
-  }
-}
 
 // Arena panels (reusable)
 .arena-panel {
@@ -119,7 +16,7 @@ body.arena-mode {
   justify-content: space-between;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba($arena-stone, 0.4);
+  border-bottom: 1px solid rgba($arena-border, 0.4);
 
   h2, h3 {
     margin: 0;
@@ -240,25 +137,5 @@ body.arena-mode {
   h3 {
     color: $arena-gold-dim;
     margin-bottom: 0.5rem;
-  }
-}
-
-// Responsive
-@media (max-width: 768px) {
-  .arena-header {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-
-    .arena-title {
-      font-size: 1.1rem;
-    }
-
-    .arena-nav {
-      gap: 0.5rem;
-      order: 3;
-      width: 100%;
-      overflow-x: auto;
-    }
   }
 }

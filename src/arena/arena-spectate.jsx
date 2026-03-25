@@ -1,4 +1,3 @@
-import { ArenaShell } from './arena-shell.jsx';
 import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
@@ -24,9 +23,7 @@ export const ArenaSpectatePage = {
   _lastReactionTime: 0,
 
   async render(container) {
-    ArenaShell.activate();
     container.innerHTML = '';
-    ArenaShell.renderHeader(container, 'arena');
 
     const content = document.createElement('div');
     content.className = 'arena-spectate';
@@ -303,6 +300,6 @@ export const ArenaSpectatePage = {
     if (this._reactionSubscription) arenaData.unsubscribe(this._reactionSubscription);
     if (this._combat) this._combat.destroy();
     if (this._presenceChannel) arenaData.leavePresence(this._presenceChannel);
-    ArenaShell.deactivate();
+    // cleanup done
   }
 };

@@ -1,4 +1,3 @@
-import { ArenaShell } from './arena-shell.jsx';
 import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { router } from '../router.js';
@@ -16,9 +15,7 @@ export const ArenaResultsPage = {
   _appUsers: null,
 
   async render(container) {
-    ArenaShell.activate();
     container.innerHTML = '';
-    ArenaShell.renderHeader(container, 'arena');
 
     const content = document.createElement('div');
     content.className = 'arena-results';
@@ -176,6 +173,6 @@ export const ArenaResultsPage = {
   },
 
   destroy() {
-    ArenaShell.deactivate();
+    // cleanup done
   }
 };

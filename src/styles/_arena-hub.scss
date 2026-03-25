@@ -150,6 +150,18 @@
     }
   }
 
+  .challenge-format {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .challenge-format-label {
+    color: $arena-text-muted;
+    font-size: 0.85rem;
+  }
+
   .challenge-status {
     margin-top: 0.75rem;
     min-height: 1.5rem;
@@ -294,6 +306,165 @@
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+// Tournament panel (compact, shown only when a real tournament is active)
+.arena-tournament-panel {
+  .tournament-info {
+    display: flex;
+    gap: 1.5rem;
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+}
+
+.arena-brackets-mini {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.arena-bracket-mini {
+  background: rgba($arena-bg, 0.5);
+  border: 1px solid rgba($arena-border, 0.3);
+  border-radius: $arena-radius;
+  padding: 0.75rem;
+
+  h4 {
+    font-size: 0.85rem;
+    color: $arena-gold;
+    margin: 0 0 0.5rem;
+  }
+}
+
+.bracket-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bracket-mini-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+
+  &.standings-leader {
+    color: $arena-gold;
+    font-weight: 600;
+  }
+}
+
+.bracket-mini-record {
+  color: $arena-text-muted;
+  font-size: 0.8rem;
+}
+
+// Player picker (custom dropdown with avatars)
+.arena-player-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba($arena-bg, 0.6);
+  border: 1px solid rgba($arena-border, 0.5);
+  border-radius: $arena-radius;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  min-height: 2.5rem;
+
+  &:hover {
+    border-color: $arena-gold;
+  }
+
+  .picker-placeholder {
+    color: $arena-text-muted;
+    font-size: 0.9rem;
+  }
+
+  .picker-arrow {
+    margin-left: auto;
+    color: $arena-text-muted;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+
+  .picker-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .picker-name {
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.picker-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: $arena-panel;
+  border: 1px solid $arena-border;
+  border-radius: $arena-radius;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  .arena-player-picker.open & {
+    display: block;
+  }
+}
+
+.picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.1s;
+
+  &:hover {
+    background: rgba($arena-gold, 0.1);
+  }
+
+  .picker-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+
+  .picker-avatar-placeholder {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba($arena-border, 0.4);
+  }
+
+  .picker-name {
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

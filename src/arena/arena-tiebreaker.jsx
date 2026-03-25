@@ -1,4 +1,3 @@
-import { ArenaShell } from './arena-shell.jsx';
 import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
@@ -25,9 +24,7 @@ export const ArenaTiebreakerPage = {
   _animationTimer: null,
 
   async render(container) {
-    ArenaShell.activate();
     container.innerHTML = '';
-    ArenaShell.renderHeader(container, 'arena');
 
     const content = document.createElement('div');
     content.className = 'arena-tiebreaker';
@@ -78,14 +75,39 @@ export const ArenaTiebreakerPage = {
       this._playerSide = 'player2';
     }
 
-    // Subscribe to tiebreaker changes (for the other player / spectators)
+    // Subscribe to tiebreaker changes — both players animate from Realtime
     if (this._tbSubscription) arenaData.unsubscribe(this._tbSubscription);
-    this._tbSubscription = arenaData.subscribeToTiebreaker(matchId, (payload) => {
+    this._tbSubscription = arenaData.subscribeToTiebreaker(matchId, async (payload) => {
+      const oldTb = this._tiebreaker;
       this._tiebreaker = payload.new;
-      if (!this._animating) {
-        const content = document.querySelector('.arena-tiebreaker');
-        if (content) this._renderContent(content);
+
+      if (this._animating) return;
+
+      const content = document.querySelector('.arena-tiebreaker');
+      if (!content) return;
+
+      const oldP1Taps = oldTb?.player1_taps || [];
+      const newP1Taps = payload.new.player1_taps || [];
+      const newP2Taps = payload.new.player2_taps || [];
+
+      // Race just started — taps went from empty to populated
+      if (oldP1Taps.length === 0 && newP1Taps.length > 0 && newP2Taps.length > 0) {
+        this._animating = true;
+        try {
+          await this._animateRace(newP1Taps, newP2Taps, payload.new.winner_id);
+          this._match = await arenaData.getMatch(this._match.id);
+          this._tiebreaker = await arenaData.getTiebreaker(this._match.id);
+          this._renderContent(content);
+          const winnerName = this._getParticipantName(payload.new.winner_id);
+          toast.success(`${winnerName} wins the enhancement race!`);
+        } finally {
+          this._animating = false;
+          this._rolling = false;
+        }
+        return;
       }
+
+      this._renderContent(content);
     });
 
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
@@ -234,7 +256,6 @@ export const ArenaTiebreakerPage = {
   async _startRace() {
     if (this._rolling) return;
     this._rolling = true;
-    this._animating = true;
 
     const rollBtn = document.getElementById('roll-btn');
     if (rollBtn) {
@@ -244,25 +265,13 @@ export const ArenaTiebreakerPage = {
 
     try {
       const currentUser = dataService.getUser();
-      const result = await arenaData.submitTiebreakerTap(this._match.id, currentUser.id);
-
-      // Animate the results step by step
-      await this._animateRace(result.player1Taps, result.player2Taps, result.winnerId);
-
-      // Refresh data and re-render final state
-      this._tiebreaker = await arenaData.getTiebreaker(this._match.id);
-      this._match = await arenaData.getMatch(this._match.id);
-
+      // Submit to server — Realtime subscription handles animation for both players
+      await arenaData.submitTiebreakerTap(this._match.id, currentUser.id);
+    } catch (err) {
+      this._rolling = false;
+      toast.error('Race failed: ' + err.message);
       const content = document.querySelector('.arena-tiebreaker');
       if (content) this._renderContent(content);
-
-      const winnerName = this._getParticipantName(result.winnerId);
-      toast.success(`${winnerName} wins with ${result.winnerId === this._match.player1_id ? result.player1Total : result.player2Total} taps!`);
-    } catch (err) {
-      toast.error('Race failed: ' + err.message);
-    } finally {
-      this._rolling = false;
-      this._animating = false;
     }
   },
 
@@ -346,6 +355,6 @@ export const ArenaTiebreakerPage = {
     if (this._tbSubscription) arenaData.unsubscribe(this._tbSubscription);
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
     if (this._animationTimer) clearTimeout(this._animationTimer);
-    ArenaShell.deactivate();
+    // cleanup done
   }
 };

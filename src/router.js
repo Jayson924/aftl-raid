@@ -22,17 +22,13 @@ class Router {
     this.onAuthRequired = handler;
   }
 
-  isArenaRoute(path) {
-    return path && path.startsWith('arena');
-  }
-
   // Get route from current URL path
   getRouteFromUrl() {
     const path = window.location.pathname;
     // Remove leading slash and get the route name
     let route = path.replace(/^\//, '') || this.defaultRoute;
-    // Preserve query string for arena routes (e.g. arena-match?match=xxx)
-    if (this.isArenaRoute(route) && window.location.search) {
+    // Preserve query string for routes that need it (e.g. arena-match?match=xxx)
+    if (window.location.search) {
       route = route + window.location.search;
     }
     // Extract base route for lookup (strip query params)
