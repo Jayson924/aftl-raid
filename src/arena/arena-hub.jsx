@@ -290,9 +290,9 @@ export const ArenaHubPage = {
 
     container.innerHTML = `
       ${this._renderChallengeSection()}
-      ${isAdmin ? this._renderQuickMatchButton() : ''}
       ${this._renderMatchList()}
       ${this._tournament ? this._renderTournamentPanel() : ''}
+      ${isAdmin ? this._renderQuickMatchButton() : ''}
       ${isAdmin ? '<div class="arena-panel" style="text-align: center;"><a href="#" class="arena-btn" data-route="arena-setup">Tournament Setup</a></div>' : ''}
     `;
 
