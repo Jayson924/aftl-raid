@@ -6,14 +6,13 @@ import { TOURNAMENT_PHASES } from './arena-constants.js';
 
 /**
  * Arena Setup — Admin-only tournament setup page.
- * Create tournament, manage brackets, add participants, randomize seeding.
+ * Create tournament, drag-and-drop players into brackets.
  * Route: /arena-setup
  */
 export const ArenaSetupPage = {
   _tournament: null,
   _participants: null,
   _appUsers: null,
-  _allPlayers: null,
 
   async render(container) {
     container.innerHTML = '';
@@ -34,7 +33,6 @@ export const ArenaSetupPage = {
 
   async _loadData() {
     const tournaments = await arenaData.getTournaments();
-    // Only show real tournaments — skip throwaway "Quick Match" ones from challenges
     this._tournament = tournaments.find(t =>
       t.status !== 'complete' && t.name !== 'Quick Match'
     ) || null;
@@ -51,6 +49,11 @@ export const ArenaSetupPage = {
   _getDisplayName(discordId) {
     const user = this._appUsers?.find(u => u.discord_id === discordId);
     return user?.display_name || user?.username || discordId;
+  },
+
+  _getAvatarUrl(discordId) {
+    const user = this._appUsers?.find(u => u.discord_id === discordId);
+    return user?.avatar_url || null;
   },
 
   _renderCreateForm(container) {
@@ -125,7 +128,6 @@ export const ArenaSetupPage = {
     const t = this._tournament;
     const phaseName = t.current_phase?.replace(/_/g, ' ') || 'setup';
     const isSetup = t.current_phase === 'setup';
-
     const isActive = !isSetup && t.current_phase !== 'complete';
 
     container.innerHTML = `
@@ -140,82 +142,99 @@ export const ArenaSetupPage = {
         </div>
       </div>
 
-      ${isSetup ? this._renderParticipantManager() : ''}
-      ${isSetup ? this._renderBracketEditor() : this._renderPhaseControls()}
+      ${isSetup ? this._renderDragDropEditor() : this._renderPhaseControls()}
     `;
 
     this._attachEventListeners(container);
+    if (isSetup) this._initDragDrop(container);
   },
 
-  _renderParticipantManager() {
+  _renderDragDropEditor() {
+    const bracketCount = this._tournament.bracket_count || 4;
     const participantIds = new Set(this._participants.map(p => p.discord_id));
-    const availableUsers = this._appUsers.filter(u => !participantIds.has(u.discord_id));
+
+    // Available players = all users not yet added as participants
+    const availableUsers = [...this._appUsers]
+      .filter(u => !participantIds.has(u.discord_id))
+      .sort((a, b) => {
+        const nameA = (a.display_name || a.username || '').toLowerCase();
+        const nameB = (b.display_name || b.username || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+
+    // Build bracket groups
+    const brackets = {};
+    for (let i = 1; i <= bracketCount; i++) brackets[i] = [];
+    for (const p of this._participants) {
+      const bn = p.bracket_number || 1;
+      if (brackets[bn]) brackets[bn].push(p);
+      else brackets[1].push(p);
+    }
 
     return `
-      <div class="arena-panel" style="margin-top: 1rem;">
-        <div class="arena-panel-header">
-          <h3>Participants (${this._participants.length})</h3>
-        </div>
-        <div class="arena-participant-controls">
-          <select id="add-participant-select" class="arena-input">
-            <option value="">Add player...</option>
-            ${availableUsers.map(u => `
-              <option value="${u.discord_id}">${u.display_name || u.username}</option>
-            `).join('')}
-          </select>
-          <button class="arena-btn arena-btn-primary arena-btn-small" id="add-participant-btn">Add</button>
-        </div>
-        <div class="arena-participant-list" id="participant-list">
-          ${this._participants.length === 0 ? '<p style="color: var(--arena-text-muted, #8a7a5a);">No participants added yet.</p>' : ''}
-          ${this._participants.map(p => `
-            <div class="arena-participant-item" data-id="${p.id}">
-              <span>${this._getDisplayName(p.discord_id)}</span>
-              <span class="arena-badge badge-blue">Bracket ${p.bracket_number || '?'}</span>
-              <button class="arena-btn arena-btn-danger arena-btn-small remove-participant-btn" data-id="${p.id}">&times;</button>
+      <div class="setup-drag-layout">
+        <div class="setup-brackets">
+          <div class="arena-panel">
+            <div class="arena-panel-header">
+              <h3>Brackets</h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="arena-btn arena-btn-small" id="randomize-btn">Randomize</button>
+                <button class="arena-btn arena-btn-primary arena-btn-small" id="start-group-stage-btn" ${this._participants.length < 2 ? 'disabled' : ''}>Start Group Stage</button>
+              </div>
             </div>
-          `).join('')}
+            <div class="arena-bracket-grid">
+              ${Object.entries(brackets).map(([bn, players]) => `
+                <div class="arena-bracket-column">
+                  <h4>Bracket ${bn} <span class="arena-badge badge-blue">${players.length}</span></h4>
+                  <div class="arena-bracket-drop" data-bracket="${bn}">
+                    ${players.length === 0
+                      ? '<div class="bracket-drop-hint">Drop players here</div>'
+                      : players.map(p => this._renderBracketPlayer(p)).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-pool arena-panel">
+          <div class="arena-panel-header">
+            <h3>Player Pool</h3>
+            <span class="arena-badge badge-blue">${availableUsers.length}</span>
+          </div>
+          <div class="setup-pool-list" id="player-pool" data-bracket="pool">
+            ${availableUsers.length === 0
+              ? '<p class="setup-pool-empty">All players added</p>'
+              : availableUsers.map(u => this._renderPoolPlayer(u)).join('')}
+          </div>
         </div>
       </div>
     `;
   },
 
-  _renderBracketEditor() {
-    const bracketCount = this._tournament.bracket_count || 4;
-    const brackets = {};
-    for (let i = 1; i <= bracketCount; i++) brackets[i] = [];
-    for (const p of this._participants) {
-      const bn = p.bracket_number || 0;
-      if (brackets[bn]) brackets[bn].push(p);
-      else {
-        // Unassigned
-        if (!brackets[0]) brackets[0] = [];
-        brackets[0].push(p);
-      }
-    }
-
+  _renderPoolPlayer(user) {
+    const avatar = user.avatar_url;
+    const name = user.display_name || user.username;
     return `
-      <div class="arena-panel" style="margin-top: 1rem;">
-        <div class="arena-panel-header">
-          <h3>Brackets</h3>
-          <div style="display: flex; gap: 0.5rem;">
-            <button class="arena-btn arena-btn-small" id="randomize-btn">Randomize</button>
-            <button class="arena-btn arena-btn-primary arena-btn-small" id="start-group-stage-btn" ${this._participants.length < 2 ? 'disabled' : ''}>Start Group Stage</button>
-          </div>
-        </div>
-        <div class="arena-bracket-grid">
-          ${Object.entries(brackets).filter(([bn]) => bn > 0).map(([bn, players]) => `
-            <div class="arena-bracket-column" data-bracket="${bn}">
-              <h4>Bracket ${bn} <span class="arena-badge badge-blue">${players.length}</span></h4>
-              <div class="arena-bracket-players" data-bracket="${bn}">
-                ${players.map(p => `
-                  <div class="arena-bracket-player" data-participant-id="${p.id}" draggable="true">
-                    ${this._getDisplayName(p.discord_id)}
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `).join('')}
-        </div>
+      <div class="setup-player-card" draggable="true" data-discord-id="${user.discord_id}" data-source="pool">
+        ${avatar
+          ? `<img src="${avatar}" alt="" class="setup-player-avatar" onerror="this.style.display='none'">`
+          : '<span class="setup-player-avatar setup-avatar-placeholder"></span>'}
+        <span class="setup-player-name">${name}</span>
+      </div>
+    `;
+  },
+
+  _renderBracketPlayer(participant) {
+    const avatar = this._getAvatarUrl(participant.discord_id);
+    const name = this._getDisplayName(participant.discord_id);
+    return `
+      <div class="setup-player-card in-bracket" draggable="true" data-participant-id="${participant.id}" data-discord-id="${participant.discord_id}" data-source="bracket">
+        ${avatar
+          ? `<img src="${avatar}" alt="" class="setup-player-avatar" onerror="this.style.display='none'">`
+          : '<span class="setup-player-avatar setup-avatar-placeholder"></span>'}
+        <span class="setup-player-name">${name}</span>
+        <button class="setup-remove-btn" data-participant-id="${participant.id}" title="Remove">&times;</button>
       </div>
     `;
   },
@@ -244,55 +263,124 @@ export const ArenaSetupPage = {
     `;
   },
 
-  _attachEventListeners(container) {
-    // Add participant
-    const addBtn = document.getElementById('add-participant-btn');
-    if (addBtn) {
-      addBtn.addEventListener('click', async () => {
-        const select = document.getElementById('add-participant-select');
-        const discordId = select.value;
-        if (!discordId) return;
+  // ============================================
+  // DRAG AND DROP
+  // ============================================
 
-        try {
-          // Auto-assign to smallest bracket
-          const bracketCount = this._tournament.bracket_count || 4;
-          const bracketSizes = {};
-          for (let i = 1; i <= bracketCount; i++) bracketSizes[i] = 0;
-          for (const p of this._participants) {
-            if (p.bracket_number) bracketSizes[p.bracket_number] = (bracketSizes[p.bracket_number] || 0) + 1;
-          }
-          const smallestBracket = Object.entries(bracketSizes).sort((a, b) => a[1] - b[1])[0][0];
+  _initDragDrop(container) {
+    let draggedEl = null;
 
-          const participant = await arenaData.addParticipant(
-            this._tournament.id,
-            discordId,
-            parseInt(smallestBracket),
-            (bracketSizes[smallestBracket] || 0) + 1
-          );
-          this._participants.push(participant);
-          toast.success('Player added');
-          this._renderContent(container);
-        } catch (err) {
-          toast.error('Failed: ' + err.message);
+    // Make all player cards draggable
+    container.querySelectorAll('.setup-player-card').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        draggedEl = card;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // Store info for drop handler
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+          source: card.dataset.source,
+          discordId: card.dataset.discordId,
+          participantId: card.dataset.participantId || null
+        }));
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        draggedEl = null;
+        container.querySelectorAll('.drag-over').forEach(z => z.classList.remove('drag-over'));
+      });
+    });
+
+    // All drop zones: bracket columns + player pool
+    const dropZones = container.querySelectorAll('.arena-bracket-drop, #player-pool');
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        zone.classList.add('drag-over');
+      });
+
+      zone.addEventListener('dragleave', (e) => {
+        // Only remove if actually leaving the zone (not entering a child)
+        if (!zone.contains(e.relatedTarget)) {
+          zone.classList.remove('drag-over');
         }
       });
-    }
 
-    // Remove participant buttons
-    container.querySelectorAll('.remove-participant-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
+      zone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+
+        let data;
         try {
-          await arenaData.removeParticipant(id);
-          this._participants = this._participants.filter(p => p.id !== id);
-          toast.success('Player removed');
-          this._renderContent(container);
-        } catch (err) {
-          toast.error('Failed: ' + err.message);
+          data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        } catch { return; }
+
+        const targetBracket = zone.dataset.bracket; // 'pool' or '1', '2', etc.
+
+        if (data.source === 'pool' && targetBracket !== 'pool') {
+          // Pool → Bracket: add participant
+          await this._addToBracket(data.discordId, parseInt(targetBracket), container);
+        } else if (data.source === 'bracket' && targetBracket === 'pool') {
+          // Bracket → Pool: remove participant
+          await this._removeFromBracket(data.participantId, container);
+        } else if (data.source === 'bracket' && targetBracket !== 'pool') {
+          // Bracket → Different bracket: move participant
+          await this._moveBetweenBrackets(data.participantId, parseInt(targetBracket), container);
         }
       });
     });
 
+    // Remove buttons (×)
+    container.querySelectorAll('.setup-remove-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this._removeFromBracket(btn.dataset.participantId, container);
+      });
+    });
+  },
+
+  async _addToBracket(discordId, bracketNumber, container) {
+    try {
+      const participant = await arenaData.addParticipant(
+        this._tournament.id,
+        discordId,
+        bracketNumber,
+        null
+      );
+      this._participants.push(participant);
+      this._renderContent(container);
+    } catch (err) {
+      toast.error('Failed to add: ' + err.message);
+    }
+  },
+
+  async _removeFromBracket(participantId, container) {
+    try {
+      await arenaData.removeParticipant(participantId);
+      this._participants = this._participants.filter(p => p.id !== participantId);
+      this._renderContent(container);
+    } catch (err) {
+      toast.error('Failed to remove: ' + err.message);
+    }
+  },
+
+  async _moveBetweenBrackets(participantId, newBracket, container) {
+    try {
+      await arenaData.updateParticipant(participantId, { bracket_number: newBracket });
+      const p = this._participants.find(p => p.id === participantId);
+      if (p) p.bracket_number = newBracket;
+      this._renderContent(container);
+    } catch (err) {
+      toast.error('Failed to move: ' + err.message);
+    }
+  },
+
+  // ============================================
+  // OTHER EVENT LISTENERS
+  // ============================================
+
+  _attachEventListeners(container) {
     // Randomize
     const randomizeBtn = document.getElementById('randomize-btn');
     if (randomizeBtn) {
@@ -308,7 +396,6 @@ export const ArenaSetupPage = {
 
         try {
           await arenaData.bulkUpdateParticipants(updates);
-          // Update local state
           for (const u of updates) {
             const p = this._participants.find(p => p.id === u.id);
             if (p) {
@@ -385,7 +472,7 @@ export const ArenaSetupPage = {
       });
     }
 
-    // Stop tournament (revert to setup, delete all matches/rounds/turns)
+    // Stop tournament
     const stopBtn = document.getElementById('stop-tournament-btn');
     if (stopBtn) {
       stopBtn.addEventListener('click', async () => {
@@ -417,57 +504,6 @@ export const ArenaSetupPage = {
         }
       });
     }
-
-    // Drag and drop for bracket players
-    this._initDragDrop(container);
-  },
-
-  _initDragDrop(container) {
-    const players = container.querySelectorAll('.arena-bracket-player');
-    const dropZones = container.querySelectorAll('.arena-bracket-players');
-
-    let draggedEl = null;
-
-    players.forEach(el => {
-      el.addEventListener('dragstart', (e) => {
-        draggedEl = el;
-        el.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      el.addEventListener('dragend', () => {
-        el.classList.remove('dragging');
-        draggedEl = null;
-        dropZones.forEach(z => z.classList.remove('drag-over'));
-      });
-    });
-
-    dropZones.forEach(zone => {
-      zone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        zone.classList.add('drag-over');
-      });
-      zone.addEventListener('dragleave', () => {
-        zone.classList.remove('drag-over');
-      });
-      zone.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        zone.classList.remove('drag-over');
-        if (!draggedEl) return;
-
-        const participantId = draggedEl.dataset.participantId;
-        const newBracket = parseInt(zone.dataset.bracket);
-
-        try {
-          await arenaData.updateParticipant(participantId, { bracket_number: newBracket });
-          const p = this._participants.find(p => p.id === participantId);
-          if (p) p.bracket_number = newBracket;
-          this._renderContent(container);
-        } catch (err) {
-          toast.error('Failed to move player: ' + err.message);
-        }
-      });
-    });
   },
 
   destroy() {

@@ -84,11 +84,22 @@
     opacity: 0.7;
   }
 
+  &.match-pending {
+    border-color: rgba($arena-gold, 0.3);
+    background: rgba($arena-gold, 0.04);
+  }
+
   .match-players {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     font-weight: 500;
+  }
+
+  .match-player {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .match-vs {
@@ -122,6 +133,48 @@
   .match-actions {
     display: flex;
     gap: 0.5rem;
+  }
+}
+
+// Upcoming matches — bracket columns with scroll
+.upcoming-brackets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.upcoming-bracket-col {
+  min-width: 0;
+}
+
+.upcoming-bracket-label {
+  font-size: 0.85rem;
+  color: $arena-gold;
+  margin: 0 0 0.5rem;
+}
+
+.upcoming-bracket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+
+  .arena-match-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+
+    .match-players {
+      justify-content: center;
+    }
+
+    .match-actions {
+      justify-content: center;
+    }
   }
 }
 
@@ -349,8 +402,9 @@
 .bracket-mini-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 0.85rem;
-  padding: 0.2rem 0;
+  padding: 0.25rem 0;
 
   &.standings-leader {
     color: $arena-gold;
@@ -358,9 +412,19 @@
   }
 }
 
+.bracket-mini-player {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bracket-mini-record {
   color: $arena-text-muted;
   font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 // Player picker (custom dropdown with avatars)

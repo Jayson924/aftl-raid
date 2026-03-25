@@ -92,10 +92,28 @@ export const ArenaHubPage = {
     return user?.display_name || user?.username || discordId;
   },
 
+  _getAvatarUrl(discordId) {
+    const user = this._appUsers?.find(u => u.discord_id === discordId);
+    return user?.avatar_url || null;
+  },
+
   _getParticipantName(participantId) {
     const p = this._allParticipants?.find(p => p.id === participantId);
     if (!p) return 'Unknown';
     return this._getDisplayName(p.discord_id);
+  },
+
+  _getParticipantDiscordId(participantId) {
+    const p = this._allParticipants?.find(p => p.id === participantId);
+    return p?.discord_id || null;
+  },
+
+  _renderAvatar(discordId, size = 24) {
+    const url = this._getAvatarUrl(discordId);
+    if (url) {
+      return `<img src="${url}" alt="" class="match-avatar" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;object-fit:cover;" onerror="this.style.display='none'">`;
+    }
+    return `<span class="match-avatar" style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;background:rgba(255,255,255,0.1);flex-shrink:0;"></span>`;
   },
 
   // ============================================
@@ -447,12 +465,44 @@ export const ArenaHubPage = {
   _renderMatchList() {
     const matches = this._recentMatches || [];
 
+    const pendingMatches = matches.filter(m => m.status === 'pending');
     const liveMatches = matches.filter(m =>
       m.status !== 'complete' && m.status !== 'pending'
     );
     const completedMatches = matches.filter(m => m.status === 'complete');
 
     let html = '';
+
+    if (pendingMatches.length > 0) {
+      // Group pending matches by bracket (via participant lookup)
+      const bracketGroups = {};
+      for (const m of pendingMatches) {
+        const p1 = this._allParticipants?.find(p => p.id === m.player1_id);
+        const bn = p1?.bracket_number || 0;
+        if (!bracketGroups[bn]) bracketGroups[bn] = [];
+        bracketGroups[bn].push(m);
+      }
+      const bracketNums = Object.keys(bracketGroups).sort((a, b) => a - b);
+
+      html += `
+        <div class="arena-panel">
+          <div class="arena-panel-header">
+            <h3>Upcoming Matches</h3>
+            <span class="arena-badge badge-gold">${pendingMatches.length} pending</span>
+          </div>
+          <div class="upcoming-brackets-grid">
+            ${bracketNums.map(bn => `
+              <div class="upcoming-bracket-col">
+                <h4 class="upcoming-bracket-label">Bracket ${bn}</h4>
+                <div class="upcoming-bracket-list">
+                  ${bracketGroups[bn].map(m => this._renderMatchCard(m, false, true)).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
 
     if (liveMatches.length > 0) {
       html += `
@@ -494,9 +544,11 @@ export const ArenaHubPage = {
     return html;
   },
 
-  _renderMatchCard(match, isLive) {
+  _renderMatchCard(match, isLive, isPending = false) {
     const p1Name = this._getParticipantName(match.player1_id);
     const p2Name = this._getParticipantName(match.player2_id);
+    const p1Discord = this._getParticipantDiscordId(match.player1_id);
+    const p2Discord = this._getParticipantDiscordId(match.player2_id);
     const statusLabel = match.status.replace(/_/g, ' ');
 
     const scoreHtml = match.status !== 'pending' ?
@@ -504,12 +556,16 @@ export const ArenaHubPage = {
 
     const winnerName = match.winner_id ? this._getParticipantName(match.winner_id) : '';
 
+    // Check if current user is a participant in this match
+    const currentUser = dataService.getUser();
+    const isParticipant = currentUser && (p1Discord === currentUser.id || p2Discord === currentUser.id);
+
     return `
-      <div class="arena-match-card ${isLive ? 'match-live' : ''} ${match.status === 'complete' ? 'match-complete' : ''}">
+      <div class="arena-match-card ${isLive ? 'match-live' : ''} ${match.status === 'complete' ? 'match-complete' : ''} ${isPending ? 'match-pending' : ''}">
         <div class="match-players">
-          <span class="match-player ${match.winner_id === match.player1_id ? 'match-winner' : ''}">${p1Name}</span>
+          <span class="match-player ${match.winner_id === match.player1_id ? 'match-winner' : ''}">${this._renderAvatar(p1Discord)} ${p1Name}</span>
           <span class="match-vs">vs</span>
-          <span class="match-player ${match.winner_id === match.player2_id ? 'match-winner' : ''}">${p2Name}</span>
+          <span class="match-player ${match.winner_id === match.player2_id ? 'match-winner' : ''}">${this._renderAvatar(p2Discord)} ${p2Name}</span>
         </div>
         ${scoreHtml}
         <div class="match-meta">
@@ -517,6 +573,7 @@ export const ArenaHubPage = {
           ${winnerName ? `<span class="match-winner-label">Winner: ${winnerName}</span>` : ''}
         </div>
         <div class="match-actions">
+          ${isPending && isParticipant ? `<button class="arena-btn arena-btn-primary arena-btn-small arena-start-match-btn" data-match-id="${match.id}">Start Match</button>` : ''}
           ${isLive ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">Watch</button>` : ''}
           ${match.status === 'complete' ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">View</button>` : ''}
         </div>
@@ -525,6 +582,24 @@ export const ArenaHubPage = {
   },
 
   _attachMatchListeners(container) {
+    // Start Match buttons (pending → drafting)
+    container.querySelectorAll('.arena-start-match-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+        try {
+          await arenaData.updateMatch(matchId, { status: 'drafting' });
+          router.navigate(`arena-draft?match=${matchId}`);
+        } catch (err) {
+          toast.error('Failed to start match: ' + err.message);
+          btn.disabled = false;
+          btn.textContent = 'Start Match';
+        }
+      });
+    });
+
+    // Watch / View buttons
     container.querySelectorAll('.arena-watch-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const matchId = btn.dataset.matchId;
@@ -594,7 +669,7 @@ export const ArenaHubPage = {
                   <div class="bracket-mini-list">
                     ${players.map((p, i) => `
                       <div class="bracket-mini-row ${i === 0 && p.wins > 0 ? 'standings-leader' : ''}">
-                        <span>${this._getDisplayName(p.discord_id)}</span>
+                        <span class="bracket-mini-player">${this._renderAvatar(p.discord_id, 20)} ${this._getDisplayName(p.discord_id)}</span>
                         <span class="bracket-mini-record">${p.wins}W ${p.losses}L</span>
                       </div>
                     `).join('')}
