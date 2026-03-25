@@ -37,14 +37,22 @@ async function sbPatch(table, query, body) {
   return data;
 }
 
-async function sbPost(table, body) {
+async function sbPost(table, body, { ignoreDuplicate = false } = {}) {
+  const postHeaders = { ...sbHeaders };
+  if (ignoreDuplicate) {
+    postHeaders['Prefer'] = 'return=representation,resolution=ignore-duplicates';
+  }
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
-    headers: sbHeaders,
+    headers: postHeaders,
     body: JSON.stringify(body)
   });
   const data = await res.json();
   if (!res.ok) {
+    if (ignoreDuplicate && res.status === 409) {
+      console.log(`sbPost ${table}: duplicate ignored`);
+      return data;
+    }
     console.error(`sbPost ${table} failed:`, data, 'body:', body);
     throw new Error(`DB insert failed: ${data.message || JSON.stringify(data)}`);
   }
@@ -120,7 +128,7 @@ export async function handler(event) {
         player1_committed: false,
         player2_committed: false,
         resolved: false
-      });
+      }, { ignoreDuplicate: true });
     }
 
     return {

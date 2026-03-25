@@ -44,14 +44,22 @@ async function sbPatch(table, query, body) {
   return data;
 }
 
-async function sbPost(table, body) {
+async function sbPost(table, body, { ignoreDuplicate = false } = {}) {
+  const postHeaders = { ...sbHeaders };
+  if (ignoreDuplicate) {
+    postHeaders['Prefer'] = 'return=representation,resolution=ignore-duplicates';
+  }
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
-    headers: sbHeaders,
+    headers: postHeaders,
     body: JSON.stringify(body)
   });
   const data = await res.json();
   if (!res.ok) {
+    if (ignoreDuplicate && res.status === 409) {
+      console.log(`sbPost ${table}: duplicate ignored`);
+      return data;
+    }
     console.error(`sbPost ${table} failed:`, data, 'body:', body);
     throw new Error(`DB insert failed: ${data.message || JSON.stringify(data)}`);
   }
@@ -173,6 +181,23 @@ export async function handler(event) {
 
     if (!turn.player1_committed || !turn.player2_committed) {
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, resolved: false }) };
+    }
+
+    // Guard against double-resolution: if the other invocation already resolved, bail
+    if (turn.resolved) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, resolved: true, alreadyResolved: true }) };
+    }
+
+    // Atomically claim resolution — only proceed if we're the one to set resolved=true
+    const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/arena_turns?id=eq.${turnId}&resolved=eq.false`, {
+      method: 'PATCH',
+      headers: { ...sbHeaders, 'Prefer': 'return=headers-only' },
+      body: JSON.stringify({ resolved: true })
+    });
+    const affectedRows = parseInt(claimRes.headers.get('content-range')?.split('/')[0]?.split('-')[1] || '0', 10) + 1;
+    if (!claimRes.ok || affectedRows === 0) {
+      // Other invocation already claimed it
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, resolved: true, alreadyResolved: true }) };
     }
 
     // ═══════════════════════════════════════════════
@@ -391,6 +416,7 @@ export async function handler(event) {
 
     // --- Write resolved turn ---
     // Update actions to reflect ability overrides (e.g. Charged Missile forces Defend)
+    // Note: resolved=true was already set by the claim above
     await sbPatch('arena_turns', `id=eq.${turnId}`, {
       player1_action: p1Action,
       player2_action: p2Action,
@@ -398,7 +424,6 @@ export async function handler(event) {
       player2_damage_dealt: p2DamageDealt,
       player1_hp_after: p1Hp,
       player2_hp_after: p2Hp,
-      resolved: true,
       resolution_log: { events }
     });
 
@@ -452,7 +477,7 @@ export async function handler(event) {
           player2_level: 9,
           player1_taps: [],
           player2_taps: []
-        });
+        }, { ignoreDuplicate: true });
         await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'tiebreaker' });
       } else {
         // Start next round with fresh HP
@@ -461,7 +486,7 @@ export async function handler(event) {
           round_number: round.round_number + 1,
           player1_hp: 120,
           player2_hp: 120
-        });
+        }, { ignoreDuplicate: true });
       }
     } else if (roundWinnerId) {
       await sbPatch('arena_rounds', `id=eq.${roundId}`, { winner_id: roundWinnerId });
@@ -519,7 +544,7 @@ export async function handler(event) {
         player1_committed: false,
         player2_committed: false,
         resolved: false
-      });
+      }, { ignoreDuplicate: true });
     }
 
     return {

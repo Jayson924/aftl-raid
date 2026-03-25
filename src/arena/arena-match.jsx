@@ -356,16 +356,25 @@ export const ArenaMatchPage = {
                 <span class="ability-desc">${!this._canUseAbility() ? 'Already used' : this._getMyAbility().description}</span>
               </button>
             ` : ''}
-            <div class="action-buttons">
-              <button class="arena-btn action-btn ${this._myAction === 'attack' ? 'selected' : ''}" data-action="attack">
-                Attack<br><span class="action-damage">12 dmg</span>
-              </button>
-              <button class="arena-btn action-btn ${this._myAction === 'defend' ? 'selected' : ''}" data-action="defend">
-                Defend<br><span class="action-damage">8 counter</span>
-              </button>
-              <button class="arena-btn action-btn ${this._myAction === 'strong_attack' ? 'selected' : ''}" data-action="strong_attack">
-                Strong Attack<br><span class="action-damage">16 dmg</span>
-              </button>
+            <div class="action-triangle">
+              <div class="action-triangle-top">
+                <button class="arena-btn action-btn ${this._myAction === 'defend' ? 'selected' : ''}" data-action="defend">
+                  Defend<br><span class="action-damage">8 counter</span>
+                </button>
+              </div>
+              <div class="action-triangle-arrows">
+                <span class="triangle-arrow arrow-left" title="Strong Attack beats Defend">↑ <span class="beats-label">beats</span></span>
+                <span class="triangle-arrow arrow-right" title="Defend beats Attack"><span class="beats-label">beats</span> ↓</span>
+              </div>
+              <div class="action-triangle-bottom">
+                <button class="arena-btn action-btn ${this._myAction === 'strong_attack' ? 'selected' : ''}" data-action="strong_attack">
+                  Strong Atk<br><span class="action-damage">16 dmg</span>
+                </button>
+                <span class="triangle-arrow arrow-bottom">← <span class="beats-label">beats</span></span>
+                <button class="arena-btn action-btn ${this._myAction === 'attack' ? 'selected' : ''}" data-action="attack">
+                  Attack<br><span class="action-damage">12 dmg</span>
+                </button>
+              </div>
             </div>
             <button class="arena-btn arena-btn-primary" id="commit-action-btn" ${!this._myAction ? 'disabled' : ''}>
               Commit Action

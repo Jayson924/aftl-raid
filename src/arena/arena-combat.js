@@ -42,8 +42,18 @@ export class ArenaCombat {
     this._turnSubscription = arenaData.subscribeToTurns(roundId, (payload) => {
       const turn = payload.new;
       if (turn && turn.resolved) {
-        this.turnHistory.push(turn);
-        this.onStateChange('turn_resolved', turn);
+        // Only process fully resolved turns (with HP data written)
+        if (turn.player1_hp_after == null || turn.player2_hp_after == null) return;
+        // Deduplicate — only add if this turn_number isn't already in history
+        const exists = this.turnHistory.some(t => t.turn_number === turn.turn_number && t.round_id === turn.round_id);
+        if (!exists) {
+          this.turnHistory.push(turn);
+          this.onStateChange('turn_resolved', turn);
+        } else {
+          // Update existing entry with latest data
+          const idx = this.turnHistory.findIndex(t => t.turn_number === turn.turn_number && t.round_id === turn.round_id);
+          if (idx !== -1) this.turnHistory[idx] = turn;
+        }
       } else if (turn) {
         this.onStateChange('turn_update', turn);
       }

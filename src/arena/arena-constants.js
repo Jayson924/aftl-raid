@@ -50,42 +50,42 @@ export const CLASS_ABILITIES = {
     id: 'highlander',
     name: 'Highlander',
     description: 'Survive lethal damage at 1 HP once (lasts 2 turns)',
-    icon: '&#9876;', // sword
+    icon: '<span class="ability-icon"><img src="/icons/warrior.png" alt=""></span>',
     classes: ['Gladiator', 'Moon Lord', 'Barbarian', 'Destroyer']
   },
   archer: {
     id: 'critical_buff',
     name: 'Critical Buff',
     description: 'This turn\'s outgoing damage x1.5',
-    icon: '&#127993;', // bow
+    icon: '<span class="ability-icon"><img src="/icons/archer.png" alt=""></span>',
     classes: ['Sniper', 'Artillery', 'Tempest', 'Wind Walker']
   },
   sorceress: {
     id: 'charged_missile',
     name: 'Charged Missile',
     description: 'Locked into Defend this turn, next turn damage x2',
-    icon: '&#9889;', // lightning
+    icon: '<span class="ability-icon"><img src="/icons/sorceress.png" alt=""></span>',
     classes: ['Saleana', 'Elestra', 'Smasher', 'Majesty']
   },
   cleric: {
     id: 'heal',
     name: 'Heal',
     description: 'Restore 20 HP (cap 120) before damage resolution',
-    icon: '&#10010;', // cross
+    icon: '<span class="ability-icon"><img src="/icons/cleric.png" alt=""></span>',
     classes: ['Saint', 'Inquisitor', 'Guardian', 'Crusader']
   },
   academic: {
     id: 'food_dispenser',
     name: 'Food Dispenser',
     description: 'Random: +5 damage, -5 incoming, or +10 HP',
-    icon: '&#9881;', // gear
+    icon: '<span class="ability-icon"><img src="/icons/academic.png" alt=""></span>',
     classes: ['Gear Master', 'Shooting Star', 'Adept', 'Physician']
   },
   kali: {
     id: 'ghost_guard',
     name: 'Ghost Guard',
     description: 'Opponent\'s damage halved this turn',
-    icon: '&#128123;', // ghost
+    icon: '<span class="ability-icon"><img src="/icons/kali.png" alt=""></span>',
     classes: ['Dark Summoner', 'Soul Eater', 'Blade Dancer', 'Spirit Dancer']
   }
 };

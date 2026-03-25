@@ -57,9 +57,18 @@
     gap: 1rem;
 
     .score-player {
+      flex: 1;
       font-size: 1.1rem;
       font-weight: 600;
       color: $arena-gold;
+
+      &:first-child {
+        text-align: right;
+      }
+
+      &:last-child {
+        text-align: left;
+      }
     }
 
     .score-rounds {
@@ -68,6 +77,7 @@
       color: $arena-text;
       min-width: 4rem;
       text-align: center;
+      flex-shrink: 0;
     }
   }
 
@@ -562,6 +572,61 @@
   }
 }
 
+// Triangle layout for action buttons
+.action-triangle {
+  margin-bottom: 1rem;
+}
+
+.action-triangle-top {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.action-triangle-arrows {
+  display: flex;
+  justify-content: center;
+  gap: 7rem;
+  margin: 0.4rem 0;
+}
+
+.triangle-arrow {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.8;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  .beats-label {
+    font-size: 0.85rem;
+  }
+
+  &.arrow-left {
+    color: $arena-strong;
+  }
+
+  &.arrow-right {
+    color: $arena-defend;
+  }
+
+  &.arrow-bottom {
+    color: $arena-attack;
+    align-self: center;
+  }
+}
+
+.action-triangle-bottom {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+// Keep for backwards compat
 .action-buttons {
   display: flex;
   gap: 0.75rem;
