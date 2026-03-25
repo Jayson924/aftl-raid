@@ -145,6 +145,55 @@
   }
 }
 
+// Arena confirmation modal
+.arena-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: arena-fade-in 0.15s ease-out;
+}
+
+@keyframes arena-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.arena-confirm-modal {
+  background: linear-gradient(180deg, $arena-panel-lighter 0%, $arena-panel 100%);
+  border: 1px solid $arena-border;
+  border-radius: $arena-radius;
+  padding: 1.5rem;
+  min-width: 320px;
+  max-width: 440px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  h3 {
+    color: $arena-gold;
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+  }
+
+  p {
+    color: $arena-text;
+    font-size: 0.95rem;
+    margin: 0 0 1.25rem;
+    line-height: 1.5;
+  }
+
+  .arena-confirm-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+}
+
 // Arena loading/empty states
 .arena-empty {
   text-align: center;

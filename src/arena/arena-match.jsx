@@ -33,6 +33,10 @@ export const ArenaMatchPage = {
   _playerSide: null, // 'player1' or 'player2'
   _revealInProgress: false,
   _autoSending: false,
+  _charSendTimer: null,
+  _charSendTimeLeft: 0,
+  _actionWaitTimer: null,
+  _actionWaitTimeLeft: 0,
 
   async render(container) {
     container.innerHTML = '';
@@ -340,6 +344,7 @@ export const ArenaMatchPage = {
       ${needsCharacterSend ? this._renderCharacterSelect() : ''}
       ${waitingForOpponentChar ? `
         <div class="match-action-panel" id="action-panel">
+          <div class="action-timer" id="char-send-timer">${this._charSendTimeLeft || TIMERS.CHARACTER_SENDOUT}s</div>
           <div class="action-waiting">Waiting for opponent to pick their character...</div>
         </div>
       ` : ''}
@@ -348,6 +353,7 @@ export const ArenaMatchPage = {
         <div class="match-action-panel" id="action-panel">
           <div class="action-timer" id="action-timer">${this._timeLeft}s</div>
           ${this._committed ? `
+            <div class="action-timer" id="action-wait-timer">${this._actionWaitTimeLeft || TIMERS.ACTION_PICK}s</div>
             <div class="action-waiting">Waiting for opponent...</div>
           ` : `
             ${this._getMyAbility() ? `
@@ -396,6 +402,14 @@ export const ArenaMatchPage = {
     this._attachListeners(container);
     if (!this._committed && !isComplete && !isTiebreaker && this._currentTurn) {
       this._startActionTimer();
+    }
+    if (this._committed && !isComplete && !isTiebreaker && this._currentTurn) {
+      this._startActionWaitTimer();
+    } else {
+      this._clearActionWaitTimer();
+    }
+    if (waitingForOpponentChar) {
+      this._startCharSendTimer();
     }
   },
 
@@ -588,6 +602,86 @@ export const ArenaMatchPage = {
     return getAbilityForClass(char.className);
   },
 
+  _startCharSendTimer() {
+    // Don't restart if already running
+    if (this._charSendTimer) return;
+    if (!this._charSendTimeLeft) this._charSendTimeLeft = TIMERS.CHARACTER_SENDOUT;
+
+    this._charSendTimer = setInterval(() => {
+      this._charSendTimeLeft--;
+      const timerEl = document.getElementById('char-send-timer');
+      if (timerEl) {
+        timerEl.textContent = `${this._charSendTimeLeft}s`;
+        if (this._charSendTimeLeft <= 10) timerEl.classList.add('timer-urgent');
+      }
+
+      if (this._charSendTimeLeft <= 0) {
+        clearInterval(this._charSendTimer);
+        this._charSendTimer = null;
+        this._forceOpponentCharSend();
+      }
+    }, 1000);
+  },
+
+  async _forceOpponentCharSend() {
+    try {
+      toast.info("Opponent didn't pick in time. Auto-picking for them...");
+      const currentUser = dataService.getUser();
+      await arenaData.forceSendCharacter(
+        this._match.id,
+        this._currentRound.id,
+        currentUser.id
+      );
+    } catch (err) {
+      console.error('Force send character failed:', err);
+      toast.error('Failed to force character send: ' + err.message);
+    }
+  },
+
+  _startActionWaitTimer() {
+    if (this._actionWaitTimer) return;
+    if (!this._actionWaitTimeLeft) this._actionWaitTimeLeft = TIMERS.ACTION_PICK;
+
+    this._actionWaitTimer = setInterval(() => {
+      this._actionWaitTimeLeft--;
+      const timerEl = document.getElementById('action-wait-timer');
+      if (timerEl) {
+        timerEl.textContent = `${this._actionWaitTimeLeft}s`;
+        if (this._actionWaitTimeLeft <= 5) timerEl.classList.add('timer-urgent');
+      }
+
+      if (this._actionWaitTimeLeft <= 0) {
+        clearInterval(this._actionWaitTimer);
+        this._actionWaitTimer = null;
+        this._forceOpponentAction();
+      }
+    }, 1000);
+  },
+
+  _clearActionWaitTimer() {
+    if (this._actionWaitTimer) {
+      clearInterval(this._actionWaitTimer);
+      this._actionWaitTimer = null;
+    }
+    this._actionWaitTimeLeft = 0;
+  },
+
+  async _forceOpponentAction() {
+    try {
+      toast.info("Opponent didn't act in time. Auto-picking for them...");
+      const currentUser = dataService.getUser();
+      await arenaData.forceAction(
+        this._match.id,
+        this._currentRound.id,
+        this._currentTurn.id,
+        currentUser.id
+      );
+    } catch (err) {
+      console.error('Force action failed:', err);
+      toast.error('Failed to force action: ' + err.message);
+    }
+  },
+
   _renderCharacterSelect() {
     const draft = this._match[`${this._playerSide}_draft`] || [];
     if (draft.length === 0) {
@@ -727,6 +821,7 @@ export const ArenaMatchPage = {
       );
 
       if (this._timerInterval) clearInterval(this._timerInterval);
+      this._clearActionWaitTimer();
 
       if (result.resolved) {
         // Turn was resolved immediately (we were the second to commit).
@@ -831,6 +926,7 @@ export const ArenaMatchPage = {
     if (event === 'turn_resolved') {
       // Turn resolved — play reveal animation, then refresh
       const turnData = data; // the resolved turn from Realtime
+      this._clearActionWaitTimer();
 
       this._playRevealSequence(turnData, () => {
         this._committed = false;
@@ -901,6 +997,7 @@ export const ArenaMatchPage = {
 
     if (newMatch.status === 'complete') {
       if (this._timerInterval) clearInterval(this._timerInterval);
+      this._clearActionWaitTimer();
       const winnerName = newMatch.winner_id ? this._getParticipantName(newMatch.winner_id) : null;
       toast.success(winnerName ? `Match over! ${winnerName} wins!` : 'Match ended in a draw!');
       const content = document.querySelector('.arena-match');
@@ -977,6 +1074,13 @@ export const ArenaMatchPage = {
       clearInterval(this._timerInterval);
       this._timerInterval = null;
     }
-    // cleanup done
+    if (this._charSendTimer) {
+      clearInterval(this._charSendTimer);
+      this._charSendTimer = null;
+    }
+    if (this._actionWaitTimer) {
+      clearInterval(this._actionWaitTimer);
+      this._actionWaitTimer = null;
+    }
   }
 };

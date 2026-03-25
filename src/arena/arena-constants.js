@@ -144,6 +144,7 @@ export const ABILITY_EFFECTS = {
 
 // Tournament phases
 export const TOURNAMENT_PHASES = {
+  REGISTRATION: 'registration',
   SETUP: 'setup',
   GROUP_STAGE: 'group_stage',
   SEMIFINALS: 'semifinals',

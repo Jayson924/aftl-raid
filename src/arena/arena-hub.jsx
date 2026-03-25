@@ -10,6 +10,7 @@ import { router } from '../router.js';
  */
 export const ArenaHubPage = {
   _matchSubscription: null,
+  _signupSubscription: null,
   _challengeSubscription: null,
   _challengeUpdateSub: null,
   _challengeTimer: null,
@@ -21,6 +22,7 @@ export const ArenaHubPage = {
   _tournament: null,
   _tournamentParticipants: null,
   _tournamentMatches: null,
+  _tournamentSignups: null,
 
   async render(container) {
     container.innerHTML = '';
@@ -58,12 +60,22 @@ export const ArenaHubPage = {
     ) || null;
 
     if (this._tournament) {
-      const [tParticipants, tMatches] = await Promise.all([
+      const [tParticipants, tMatches, tSignups] = await Promise.all([
         arenaData.getParticipants(this._tournament.id),
-        arenaData.getMatches(this._tournament.id)
+        arenaData.getMatches(this._tournament.id),
+        arenaData.getSignups(this._tournament.id)
       ]);
       this._tournamentParticipants = tParticipants;
       this._tournamentMatches = tMatches;
+      this._tournamentSignups = tSignups;
+
+      // Subscribe to signup changes for live updates
+      if (this._signupSubscription) arenaData.unsubscribe(this._signupSubscription);
+      if (this._tournament.current_phase === 'registration') {
+        this._signupSubscription = arenaData.subscribeToSignups(this._tournament.id, () => {
+          this._refreshSignups();
+        });
+      }
     }
 
     // Subscribe to match changes
@@ -84,6 +96,17 @@ export const ArenaHubPage = {
       if (content) this._renderContent(content);
     } catch (e) {
       console.error('Failed to refresh matches:', e);
+    }
+  },
+
+  async _refreshSignups() {
+    try {
+      if (!this._tournament) return;
+      this._tournamentSignups = await arenaData.getSignups(this._tournament.id);
+      const content = document.querySelector('.arena-hub');
+      if (content) this._renderContent(content);
+    } catch (e) {
+      console.error('Failed to refresh signups:', e);
     }
   },
 
@@ -288,10 +311,13 @@ export const ArenaHubPage = {
     const currentUser = dataService.getUser();
     const isAdmin = dataService.isAdmin();
 
+    const isRegistration = this._tournament?.current_phase === 'registration';
+
     container.innerHTML = `
       ${this._renderChallengeSection()}
+      ${isRegistration ? this._renderRegistrationPanel() : ''}
       ${this._renderMatchList()}
-      ${this._tournament ? this._renderTournamentPanel() : ''}
+      ${this._tournament && !isRegistration ? this._renderTournamentPanel() : ''}
       ${isAdmin ? this._renderQuickMatchButton() : ''}
       ${isAdmin ? '<div class="arena-panel" style="text-align: center;"><a href="#" class="arena-btn" data-route="arena-setup">Tournament Setup</a></div>' : ''}
     `;
@@ -300,6 +326,7 @@ export const ArenaHubPage = {
     this._attachChallengeListeners(container);
     this._attachQuickMatchListener(container);
     this._attachMatchListeners(container);
+    this._attachRegistrationListeners(container);
   },
 
   _renderChallengeSection() {
@@ -627,6 +654,87 @@ export const ArenaHubPage = {
   },
 
   // ============================================
+  // REGISTRATION PANEL (shown when tournament is in registration phase)
+  // ============================================
+
+  _renderRegistrationPanel() {
+    const t = this._tournament;
+    const signups = this._tournamentSignups || [];
+    const currentUser = dataService.getUser();
+    const isSignedUp = currentUser && signups.some(s => s.discord_id === currentUser.id);
+    const formatLabel = `${t.match_format || 1}v${t.match_format || 1}`;
+
+    return `
+      <div class="arena-panel arena-registration-panel">
+        <div class="arena-panel-header">
+          <h3>${t.name || 'Tournament'}</h3>
+          <span class="arena-badge badge-green">Registration Open</span>
+        </div>
+        <p class="registration-desc">${formatLabel} format &middot; ${t.bracket_count} brackets &middot; Sign up to participate!</p>
+        <div class="registration-player-list">
+          ${signups.length === 0
+            ? '<div class="registration-empty">No one has signed up yet. Be the first!</div>'
+            : signups.map(s => `
+              <div class="registration-player-row">
+                ${this._renderAvatar(s.discord_id, 22)}
+                <span>${this._getDisplayName(s.discord_id)}</span>
+              </div>
+            `).join('')}
+        </div>
+        <div class="registration-footer">
+          <span class="registration-count">${signups.length} player${signups.length !== 1 ? 's' : ''} signed up</span>
+          <div class="registration-actions">
+            ${!currentUser
+              ? '<span class="registration-login-hint">Log in to sign up</span>'
+              : isSignedUp
+                ? `<button class="arena-btn arena-btn-danger arena-btn-small" id="registration-leave-btn">Leave</button>`
+                : `<button class="arena-btn arena-btn-primary" id="registration-signup-btn">Sign Up</button>`
+            }
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  _attachRegistrationListeners(container) {
+    const signupBtn = container.querySelector('#registration-signup-btn');
+    if (signupBtn) {
+      signupBtn.addEventListener('click', async () => {
+        const currentUser = dataService.getUser();
+        if (!currentUser || !this._tournament) return;
+        signupBtn.disabled = true;
+        signupBtn.textContent = 'Signing up...';
+        try {
+          await arenaData.signUp(this._tournament.id, currentUser.id);
+          toast.success('You\'re signed up!');
+          await this._refreshSignups();
+        } catch (err) {
+          toast.error('Failed to sign up: ' + err.message);
+          signupBtn.disabled = false;
+          signupBtn.textContent = 'Sign Up';
+        }
+      });
+    }
+
+    const leaveBtn = container.querySelector('#registration-leave-btn');
+    if (leaveBtn) {
+      leaveBtn.addEventListener('click', async () => {
+        const currentUser = dataService.getUser();
+        if (!currentUser || !this._tournament) return;
+        leaveBtn.disabled = true;
+        try {
+          await arenaData.leaveSignUp(this._tournament.id, currentUser.id);
+          toast.info('You left the tournament');
+          await this._refreshSignups();
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+          leaveBtn.disabled = false;
+        }
+      });
+    }
+  },
+
+  // ============================================
   // TOURNAMENT PANEL (only if a real tournament exists)
   // ============================================
 
@@ -765,6 +873,10 @@ export const ArenaHubPage = {
     if (this._matchSubscription) {
       arenaData.unsubscribe(this._matchSubscription);
       this._matchSubscription = null;
+    }
+    if (this._signupSubscription) {
+      arenaData.unsubscribe(this._signupSubscription);
+      this._signupSubscription = null;
     }
     if (this._challengeSubscription) {
       arenaData.unsubscribe(this._challengeSubscription);

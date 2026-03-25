@@ -320,10 +320,25 @@ export const ArenaDraftPage = {
       if (this._timeLeft <= 0) {
         clearInterval(this._timerInterval);
         if (!this._locked) {
+          // We haven't drafted — auto-pick for ourselves
           this._autoRandomDraft(container);
+        } else {
+          // We already drafted but opponent hasn't — force-draft for them
+          this._forceDraftOpponent();
         }
       }
     }, 1000);
+  },
+
+  async _forceDraftOpponent() {
+    try {
+      toast.info("Opponent didn't draft in time. Auto-picking for them...");
+      const currentUser = dataService.getUser();
+      await arenaData.forceDraft(this._match.id, currentUser.id);
+    } catch (err) {
+      console.error('Force draft failed:', err);
+      toast.error('Failed to force draft: ' + err.message);
+    }
   },
 
   async _autoRandomDraft(container) {
@@ -352,6 +367,8 @@ export const ArenaDraftPage = {
     if (this._selectedCharacters.length === this._getFormatRules().charsPerDraft) {
       toast.info("Time's up! Auto-picked random characters.");
       await this._lockIn(container);
+      // Timer already expired — force-draft opponent too if they haven't drafted
+      await this._forceDraftOpponent();
     } else {
       toast.error(`Time's up! Not enough characters to auto-draft (need ${this._getFormatRules().charsPerDraft}, have ${this._myCharacters.length}).`);
     }

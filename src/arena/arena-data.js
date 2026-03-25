@@ -44,8 +44,8 @@ class ArenaDataService {
         bracket_count: bracketCount,
         match_format: matchFormat,
         prizes,
-        status: 'setup',
-        current_phase: 'setup'
+        status: 'registration',
+        current_phase: 'registration'
       })
       .select()
       .single();
@@ -213,6 +213,91 @@ class ArenaDataService {
     const results = await Promise.all(promises);
     const failed = results.find(r => r.error);
     if (failed) throw failed.error;
+  }
+
+  // ============================================
+  // SIGNUPS (tournament registration)
+  // ============================================
+
+  async getSignups(tournamentId) {
+    const { data, error } = await supabase
+      .from('arena_signups')
+      .select('*')
+      .eq('tournament_id', tournamentId)
+      .order('signed_up_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async signUp(tournamentId, discordId) {
+    const { data, error } = await supabase
+      .from('arena_signups')
+      .upsert({
+        tournament_id: tournamentId,
+        discord_id: discordId
+      }, { onConflict: 'tournament_id,discord_id' })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async leaveSignUp(tournamentId, discordId) {
+    const { error } = await supabase
+      .from('arena_signups')
+      .delete()
+      .eq('tournament_id', tournamentId)
+      .eq('discord_id', discordId);
+    if (error) throw error;
+  }
+
+  async removeSignUp(signupId) {
+    const { error } = await supabase
+      .from('arena_signups')
+      .delete()
+      .eq('id', signupId);
+    if (error) throw error;
+  }
+
+  /**
+   * Close registration: move to setup phase and promote all signups to participants.
+   * Returns the created participants.
+   */
+  async closeRegistration(tournamentId) {
+    // Fetch signups
+    const signups = await this.getSignups(tournamentId);
+
+    // Create participants from signups (unassigned bracket)
+    const participants = [];
+    for (const s of signups) {
+      try {
+        const p = await this.addParticipant(tournamentId, s.discord_id, null, null);
+        participants.push(p);
+      } catch (err) {
+        // Skip duplicates (already a participant)
+        if (!err.message?.includes('duplicate')) throw err;
+      }
+    }
+
+    // Advance tournament to setup phase
+    await this.updateTournament(tournamentId, {
+      status: 'setup',
+      current_phase: 'setup'
+    });
+
+    return participants;
+  }
+
+  subscribeToSignups(tournamentId, callback) {
+    return supabase
+      .channel(`arena-signups-${tournamentId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'arena_signups',
+        filter: `tournament_id=eq.${tournamentId}`
+      }, callback)
+      .subscribe();
   }
 
   // ============================================
@@ -569,6 +654,18 @@ class ArenaDataService {
 
   async submitAction(matchId, roundId, turnId, discordId, action, useAbility = false) {
     return this.callFunction('arena-action', { matchId, roundId, turnId, discordId, action, useAbility });
+  }
+
+  async forceDraft(matchId, requestingDiscordId) {
+    return this.callFunction('arena-force-draft', { matchId, requestingDiscordId });
+  }
+
+  async forceSendCharacter(matchId, roundId, requestingDiscordId) {
+    return this.callFunction('arena-force-send-character', { matchId, roundId, requestingDiscordId });
+  }
+
+  async forceAction(matchId, roundId, turnId, requestingDiscordId) {
+    return this.callFunction('arena-force-action', { matchId, roundId, turnId, requestingDiscordId });
   }
 
   async submitReaction(matchId, discordId, emoji) {

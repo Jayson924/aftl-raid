@@ -139,7 +139,7 @@ export const ArenaSpectatePage = {
         <div class="spectate-badge">SPECTATING</div>
       </div>
 
-      <div class="match-arena">
+      <div class="match-arena match-arena-1v1">
         <div class="match-fighter match-fighter-left">
           <div class="fighter-portrait">
             <div class="fighter-portrait-inner">

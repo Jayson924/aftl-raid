@@ -3,6 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { TOURNAMENT_PHASES } from './arena-constants.js';
+import { arenaConfirm } from './arena-confirm.js';
 
 /**
  * Arena Setup — Admin-only tournament setup page.
@@ -12,7 +13,9 @@ import { TOURNAMENT_PHASES } from './arena-constants.js';
 export const ArenaSetupPage = {
   _tournament: null,
   _participants: null,
+  _signups: null,
   _appUsers: null,
+  _signupSubscription: null,
 
   async render(container) {
     container.innerHTML = '';
@@ -40,9 +43,25 @@ export const ArenaSetupPage = {
     this._appUsers = await arenaData.getAllAppUsers();
 
     if (this._tournament) {
-      this._participants = await arenaData.getParticipants(this._tournament.id);
+      const [participants, signups] = await Promise.all([
+        arenaData.getParticipants(this._tournament.id),
+        arenaData.getSignups(this._tournament.id)
+      ]);
+      this._participants = participants;
+      this._signups = signups;
+
+      // Live signup updates during registration
+      if (this._signupSubscription) arenaData.unsubscribe(this._signupSubscription);
+      if (this._tournament.current_phase === 'registration') {
+        this._signupSubscription = arenaData.subscribeToSignups(this._tournament.id, async () => {
+          this._signups = await arenaData.getSignups(this._tournament.id);
+          const content = document.querySelector('.arena-setup');
+          if (content) this._renderContent(content);
+        });
+      }
     } else {
       this._participants = [];
+      this._signups = [];
     }
   },
 
@@ -56,8 +75,75 @@ export const ArenaSetupPage = {
     return user?.avatar_url || null;
   },
 
+  // ============================================
+  // PLAYER PICKER (custom dropdown with avatars)
+  // ============================================
+
+  _renderPlayerPicker(id, placeholder, users) {
+    const sorted = [...users].sort((a, b) => {
+      const nameA = (a.display_name || a.username || '').toLowerCase();
+      const nameB = (b.display_name || b.username || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    return `
+      <div class="arena-player-picker" id="${id}">
+        <div class="picker-selected" data-value="">
+          <span class="picker-placeholder">${placeholder}</span>
+          <span class="picker-arrow">&#9662;</span>
+        </div>
+        <div class="picker-dropdown">
+          ${sorted.map(u => `
+            <div class="picker-option" data-value="${u.discord_id}">
+              ${u.avatar_url
+                ? `<img src="${u.avatar_url}" alt="" class="picker-avatar" onerror="this.style.display='none'">`
+                : '<span class="picker-avatar picker-avatar-placeholder"></span>'}
+              <span class="picker-name">${u.display_name || u.username}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  },
+
+  _attachPickerListeners(container) {
+    container.querySelectorAll('.arena-player-picker').forEach(picker => {
+      const selected = picker.querySelector('.picker-selected');
+      const dropdown = picker.querySelector('.picker-dropdown');
+
+      selected.addEventListener('click', (e) => {
+        e.stopPropagation();
+        container.querySelectorAll('.arena-player-picker.open').forEach(p => {
+          if (p !== picker) p.classList.remove('open');
+        });
+        picker.classList.toggle('open');
+      });
+
+      dropdown.querySelectorAll('.picker-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const value = opt.dataset.value;
+          selected.dataset.value = value;
+          selected.innerHTML = opt.innerHTML + '<span class="picker-arrow">&#9662;</span>';
+          selected.classList.add('has-value');
+          picker.classList.remove('open');
+        });
+      });
+    });
+
+    document.addEventListener('click', () => {
+      container.querySelectorAll('.arena-player-picker.open').forEach(p => p.classList.remove('open'));
+    });
+  },
+
+  _getPickerValue(id) {
+    const picker = document.getElementById(id);
+    return picker?.querySelector('.picker-selected')?.dataset.value || '';
+  },
+
   _renderCreateForm(container) {
     container.innerHTML = `
+      <a href="#" class="arena-back-link" data-route="arena">&larr; Back to Arena</a>
       <div class="arena-panel" style="max-width: 500px; margin: 2rem auto;">
         <div class="arena-panel-header">
           <h2>Create Tournament</h2>
@@ -116,7 +202,8 @@ export const ArenaSetupPage = {
       try {
         this._tournament = await arenaData.createTournament(name, selectedCount, selectedFormat);
         this._participants = [];
-        toast.success('Tournament created!');
+        this._signups = [];
+        toast.success('Tournament created! Registration is now open.');
         this._renderContent(container);
       } catch (err) {
         toast.error('Failed: ' + err.message);
@@ -127,33 +214,160 @@ export const ArenaSetupPage = {
   _renderContent(container) {
     const t = this._tournament;
     const phaseName = t.current_phase?.replace(/_/g, ' ') || 'setup';
+    const isRegistration = t.current_phase === 'registration';
     const isSetup = t.current_phase === 'setup';
-    const isActive = !isSetup && t.current_phase !== 'complete';
+    const isActive = !isSetup && !isRegistration && t.current_phase !== 'complete';
 
     container.innerHTML = `
+      <a href="#" class="arena-back-link" data-route="arena">&larr; Back to Arena</a>
       <div class="arena-setup-header arena-panel">
         <div class="arena-panel-header">
           <h2>${t.name}</h2>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <span class="arena-badge badge-gold">${phaseName}</span>
+            <span class="arena-badge ${isRegistration ? 'badge-green' : 'badge-gold'}">${phaseName}</span>
             ${isActive ? `<button class="arena-btn arena-btn-danger arena-btn-small" id="stop-tournament-btn">Stop Tournament</button>` : ''}
             <button class="arena-btn arena-btn-danger arena-btn-small" id="delete-tournament-btn">Delete</button>
           </div>
         </div>
       </div>
 
-      ${isSetup ? this._renderDragDropEditor() : this._renderPhaseControls()}
+      ${isRegistration ? this._renderRegistrationManagement() : ''}
+      ${isSetup ? this._renderDragDropEditor() : ''}
+      ${!isRegistration && !isSetup ? this._renderPhaseControls() : ''}
     `;
 
+    this._attachPickerListeners(container);
     this._attachEventListeners(container);
     if (isSetup) this._initDragDrop(container);
+    if (isRegistration) this._attachRegistrationManagementListeners(container);
+  },
+
+  // ============================================
+  // REGISTRATION MANAGEMENT (admin view during registration phase)
+  // ============================================
+
+  _renderRegistrationManagement() {
+    const signups = this._signups || [];
+    const signupDiscordIds = new Set(signups.map(s => s.discord_id));
+
+    // Users who haven't signed up (for manual add)
+    const availableUsers = (this._appUsers || [])
+      .filter(u => !signupDiscordIds.has(u.discord_id))
+      .sort((a, b) => {
+        const nameA = (a.display_name || a.username || '').toLowerCase();
+        const nameB = (b.display_name || b.username || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+
+    return `
+      <div class="arena-panel setup-registration-management">
+        <div class="arena-panel-header">
+          <h3>Registered Players</h3>
+          <span class="arena-badge badge-green">${signups.length} signed up</span>
+        </div>
+
+        <div class="registration-player-list">
+          ${signups.length === 0
+            ? '<div class="registration-empty">No one has signed up yet. Share the link or add players manually.</div>'
+            : signups.map(s => `
+              <div class="setup-player-card in-bracket">
+                ${this._getAvatarUrl(s.discord_id)
+                  ? `<img src="${this._getAvatarUrl(s.discord_id)}" alt="" class="setup-player-avatar" onerror="this.style.display='none'">`
+                  : '<span class="setup-player-avatar setup-avatar-placeholder"></span>'}
+                <span class="setup-player-name">${this._getDisplayName(s.discord_id)}</span>
+                <button class="setup-remove-btn registration-remove-btn" data-signup-id="${s.id}" data-discord-id="${s.discord_id}" title="Remove">&times;</button>
+              </div>
+            `).join('')}
+        </div>
+
+        <div class="registration-controls">
+          <div class="registration-add-manual">
+            ${this._renderPlayerPicker('manual-add-picker', 'Add player manually...', availableUsers)}
+            <button class="arena-btn arena-btn-small" id="manual-add-btn">Add</button>
+          </div>
+          <button class="arena-btn arena-btn-primary" id="close-registration-btn" ${signups.length < 2 ? 'disabled' : ''}>
+            Close Registration & Arrange Brackets
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
+  _attachRegistrationManagementListeners(container) {
+    // Remove signup buttons
+    container.querySelectorAll('.registration-remove-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await arenaData.removeSignUp(btn.dataset.signupId);
+          this._signups = (this._signups || []).filter(s => s.id !== btn.dataset.signupId);
+          this._renderContent(container);
+          toast.info('Player removed from registration');
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    });
+
+    // Manual add
+    const addBtn = container.querySelector('#manual-add-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', async () => {
+        const discordId = this._getPickerValue('manual-add-picker');
+        if (!discordId) {
+          toast.error('Select a player to add');
+          return;
+        }
+        try {
+          await arenaData.signUp(this._tournament.id, discordId);
+          this._signups = await arenaData.getSignups(this._tournament.id);
+          this._renderContent(container);
+          toast.success('Player added');
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Close registration
+    const closeBtn = container.querySelector('#close-registration-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', async () => {
+        if (!await arenaConfirm('Close registration and move to bracket arrangement? Players will no longer be able to sign up.', { title: 'Close Registration', confirmText: 'Close Registration' })) return;
+        closeBtn.disabled = true;
+        closeBtn.textContent = 'Closing...';
+        try {
+          const participants = await arenaData.closeRegistration(this._tournament.id);
+          this._participants = participants;
+          this._tournament.current_phase = 'setup';
+          this._tournament.status = 'setup';
+          toast.success('Registration closed! Arrange your brackets.');
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+          closeBtn.disabled = false;
+          closeBtn.textContent = 'Close Registration & Arrange Brackets';
+        }
+      });
+    }
   },
 
   _renderDragDropEditor() {
     const bracketCount = this._tournament.bracket_count || 4;
     const participantIds = new Set(this._participants.map(p => p.discord_id));
 
-    // Available players = all users not yet added as participants
+    // Separate participants into assigned (in a bracket) and unassigned (pool)
+    const unassigned = [];
+    const brackets = {};
+    for (let i = 1; i <= bracketCount; i++) brackets[i] = [];
+    for (const p of this._participants) {
+      if (p.bracket_number && brackets[p.bracket_number]) {
+        brackets[p.bracket_number].push(p);
+      } else {
+        unassigned.push(p);
+      }
+    }
+
+    // Non-participant users available for manual add
     const availableUsers = [...this._appUsers]
       .filter(u => !participantIds.has(u.discord_id))
       .sort((a, b) => {
@@ -162,14 +376,8 @@ export const ArenaSetupPage = {
         return nameA.localeCompare(nameB);
       });
 
-    // Build bracket groups
-    const brackets = {};
-    for (let i = 1; i <= bracketCount; i++) brackets[i] = [];
-    for (const p of this._participants) {
-      const bn = p.bracket_number || 1;
-      if (brackets[bn]) brackets[bn].push(p);
-      else brackets[1].push(p);
-    }
+    const poolCount = unassigned.length;
+    const allAssigned = poolCount === 0 && this._participants.length > 0;
 
     return `
       <div class="setup-drag-layout">
@@ -200,13 +408,21 @@ export const ArenaSetupPage = {
         <div class="setup-pool arena-panel">
           <div class="arena-panel-header">
             <h3>Player Pool</h3>
-            <span class="arena-badge badge-blue">${availableUsers.length}</span>
+            <span class="arena-badge badge-blue">${poolCount}</span>
           </div>
           <div class="setup-pool-list" id="player-pool" data-bracket="pool">
-            ${availableUsers.length === 0
-              ? '<p class="setup-pool-empty">All players added</p>'
-              : availableUsers.map(u => this._renderPoolPlayer(u)).join('')}
+            ${unassigned.length > 0
+              ? unassigned.map(p => this._renderBracketPlayer(p)).join('')
+              : (allAssigned
+                ? '<p class="setup-pool-empty">All players assigned to brackets</p>'
+                : '<p class="setup-pool-empty">No players yet</p>')}
           </div>
+          ${availableUsers.length > 0 ? `
+            <div class="setup-manual-add">
+              ${this._renderPlayerPicker('setup-manual-add-picker', 'Add player...', availableUsers)}
+              <button class="arena-btn arena-btn-small" id="setup-manual-add-btn">Add</button>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -318,15 +534,15 @@ export const ArenaSetupPage = {
 
         const targetBracket = zone.dataset.bracket; // 'pool' or '1', '2', etc.
 
-        if (data.source === 'pool' && targetBracket !== 'pool') {
-          // Pool → Bracket: add participant
-          await this._addToBracket(data.discordId, parseInt(targetBracket), container);
-        } else if (data.source === 'bracket' && targetBracket === 'pool') {
-          // Bracket → Pool: remove participant
-          await this._removeFromBracket(data.participantId, container);
-        } else if (data.source === 'bracket' && targetBracket !== 'pool') {
-          // Bracket → Different bracket: move participant
+        if (data.participantId && targetBracket !== 'pool') {
+          // Participant (from bracket or pool) → bracket: move
           await this._moveBetweenBrackets(data.participantId, parseInt(targetBracket), container);
+        } else if (data.participantId && targetBracket === 'pool') {
+          // Participant → Pool: unassign bracket
+          await this._unassignFromBracket(data.participantId, container);
+        } else if (!data.participantId && data.source === 'pool' && targetBracket !== 'pool') {
+          // Non-participant pool user → Bracket: add as participant
+          await this._addToBracket(data.discordId, parseInt(targetBracket), container);
         }
       });
     });
@@ -362,6 +578,20 @@ export const ArenaSetupPage = {
       this._renderContent(container);
     } catch (err) {
       toast.error('Failed to remove: ' + err.message);
+    }
+  },
+
+  async _unassignFromBracket(participantId, container) {
+    try {
+      await arenaData.updateParticipant(participantId, { bracket_number: null, seed_position: null });
+      const p = this._participants.find(p => p.id === participantId);
+      if (p) {
+        p.bracket_number = null;
+        p.seed_position = null;
+      }
+      this._renderContent(container);
+    } catch (err) {
+      toast.error('Failed to unassign: ' + err.message);
     }
   },
 
@@ -415,7 +645,7 @@ export const ArenaSetupPage = {
     const startBtn = document.getElementById('start-group-stage-btn');
     if (startBtn) {
       startBtn.addEventListener('click', async () => {
-        if (!confirm('Start the group stage? This will generate all bracket matches.')) return;
+        if (!await arenaConfirm('This will generate all bracket matches.', { title: 'Start Group Stage', confirmText: 'Start' })) return;
         try {
           await arenaData.generateGroupMatches(this._tournament.id);
           toast.success('Group stage started! Matches generated.');
@@ -430,7 +660,7 @@ export const ArenaSetupPage = {
     const semisBtn = document.getElementById('advance-semifinals-btn');
     if (semisBtn) {
       semisBtn.addEventListener('click', async () => {
-        if (!confirm('Advance to semifinals?')) return;
+        if (!await arenaConfirm('Generate semifinal matches from bracket winners?', { title: 'Advance to Semifinals', confirmText: 'Advance' })) return;
         try {
           await arenaData.generateSemifinalMatches(this._tournament.id);
           toast.success('Semifinals generated!');
@@ -444,7 +674,7 @@ export const ArenaSetupPage = {
     const finalsBtn = document.getElementById('advance-finals-btn');
     if (finalsBtn) {
       finalsBtn.addEventListener('click', async () => {
-        if (!confirm('Advance to finals?')) return;
+        if (!await arenaConfirm('Generate the final match from semifinal winners?', { title: 'Advance to Finals', confirmText: 'Advance' })) return;
         try {
           await arenaData.generateFinalMatch(this._tournament.id);
           toast.success('Final match generated!');
@@ -458,7 +688,7 @@ export const ArenaSetupPage = {
     const completeBtn = document.getElementById('complete-tournament-btn');
     if (completeBtn) {
       completeBtn.addEventListener('click', async () => {
-        if (!confirm('Complete the tournament?')) return;
+        if (!await arenaConfirm('Mark the tournament as complete?', { title: 'Complete Tournament', confirmText: 'Complete' })) return;
         try {
           await arenaData.updateTournament(this._tournament.id, {
             status: 'complete',
@@ -476,7 +706,7 @@ export const ArenaSetupPage = {
     const stopBtn = document.getElementById('stop-tournament-btn');
     if (stopBtn) {
       stopBtn.addEventListener('click', async () => {
-        if (!confirm('Stop this tournament? All matches, rounds, and results will be deleted. Participants and brackets are kept.')) return;
+        if (!await arenaConfirm('All matches, rounds, and results will be deleted. Participants and brackets are kept.', { title: 'Stop Tournament', confirmText: 'Stop', danger: true })) return;
         try {
           await arenaData.stopTournament(this._tournament.id);
           toast.success('Tournament stopped — back to setup');
@@ -488,11 +718,31 @@ export const ArenaSetupPage = {
       });
     }
 
+    // Manual add (setup phase - add non-registered user as participant)
+    const manualAddBtn = document.getElementById('setup-manual-add-btn');
+    if (manualAddBtn) {
+      manualAddBtn.addEventListener('click', async () => {
+        const discordId = this._getPickerValue('setup-manual-add-picker');
+        if (!discordId) {
+          toast.error('Select a player to add');
+          return;
+        }
+        try {
+          const participant = await arenaData.addParticipant(this._tournament.id, discordId, null, null);
+          this._participants.push(participant);
+          toast.success('Player added to pool');
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
     // Delete tournament
     const deleteBtn = document.getElementById('delete-tournament-btn');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async () => {
-        if (!confirm('Delete this tournament entirely? This cannot be undone.')) return;
+        if (!await arenaConfirm('Delete this tournament entirely? This cannot be undone.', { title: 'Delete Tournament', confirmText: 'Delete', danger: true })) return;
         try {
           await arenaData.deleteTournament(this._tournament.id);
           toast.success('Tournament deleted');
@@ -507,6 +757,9 @@ export const ArenaSetupPage = {
   },
 
   destroy() {
-    // cleanup done
+    if (this._signupSubscription) {
+      arenaData.unsubscribe(this._signupSubscription);
+      this._signupSubscription = null;
+    }
   }
 };
