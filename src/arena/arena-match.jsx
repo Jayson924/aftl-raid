@@ -14,6 +14,7 @@ export const ArenaMatchPage = {
   _match: null,
   _matchSubscription: null,
   _roundSubscription: null,
+  _reactionSubscription: null,
   _combat: null,
   _presenceChannel: null,
   _spectatorCount: 0,
@@ -135,6 +136,12 @@ export const ArenaMatchPage = {
         if (countEl) countEl.textContent = `${this._spectatorCount} watching`;
       });
     }
+
+    // Subscribe to spectator reactions
+    if (this._reactionSubscription) arenaData.unsubscribe(this._reactionSubscription);
+    this._reactionSubscription = arenaData.subscribeToReactions(matchId, (payload) => {
+      if (payload.new?.emoji) this._showReactionBubble(payload.new.emoji);
+    });
 
     this._myAction = null;
     this._myAbility = false;
@@ -327,6 +334,8 @@ export const ArenaMatchPage = {
           </div>
         ` : ''}
       </div>
+
+      <div class="reaction-bubbles-overlay" id="reaction-bubbles"></div>
 
       ${needsCharacterSend ? this._renderCharacterSelect() : ''}
       ${waitingForOpponentChar ? `
@@ -921,6 +930,19 @@ export const ArenaMatchPage = {
     }
   },
 
+  _showReactionBubble(emoji) {
+    const container = document.getElementById('reaction-bubbles');
+    if (!container) return;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'reaction-bubble';
+    bubble.textContent = emoji;
+    bubble.style.left = `${20 + Math.random() * 60}%`;
+    container.appendChild(bubble);
+
+    setTimeout(() => bubble.remove(), 2000);
+  },
+
   destroy() {
     if (this._matchSubscription) {
       arenaData.unsubscribe(this._matchSubscription);
@@ -929,6 +951,10 @@ export const ArenaMatchPage = {
     if (this._roundSubscription) {
       arenaData.unsubscribe(this._roundSubscription);
       this._roundSubscription = null;
+    }
+    if (this._reactionSubscription) {
+      arenaData.unsubscribe(this._reactionSubscription);
+      this._reactionSubscription = null;
     }
     if (this._combat) {
       this._combat.destroy();

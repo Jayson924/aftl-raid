@@ -219,6 +219,7 @@ export const ArenaSpectatePage = {
         }
 
         this._lastReactionTime = now;
+        btn.blur();
         const emoji = btn.dataset.emoji;
 
         try {
