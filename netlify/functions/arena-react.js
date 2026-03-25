@@ -14,7 +14,7 @@ const sbHeaders = {
 };
 
 const VALID_EMOJIS = ['👍', '👎', '😂', '😢', '😮'];
-const COOLDOWN_SECONDS = 3;
+const COOLDOWN_SECONDS = 2;
 
 const headers = {
   'Access-Control-Allow-Origin': '*',

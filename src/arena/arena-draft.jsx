@@ -2,7 +2,7 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
-import { TIMERS, DRAFT_RULES, CLASS_ABILITIES, getAbilityForClass, getMatchFormat } from './arena-constants.js';
+import { TIMERS, DRAFT_RULES, CLASS_ABILITIES, getAbilityForClass, getMatchFormat, getRemainingSeconds } from './arena-constants.js';
 
 /**
  * Arena Draft — Character selection phase before a match.
@@ -307,7 +307,7 @@ export const ArenaDraftPage = {
 
   _startTimer(container) {
     if (this._timerInterval) clearInterval(this._timerInterval);
-    this._timeLeft = TIMERS.DRAFT_PHASE;
+    this._timeLeft = getRemainingSeconds(this._match?.created_at, TIMERS.DRAFT_PHASE);
 
     this._timerInterval = setInterval(() => {
       this._timeLeft--;

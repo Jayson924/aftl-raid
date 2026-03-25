@@ -399,6 +399,49 @@ class ArenaDataService {
     return data;
   }
 
+  /**
+   * Forfeit a match — admin picks a winner, match is marked complete.
+   * Updates participant win/loss stats.
+   */
+  async forfeitMatch(matchId, winnerId) {
+    const match = await this.getMatch(matchId);
+    if (!match) throw new Error('Match not found');
+    if (match.status === 'complete') throw new Error('Match already complete');
+
+    const loserId = winnerId === match.player1_id ? match.player2_id : match.player1_id;
+
+    // Update match
+    await this.updateMatch(matchId, {
+      status: 'complete',
+      winner_id: winnerId
+    });
+
+    // Update participant stats
+    const winnerPart = await supabase
+      .from('arena_participants')
+      .select('wins')
+      .eq('id', winnerId)
+      .single();
+    if (winnerPart.data) {
+      await supabase
+        .from('arena_participants')
+        .update({ wins: (winnerPart.data.wins || 0) + 1 })
+        .eq('id', winnerId);
+    }
+
+    const loserPart = await supabase
+      .from('arena_participants')
+      .select('losses')
+      .eq('id', loserId)
+      .single();
+    if (loserPart.data) {
+      await supabase
+        .from('arena_participants')
+        .update({ losses: (loserPart.data.losses || 0) + 1 })
+        .eq('id', loserId);
+    }
+  }
+
   // ============================================
   // ROUNDS
   // ============================================
@@ -839,17 +882,42 @@ class ArenaDataService {
     return matches;
   }
 
-  async generateSemifinalMatches(tournamentId) {
+  async generateSemifinalMatches(tournamentId, { forceAdvance = false } = {}) {
+    // If force-advancing, auto-forfeit incomplete group matches first
+    if (forceAdvance) {
+      const allMatches = await this.getMatches(tournamentId);
+      const incomplete = allMatches.filter(m => m.phase === 'group_stage' && m.status !== 'complete');
+      for (const m of incomplete) {
+        await this.forfeitMatch(m.id, m.player1_id);
+      }
+    }
+
     const { brackets } = await this.getStandings(tournamentId);
-    const bracketNumbers = Object.keys(brackets).sort((a, b) => a - b);
+    const bracketNumbers = Object.keys(brackets)
+      .filter(bn => bn !== '0') // Exclude unassigned pool
+      .sort((a, b) => a - b);
 
-    // Top player from each bracket
-    const semifinalists = bracketNumbers.map(bn => brackets[bn][0]).filter(Boolean);
+    let semifinalists;
 
-    if (semifinalists.length < 2) throw new Error('Not enough bracket winners for semifinals');
+    if (bracketNumbers.length >= 2) {
+      // Multiple brackets — top player from each bracket
+      semifinalists = bracketNumbers.map(bn => brackets[bn][0]).filter(Boolean);
+    } else {
+      // Single bracket or no brackets — take top players ranked by wins
+      const allPlayers = bracketNumbers.flatMap(bn => brackets[bn]);
+      // Also include bracket 0 if that's all we have
+      if (bracketNumbers.length === 0 && brackets[0]) {
+        allPlayers.push(...brackets[0]);
+      }
+      // Take top 4 (or top 2 if fewer) — already sorted by wins desc
+      const count = allPlayers.length >= 4 ? 4 : Math.min(allPlayers.length, 2);
+      semifinalists = allPlayers.slice(0, count);
+    }
+
+    if (semifinalists.length < 2) throw new Error('Not enough players with results for semifinals');
 
     const matches = [];
-    // 1st bracket top vs last bracket top, 2nd vs 2nd-last, etc.
+    // 1st vs last, 2nd vs 2nd-last, etc.
     const half = Math.floor(semifinalists.length / 2);
     for (let i = 0; i < half; i++) {
       matches.push(
@@ -861,12 +929,32 @@ class ArenaDataService {
     return matches;
   }
 
-  async generateFinalMatch(tournamentId) {
+  async generateFinalMatch(tournamentId, { forceAdvance = false } = {}) {
+    // If force-advancing, auto-forfeit incomplete semifinal matches first
+    if (forceAdvance) {
+      const allMatches = await this.getMatches(tournamentId);
+      const incomplete = allMatches.filter(m => m.phase === 'semifinals' && m.status !== 'complete');
+      for (const m of incomplete) {
+        await this.forfeitMatch(m.id, m.player1_id);
+      }
+    }
+
     const matches = await this.getMatches(tournamentId);
     const semis = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
 
     const winners = semis.map(m => m.winner_id).filter(Boolean);
-    if (winners.length < 2) throw new Error('Not enough semifinal winners for final');
+
+    if (winners.length < 2) {
+      // Only 1 semifinal winner (or none) — skip finals, they win the tournament
+      if (winners.length === 1) {
+        await this.updateTournament(tournamentId, {
+          status: 'complete',
+          current_phase: 'complete'
+        });
+        return { skipped: true, winnerId: winners[0] };
+      }
+      throw new Error('No semifinal winners to advance');
+    }
 
     const finalMatch = await this.createMatch(tournamentId, 'finals', winners[0], winners[1]);
     await this.updateTournament(tournamentId, { current_phase: 'finals' });

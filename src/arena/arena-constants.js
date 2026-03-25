@@ -44,6 +44,16 @@ export const TIMERS = {
   TIEBREAKER_SUSPENSE: 2
 };
 
+/**
+ * Calculate remaining seconds for a timer anchored to a server timestamp.
+ * Returns at least 1 to avoid instantly expiring due to clock skew.
+ */
+export function getRemainingSeconds(serverTimestamp, durationSeconds) {
+  if (!serverTimestamp) return durationSeconds;
+  const elapsed = (Date.now() - new Date(serverTimestamp).getTime()) / 1000;
+  return Math.max(1, Math.ceil(durationSeconds - elapsed));
+}
+
 // Class family → ability mapping
 export const CLASS_ABILITIES = {
   warrior: {
@@ -195,7 +205,7 @@ export const TIEBREAKER_TARGET_LEVEL = 13;
 
 // Spectator reactions
 export const REACTIONS = ['👍', '👎', '😂', '😢', '😮'];
-export const REACTION_COOLDOWN_MS = 3000;
+export const REACTION_COOLDOWN_MS = 2000;
 
 // Prize distribution (default for ~20 players)
 export const DEFAULT_PRIZES = {

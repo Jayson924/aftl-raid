@@ -43,12 +43,14 @@ export const ArenaSetupPage = {
     this._appUsers = await arenaData.getAllAppUsers();
 
     if (this._tournament) {
-      const [participants, signups] = await Promise.all([
+      const [participants, signups, matches] = await Promise.all([
         arenaData.getParticipants(this._tournament.id),
-        arenaData.getSignups(this._tournament.id)
+        arenaData.getSignups(this._tournament.id),
+        arenaData.getMatches(this._tournament.id)
       ]);
       this._participants = participants;
       this._signups = signups;
+      this._matches = matches;
 
       // Live signup updates during registration
       if (this._signupSubscription) arenaData.unsubscribe(this._signupSubscription);
@@ -62,6 +64,7 @@ export const ArenaSetupPage = {
     } else {
       this._participants = [];
       this._signups = [];
+      this._matches = [];
     }
   },
 
@@ -458,14 +461,41 @@ export const ArenaSetupPage = {
   _renderPhaseControls() {
     const t = this._tournament;
     const phase = t.current_phase;
+    const matches = this._matches || [];
+
+    // Count matches for the current phase
+    const phaseMatches = matches.filter(m => m.phase === phase);
+    const completedCount = phaseMatches.filter(m => m.status === 'complete').length;
+    const totalCount = phaseMatches.length;
+    const incompleteCount = totalCount - completedCount;
+    const allComplete = incompleteCount === 0 && totalCount > 0;
 
     let actionHtml = '';
+    let nextPhaseLabel = '';
+
     if (phase === 'group_stage') {
-      actionHtml = `<button class="arena-btn arena-btn-primary" id="advance-semifinals-btn">Advance to Semifinals</button>`;
+      nextPhaseLabel = 'Semifinals';
+      actionHtml = allComplete
+        ? `<button class="arena-btn arena-btn-primary" id="advance-btn">Advance to Semifinals</button>`
+        : `
+          <button class="arena-btn arena-btn-primary" id="advance-btn" ${totalCount === 0 ? 'disabled' : ''}>Advance to Semifinals</button>
+          ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Advance (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
+        `;
     } else if (phase === 'semifinals') {
-      actionHtml = `<button class="arena-btn arena-btn-primary" id="advance-finals-btn">Advance to Finals</button>`;
+      nextPhaseLabel = 'Finals';
+      actionHtml = allComplete
+        ? `<button class="arena-btn arena-btn-primary" id="advance-btn">Advance to Finals</button>`
+        : `
+          <button class="arena-btn arena-btn-primary" id="advance-btn" ${totalCount === 0 ? 'disabled' : ''}>Advance to Finals</button>
+          ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Advance (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
+        `;
     } else if (phase === 'finals') {
-      actionHtml = `<button class="arena-btn arena-btn-primary" id="complete-tournament-btn">Complete Tournament</button>`;
+      actionHtml = allComplete
+        ? `<button class="arena-btn arena-btn-primary" id="complete-tournament-btn">Complete Tournament</button>`
+        : `
+          <button class="arena-btn arena-btn-primary" id="complete-tournament-btn" disabled>Complete Tournament</button>
+          ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Complete (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
+        `;
     }
 
     return `
@@ -474,7 +504,10 @@ export const ArenaSetupPage = {
           <h3>Phase Controls</h3>
         </div>
         <p>Current phase: <strong>${phase?.replace(/_/g, ' ')}</strong></p>
-        ${actionHtml}
+        ${totalCount > 0 ? `<p>Matches: <strong>${completedCount}/${totalCount}</strong> complete${incompleteCount > 0 ? ` — <span style="color: #e8a44a;">${incompleteCount} incomplete</span>` : ''}</p>` : ''}
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+          ${actionHtml}
+        </div>
       </div>
     `;
   },
@@ -657,30 +690,73 @@ export const ArenaSetupPage = {
     }
 
     // Phase advancement buttons
-    const semisBtn = document.getElementById('advance-semifinals-btn');
-    if (semisBtn) {
-      semisBtn.addEventListener('click', async () => {
-        if (!await arenaConfirm('Generate semifinal matches from bracket winners?', { title: 'Advance to Semifinals', confirmText: 'Advance' })) return;
+    const advanceBtn = document.getElementById('advance-btn');
+    if (advanceBtn) {
+      advanceBtn.addEventListener('click', async () => {
+        const phase = this._tournament.current_phase;
+        const nextLabel = phase === 'group_stage' ? 'Semifinals' : 'Finals';
+        if (!await arenaConfirm(`Advance to ${nextLabel} using current standings?`, { title: `Advance to ${nextLabel}`, confirmText: 'Advance' })) return;
         try {
-          await arenaData.generateSemifinalMatches(this._tournament.id);
-          toast.success('Semifinals generated!');
-          this._loadData().then(() => this._renderContent(container));
+          let result;
+          if (phase === 'group_stage') {
+            result = await arenaData.generateSemifinalMatches(this._tournament.id);
+          } else {
+            result = await arenaData.generateFinalMatch(this._tournament.id);
+          }
+          if (result?.skipped) {
+            toast.success('Only 1 semifinal winner — tournament complete!');
+            router.navigate('arena');
+          } else {
+            toast.success(`${nextLabel} generated!`);
+            this._loadData().then(() => this._renderContent(container));
+          }
         } catch (err) {
           toast.error('Failed: ' + err.message);
         }
       });
     }
 
-    const finalsBtn = document.getElementById('advance-finals-btn');
-    if (finalsBtn) {
-      finalsBtn.addEventListener('click', async () => {
-        if (!await arenaConfirm('Generate the final match from semifinal winners?', { title: 'Advance to Finals', confirmText: 'Advance' })) return;
-        try {
-          await arenaData.generateFinalMatch(this._tournament.id);
-          toast.success('Final match generated!');
-          this._loadData().then(() => this._renderContent(container));
-        } catch (err) {
-          toast.error('Failed: ' + err.message);
+    const forceAdvanceBtn = document.getElementById('force-advance-btn');
+    if (forceAdvanceBtn) {
+      forceAdvanceBtn.addEventListener('click', async () => {
+        const phase = this._tournament.current_phase;
+        if (phase === 'finals') {
+          // Force complete finals — forfeit incomplete final matches
+          if (!await arenaConfirm('Forfeit all incomplete final matches (Player 1 wins by default) and complete the tournament?', { title: 'Force Complete', confirmText: 'Force Complete', danger: true })) return;
+          try {
+            const incompleteMatches = (this._matches || []).filter(m => m.phase === 'finals' && m.status !== 'complete');
+            for (const m of incompleteMatches) {
+              await arenaData.forfeitMatch(m.id, m.player1_id);
+            }
+            await arenaData.updateTournament(this._tournament.id, {
+              status: 'complete',
+              current_phase: 'complete'
+            });
+            toast.success('Tournament force-completed!');
+            router.navigate('arena');
+          } catch (err) {
+            toast.error('Failed: ' + err.message);
+          }
+        } else {
+          const nextLabel = phase === 'group_stage' ? 'Semifinals' : 'Finals';
+          if (!await arenaConfirm(`Forfeit all incomplete matches (Player 1 wins by default) and advance to ${nextLabel}?`, { title: 'Force Advance', confirmText: 'Force Advance', danger: true })) return;
+          try {
+            let result;
+            if (phase === 'group_stage') {
+              result = await arenaData.generateSemifinalMatches(this._tournament.id, { forceAdvance: true });
+            } else {
+              result = await arenaData.generateFinalMatch(this._tournament.id, { forceAdvance: true });
+            }
+            if (result?.skipped) {
+              toast.success('Only 1 semifinal winner — tournament complete!');
+              router.navigate('arena');
+            } else {
+              toast.success(`${nextLabel} generated!`);
+              this._loadData().then(() => this._renderContent(container));
+            }
+          } catch (err) {
+            toast.error('Failed: ' + err.message);
+          }
         }
       });
     }

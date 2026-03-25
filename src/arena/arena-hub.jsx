@@ -2,6 +2,7 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
+import { arenaConfirm } from './arena-confirm.js';
 
 /**
  * Arena Hub — Challenge-first landing page.
@@ -587,6 +588,9 @@ export const ArenaHubPage = {
     const currentUser = dataService.getUser();
     const isParticipant = currentUser && (p1Discord === currentUser.id || p2Discord === currentUser.id);
 
+    const isAdmin = dataService.isAdmin();
+    const canForfeit = isAdmin && match.status !== 'complete';
+
     return `
       <div class="arena-match-card ${isLive ? 'match-live' : ''} ${match.status === 'complete' ? 'match-complete' : ''} ${isPending ? 'match-pending' : ''}">
         <div class="match-players">
@@ -603,6 +607,14 @@ export const ArenaHubPage = {
           ${isPending && isParticipant ? `<button class="arena-btn arena-btn-primary arena-btn-small arena-start-match-btn" data-match-id="${match.id}">Start Match</button>` : ''}
           ${isLive ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">Watch</button>` : ''}
           ${match.status === 'complete' ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">View</button>` : ''}
+          ${canForfeit ? `
+            <button class="arena-btn arena-btn-small arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player1_id}" data-winner-name="${p1Name}">
+              ${p1Name} wins
+            </button>
+            <button class="arena-btn arena-btn-small arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player2_id}" data-winner-name="${p2Name}">
+              ${p2Name} wins
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -622,6 +634,31 @@ export const ArenaHubPage = {
           toast.error('Failed to start match: ' + err.message);
           btn.disabled = false;
           btn.textContent = 'Start Match';
+        }
+      });
+    });
+
+    // Forfeit buttons (admin picks winner)
+    container.querySelectorAll('.arena-forfeit-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        const winnerId = btn.dataset.winnerId;
+        const winnerName = btn.dataset.winnerName;
+        if (!await arenaConfirm(`Forfeit this match and give the win to ${winnerName}?`, {
+          title: 'Forfeit Match',
+          confirmText: 'Forfeit',
+          danger: true
+        })) return;
+        btn.disabled = true;
+        try {
+          await arenaData.forfeitMatch(matchId, winnerId);
+          toast.success(`${winnerName} wins by forfeit`);
+          await this._loadData();
+          const content = document.querySelector('.arena-hub');
+          if (content) this._renderContent(content);
+        } catch (err) {
+          toast.error('Forfeit failed: ' + err.message);
+          btn.disabled = false;
         }
       });
     });

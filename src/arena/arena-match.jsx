@@ -3,7 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { ArenaCombat } from './arena-combat.js';
-import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassIconPath, MATCH_STATUS, getMatchFormat } from './arena-constants.js';
+import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassIconPath, MATCH_STATUS, getMatchFormat, getRemainingSeconds } from './arena-constants.js';
 
 /**
  * Arena Match — The main combat screen.
@@ -35,8 +35,6 @@ export const ArenaMatchPage = {
   _autoSending: false,
   _charSendTimer: null,
   _charSendTimeLeft: 0,
-  _actionWaitTimer: null,
-  _actionWaitTimeLeft: 0,
 
   async render(container) {
     container.innerHTML = '';
@@ -353,7 +351,6 @@ export const ArenaMatchPage = {
         <div class="match-action-panel" id="action-panel">
           <div class="action-timer" id="action-timer">${this._timeLeft}s</div>
           ${this._committed ? `
-            <div class="action-timer" id="action-wait-timer">${this._actionWaitTimeLeft || TIMERS.ACTION_PICK}s</div>
             <div class="action-waiting">Waiting for opponent...</div>
           ` : `
             ${this._getMyAbility() ? `
@@ -400,13 +397,8 @@ export const ArenaMatchPage = {
     `;
 
     this._attachListeners(container);
-    if (!this._committed && !isComplete && !isTiebreaker && this._currentTurn) {
+    if (!isComplete && !isTiebreaker && this._currentTurn) {
       this._startActionTimer();
-    }
-    if (this._committed && !isComplete && !isTiebreaker && this._currentTurn) {
-      this._startActionWaitTimer();
-    } else {
-      this._clearActionWaitTimer();
     }
     if (waitingForOpponentChar) {
       this._startCharSendTimer();
@@ -605,7 +597,7 @@ export const ArenaMatchPage = {
   _startCharSendTimer() {
     // Don't restart if already running
     if (this._charSendTimer) return;
-    if (!this._charSendTimeLeft) this._charSendTimeLeft = TIMERS.CHARACTER_SENDOUT;
+    this._charSendTimeLeft = getRemainingSeconds(this._currentRound?.created_at, TIMERS.CHARACTER_SENDOUT);
 
     this._charSendTimer = setInterval(() => {
       this._charSendTimeLeft--;
@@ -638,37 +630,8 @@ export const ArenaMatchPage = {
     }
   },
 
-  _startActionWaitTimer() {
-    if (this._actionWaitTimer) return;
-    if (!this._actionWaitTimeLeft) this._actionWaitTimeLeft = TIMERS.ACTION_PICK;
-
-    this._actionWaitTimer = setInterval(() => {
-      this._actionWaitTimeLeft--;
-      const timerEl = document.getElementById('action-wait-timer');
-      if (timerEl) {
-        timerEl.textContent = `${this._actionWaitTimeLeft}s`;
-        if (this._actionWaitTimeLeft <= 5) timerEl.classList.add('timer-urgent');
-      }
-
-      if (this._actionWaitTimeLeft <= 0) {
-        clearInterval(this._actionWaitTimer);
-        this._actionWaitTimer = null;
-        this._forceOpponentAction();
-      }
-    }, 1000);
-  },
-
-  _clearActionWaitTimer() {
-    if (this._actionWaitTimer) {
-      clearInterval(this._actionWaitTimer);
-      this._actionWaitTimer = null;
-    }
-    this._actionWaitTimeLeft = 0;
-  },
-
   async _forceOpponentAction() {
     try {
-      toast.info("Opponent didn't act in time. Auto-picking for them...");
       const currentUser = dataService.getUser();
       await arenaData.forceAction(
         this._match.id,
@@ -820,10 +783,8 @@ export const ArenaMatchPage = {
         this._myAbility
       );
 
-      if (this._timerInterval) clearInterval(this._timerInterval);
-      this._clearActionWaitTimer();
-
       if (result.resolved) {
+        if (this._timerInterval) { clearInterval(this._timerInterval); this._timerInterval = null; }
         // Turn was resolved immediately (we were the second to commit).
         // Build a turn-like object from the response for the reveal sequence.
         const revealTurn = {
@@ -869,8 +830,9 @@ export const ArenaMatchPage = {
   },
 
   _startActionTimer() {
-    if (this._timerInterval) clearInterval(this._timerInterval);
-    this._timeLeft = TIMERS.ACTION_PICK;
+    // Don't restart if already running — preserves remaining time across re-renders
+    if (this._timerInterval) return;
+    this._timeLeft = getRemainingSeconds(this._currentTurn?.created_at, TIMERS.ACTION_PICK);
 
     this._timerInterval = setInterval(() => {
       this._timeLeft--;
@@ -882,14 +844,24 @@ export const ArenaMatchPage = {
 
       if (this._timeLeft <= 0) {
         clearInterval(this._timerInterval);
+        this._timerInterval = null;
         if (!this._committed) {
-          // Auto-random action
+          // Auto-random action for self, then force opponent too
           const actions = ['attack', 'defend', 'strong_attack'];
           this._myAction = actions[Math.floor(Math.random() * actions.length)];
           this._myAbility = false;
+          toast.info("Time's up! Random actions for both players.");
           const content = document.querySelector('.arena-match');
-          if (content) this._commitAction(content);
-          toast.info('Time\'s up! Random action submitted.');
+          if (content) {
+            // Commit our action, then immediately force opponent
+            this._commitAction(content).then(() => {
+              this._forceOpponentAction();
+            });
+          }
+        } else {
+          // We already committed — force opponent
+          toast.info("Opponent didn't act in time. Auto-picking for them...");
+          this._forceOpponentAction();
         }
       }
     }, 1000);
@@ -926,7 +898,6 @@ export const ArenaMatchPage = {
     if (event === 'turn_resolved') {
       // Turn resolved — play reveal animation, then refresh
       const turnData = data; // the resolved turn from Realtime
-      this._clearActionWaitTimer();
 
       this._playRevealSequence(turnData, () => {
         this._committed = false;
@@ -997,7 +968,6 @@ export const ArenaMatchPage = {
 
     if (newMatch.status === 'complete') {
       if (this._timerInterval) clearInterval(this._timerInterval);
-      this._clearActionWaitTimer();
       const winnerName = newMatch.winner_id ? this._getParticipantName(newMatch.winner_id) : null;
       toast.success(winnerName ? `Match over! ${winnerName} wins!` : 'Match ended in a draw!');
       const content = document.querySelector('.arena-match');
@@ -1077,10 +1047,6 @@ export const ArenaMatchPage = {
     if (this._charSendTimer) {
       clearInterval(this._charSendTimer);
       this._charSendTimer = null;
-    }
-    if (this._actionWaitTimer) {
-      clearInterval(this._actionWaitTimer);
-      this._actionWaitTimer = null;
     }
   }
 };

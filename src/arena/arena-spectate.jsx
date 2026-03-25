@@ -128,6 +128,7 @@ export const ArenaSpectatePage = {
     const waitingMsg = this._currentTurn && !this._currentTurn.resolved && !bothCommitted;
 
     container.innerHTML = `
+      <a href="#" class="arena-back-link" data-route="arena">&larr; Back to Arena</a>
       <div class="match-scoreboard">
         <div class="match-score-display">
           <span class="score-player">${p1Name}</span>
@@ -185,7 +186,7 @@ export const ArenaSpectatePage = {
       <div class="spectate-reactions" id="reaction-bar">
         <div class="reaction-buttons">
           ${REACTIONS.map(emoji => `
-            <button class="reaction-btn" data-emoji="${emoji}">${emoji}</button>
+            <button class="reaction-btn" data-emoji="${emoji}">${emoji}<span class="cooldown-overlay"></span></button>
           `).join('')}
         </div>
         <div class="reaction-bubbles" id="reaction-bubbles"></div>
@@ -205,7 +206,8 @@ export const ArenaSpectatePage = {
   },
 
   _attachListeners(container) {
-    container.querySelectorAll('.reaction-btn').forEach(btn => {
+    const allBtns = container.querySelectorAll('.reaction-btn');
+    allBtns.forEach(btn => {
       btn.addEventListener('click', async () => {
         const now = Date.now();
         if (now - this._lastReactionTime < REACTION_COOLDOWN_MS) {
@@ -222,14 +224,37 @@ export const ArenaSpectatePage = {
         btn.blur();
         const emoji = btn.dataset.emoji;
 
+        // Start cooldown animation on all buttons
+        this._startCooldown(allBtns);
+
         try {
           await arenaData.submitReaction(this._match.id, currentUser.id, emoji);
-          this._showReactionBubble(emoji);
+          // Bubble shown via Realtime subscription (_onReaction)
         } catch (err) {
           // Silently fail for rate limits
         }
       });
     });
+  },
+
+  _startCooldown(buttons) {
+    buttons.forEach(btn => {
+      btn.classList.add('on-cooldown');
+      const overlay = btn.querySelector('.cooldown-overlay');
+      if (overlay) {
+        // Reset to full height instantly
+        overlay.style.transition = 'none';
+        overlay.style.height = '100%';
+        // Force reflow then animate to 0
+        void overlay.offsetHeight;
+        overlay.style.transition = `height ${REACTION_COOLDOWN_MS}ms linear`;
+        overlay.style.height = '0%';
+      }
+    });
+
+    setTimeout(() => {
+      buttons.forEach(btn => btn.classList.remove('on-cooldown'));
+    }, REACTION_COOLDOWN_MS);
   },
 
   _onReaction(payload) {
