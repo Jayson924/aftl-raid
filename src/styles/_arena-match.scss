@@ -275,6 +275,13 @@
     color: $arena-text-muted;
   }
 
+  .fighter-bet-total {
+    font-size: 0.75rem;
+    color: $arena-gold;
+    opacity: 0.8;
+    margin-top: 0.15rem;
+  }
+
   .fighter-ability-ready {
     font-size: 0.8rem;
     color: $arena-purple;

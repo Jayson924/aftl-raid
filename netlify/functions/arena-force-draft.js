@@ -156,8 +156,9 @@ export async function handler(event) {
     const bothReady = !!(updated?.player1_draft && updated?.player2_draft);
 
     if (bothReady) {
-      // Transition to in_progress
-      await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'in_progress' });
+      // Transition to in_progress, open betting window
+      const bettingClosesAt = new Date(Date.now() + 90 * 1000).toISOString();
+      await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'in_progress', betting_closes_at: bettingClosesAt });
 
       // Create first round
       await sbPost('arena_rounds', {

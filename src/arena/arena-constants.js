@@ -46,12 +46,12 @@ export const TIMERS = {
 
 /**
  * Calculate remaining seconds for a timer anchored to a server timestamp.
- * Returns at least 1 to avoid instantly expiring due to clock skew.
+ * Returns at least 0. Callers that need a minimum of 1 should clamp themselves.
  */
 export function getRemainingSeconds(serverTimestamp, durationSeconds) {
   if (!serverTimestamp) return durationSeconds;
   const elapsed = (Date.now() - new Date(serverTimestamp).getTime()) / 1000;
-  return Math.max(1, Math.ceil(durationSeconds - elapsed));
+  return Math.max(0, Math.ceil(durationSeconds - elapsed));
 }
 
 // Class family → ability mapping
@@ -206,6 +206,45 @@ export const TIEBREAKER_TARGET_LEVEL = 13;
 // Spectator reactions
 export const REACTIONS = ['👍', '👎', '😂', '😢', '😮'];
 export const REACTION_COOLDOWN_MS = 2000;
+
+// Betting
+export const BETTING_WINDOW_SECONDS = 60;
+export const MAX_BET_PERCENTAGE = 0.5; // 50% of current gold
+
+// Fallback increments when no pool is set
+export const BET_INCREMENTS = {
+  group_stage: [20, 50, 100],
+  semifinals: [50, 125, 200],
+  finals: [50, 125, 200]
+};
+
+/**
+ * Calculate dynamic bet increments based on starting gold and participant count.
+ * Group stage: min bet = startingGold / maxBettableMatches, so everyone can bet min on every match.
+ * Semis/Finals: scaled up (2x, 2.5x, 4x of group min).
+ */
+export function getDynamicBetIncrements(startingGold, participantCount) {
+  if (!startingGold || startingGold <= 0) return BET_INCREMENTS;
+
+  // Estimate max bettable group matches: round-robin total minus your own matches
+  // With B brackets of ~N/B players: total matches ≈ N*(N/B-1)/2, your matches ≈ N/B-1
+  // Simplify: assume ~participantCount bettable matches as a safe estimate
+  const bettableMatches = Math.max(3, participantCount - 1);
+  const minBet = Math.max(5, roundToNice(startingGold / bettableMatches));
+
+  return {
+    group_stage: [minBet, minBet * 2, minBet * 4],
+    semifinals: [minBet * 2, minBet * 4, minBet * 8],
+    finals: [minBet * 2, minBet * 4, minBet * 8]
+  };
+}
+
+function roundToNice(n) {
+  if (n <= 10) return Math.max(5, Math.round(n / 5) * 5);
+  if (n <= 50) return Math.round(n / 5) * 5;
+  if (n <= 100) return Math.round(n / 10) * 10;
+  return Math.round(n / 25) * 25;
+}
 
 // Prize distribution (default fixed amounts, used when no pool is set)
 export const DEFAULT_PRIZES = {

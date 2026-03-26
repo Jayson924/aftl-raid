@@ -45,6 +45,51 @@
   50% { opacity: 1; }
 }
 
+// Gold standings bar
+.spectate-gold-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba($arena-gold, 0.06);
+  border: 1px solid rgba($arena-gold, 0.2);
+  border-radius: $arena-radius;
+  font-size: 0.8rem;
+}
+
+.spectate-my-gold {
+  color: $arena-gold;
+  font-weight: 600;
+  padding-right: 0.5rem;
+  border-right: 1px solid rgba($arena-gold, 0.2);
+
+  strong {
+    font-size: 0.9rem;
+  }
+}
+
+.spectate-gold-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+}
+
+.spectate-gold-entry {
+  color: $arena-text-muted;
+  white-space: nowrap;
+
+  &.spectate-gold-me {
+    color: $arena-text;
+    font-weight: 600;
+  }
+}
+
+.spectate-gold-amount {
+  color: $arena-gold;
+  font-weight: 600;
+}
+
 // Reaction bar
 .spectate-reactions {
   position: relative;

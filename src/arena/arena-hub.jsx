@@ -3,7 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { arenaConfirm } from './arena-confirm.js';
-import { distributePrizePool } from './arena-constants.js';
+import { distributePrizePool, BET_INCREMENTS, getDynamicBetIncrements, MAX_BET_PERCENTAGE, getRemainingSeconds } from './arena-constants.js';
 
 /**
  * Arena Hub — Challenge-first landing page.
@@ -14,6 +14,7 @@ export const ArenaHubPage = {
   _matchSubscription: null,
   _signupSubscription: null,
   _tournamentSubscription: null,
+  _participantGoldSubscription: null,
   _challengeSubscription: null,
   _challengeUpdateSub: null,
   _challengeTimer: null,
@@ -26,6 +27,9 @@ export const ArenaHubPage = {
   _tournamentParticipants: null,
   _tournamentMatches: null,
   _tournamentSignups: null,
+  _matchBets: {},          // matchId → bets array
+  _myParticipant: null,    // current user's participant record
+  _bettingTimers: {},      // matchId → interval ID
 
   async render(container) {
     container.innerHTML = '';
@@ -48,7 +52,7 @@ export const ArenaHubPage = {
     // Load everything in parallel
     const [appUsers, recentMatches, allParticipants, tournaments] = await Promise.all([
       arenaData.getAllAppUsers(),
-      arenaData.getRecentMatches(20),
+      arenaData.getRecentMatches(100),
       arenaData.getAllParticipants(),
       arenaData.getTournaments()
     ]);
@@ -58,8 +62,11 @@ export const ArenaHubPage = {
     this._allParticipants = allParticipants;
 
     // Find a real tournament (not a "Quick Match" throwaway)
+    // Prefer active tournaments; fall back to most recently completed
     this._tournament = tournaments.find(t =>
       t.status !== 'complete' && t.name !== 'Quick Match'
+    ) || tournaments.find(t =>
+      t.status === 'complete' && t.name !== 'Quick Match'
     ) || null;
 
     if (this._tournament) {
@@ -89,7 +96,44 @@ export const ArenaHubPage = {
           if (content) this._renderContent(content);
         }
       });
+
+      // Subscribe to participant gold changes (live betting updates)
+      if (this._participantGoldSubscription) arenaData.unsubscribe(this._participantGoldSubscription);
+      this._participantGoldSubscription = arenaData.subscribeToParticipantGold(this._tournament.id, async () => {
+        try {
+          this._tournamentParticipants = await arenaData.getParticipants(this._tournament.id);
+          this._updateMyParticipant();
+          const content = document.querySelector('.arena-hub');
+          if (content) this._renderContent(content);
+        } catch (e) { console.error('Failed to refresh participant gold:', e); }
+      });
+
+      // Find current user's participant + load bets for bettable matches
+      this._updateMyParticipant();
+      await this._loadMatchBets().catch(() => {});
     }
+
+    // Poll bets every 10 seconds — update pool numbers in-place to avoid scroll reset
+    if (this._betPollInterval) clearInterval(this._betPollInterval);
+    this._betPollInterval = setInterval(async () => {
+      try {
+        await this._loadMatchBets();
+        // Patch bet pool totals in the DOM without full re-render
+        document.querySelectorAll('.hub-betting[data-match-id]').forEach(el => {
+          const matchId = el.dataset.matchId;
+          const bets = this._matchBets[matchId] || [];
+          const match = (this._recentMatches || []).find(m => m.id === matchId);
+          if (!match) return;
+          const pools = el.querySelectorAll('.hub-bet-pool');
+          if (pools.length >= 2) {
+            const p1Total = bets.filter(b => b.backed_participant_id === match.player1_id).reduce((s, b) => s + b.amount, 0);
+            const p2Total = bets.filter(b => b.backed_participant_id === match.player2_id).reduce((s, b) => s + b.amount, 0);
+            pools[0].textContent = `${p1Total}G`;
+            pools[1].textContent = `${p2Total}G`;
+          }
+        });
+      } catch (e) { /* ignore */ }
+    }, 10000);
 
     // Subscribe to match changes
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
@@ -103,8 +147,13 @@ export const ArenaHubPage = {
 
   async _refreshMatches() {
     try {
-      this._recentMatches = await arenaData.getRecentMatches(20);
+      this._recentMatches = await arenaData.getRecentMatches(100);
       this._allParticipants = await arenaData.getAllParticipants();
+      if (this._tournament) {
+        this._tournamentParticipants = await arenaData.getParticipants(this._tournament.id);
+        this._updateMyParticipant();
+        await this._loadMatchBets();
+      }
       const content = document.querySelector('.arena-hub');
       if (content) this._renderContent(content);
     } catch (e) {
@@ -147,9 +196,9 @@ export const ArenaHubPage = {
   _renderAvatar(discordId, size = 24) {
     const url = this._getAvatarUrl(discordId);
     if (url) {
-      return `<img src="${url}" alt="" class="match-avatar" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;object-fit:cover;" onerror="this.style.display='none'">`;
+      return `<img src="${url}" alt="" class="match-avatar" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;object-fit:cover;" onerror="this.outerHTML='<span class=\\'match-avatar match-avatar-empty\\' style=\\'width:${size}px;height:${size}px;\\'></span>'">`;
     }
-    return `<span class="match-avatar" style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;background:rgba(255,255,255,0.1);flex-shrink:0;"></span>`;
+    return `<span class="match-avatar match-avatar-empty" style="width:${size}px;height:${size}px;"></span>`;
   },
 
   // ============================================
@@ -317,6 +366,95 @@ export const ArenaHubPage = {
   },
 
   // ============================================
+  // BETTING HELPERS
+  // ============================================
+
+  _updateMyParticipant() {
+    const currentUser = dataService.getUser();
+    if (currentUser && this._tournamentParticipants) {
+      this._myParticipant = this._tournamentParticipants.find(p => p.discord_id === currentUser.id) || null;
+    } else {
+      this._myParticipant = null;
+    }
+  },
+
+  async _loadMatchBets() {
+    // Load bets for all tournament matches (including complete for results display)
+    const bettableMatches = (this._recentMatches || []).filter(m => {
+      if (this._tournament && m.tournament_id !== this._tournament?.id) return false;
+      return true;
+    });
+    const results = await Promise.all(
+      bettableMatches.map(m => arenaData.getBetsForMatch(m.id).then(bets => [m.id, bets]))
+    );
+    this._matchBets = {};
+    for (const [matchId, bets] of results) {
+      this._matchBets[matchId] = bets;
+    }
+  },
+
+  _canBetOnMatch(match) {
+    if (!this._myParticipant) return false;
+    if (this._myParticipant.id === match.player1_id || this._myParticipant.id === match.player2_id) return false;
+    if (match.status === 'complete') return false;
+    if (this._tournament && match.tournament_id !== this._tournament.id) return false;
+    // Open for pending, drafting; otherwise need betting_closes_at with time left
+    const isPreMatch = match.status === 'pending' || match.status === 'drafting' || match.status === 'roster_reveal';
+    if (!isPreMatch && !match.betting_closes_at) return false;
+    return true;
+  },
+
+  _shouldShowBetting(match) {
+    if (match.status === 'complete') return false;
+    if (this._tournament && match.tournament_id !== this._tournament.id) return false;
+    const isPreMatch = match.status === 'pending' || match.status === 'drafting' || match.status === 'roster_reveal';
+    if (!isPreMatch && !match.betting_closes_at) {
+      // Still show if there are existing bets on this match
+      const bets = this._matchBets[match.id] || [];
+      if (bets.length > 0) return true;
+      return false;
+    }
+    return true;
+  },
+
+  _getBettingTimeLeft(match) {
+    if (!match.betting_closes_at) return 0;
+    return getRemainingSeconds(match.betting_closes_at, 0);
+  },
+
+  _startBettingTimers() {
+    // Clear old timers
+    Object.values(this._bettingTimers).forEach(id => clearInterval(id));
+    this._bettingTimers = {};
+
+    const bettableMatches = (this._recentMatches || []).filter(m => this._shouldShowBetting(m));
+    for (const match of bettableMatches) {
+      const timeLeft = this._getBettingTimeLeft(match);
+      if (timeLeft <= 0) continue;
+
+      this._bettingTimers[match.id] = setInterval(() => {
+        const remaining = this._getBettingTimeLeft(match);
+        const timerEl = document.getElementById(`betting-timer-${match.id}`);
+        if (timerEl) {
+          if (remaining > 0) {
+            timerEl.textContent = `${remaining}s`;
+            timerEl.classList.toggle('betting-urgent', remaining <= 15);
+          } else {
+            timerEl.textContent = 'Closed';
+            timerEl.classList.remove('betting-urgent');
+          }
+        }
+        if (remaining <= 0) {
+          clearInterval(this._bettingTimers[match.id]);
+          delete this._bettingTimers[match.id];
+          // Disable bet buttons for this match
+          document.querySelectorAll(`.hub-bet-btn[data-match-id="${match.id}"]`).forEach(b => b.disabled = true);
+        }
+      }, 1000);
+    }
+  },
+
+  // ============================================
   // RENDER
   // ============================================
 
@@ -340,6 +478,7 @@ export const ArenaHubPage = {
     this._attachQuickMatchListener(container);
     this._attachMatchListeners(container);
     this._attachRegistrationListeners(container);
+    this._startBettingTimers();
   },
 
   _renderChallengeSection() {
@@ -603,30 +742,194 @@ export const ArenaHubPage = {
     const isAdmin = dataService.isAdmin();
     const canForfeit = isAdmin && match.status !== 'complete';
 
-    return `
-      <div class="arena-match-card ${isLive ? 'match-live' : ''} ${match.status === 'complete' ? 'match-complete' : ''} ${isPending ? 'match-pending' : ''}">
-        <div class="match-players">
-          <span class="match-player ${match.winner_id === match.player1_id ? 'match-winner' : ''}">${this._renderAvatar(p1Discord)} ${p1Name}</span>
-          <span class="match-vs">vs</span>
-          <span class="match-player ${match.winner_id === match.player2_id ? 'match-winner' : ''}">${this._renderAvatar(p2Discord)} ${p2Name}</span>
+    // Betting section
+    const showBetting = this._shouldShowBetting(match);
+    const canBet = this._canBetOnMatch(match);
+    const bettingTimeLeft = showBetting ? this._getBettingTimeLeft(match) : 0;
+    let bettingHtml = '';
+
+    if (showBetting) {
+      const myP = this._myParticipant;
+      const bets = this._matchBets[match.id] || [];
+      const activeBets = bets.filter(b => b.status === 'active');
+      const p1Bets = activeBets.filter(b => b.backed_participant_id === match.player1_id);
+      const p2Bets = activeBets.filter(b => b.backed_participant_id === match.player2_id);
+      const p1Total = p1Bets.reduce((s, b) => s + b.amount, 0);
+      const p2Total = p2Bets.reduce((s, b) => s + b.amount, 0);
+
+      const myP1Total = myP ? p1Bets.filter(b => b.bettor_id === myP.id).reduce((s, b) => s + b.amount, 0) : 0;
+      const myP2Total = myP ? p2Bets.filter(b => b.bettor_id === myP.id).reduce((s, b) => s + b.amount, 0) : 0;
+
+      const p1Potential = myP1Total > 0 && p1Total > 0
+        ? Math.floor(myP1Total + p2Total * (myP1Total / p1Total)) - myP1Total : 0;
+      const p2Potential = myP2Total > 0 && p2Total > 0
+        ? Math.floor(myP2Total + p1Total * (myP2Total / p2Total)) - myP2Total : 0;
+
+      const myGold = myP?.gold || 0;
+      const pool = this._tournament?.prizes?.pool || 0;
+      const participantCount = (this._tournamentParticipants || []).length;
+      const prizes = pool > 0 ? distributePrizePool(pool, participantCount) : null;
+      const goldFloor = prizes?.participation ? Math.floor(prizes.participation * MAX_BET_PERCENTAGE) : 0;
+      const totalMyActiveBets = myP ? activeBets.filter(b => b.bettor_id === myP.id).reduce((s, b) => s + b.amount, 0) : 0;
+      const remainingBudget = Math.max(0, myGold - goldFloor) - totalMyActiveBets;
+
+      const startGold = prizes?.participation || 0;
+      const betIncrements = startGold > 0 ? getDynamicBetIncrements(startGold, participantCount) : BET_INCREMENTS;
+      const increments = betIncrements[match.phase] || betIncrements.group_stage;
+      const isPreMatch = match.status === 'pending' || match.status === 'drafting' || match.status === 'roster_reveal';
+      const bettingOpen = isPreMatch || bettingTimeLeft > 0;
+
+      // Lock to one side
+      const lockedToP1 = myP1Total > 0;
+      const lockedToP2 = myP2Total > 0;
+
+      const timerLabel = isPreMatch && !match.betting_closes_at
+        ? 'Open' : (bettingTimeLeft > 0 ? `${bettingTimeLeft}s` : 'Closed');
+
+      bettingHtml = `
+        <div class="hub-betting" data-match-id="${match.id}">
+          <div class="hub-bet-sides">
+            <div class="hub-bet-side ${lockedToP2 ? 'hub-bet-locked' : ''} ${lockedToP1 ? 'hub-bet-active' : ''}">
+              <span class="hub-bet-player">${p1Name}</span>
+              <span class="hub-bet-pool">${p1Total}G</span>
+              ${myP1Total > 0 ? `<span class="hub-bet-mine">You: ${myP1Total}G</span>` : ''}
+              ${canBet && !lockedToP2 ? `<div class="hub-bet-btns">${increments.map(inc => `<button class="hub-bet-btn" data-match-id="${match.id}" data-backed="${match.player1_id}" data-amount="${inc}" ${!bettingOpen || inc > remainingBudget ? 'disabled' : ''}>+${inc}</button>`).join('')}</div>` : ''}
+            </div>
+            <div class="hub-bet-divider">
+              <span class="hub-bet-timer ${bettingTimeLeft > 0 && bettingTimeLeft <= 15 ? 'betting-urgent' : ''}" id="betting-timer-${match.id}">${timerLabel}</span>
+            </div>
+            <div class="hub-bet-side ${lockedToP1 ? 'hub-bet-locked' : ''} ${lockedToP2 ? 'hub-bet-active' : ''}">
+              <span class="hub-bet-player">${p2Name}</span>
+              <span class="hub-bet-pool">${p2Total}G</span>
+              ${myP2Total > 0 ? `<span class="hub-bet-mine">You: ${myP2Total}G</span>` : ''}
+              ${canBet && !lockedToP1 ? `<div class="hub-bet-btns">${increments.map(inc => `<button class="hub-bet-btn" data-match-id="${match.id}" data-backed="${match.player2_id}" data-amount="${inc}" ${!bettingOpen || inc > remainingBudget ? 'disabled' : ''}>+${inc}</button>`).join('')}</div>` : ''}
+            </div>
+          </div>
         </div>
-        ${scoreHtml}
-        <div class="match-meta">
-          <span class="arena-badge ${isLive ? 'badge-red' : match.status === 'complete' ? 'badge-green' : 'badge-gold'}">${statusLabel}</span>
-          ${winnerName ? `<span class="match-winner-label">Winner: ${winnerName}</span>` : ''}
-        </div>
-        <div class="match-actions">
-          ${isPending && isParticipant ? `<button class="arena-btn arena-btn-primary arena-btn-small arena-start-match-btn" data-match-id="${match.id}">Start Match</button>` : ''}
-          ${isLive ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">Watch</button>` : ''}
-          ${match.status === 'complete' ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">View</button>` : ''}
+      `;
+    }
+
+    // Completed matches — show final bet totals
+    if (match.status === 'complete') {
+      const bets = this._matchBets[match.id] || [];
+      if (bets.length > 0) {
+        const p1Bets = bets.filter(b => b.backed_participant_id === match.player1_id);
+        const p2Bets = bets.filter(b => b.backed_participant_id === match.player2_id);
+        const p1Total = p1Bets.reduce((s, b) => s + b.amount, 0);
+        const p2Total = p2Bets.reduce((s, b) => s + b.amount, 0);
+
+        const myP = this._myParticipant;
+        const myBets = myP ? bets.filter(b => b.bettor_id === myP.id) : [];
+        const myWagered = myBets.reduce((s, b) => s + b.amount, 0);
+        const myPayout = myBets.reduce((s, b) => s + (b.payout || 0), 0);
+        const myNet = myPayout - myWagered;
+
+        bettingHtml = `
+          <div class="hub-betting hub-betting-final">
+            <div class="hub-bet-sides">
+              <div class="hub-bet-side ${match.winner_id === match.player1_id ? 'hub-bet-won' : 'hub-bet-lost'}">
+                <span class="hub-bet-player">${p1Name}</span>
+                <span class="hub-bet-pool">${p1Total}G</span>
+              </div>
+              <div class="hub-bet-divider">
+                <span class="hub-bet-timer">Final</span>
+              </div>
+              <div class="hub-bet-side ${match.winner_id === match.player2_id ? 'hub-bet-won' : 'hub-bet-lost'}">
+                <span class="hub-bet-player">${p2Name}</span>
+                <span class="hub-bet-pool">${p2Total}G</span>
+              </div>
+            </div>
+            ${myWagered > 0 ? `
+              <div class="hub-bet-result ${myNet > 0 ? 'hub-bet-result-win' : myNet < 0 ? 'hub-bet-result-loss' : ''}">
+                ${myNet > 0 ? `+${myNet.toLocaleString()}G` : myNet < 0 ? `${myNet.toLocaleString()}G` : 'Refunded'}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+    }
+
+    // Upcoming/pending cards get a dedicated matchup layout
+    if (isPending) {
+      return `
+        <div class="upcoming-match-card">
           ${canForfeit ? `
-            <button class="arena-btn arena-btn-small arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player1_id}" data-winner-name="${p1Name}">
-              ${p1Name} wins
-            </button>
-            <button class="arena-btn arena-btn-small arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player2_id}" data-winner-name="${p2Name}">
-              ${p2Name} wins
-            </button>
+            <div class="upcoming-admin-menu">
+              <button class="upcoming-admin-toggle" title="Admin actions">&#9881;</button>
+              <div class="upcoming-admin-dropdown">
+                <button class="admin-force-start-btn" data-match-id="${match.id}">Force Start</button>
+                <button class="arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player1_id}" data-winner-name="${p1Name}">
+                  ${p1Name} wins
+                </button>
+                <button class="arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player2_id}" data-winner-name="${p2Name}">
+                  ${p2Name} wins
+                </button>
+              </div>
+            </div>
           ` : ''}
+          <div class="upcoming-matchup">
+            <div class="upcoming-fighter upcoming-fighter-left">
+              ${this._renderAvatar(p1Discord, 32)}
+              <span class="upcoming-fighter-name">${p1Name}</span>
+            </div>
+            <div class="upcoming-vs">VS</div>
+            <div class="upcoming-fighter upcoming-fighter-right">
+              ${this._renderAvatar(p2Discord, 32)}
+              <span class="upcoming-fighter-name">${p2Name}</span>
+            </div>
+          </div>
+          ${bettingHtml}
+          ${isParticipant ? `
+            <div class="upcoming-footer">
+              <button class="arena-btn arena-btn-primary arena-btn-small arena-start-match-btn" data-match-id="${match.id}">Start Match</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Live / complete cards — matchup layout
+    const isComplete = match.status === 'complete';
+    const p1Won = match.winner_id === match.player1_id;
+    const p2Won = match.winner_id === match.player2_id;
+
+    return `
+      <div class="live-match-card ${isLive ? 'live-match-active' : ''} ${isComplete ? 'live-match-complete' : ''}">
+        ${canForfeit ? `
+          <div class="upcoming-admin-menu">
+            <button class="upcoming-admin-toggle" title="Admin actions">&#9881;</button>
+            <div class="upcoming-admin-dropdown">
+              <button class="arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player1_id}" data-winner-name="${p1Name}">
+                ${p1Name} wins
+              </button>
+              <button class="arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player2_id}" data-winner-name="${p2Name}">
+                ${p2Name} wins
+              </button>
+            </div>
+          </div>
+        ` : ''}
+        <div class="live-match-matchup">
+          <div class="live-match-fighter live-match-fighter-left ${p1Won ? 'live-match-winner' : ''} ${p2Won ? 'live-match-loser' : ''}">
+            <span class="live-match-fighter-name">${p1Name}</span>
+            <span class="live-match-avatar-wrap">${this._renderAvatar(p1Discord, 36)}${p1Won ? '<span class="winner-crown">&#9818;</span>' : ''}</span>
+          </div>
+          <div class="live-match-center">
+            ${match.status !== 'pending' ? `
+              <span class="live-match-score">${match.player1_rounds_won} - ${match.player2_rounds_won}</span>
+            ` : `
+              <span class="live-match-vs">VS</span>
+            `}
+            <span class="arena-badge ${isLive ? 'badge-red' : 'badge-green'}">${statusLabel}</span>
+          </div>
+          <div class="live-match-fighter live-match-fighter-right ${p2Won ? 'live-match-winner' : ''} ${p1Won ? 'live-match-loser' : ''}">
+            <span class="live-match-avatar-wrap">${this._renderAvatar(p2Discord, 36)}${p2Won ? '<span class="winner-crown">&#9818;</span>' : ''}</span>
+            <span class="live-match-fighter-name">${p2Name}</span>
+          </div>
+        </div>
+        ${bettingHtml}
+        <div class="live-match-footer">
+          ${isLive ? `<button class="arena-btn arena-btn-primary arena-btn-small arena-watch-btn" data-match-id="${match.id}">Watch</button>` : ''}
+          ${isComplete ? `<button class="arena-btn arena-btn-small arena-watch-btn" data-match-id="${match.id}">View</button>` : ''}
         </div>
       </div>
     `;
@@ -691,6 +994,94 @@ export const ArenaHubPage = {
           if (content) this._renderContent(content);
         } catch (err) {
           toast.error('Forfeit failed: ' + err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Admin menu toggles
+    container.querySelectorAll('.upcoming-admin-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menu = btn.closest('.upcoming-admin-menu');
+        const wasOpen = menu.classList.contains('open');
+        // Close all other open menus
+        container.querySelectorAll('.upcoming-admin-menu.open').forEach(m => m.classList.remove('open'));
+        if (!wasOpen) menu.classList.add('open');
+      });
+    });
+
+    // Close admin menus when clicking outside
+    document.addEventListener('click', () => {
+      container.querySelectorAll('.upcoming-admin-menu.open').forEach(m => m.classList.remove('open'));
+    });
+
+    // Force Start buttons (admin starts match on behalf of participants)
+    container.querySelectorAll('.admin-force-start-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        const match = this._recentMatches?.find(m => m.id === matchId);
+        if (!match) return;
+
+        if (!await arenaConfirm('Force start this match? Both players will enter the draft phase.', {
+          title: 'Force Start Match',
+          confirmText: 'Start',
+        })) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+        try {
+          // Check if either player is already in an active match
+          const [p1Active, p2Active] = await Promise.all([
+            arenaData.getActiveMatchForParticipant(match.player1_id),
+            arenaData.getActiveMatchForParticipant(match.player2_id)
+          ]);
+
+          const busyPlayers = [];
+          if (p1Active) busyPlayers.push(this._getParticipantName(match.player1_id));
+          if (p2Active) busyPlayers.push(this._getParticipantName(match.player2_id));
+
+          if (busyPlayers.length > 0) {
+            toast.error(`Can't start — ${busyPlayers.join(' and ')} already in an active match`);
+            btn.disabled = false;
+            btn.textContent = 'Force Start';
+            return;
+          }
+
+          await arenaData.updateMatch(matchId, { status: 'drafting' });
+          toast.success('Match started');
+          await this._loadData();
+          const content = document.querySelector('.arena-hub');
+          if (content) this._renderContent(content);
+        } catch (err) {
+          toast.error('Failed to start match: ' + err.message);
+          btn.disabled = false;
+          btn.textContent = 'Force Start';
+        }
+      });
+    });
+
+    // Hub bet buttons
+    container.querySelectorAll('.hub-bet-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const currentUser = dataService.getUser();
+        if (!currentUser || !this._myParticipant) return;
+
+        const matchId = btn.dataset.matchId;
+        const backed = btn.dataset.backed;
+        const amount = parseInt(btn.dataset.amount);
+
+        btn.disabled = true;
+        try {
+          await arenaData.placeBet(matchId, currentUser.id, backed, amount);
+          // Refresh bets and re-render
+          this._matchBets[matchId] = await arenaData.getBetsForMatch(matchId);
+          this._tournamentParticipants = await arenaData.getParticipants(this._tournament.id);
+          this._updateMyParticipant();
+          const content = document.querySelector('.arena-hub');
+          if (content) this._renderContent(content);
+        } catch (err) {
+          toast.error(err.message || 'Bet failed');
           btn.disabled = false;
         }
       });
@@ -826,18 +1217,88 @@ export const ArenaHubPage = {
 
     const bracketNumbers = Object.keys(brackets).sort((a, b) => a - b).filter(bn => bn > 0);
 
+    const isComplete = t.status === 'complete';
+
+    // Current user's gold callout
+    const myGoldHtml = this._myParticipant != null && !isComplete
+      ? `<div class="tournament-my-gold">Your Gold: <strong>${(this._myParticipant.gold || 0).toLocaleString()}G</strong></div>`
+      : '';
+
+    // Final results for completed tournaments
+    let finalResultsHtml = '';
+    if (isComplete) {
+      const semiMatches = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
+      const finalMatch = matches.find(m => m.phase === 'finals' && m.status === 'complete');
+      const startingGold = prizeDistribution?.participation || 0;
+
+      // Build placements
+      const placements = [];
+      if (finalMatch?.winner_id) {
+        placements.push({ pid: finalMatch.winner_id, place: '1st' });
+        const finalLoser = finalMatch.player1_id === finalMatch.winner_id ? finalMatch.player2_id : finalMatch.player1_id;
+        placements.push({ pid: finalLoser, place: '2nd' });
+      } else {
+        const semiWinners = semiMatches.map(m => m.winner_id).filter(Boolean);
+        if (semiWinners.length === 1) placements.push({ pid: semiWinners[0], place: '1st' });
+      }
+      const placedIds = new Set(placements.map(s => s.pid));
+      const semiLosers = semiMatches
+        .map(m => m.winner_id ? (m.player1_id === m.winner_id ? m.player2_id : m.player1_id) : null)
+        .filter(pid => pid && !placedIds.has(pid));
+      semiLosers.forEach(pid => {
+        const usedPlaces = placements.map(s => s.place);
+        placements.push({ pid, place: !usedPlaces.includes('3rd') ? '3rd' : '4th' });
+      });
+      const allPlacedIds = new Set(placements.map(s => s.pid));
+      const rest = participants
+        .filter(p => !allPlacedIds.has(p.id))
+        .sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses) || ((b.gold || 0) - (a.gold || 0)));
+      let nextPlace = placements.length + 1;
+      rest.forEach(p => {
+        const suffix = nextPlace === 1 ? 'st' : nextPlace === 2 ? 'nd' : nextPlace === 3 ? 'rd' : 'th';
+        placements.push({ pid: p.id, place: `${nextPlace}${suffix}` });
+        nextPlace++;
+      });
+
+      const placeClasses = { '1st': 'tree-place-1st', '2nd': 'tree-place-2nd', '3rd': 'tree-place-3rd', '4th': 'tree-place-4th' };
+
+      finalResultsHtml = `
+        <div class="tournament-final-results">
+          <div class="final-results-header">Final Results</div>
+          <div class="final-results-list">
+            ${placements.map(s => {
+              const part = participants.find(p => p.id === s.pid);
+              const prizeKey = ['1st','2nd','3rd','4th'].includes(s.place) ? s.place : 'participation';
+              const prizeAmount = prizeDistribution?.[prizeKey] || 0;
+              const bonus = prizeKey !== 'participation' ? Math.max(0, prizeAmount - startingGold) : 0;
+              return `
+                <div class="final-results-row ${placeClasses[s.place] || ''}">
+                  <span class="final-results-place">${s.place}</span>
+                  <span class="final-results-player">${this._renderAvatar(part?.discord_id, 22)} ${this._getDisplayName(part?.discord_id)}</span>
+                  <span class="final-results-record">${part?.wins || 0}W ${part?.losses || 0}L</span>
+                  ${bonus > 0 ? `<span class="final-results-prize">+${bonus.toLocaleString()}G</span>` : ''}
+                  <span class="final-results-gold">${(part?.gold || 0).toLocaleString()}G</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="arena-panel arena-tournament-panel">
         <div class="arena-panel-header">
           <h3>${t.name || 'Tournament'}</h3>
-          <span class="arena-badge badge-gold">${phaseName}</span>
+          <span class="arena-badge ${isComplete ? 'badge-green' : 'badge-gold'}">${isComplete ? 'complete' : phaseName}</span>
         </div>
         <div class="tournament-info">
           <span>${participants.length} players</span>
           <span>${matches.filter(m => m.status === 'complete').length}/${matches.length} matches done</span>
           ${pool > 0 ? `<span class="tournament-prize-pool-label">${pool.toLocaleString()} Gold Prize Pool</span>` : ''}
         </div>
-        ${pool > 0 && prizeDistribution ? `
+        ${myGoldHtml}
+        ${!isComplete && pool > 0 && prizeDistribution ? `
           <div class="tournament-prize-breakdown">
             ${prizeDistribution['1st'] ? `<span class="prize-tier prize-1st">1st: ${prizeDistribution['1st'].toLocaleString()}G</span>` : ''}
             ${prizeDistribution['2nd'] ? `<span class="prize-tier prize-2nd">2nd: ${prizeDistribution['2nd'].toLocaleString()}G</span>` : ''}
@@ -846,7 +1307,8 @@ export const ArenaHubPage = {
             ${prizeDistribution['participation'] ? `<span class="prize-tier prize-participation">Participation: ${prizeDistribution['participation'].toLocaleString()}G</span>` : ''}
           </div>
         ` : ''}
-        ${bracketNumbers.length > 0 ? `
+        ${finalResultsHtml}
+        ${!isComplete && bracketNumbers.length > 0 ? `
           <div class="arena-brackets-mini">
             ${bracketNumbers.map(bn => {
               const players = brackets[bn].sort((a, b) => {
@@ -860,13 +1322,142 @@ export const ArenaHubPage = {
                     ${players.map((p, i) => `
                       <div class="bracket-mini-row ${i === 0 && p.wins > 0 ? 'standings-leader' : ''}">
                         <span class="bracket-mini-player">${this._renderAvatar(p.discord_id, 20)} ${this._getDisplayName(p.discord_id)}</span>
-                        <span class="bracket-mini-record">${p.wins}W ${p.losses}L</span>
+                        <span class="bracket-mini-right">
+                          <span class="bracket-mini-gold">${(p.gold || 0).toLocaleString()}G</span>
+                          <span class="bracket-mini-record">${p.wins}W ${p.losses}L</span>
+                        </span>
                       </div>
                     `).join('')}
                   </div>
                 </div>
               `;
             }).join('')}
+          </div>
+        ` : ''}
+        ${this._renderTournamentTree(matches, participants, isComplete)}
+      </div>
+    `;
+  },
+
+  _renderTournamentTree(matches, participants, isComplete = false) {
+    const semiMatches = matches.filter(m => m.phase === 'semifinals');
+    const finalMatches = matches.filter(m => m.phase === 'finals');
+
+    // Don't show tree until semifinals exist or are upcoming
+    const phase = this._tournament?.current_phase;
+    const showTree = phase === 'semifinals' || phase === 'finals' || phase === 'complete'
+      || semiMatches.length > 0 || finalMatches.length > 0;
+    if (!showTree) return '';
+
+    const getName = (pid) => {
+      if (!pid) return 'TBD';
+      const p = participants.find(pp => pp.id === pid);
+      return p ? this._getDisplayName(p.discord_id) : 'TBD';
+    };
+    const getDiscord = (pid) => {
+      const p = participants.find(pp => pp.id === pid);
+      return p?.discord_id;
+    };
+    const renderSlot = (pid, isWinner, isLoser, showCrown = false) => {
+      const name = getName(pid);
+      const cls = isWinner ? 'tree-slot-winner' : (isLoser ? 'tree-slot-loser' : '');
+      return `<div class="tree-slot ${cls}">
+        ${pid ? this._renderAvatar(getDiscord(pid), 20) : ''}
+        <span class="tree-slot-name">${name}</span>
+        ${showCrown && isWinner ? '<span class="tree-slot-crown">&#9818;</span>' : ''}
+      </div>`;
+    };
+
+    // Build semifinal slots (pad to 2 matches)
+    const semis = [...semiMatches];
+    while (semis.length < 2) semis.push(null);
+
+    const renderMatch = (m, label, isFinal = false) => {
+      if (!m) {
+        return `<div class="tree-match tree-match-tbd">
+          <div class="tree-match-label">${label}</div>
+          ${renderSlot(null, false, false)}
+          ${renderSlot(null, false, false)}
+        </div>`;
+      }
+      const isDone = m.status === 'complete';
+      const score = isDone || m.player1_rounds_won || m.player2_rounds_won
+        ? `${m.player1_rounds_won}-${m.player2_rounds_won}` : '';
+      return `<div class="tree-match ${isDone ? 'tree-match-done' : ''}">
+        <div class="tree-match-label">${label}${score ? ` <span class="tree-match-score">${score}</span>` : ''}</div>
+        ${renderSlot(m.player1_id, isDone && m.winner_id === m.player1_id, isDone && m.winner_id && m.winner_id !== m.player1_id, isFinal)}
+        ${renderSlot(m.player2_id, isDone && m.winner_id === m.player2_id, isDone && m.winner_id && m.winner_id !== m.player2_id, isFinal)}
+      </div>`;
+    };
+
+    const final = finalMatches[0] || null;
+
+    // Build standings from bracket results
+    const standings = [];
+    // 1st = final winner
+    if (final?.status === 'complete' && final.winner_id) {
+      standings.push({ pid: final.winner_id, place: '1st' });
+      // 2nd = final loser
+      const finalLoser = final.player1_id === final.winner_id ? final.player2_id : final.player1_id;
+      standings.push({ pid: finalLoser, place: '2nd' });
+    }
+    // 3rd/4th = semi losers
+    const semiLosers = semiMatches
+      .filter(m => m.status === 'complete' && m.winner_id)
+      .map(m => m.player1_id === m.winner_id ? m.player2_id : m.player1_id)
+      .filter(pid => !standings.some(s => s.pid === pid));
+    semiLosers.forEach(pid => standings.push({ pid, place: standings.length < 3 ? '3rd' : '4th' }));
+
+    // Remaining participants not in semis/finals
+    const placedIds = new Set(standings.map(s => s.pid));
+    const allSemiPlayerIds = new Set(semiMatches.flatMap(m => [m.player1_id, m.player2_id].filter(Boolean)));
+    const rest = participants
+      .filter(p => !placedIds.has(p.id) && !allSemiPlayerIds.has(p.id))
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        return (b.gold || 0) - (a.gold || 0);
+      });
+    let nextPlace = standings.length + 1;
+    rest.forEach(p => {
+      standings.push({ pid: p.id, place: `${nextPlace}${nextPlace === 1 ? 'st' : nextPlace === 2 ? 'nd' : nextPlace === 3 ? 'rd' : 'th'}` });
+      nextPlace++;
+    });
+
+    const placeClasses = { '1st': 'tree-place-1st', '2nd': 'tree-place-2nd', '3rd': 'tree-place-3rd', '4th': 'tree-place-4th' };
+
+    return `
+      <div class="tournament-tree">
+        <div class="tree-header">Tournament Bracket</div>
+        <div class="tree-bracket">
+          <div class="tree-round tree-round-semis">
+            <div class="tree-round-label">Semifinals</div>
+            ${semis.map((m, i) => renderMatch(m, `SF ${i + 1}`)).join('')}
+          </div>
+          <div class="tree-connectors">
+            <div class="tree-connector"></div>
+          </div>
+          <div class="tree-round tree-round-final">
+            <div class="tree-round-label">Final</div>
+            ${renderMatch(final, 'Final', true)}
+          </div>
+        </div>
+        ${standings.length > 0 && !isComplete ? `
+          <div class="tree-standings">
+            <div class="tree-standings-label">Standings</div>
+            <div class="tree-standings-list">
+              ${standings.map(s => {
+                const part = participants.find(p => p.id === s.pid);
+                return `
+                <div class="tree-standings-row ${placeClasses[s.place] || ''}">
+                  <span class="tree-standings-place">${s.place}</span>
+                  <span class="tree-standings-player">${this._renderAvatar(getDiscord(s.pid), 20)} ${getName(s.pid)}</span>
+                  <span class="tree-standings-record">${part?.wins || 0}W ${part?.losses || 0}L</span>
+                  <span class="tree-standings-gold">${(part?.gold || 0).toLocaleString()}G</span>
+                </div>
+                `;
+              }).join('')}
+            </div>
           </div>
         ` : ''}
       </div>
@@ -964,6 +1555,10 @@ export const ArenaHubPage = {
       arenaData.unsubscribe(this._tournamentSubscription);
       this._tournamentSubscription = null;
     }
+    if (this._participantGoldSubscription) {
+      arenaData.unsubscribe(this._participantGoldSubscription);
+      this._participantGoldSubscription = null;
+    }
     if (this._challengeSubscription) {
       arenaData.unsubscribe(this._challengeSubscription);
       this._challengeSubscription = null;
@@ -978,6 +1573,16 @@ export const ArenaHubPage = {
     }
     const overlay = document.getElementById('challenge-overlay');
     if (overlay) overlay.remove();
+
+    if (this._betPollInterval) {
+      clearInterval(this._betPollInterval);
+      this._betPollInterval = null;
+    }
+    // Clean up betting timers
+    Object.values(this._bettingTimers).forEach(id => clearInterval(id));
+    this._bettingTimers = {};
+    this._matchBets = {};
+    this._myParticipant = null;
 
     this._pendingChallenge = null;
     this._outgoingChallenge = null;

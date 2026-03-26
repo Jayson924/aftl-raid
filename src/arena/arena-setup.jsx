@@ -738,17 +738,18 @@ export const ArenaSetupPage = {
         const phase = this._tournament.current_phase;
         if (phase === 'finals') {
           // Force complete finals — forfeit incomplete final matches
-          if (!await arenaConfirm('Forfeit all incomplete final matches (Player 1 wins by default) and complete the tournament?', { title: 'Force Complete', confirmText: 'Force Complete', danger: true })) return;
+          if (!await arenaConfirm('Forfeit all incomplete final matches (Player 1 wins by default) and complete the tournament? Placement prizes will be distributed.', { title: 'Force Complete', confirmText: 'Force Complete', danger: true })) return;
           try {
             const incompleteMatches = (this._matches || []).filter(m => m.phase === 'finals' && m.status !== 'complete');
             for (const m of incompleteMatches) {
               await arenaData.forfeitMatch(m.id, m.player1_id);
             }
+            await arenaData.distributePlacementPrizes(this._tournament.id);
             await arenaData.updateTournament(this._tournament.id, {
               status: 'complete',
               current_phase: 'complete'
             });
-            toast.success('Tournament force-completed!');
+            toast.success('Tournament force-completed! Prizes distributed.');
             router.navigate('arena');
           } catch (err) {
             toast.error('Failed: ' + err.message);
@@ -780,13 +781,14 @@ export const ArenaSetupPage = {
     const completeBtn = document.getElementById('complete-tournament-btn');
     if (completeBtn) {
       completeBtn.addEventListener('click', async () => {
-        if (!await arenaConfirm('Mark the tournament as complete?', { title: 'Complete Tournament', confirmText: 'Complete' })) return;
+        if (!await arenaConfirm('Mark the tournament as complete? Placement prizes will be distributed.', { title: 'Complete Tournament', confirmText: 'Complete' })) return;
         try {
+          await arenaData.distributePlacementPrizes(this._tournament.id);
           await arenaData.updateTournament(this._tournament.id, {
             status: 'complete',
             current_phase: 'complete'
           });
-          toast.success('Tournament complete!');
+          toast.success('Tournament complete! Prizes distributed.');
           router.navigate('arena');
         } catch (err) {
           toast.error('Failed: ' + err.message);

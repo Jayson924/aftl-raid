@@ -10,6 +10,8 @@
  * Concurrency safety: only resolves when both committed.
  */
 
+import { resolveBets } from './arena-resolve-bets.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -536,6 +538,11 @@ export async function handler(event) {
       }
 
       await sbPatch('arena_matches', `id=eq.${matchId}`, matchUpdate);
+
+      // Resolve bets if match completed
+      if (matchUpdate.winner_id) {
+        try { await resolveBets(matchId, matchUpdate.winner_id); } catch (e) { console.error('Bet resolution error:', e); }
+      }
     } else {
       // No KO — create next turn
       await sbPost('arena_turns', {
@@ -562,4 +569,15 @@ async function incrementStat(participantId, field) {
   const rows = await sbGet('arena_participants', `id=eq.${participantId}&select=${field}`);
   const current = rows[0]?.[field] || 0;
   await sbPatch('arena_participants', `id=eq.${participantId}`, { [field]: current + 1 });
+}
+
+// Gold reward for winning a match (per phase)
+const MATCH_WIN_GOLD = { group_stage: 100, semifinals: 200, finals: 300 };
+
+async function awardMatchGold(winnerId, phase) {
+  const reward = MATCH_WIN_GOLD[phase] || 100;
+  const rows = await sbGet('arena_participants', `id=eq.${winnerId}&select=gold`);
+  if (rows[0]) {
+    await sbPatch('arena_participants', `id=eq.${winnerId}`, { gold: (rows[0].gold || 0) + reward });
+  }
 }

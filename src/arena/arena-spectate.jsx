@@ -2,11 +2,12 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { ArenaCombat } from './arena-combat.js';
-import { BASE_HP, MAX_HP, REACTIONS, REACTION_COOLDOWN_MS, getAbilityForClass } from './arena-constants.js';
+import { BASE_HP, MAX_HP, REACTIONS, REACTION_COOLDOWN_MS, BET_INCREMENTS, BETTING_WINDOW_SECONDS, MAX_BET_PERCENTAGE, getAbilityForClass, getRemainingSeconds } from './arena-constants.js';
 
 /**
  * Arena Spectate — Watch a match in progress. Same layout as match but no action buttons.
  * Shows "Choosing..." until both committed. 5 emoji reaction buttons.
+ * Betting panel for tournament participants not in the match.
  * Route: /arena-spectate?match=<id>
  */
 export const ArenaSpectatePage = {
@@ -21,6 +22,13 @@ export const ArenaSpectatePage = {
   _currentTurn: null,
   _reactionSubscription: null,
   _lastReactionTime: 0,
+  // Betting state
+  _bets: [],
+  _myParticipant: null,
+  _betSubscription: null,
+  _goldSubscription: null,
+  _bettingTimer: null,
+  _bettingTimeLeft: 0,
 
   async render(container) {
     container.innerHTML = '';
@@ -50,13 +58,21 @@ export const ArenaSpectatePage = {
     this._match = await arenaData.getMatch(matchId);
     if (!this._match) throw new Error('Match not found');
 
-    const [participants, appUsers] = await Promise.all([
+    const [participants, appUsers, bets] = await Promise.all([
       arenaData.getParticipants(this._match.tournament_id),
-      arenaData.getAllAppUsers()
+      arenaData.getAllAppUsers(),
+      arenaData.getBetsForMatch(matchId).catch(() => [])
     ]);
 
     this._participants = participants;
     this._appUsers = appUsers;
+    this._bets = bets;
+
+    // Find current user's participant record
+    const currentUser = dataService.getUser();
+    this._myParticipant = currentUser
+      ? participants.find(p => p.discord_id === currentUser.id) || null
+      : null;
 
     // Load round data
     const rounds = await arenaData.getRounds(matchId);
@@ -85,8 +101,29 @@ export const ArenaSpectatePage = {
       this._onReaction(payload);
     });
 
+    // Subscribe to bets for live odds
+    if (this._betSubscription) arenaData.unsubscribe(this._betSubscription);
+    this._betSubscription = arenaData.subscribeToBets(matchId, async () => {
+      try {
+        this._bets = await arenaData.getBetsForMatch(matchId);
+        this._updateBettingUI();
+      } catch (e) { console.error('Bet refresh error:', e); }
+    });
+
+    // Subscribe to participant gold changes
+    if (this._goldSubscription) arenaData.unsubscribe(this._goldSubscription);
+    this._goldSubscription = arenaData.subscribeToParticipantGold(this._match.tournament_id, async () => {
+      try {
+        this._participants = await arenaData.getParticipants(this._match.tournament_id);
+        const currentUser = dataService.getUser();
+        this._myParticipant = currentUser
+          ? this._participants.find(p => p.discord_id === currentUser.id) || null
+          : null;
+        this._updateBettingUI();
+      } catch (e) { console.error('Gold refresh error:', e); }
+    });
+
     // Join presence
-    const currentUser = dataService.getUser();
     if (currentUser) {
       this._presenceChannel = arenaData.joinMatchPresence(matchId, currentUser, (users) => {
         this._spectatorCount = users.length;
@@ -94,6 +131,49 @@ export const ArenaSpectatePage = {
         if (countEl) countEl.textContent = `${this._spectatorCount + 1} watching`;
       });
     }
+
+    // Start betting countdown
+    this._startBettingTimer();
+  },
+
+  _startBettingTimer() {
+    if (this._bettingTimer) clearInterval(this._bettingTimer);
+
+    const m = this._match;
+    if (!m.betting_closes_at || m.status === 'complete') {
+      this._bettingTimeLeft = 0;
+      return;
+    }
+
+    this._bettingTimeLeft = getRemainingSeconds(m.betting_closes_at, 0);
+    if (this._bettingTimeLeft <= 0) {
+      this._bettingTimeLeft = 0;
+      return;
+    }
+
+    this._bettingTimer = setInterval(() => {
+      this._bettingTimeLeft--;
+      if (this._bettingTimeLeft <= 0) {
+        this._bettingTimeLeft = 0;
+        clearInterval(this._bettingTimer);
+        this._bettingTimer = null;
+      }
+      // Update timer display
+      const timerEl = document.getElementById('betting-timer');
+      if (timerEl) {
+        if (this._bettingTimeLeft > 0) {
+          timerEl.textContent = `Betting closes in ${this._bettingTimeLeft}s`;
+          timerEl.classList.toggle('betting-urgent', this._bettingTimeLeft <= 15);
+        } else {
+          timerEl.textContent = 'Betting closed';
+          timerEl.classList.remove('betting-urgent');
+        }
+      }
+      // Disable buttons when closed
+      if (this._bettingTimeLeft <= 0) {
+        document.querySelectorAll('.bet-btn').forEach(b => b.disabled = true);
+      }
+    }, 1000);
   },
 
   _getDisplayName(discordId) {
@@ -192,6 +272,8 @@ export const ArenaSpectatePage = {
         <div class="reaction-bubbles" id="reaction-bubbles"></div>
       </div>
 
+      ${this._renderBettingPanel()}
+
       <div class="match-history arena-panel">
         <div class="arena-panel-header">
           <h3>Turn History</h3>
@@ -205,7 +287,145 @@ export const ArenaSpectatePage = {
     this._attachListeners(container);
   },
 
+  _renderBettingPanel() {
+    const m = this._match;
+    const myP = this._myParticipant;
+
+    // Can't bet on own match
+    const isInMatch = myP && (myP.id === m.player1_id || myP.id === m.player2_id);
+    if (isInMatch) return '';
+
+    // Match already complete — show results if participant
+    if (m.status === 'complete') {
+      return myP ? this._renderBetResults() : '';
+    }
+
+    // Show during pending, drafting, or when betting window exists
+    const isPreMatch = m.status === 'pending' || m.status === 'drafting' || m.status === 'roster_reveal';
+    if (!isPreMatch && !m.betting_closes_at) return '';
+
+    const canBet = !!myP && !isInMatch;
+    // Betting open during pre-match (no timer) or while timer > 0
+    const bettingOpen = isPreMatch || this._bettingTimeLeft > 0;
+    const increments = BET_INCREMENTS[m.phase] || BET_INCREMENTS.group_stage;
+
+    // Calculate totals per side
+    const activeBets = this._bets.filter(b => b.status === 'active');
+    const p1Bets = activeBets.filter(b => b.backed_participant_id === m.player1_id);
+    const p2Bets = activeBets.filter(b => b.backed_participant_id === m.player2_id);
+    const p1Total = p1Bets.reduce((s, b) => s + b.amount, 0);
+    const p2Total = p2Bets.reduce((s, b) => s + b.amount, 0);
+
+    // My bets on each side
+    const myP1Bets = myP ? p1Bets.filter(b => b.bettor_id === myP.id) : [];
+    const myP2Bets = myP ? p2Bets.filter(b => b.bettor_id === myP.id) : [];
+    const myP1Total = myP1Bets.reduce((s, b) => s + b.amount, 0);
+    const myP2Total = myP2Bets.reduce((s, b) => s + b.amount, 0);
+
+    // Lock to one side — if you've bet on P1, can't bet on P2
+    const lockedToP1 = myP1Total > 0;
+    const lockedToP2 = myP2Total > 0;
+
+    // Potential winnings
+    const p1Potential = myP1Total > 0 && p1Total > 0
+      ? Math.floor(myP1Total + p2Total * (myP1Total / p1Total)) - myP1Total
+      : 0;
+    const p2Potential = myP2Total > 0 && p2Total > 0
+      ? Math.floor(myP2Total + p1Total * (myP2Total / p2Total)) - myP2Total
+      : 0;
+
+    const maxBet = Math.floor((myP?.gold || 0) * MAX_BET_PERCENTAGE);
+    const totalMyActiveBets = myP ? activeBets.filter(b => b.bettor_id === myP.id).reduce((s, b) => s + b.amount, 0) : 0;
+    const remainingBetBudget = maxBet - totalMyActiveBets;
+
+    const p1Name = this._getParticipantName(m.player1_id);
+    const p2Name = this._getParticipantName(m.player2_id);
+
+    const timerHtml = isPreMatch && !m.betting_closes_at
+      ? 'Open during draft'
+      : (this._bettingTimeLeft > 0 ? `Betting closes in ${this._bettingTimeLeft}s` : 'Betting closed');
+
+    return `
+      <div class="betting-panel" id="betting-panel">
+        <div class="betting-header">
+          <h4>${canBet ? 'Place Your Bet' : 'Betting Odds'}</h4>
+          ${canBet ? `<span class="betting-gold">Your Gold: <strong>${(myP?.gold || 0).toLocaleString()}G</strong></span>` : ''}
+          <span class="betting-timer ${this._bettingTimeLeft <= 15 && this._bettingTimeLeft > 0 ? 'betting-urgent' : ''}" id="betting-timer">
+            ${timerHtml}
+          </span>
+        </div>
+        ${!canBet ? '<p style="color: rgba(255,255,255,0.4); font-size: 0.85rem; margin: 0 0 0.5rem;">Only tournament participants can place bets</p>' : ''}
+        <div class="betting-sides">
+          <div class="betting-side ${myP1Total > 0 ? 'betting-side-active' : ''} ${lockedToP2 ? 'betting-side-locked' : ''}">
+            <span class="betting-player-name">${p1Name}</span>
+            <span class="betting-total">${p1Total.toLocaleString()}G wagered</span>
+            ${myP1Total > 0 ? `<span class="betting-potential">Win: +${p1Potential.toLocaleString()}G</span>` : ''}
+            ${canBet && !lockedToP2 ? `<div class="betting-buttons">
+              ${increments.map(inc => `
+                <button class="bet-btn" data-backed="${m.player1_id}" data-amount="${inc}" ${!bettingOpen || inc > remainingBetBudget ? 'disabled' : ''}>+${inc}</button>
+              `).join('')}
+            </div>` : ''}
+            ${myP1Total > 0 ? `<span class="betting-my-bet">Your bet: ${myP1Total.toLocaleString()}G</span>` : ''}
+          </div>
+          <div class="betting-side ${myP2Total > 0 ? 'betting-side-active' : ''} ${lockedToP1 ? 'betting-side-locked' : ''}">
+            <span class="betting-player-name">${p2Name}</span>
+            <span class="betting-total">${p2Total.toLocaleString()}G wagered</span>
+            ${myP2Total > 0 ? `<span class="betting-potential">Win: +${p2Potential.toLocaleString()}G</span>` : ''}
+            ${canBet && !lockedToP1 ? `<div class="betting-buttons">
+              ${increments.map(inc => `
+                <button class="bet-btn" data-backed="${m.player2_id}" data-amount="${inc}" ${!bettingOpen || inc > remainingBetBudget ? 'disabled' : ''}>+${inc}</button>
+              `).join('')}
+            </div>` : ''}
+            ${myP2Total > 0 ? `<span class="betting-my-bet">Your bet: ${myP2Total.toLocaleString()}G</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  _renderBetResults() {
+    const m = this._match;
+    const myP = this._myParticipant;
+    if (!myP) return '';
+
+    const myBets = this._bets.filter(b => b.bettor_id === myP.id);
+    if (myBets.length === 0) return '';
+
+    const totalWagered = myBets.reduce((s, b) => s + b.amount, 0);
+    const totalPayout = myBets.reduce((s, b) => s + b.payout, 0);
+    const net = totalPayout - totalWagered;
+    const won = net > 0;
+    const lost = net < 0;
+
+    return `
+      <div class="betting-panel">
+        <div class="betting-header">
+          <h4>Bet Results</h4>
+          <span class="betting-gold" style="color: ${won ? '#4ade80' : lost ? '#ef4444' : 'inherit'}">
+            ${won ? `+${net.toLocaleString()}G` : lost ? `${net.toLocaleString()}G` : 'Refunded'}
+          </span>
+        </div>
+      </div>
+    `;
+  },
+
+  _updateBettingUI() {
+    const panel = document.getElementById('betting-panel');
+    if (!panel) return;
+
+    // Re-render just the betting panel contents
+    const newHtml = this._renderBettingPanel();
+    const temp = document.createElement('div');
+    temp.innerHTML = newHtml;
+    const newPanel = temp.querySelector('.betting-panel');
+    if (newPanel && panel) {
+      panel.replaceWith(newPanel);
+      this._attachBetListeners();
+    }
+  },
+
   _attachListeners(container) {
+    // Reaction buttons
     const allBtns = container.querySelectorAll('.reaction-btn');
     allBtns.forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -229,9 +449,32 @@ export const ArenaSpectatePage = {
 
         try {
           await arenaData.submitReaction(this._match.id, currentUser.id, emoji);
-          // Bubble shown via Realtime subscription (_onReaction)
         } catch (err) {
           // Silently fail for rate limits
+        }
+      });
+    });
+
+    // Bet buttons
+    this._attachBetListeners();
+  },
+
+  _attachBetListeners() {
+    document.querySelectorAll('.bet-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const currentUser = dataService.getUser();
+        if (!currentUser || !this._myParticipant) return;
+
+        const backed = btn.dataset.backed;
+        const amount = parseInt(btn.dataset.amount);
+
+        btn.disabled = true;
+        try {
+          await arenaData.placeBet(this._match.id, currentUser.id, backed, amount);
+          // UI updates via Realtime subscription
+        } catch (err) {
+          toast.error(err.message || 'Bet failed');
+          btn.disabled = false;
         }
       });
     });
@@ -300,6 +543,10 @@ export const ArenaSpectatePage = {
     if (newMatch.status === 'complete') {
       const winnerName = newMatch.winner_id ? this._getParticipantName(newMatch.winner_id) : null;
       toast.success(winnerName ? `${winnerName} wins!` : 'Match over!');
+      // Refresh bets to show results
+      arenaData.getBetsForMatch(this._match.id).then(bets => {
+        this._bets = bets;
+      });
     }
 
     // Reload rounds for new round transitions
@@ -324,8 +571,13 @@ export const ArenaSpectatePage = {
   destroy() {
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
     if (this._reactionSubscription) arenaData.unsubscribe(this._reactionSubscription);
+    if (this._betSubscription) arenaData.unsubscribe(this._betSubscription);
+    if (this._goldSubscription) arenaData.unsubscribe(this._goldSubscription);
     if (this._combat) this._combat.destroy();
     if (this._presenceChannel) arenaData.leavePresence(this._presenceChannel);
-    // cleanup done
+    if (this._bettingTimer) {
+      clearInterval(this._bettingTimer);
+      this._bettingTimer = null;
+    }
   }
 };

@@ -6,6 +6,8 @@
  * Either player triggers this once — server simulates both runs.
  */
 
+import { resolveBets } from './arena-resolve-bets.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -38,6 +40,16 @@ async function sbPatch(table, query, body) {
     throw new Error(`DB update failed: ${data.message || JSON.stringify(data)}`);
   }
   return data;
+}
+
+const MATCH_WIN_GOLD = { group_stage: 100, semifinals: 200, finals: 300 };
+
+async function awardMatchGold(winnerId, phase) {
+  const reward = MATCH_WIN_GOLD[phase] || 100;
+  const rows = await sbGet('arena_participants', `id=eq.${winnerId}&select=gold`);
+  if (rows[0]) {
+    await sbPatch('arena_participants', `id=eq.${winnerId}`, { gold: (rows[0].gold || 0) + reward });
+  }
 }
 
 const RATES = {
@@ -144,6 +156,9 @@ export async function handler(event) {
 
     // Update match
     await sbPatch('arena_matches', `id=eq.${matchId}`, { status: 'complete', winner_id: winnerId });
+
+    // Resolve bets
+    try { await resolveBets(matchId, winnerId); } catch (e) { console.error('Bet resolution error:', e); }
 
     // Update stats
     const winRows = await sbGet('arena_participants', `id=eq.${winnerId}&select=wins`);

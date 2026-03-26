@@ -35,6 +35,8 @@ export const ArenaMatchPage = {
   _autoSending: false,
   _charSendTimer: null,
   _charSendTimeLeft: 0,
+  _p1BetTotal: 0,
+  _p2BetTotal: 0,
 
   async render(container) {
     container.innerHTML = '';
@@ -116,6 +118,13 @@ export const ArenaMatchPage = {
       }
     }
 
+    // Load bets
+    try {
+      const bets = await arenaData.getBetsForMatch(matchId);
+      this._p1BetTotal = bets.filter(b => b.backed_participant_id === this._match.player1_id).reduce((s, b) => s + b.amount, 0);
+      this._p2BetTotal = bets.filter(b => b.backed_participant_id === this._match.player2_id).reduce((s, b) => s + b.amount, 0);
+    } catch (e) { /* no bets */ }
+
     // Subscribe to match changes
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
     this._matchSubscription = arenaData.subscribeToMatch(matchId, (payload) => {
@@ -138,6 +147,19 @@ export const ArenaMatchPage = {
         if (countEl) countEl.textContent = `${this._spectatorCount} watching`;
       });
     }
+
+    // Subscribe to bet changes
+    if (this._betSubscription) arenaData.unsubscribe(this._betSubscription);
+    this._betSubscription = arenaData.subscribeToBets(matchId, async () => {
+      try {
+        const bets = await arenaData.getBetsForMatch(matchId);
+        this._p1BetTotal = bets.filter(b => b.backed_participant_id === this._match.player1_id).reduce((s, b) => s + b.amount, 0);
+        this._p2BetTotal = bets.filter(b => b.backed_participant_id === this._match.player2_id).reduce((s, b) => s + b.amount, 0);
+        document.querySelectorAll('.fighter-bet-total').forEach((el, i) => {
+          el.textContent = `${i === 0 ? this._p1BetTotal : this._p2BetTotal}G bets`;
+        });
+      } catch (e) { console.error('Bet refresh error:', e); }
+    });
 
     // Subscribe to spectator reactions
     if (this._reactionSubscription) arenaData.unsubscribe(this._reactionSubscription);
@@ -294,6 +316,7 @@ export const ArenaMatchPage = {
           ` : ''}
           ${round?.player1_status?.highlander ? '<div class="fighter-status-effect">Highlander Active</div>' : ''}
           ${round?.player1_status?.chargedMissile ? '<div class="fighter-status-effect">Charged! (x2 next)</div>' : ''}
+          ${this._p1BetTotal > 0 || this._p2BetTotal > 0 ? `<div class="fighter-bet-total">${this._p1BetTotal}G bets</div>` : ''}
         </div>
 
         <div class="match-center">
@@ -317,6 +340,7 @@ export const ArenaMatchPage = {
           ` : ''}
           ${round?.player2_status?.highlander ? '<div class="fighter-status-effect">Highlander Active</div>' : ''}
           ${round?.player2_status?.chargedMissile ? '<div class="fighter-status-effect">Charged! (x2 next)</div>' : ''}
+          ${this._p1BetTotal > 0 || this._p2BetTotal > 0 ? `<div class="fighter-bet-total">${this._p2BetTotal}G bets</div>` : ''}
         </div>
 
         ${fmt.charsPerDraft > 1 ? `
@@ -1027,6 +1051,10 @@ export const ArenaMatchPage = {
     if (this._roundSubscription) {
       arenaData.unsubscribe(this._roundSubscription);
       this._roundSubscription = null;
+    }
+    if (this._betSubscription) {
+      arenaData.unsubscribe(this._betSubscription);
+      this._betSubscription = null;
     }
     if (this._reactionSubscription) {
       arenaData.unsubscribe(this._reactionSubscription);

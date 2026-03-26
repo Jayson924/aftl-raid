@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { distributePrizePool, getMatchFormat } from './arena-constants.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -84,10 +85,10 @@ class ArenaDataService {
       .eq('tournament_id', id);
     if (matchErr) throw matchErr;
 
-    // Reset participant stats
+    // Reset participant stats and gold
     const { error: partErr } = await supabase
       .from('arena_participants')
-      .update({ wins: 0, losses: 0 })
+      .update({ wins: 0, losses: 0, gold: 0 })
       .eq('tournament_id', id);
     if (partErr) throw partErr;
 
@@ -439,12 +440,19 @@ class ArenaDataService {
     if (match.status === 'complete') throw new Error('Match already complete');
 
     const loserId = winnerId === match.player1_id ? match.player2_id : match.player1_id;
+    const isP1Winner = winnerId === match.player1_id;
+    const fmt = getMatchFormat(match.match_format);
 
-    // Update match
+    // Update match — set rounds_won so the score reflects the forfeit
     await this.updateMatch(matchId, {
       status: 'complete',
-      winner_id: winnerId
+      winner_id: winnerId,
+      player1_rounds_won: isP1Winner ? fmt.roundsToWin : match.player1_rounds_won,
+      player2_rounds_won: !isP1Winner ? fmt.roundsToWin : match.player2_rounds_won
     });
+
+    // Resolve bets — pay out winners as if the match ended normally
+    try { await this.resolveBetsForMatch(matchId, winnerId); } catch (e) { console.error('Bet resolve on forfeit:', e); }
 
     // Update participant stats
     const winnerPart = await supabase
@@ -469,6 +477,82 @@ class ArenaDataService {
         .from('arena_participants')
         .update({ losses: (loserPart.data.losses || 0) + 1 })
         .eq('id', loserId);
+    }
+  }
+
+  /**
+   * Refund all active bets for a match.
+   */
+  async refundBetsForMatch(matchId) {
+    const { data: bets } = await supabase
+      .from('arena_bets')
+      .select('*')
+      .eq('match_id', matchId)
+      .eq('status', 'active');
+    if (!bets || bets.length === 0) return;
+
+    for (const bet of bets) {
+      await supabase.from('arena_bets').update({ status: 'refunded', payout: bet.amount }).eq('id', bet.id);
+      const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+      if (bettor) {
+        await supabase.from('arena_participants').update({ gold: bettor.gold + bet.amount }).eq('id', bet.bettor_id);
+      }
+    }
+  }
+
+  /**
+   * Resolve bets for a match — pay out winners proportionally from losing pool.
+   * If nobody bet on the winner, refund all bets instead.
+   */
+  async resolveBetsForMatch(matchId, winnerId) {
+    const { data: bets } = await supabase
+      .from('arena_bets')
+      .select('*')
+      .eq('match_id', matchId)
+      .eq('status', 'active');
+    if (!bets || bets.length === 0) return;
+
+    const winningBets = bets.filter(b => b.backed_participant_id === winnerId);
+    const losingBets = bets.filter(b => b.backed_participant_id !== winnerId);
+
+    if (winningBets.length === 0) {
+      // Nobody bet on the winner — refund all
+      for (const bet of losingBets) {
+        await supabase.from('arena_bets').update({ status: 'refunded', payout: bet.amount }).eq('id', bet.id);
+        const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+        if (bettor) {
+          await supabase.from('arena_participants').update({ gold: bettor.gold + bet.amount }).eq('id', bet.bettor_id);
+        }
+      }
+      return;
+    }
+
+    const totalLosingPool = losingBets.reduce((s, b) => s + b.amount, 0);
+    const totalWinningBets = winningBets.reduce((s, b) => s + b.amount, 0);
+
+    // Mark losing bets
+    for (const bet of losingBets) {
+      await supabase.from('arena_bets').update({ status: 'lost', payout: 0 }).eq('id', bet.id);
+    }
+
+    // Distribute losing pool proportionally to winners
+    let distributed = 0;
+    for (let i = 0; i < winningBets.length; i++) {
+      const bet = winningBets[i];
+      let share;
+      if (i === winningBets.length - 1) {
+        share = totalLosingPool - distributed;
+      } else {
+        share = Math.floor(totalLosingPool * (bet.amount / totalWinningBets));
+        distributed += share;
+      }
+
+      const payout = bet.amount + share;
+      await supabase.from('arena_bets').update({ status: 'won', payout }).eq('id', bet.id);
+      const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+      if (bettor) {
+        await supabase.from('arena_participants').update({ gold: bettor.gold + payout }).eq('id', bet.bettor_id);
+      }
     }
   }
 
@@ -749,6 +833,43 @@ class ArenaDataService {
     return this.callFunction('arena-tiebreaker-tap', { matchId, discordId });
   }
 
+  async placeBet(matchId, discordId, backedParticipantId, amount) {
+    return this.callFunction('arena-bet', { matchId, discordId, backedParticipantId, amount });
+  }
+
+  async getBetsForMatch(matchId) {
+    const { data, error } = await supabase
+      .from('arena_bets')
+      .select('*')
+      .eq('match_id', matchId);
+    if (error) throw error;
+    return data || [];
+  }
+
+  subscribeToBets(matchId, callback) {
+    return supabase
+      .channel(`arena-bets-${matchId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'arena_bets',
+        filter: `match_id=eq.${matchId}`
+      }, callback)
+      .subscribe();
+  }
+
+  subscribeToParticipantGold(tournamentId, callback) {
+    return supabase
+      .channel(`arena-participants-gold-${tournamentId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'arena_participants',
+        filter: `tournament_id=eq.${tournamentId}`
+      }, callback)
+      .subscribe();
+  }
+
   // ============================================
   // HELPER: Get players for a user
   // ============================================
@@ -884,6 +1005,20 @@ class ArenaDataService {
   async generateGroupMatches(tournamentId) {
     const participants = await this.getParticipants(tournamentId);
 
+    // Initialize gold from prize pool
+    const tournament = await this.getTournament(tournamentId);
+    const pool = tournament.prizes?.pool;
+    if (pool && pool > 0) {
+      const dist = distributePrizePool(pool, participants.length);
+      // Starting gold = participation tier (lowest prize), fallback to smallest value
+      const startingGold = dist?.participation
+        || Math.min(...Object.values(dist || { x: 500 }));
+      const promises = participants.map(p =>
+        supabase.from('arena_participants').update({ gold: startingGold }).eq('id', p.id)
+      );
+      await Promise.all(promises);
+    }
+
     // Group by bracket
     const brackets = {};
     for (const p of participants) {
@@ -930,8 +1065,13 @@ class ArenaDataService {
     let semifinalists;
 
     if (bracketNumbers.length >= 2) {
-      // Multiple brackets — top player from each bracket
-      semifinalists = bracketNumbers.map(bn => brackets[bn][0]).filter(Boolean);
+      // Multiple brackets — top 2 from each bracket (1st seed vs other bracket's 2nd seed)
+      semifinalists = [];
+      for (const bn of bracketNumbers) {
+        const top2 = brackets[bn].slice(0, 2);
+        semifinalists.push(...top2);
+      }
+      semifinalists = semifinalists.filter(Boolean);
     } else {
       // Single bracket or no brackets — take top players ranked by wins
       const allPlayers = bracketNumbers.flatMap(bn => brackets[bn]);
@@ -959,6 +1099,66 @@ class ArenaDataService {
     return matches;
   }
 
+  /**
+   * Award placement prizes from the prize pool when tournament completes.
+   * Derives placements from semifinal/final results.
+   */
+  async distributePlacementPrizes(tournamentId) {
+    const tournament = await this.getTournament(tournamentId);
+    const pool = tournament?.prizes?.pool;
+    if (!pool || pool <= 0) return;
+
+    const participants = await this.getParticipants(tournamentId);
+    const matches = await this.getMatches(tournamentId);
+    const prizes = distributePrizePool(pool, participants.length);
+    if (!prizes) return;
+
+    const semiMatches = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
+    const finalMatch = matches.find(m => m.phase === 'finals' && m.status === 'complete');
+
+    // Build placement map: participantId → prize key
+    const placements = {};
+
+    if (finalMatch?.winner_id) {
+      placements[finalMatch.winner_id] = '1st';
+      const finalLoser = finalMatch.player1_id === finalMatch.winner_id ? finalMatch.player2_id : finalMatch.player1_id;
+      placements[finalLoser] = '2nd';
+    } else {
+      // No final played — check if a semifinal winner was auto-promoted
+      const semiWinners = semiMatches.map(m => m.winner_id).filter(Boolean);
+      if (semiWinners.length === 1) {
+        placements[semiWinners[0]] = '1st';
+      }
+    }
+
+    // Semi losers get 3rd/4th
+    const semiLosers = semiMatches
+      .map(m => m.winner_id ? (m.player1_id === m.winner_id ? m.player2_id : m.player1_id) : null)
+      .filter(pid => pid && !placements[pid]);
+    semiLosers.forEach(pid => {
+      if (!placements[pid]) {
+        const usedPlaces = Object.values(placements);
+        placements[pid] = !usedPlaces.includes('3rd') ? '3rd' : '4th';
+      }
+    });
+
+    // Everyone already received participation gold as starting gold,
+    // so only award the difference above that for placed players.
+    const startingGold = prizes.participation || 0;
+
+    for (const [pid, place] of Object.entries(placements)) {
+      const amount = prizes[place];
+      if (!amount || amount <= 0) continue;
+      const bonus = amount - startingGold;
+      if (bonus <= 0) continue;
+      const { data } = await supabase.from('arena_participants').select('gold').eq('id', pid).single();
+      if (data) {
+        await supabase.from('arena_participants').update({ gold: (data.gold || 0) + bonus }).eq('id', pid);
+      }
+    }
+    // 5th+ already received their participation prize at the start — no extra gold needed.
+  }
+
   async generateFinalMatch(tournamentId, { forceAdvance = false } = {}) {
     // If force-advancing, auto-forfeit incomplete semifinal matches first
     if (forceAdvance) {
@@ -977,6 +1177,7 @@ class ArenaDataService {
     if (winners.length < 2) {
       // Only 1 semifinal winner (or none) — skip finals, they win the tournament
       if (winners.length === 1) {
+        await this.distributePlacementPrizes(tournamentId);
         await this.updateTournament(tournamentId, {
           status: 'complete',
           current_phase: 'complete'
