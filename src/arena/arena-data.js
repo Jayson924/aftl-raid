@@ -1209,7 +1209,7 @@ class ArenaDataService {
     const half = Math.floor(semifinalists.length / 2);
     for (let i = 0; i < half; i++) {
       matches.push(
-        await this.createMatch(tournamentId, 'semifinals', semifinalists[i].id, semifinalists[semifinalists.length - 1 - i].id)
+        await this.createMatch(tournamentId, 'semifinals', semifinalists[i].id, semifinalists[semifinalists.length - 1 - i].id, 1)
       );
     }
 
@@ -1324,7 +1324,7 @@ class ArenaDataService {
         throw new Error('No finals winners to advance');
       }
 
-      const grandFinal = await this.createMatch(tournamentId, 'grand_final', winners[0], winners[1]);
+      const grandFinal = await this.createMatch(tournamentId, 'grand_final', winners[0], winners[1], 1);
       await this.updateTournament(tournamentId, { current_phase: 'grand_final' });
       return grandFinal;
     }
@@ -1347,7 +1347,7 @@ class ArenaDataService {
     const half = Math.floor(winners.length / 2);
     for (let i = 0; i < half; i++) {
       finalMatches.push(
-        await this.createMatch(tournamentId, 'finals', winners[i], winners[winners.length - 1 - i])
+        await this.createMatch(tournamentId, 'finals', winners[i], winners[winners.length - 1 - i], 1)
       );
     }
 
