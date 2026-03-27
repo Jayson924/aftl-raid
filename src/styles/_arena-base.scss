@@ -110,6 +110,12 @@
     color: $arena-blue;
     border: 1px solid rgba($arena-blue, 0.3);
   }
+
+  &.badge-orange {
+    background: rgba(#e8a44a, 0.2);
+    color: #e8a44a;
+    border: 1px solid rgba(#e8a44a, 0.3);
+  }
 }
 
 // Arena inputs

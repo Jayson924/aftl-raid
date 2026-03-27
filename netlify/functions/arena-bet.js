@@ -48,8 +48,10 @@ async function sbPatch(table, query, body) {
 // Fallback bet increments per phase
 const DEFAULT_INCREMENTS = {
   group_stage: [20, 50, 100],
+  tiebreaker: [20, 50, 100],
   semifinals: [50, 125, 200],
-  finals: [50, 125, 200]
+  finals: [50, 125, 200],
+  grand_final: [50, 125, 200]
 };
 
 // Prize pool distribution percentages (mirrored from arena-constants.js)
@@ -75,8 +77,10 @@ function getDynamicIncrements(startingGold, participantCount) {
   const minBet = Math.max(5, roundToNice(startingGold / bettableMatches));
   return {
     group_stage: [minBet, minBet * 2, minBet * 4],
+    tiebreaker: [minBet, minBet * 2, minBet * 4],
     semifinals: [minBet * 2, minBet * 4, minBet * 8],
-    finals: [minBet * 2, minBet * 4, minBet * 8]
+    finals: [minBet * 2, minBet * 4, minBet * 8],
+    grand_final: [minBet * 2, minBet * 4, minBet * 8]
   };
 }
 

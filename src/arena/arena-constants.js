@@ -214,8 +214,10 @@ export const MAX_BET_PERCENTAGE = 0.5; // 50% of current gold
 // Fallback increments when no pool is set
 export const BET_INCREMENTS = {
   group_stage: [20, 50, 100],
+  tiebreaker: [20, 50, 100],
   semifinals: [50, 125, 200],
-  finals: [50, 125, 200]
+  finals: [50, 125, 200],
+  grand_final: [50, 125, 200]
 };
 
 /**
@@ -234,8 +236,10 @@ export function getDynamicBetIncrements(startingGold, participantCount) {
 
   return {
     group_stage: [minBet, minBet * 2, minBet * 4],
+    tiebreaker: [minBet, minBet * 2, minBet * 4],
     semifinals: [minBet * 2, minBet * 4, minBet * 8],
-    finals: [minBet * 2, minBet * 4, minBet * 8]
+    finals: [minBet * 2, minBet * 4, minBet * 8],
+    grand_final: [minBet * 2, minBet * 4, minBet * 8]
   };
 }
 

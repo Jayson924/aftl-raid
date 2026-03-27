@@ -975,23 +975,56 @@ class ArenaDataService {
   // STANDINGS
   // ============================================
 
-  async getStandings(tournamentId) {
+  async getStandings(tournamentId, { includeTiebreakers = false } = {}) {
     const participants = await this.getParticipants(tournamentId);
     const matches = await this.getMatches(tournamentId);
 
-    // Group by bracket
+    // Compute wins/losses from completed group stage match results (more reliable than denormalized counters)
+    const completedMatches = matches.filter(m => m.status === 'complete' && m.winner_id && m.phase === 'group_stage');
+    const statsMap = {};
+    for (const m of completedMatches) {
+      const winnerId = m.winner_id;
+      const loserId = m.player1_id === winnerId ? m.player2_id : m.player1_id;
+      if (!statsMap[winnerId]) statsMap[winnerId] = { wins: 0, losses: 0 };
+      if (!statsMap[loserId]) statsMap[loserId] = { wins: 0, losses: 0 };
+      statsMap[winnerId].wins++;
+      statsMap[loserId].losses++;
+    }
+
+    // Optionally compute tiebreaker stats for secondary sorting
+    let tbStatsMap = {};
+    if (includeTiebreakers) {
+      const tbMatches = matches.filter(m => m.status === 'complete' && m.winner_id && m.phase === 'tiebreaker');
+      for (const m of tbMatches) {
+        const winnerId = m.winner_id;
+        const loserId = m.player1_id === winnerId ? m.player2_id : m.player1_id;
+        if (!tbStatsMap[winnerId]) tbStatsMap[winnerId] = { wins: 0, losses: 0 };
+        if (!tbStatsMap[loserId]) tbStatsMap[loserId] = { wins: 0, losses: 0 };
+        tbStatsMap[winnerId].wins++;
+        tbStatsMap[loserId].losses++;
+      }
+    }
+
+    // Group by bracket, override wins/losses with computed stats
     const brackets = {};
     for (const p of participants) {
       const bn = p.bracket_number || 0;
       if (!brackets[bn]) brackets[bn] = [];
-      brackets[bn].push({ ...p });
+      const computed = statsMap[p.id] || { wins: 0, losses: 0 };
+      const tb = tbStatsMap[p.id] || { wins: 0, losses: 0 };
+      brackets[bn].push({ ...p, wins: computed.wins, losses: computed.losses, tbWins: tb.wins, tbLosses: tb.losses });
     }
 
-    // Sort each bracket by wins (desc), then losses (asc)
+    // Sort each bracket by wins (desc), then losses (asc), then tiebreaker wins (desc), tiebreaker losses (asc)
     for (const bn of Object.keys(brackets)) {
       brackets[bn].sort((a, b) => {
         if (b.wins !== a.wins) return b.wins - a.wins;
-        return a.losses - b.losses;
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        if (includeTiebreakers) {
+          if (b.tbWins !== a.tbWins) return b.tbWins - a.tbWins;
+          if (a.tbLosses !== b.tbLosses) return a.tbLosses - b.tbLosses;
+        }
+        return 0;
       });
     }
 
@@ -1047,17 +1080,102 @@ class ArenaDataService {
     return matches;
   }
 
+  /**
+   * Detect if there are ties at advancement boundaries that need tiebreaker matches.
+   * Returns { needed, tiedGroups: [{ bracketNumber, players, advanceCount }] }
+   */
+  async detectTiebreakerNeeded(tournamentId) {
+    const { brackets } = await this.getStandings(tournamentId, { includeTiebreakers: true });
+    const bracketNumbers = Object.keys(brackets)
+      .filter(bn => bn !== '0')
+      .sort((a, b) => a - b);
+
+    const tiedGroups = [];
+
+    for (const bn of bracketNumbers) {
+      const players = brackets[bn];
+      // Top 2 advance per bracket (multi-bracket) or top 4 (single bracket)
+      const advanceCount = bracketNumbers.length >= 2 ? 2 : Math.min(4, players.length);
+      if (players.length <= advanceCount) continue; // Everyone advances, no tie issue
+
+      // Check the cutoff boundary — last advancing vs first non-advancing
+      const lastIn = players[advanceCount - 1];
+      const firstOut = players[advanceCount];
+
+      if (lastIn.wins === firstOut.wins && lastIn.losses === firstOut.losses
+          && lastIn.tbWins === firstOut.tbWins && lastIn.tbLosses === firstOut.tbLosses) {
+        // Collect all players with the same W/L/TB record as the cutoff
+        const tied = players.filter(p =>
+          p.wins === lastIn.wins && p.losses === lastIn.losses
+          && p.tbWins === lastIn.tbWins && p.tbLosses === lastIn.tbLosses
+        );
+        tiedGroups.push({ bracketNumber: bn, players: tied, advanceCount });
+      }
+    }
+
+    // Handle single bracket with bracket 0
+    if (bracketNumbers.length === 0 && brackets[0]) {
+      const players = brackets[0];
+      const advanceCount = Math.min(4, players.length);
+      if (players.length > advanceCount) {
+        const lastIn = players[advanceCount - 1];
+        const firstOut = players[advanceCount];
+        if (lastIn.wins === firstOut.wins && lastIn.losses === firstOut.losses
+            && lastIn.tbWins === firstOut.tbWins && lastIn.tbLosses === firstOut.tbLosses) {
+          const tied = players.filter(p =>
+            p.wins === lastIn.wins && p.losses === lastIn.losses
+            && p.tbWins === lastIn.tbWins && p.tbLosses === lastIn.tbLosses
+          );
+          tiedGroups.push({ bracketNumber: 0, players: tied, advanceCount });
+        }
+      }
+    }
+
+    return { needed: tiedGroups.length > 0, tiedGroups };
+  }
+
+  /**
+   * Generate round-robin Bo1 tiebreaker matches for tied players.
+   */
+  async generateTiebreakerMatches(tournamentId) {
+    const { needed, tiedGroups } = await this.detectTiebreakerNeeded(tournamentId);
+    if (!needed) return { tiebreakerNeeded: false };
+
+    const matches = [];
+    for (const group of tiedGroups) {
+      // Round-robin among tied players, always Bo1
+      for (let i = 0; i < group.players.length; i++) {
+        for (let j = i + 1; j < group.players.length; j++) {
+          matches.push(
+            await this.createMatch(tournamentId, 'tiebreaker', group.players[i].id, group.players[j].id, 1)
+          );
+        }
+      }
+    }
+
+    await this.updateTournament(tournamentId, { current_phase: 'tiebreaker' });
+    return { tiebreakerNeeded: true, matches };
+  }
+
   async generateSemifinalMatches(tournamentId, { forceAdvance = false } = {}) {
-    // If force-advancing, auto-forfeit incomplete group matches first
+    // If force-advancing, auto-forfeit incomplete group + tiebreaker matches first
     if (forceAdvance) {
       const allMatches = await this.getMatches(tournamentId);
-      const incomplete = allMatches.filter(m => m.phase === 'group_stage' && m.status !== 'complete');
+      const incomplete = allMatches.filter(m =>
+        (m.phase === 'group_stage' || m.phase === 'tiebreaker') && m.status !== 'complete'
+      );
       for (const m of incomplete) {
         await this.forfeitMatch(m.id, m.player1_id);
       }
     }
 
-    const { brackets } = await this.getStandings(tournamentId);
+    // Check for ties that need tiebreaker matches
+    const tieCheck = await this.detectTiebreakerNeeded(tournamentId);
+    if (tieCheck.needed && !forceAdvance) {
+      return await this.generateTiebreakerMatches(tournamentId);
+    }
+
+    const { brackets } = await this.getStandings(tournamentId, { includeTiebreakers: true });
     const bracketNumbers = Object.keys(brackets)
       .filter(bn => bn !== '0') // Exclude unassigned pool
       .sort((a, b) => a - b);
@@ -1114,31 +1232,48 @@ class ArenaDataService {
     if (!prizes) return;
 
     const semiMatches = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
-    const finalMatch = matches.find(m => m.phase === 'finals' && m.status === 'complete');
+    const finalsMatches = matches.filter(m => m.phase === 'finals' && m.status === 'complete');
+    const grandFinalMatch = matches.find(m => m.phase === 'grand_final' && m.status === 'complete');
+
+    // The "championship" match is the grand final if it exists, otherwise the single finals match
+    const championshipMatch = grandFinalMatch || (finalsMatches.length === 1 ? finalsMatches[0] : null);
 
     // Build placement map: participantId → prize key
     const placements = {};
 
-    if (finalMatch?.winner_id) {
-      placements[finalMatch.winner_id] = '1st';
-      const finalLoser = finalMatch.player1_id === finalMatch.winner_id ? finalMatch.player2_id : finalMatch.player1_id;
-      placements[finalLoser] = '2nd';
+    if (championshipMatch?.winner_id) {
+      placements[championshipMatch.winner_id] = '1st';
+      const champLoser = championshipMatch.player1_id === championshipMatch.winner_id ? championshipMatch.player2_id : championshipMatch.player1_id;
+      placements[champLoser] = '2nd';
     } else {
-      // No final played — check if a semifinal winner was auto-promoted
+      // No championship played — check if a semifinal winner was auto-promoted
       const semiWinners = semiMatches.map(m => m.winner_id).filter(Boolean);
       if (semiWinners.length === 1) {
         placements[semiWinners[0]] = '1st';
       }
     }
 
-    // Semi losers get 3rd/4th
+    // Finals losers get 3rd/4th (when grand final exists, these are the finals losers)
+    if (grandFinalMatch && finalsMatches.length > 0) {
+      const finalsLosers = finalsMatches
+        .map(m => m.winner_id ? (m.player1_id === m.winner_id ? m.player2_id : m.player1_id) : null)
+        .filter(pid => pid && !placements[pid]);
+      finalsLosers.forEach(pid => {
+        if (!placements[pid]) {
+          const usedPlaces = Object.values(placements);
+          placements[pid] = !usedPlaces.includes('3rd') ? '3rd' : '4th';
+        }
+      });
+    }
+
+    // Semi losers get 3rd/4th (or 5th+ if finals losers already filled 3rd/4th)
     const semiLosers = semiMatches
       .map(m => m.winner_id ? (m.player1_id === m.winner_id ? m.player2_id : m.player1_id) : null)
       .filter(pid => pid && !placements[pid]);
     semiLosers.forEach(pid => {
       if (!placements[pid]) {
         const usedPlaces = Object.values(placements);
-        placements[pid] = !usedPlaces.includes('3rd') ? '3rd' : '4th';
+        placements[pid] = !usedPlaces.includes('3rd') ? '3rd' : !usedPlaces.includes('4th') ? '4th' : null;
       }
     });
 
@@ -1160,36 +1295,66 @@ class ArenaDataService {
   }
 
   async generateFinalMatch(tournamentId, { forceAdvance = false } = {}) {
-    // If force-advancing, auto-forfeit incomplete semifinal matches first
+    const currentPhase = (await this.getTournament(tournamentId)).current_phase;
+
+    // If force-advancing, auto-forfeit incomplete matches from current phase
     if (forceAdvance) {
       const allMatches = await this.getMatches(tournamentId);
-      const incomplete = allMatches.filter(m => m.phase === 'semifinals' && m.status !== 'complete');
+      const forfeitable = currentPhase === 'finals' ? 'finals' : 'semifinals';
+      const incomplete = allMatches.filter(m => m.phase === forfeitable && m.status !== 'complete');
       for (const m of incomplete) {
         await this.forfeitMatch(m.id, m.player1_id);
       }
     }
 
     const matches = await this.getMatches(tournamentId);
-    const semis = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
 
+    // Determine which phase we're advancing FROM
+    if (currentPhase === 'finals') {
+      // Advancing from finals → grand final
+      const finalsMatches = matches.filter(m => m.phase === 'finals' && m.status === 'complete');
+      const winners = finalsMatches.map(m => m.winner_id).filter(Boolean);
+
+      if (winners.length < 2) {
+        if (winners.length === 1) {
+          await this.distributePlacementPrizes(tournamentId);
+          await this.updateTournament(tournamentId, { status: 'complete', current_phase: 'complete' });
+          return { skipped: true, winnerId: winners[0] };
+        }
+        throw new Error('No finals winners to advance');
+      }
+
+      const grandFinal = await this.createMatch(tournamentId, 'grand_final', winners[0], winners[1]);
+      await this.updateTournament(tournamentId, { current_phase: 'grand_final' });
+      return grandFinal;
+    }
+
+    // Advancing from semifinals → finals
+    const semis = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
     const winners = semis.map(m => m.winner_id).filter(Boolean);
 
     if (winners.length < 2) {
-      // Only 1 semifinal winner (or none) — skip finals, they win the tournament
       if (winners.length === 1) {
         await this.distributePlacementPrizes(tournamentId);
-        await this.updateTournament(tournamentId, {
-          status: 'complete',
-          current_phase: 'complete'
-        });
+        await this.updateTournament(tournamentId, { status: 'complete', current_phase: 'complete' });
         return { skipped: true, winnerId: winners[0] };
       }
       throw new Error('No semifinal winners to advance');
     }
 
-    const finalMatch = await this.createMatch(tournamentId, 'finals', winners[0], winners[1]);
+    // Pair up winners: 1st vs last, 2nd vs 2nd-last
+    const finalMatches = [];
+    const half = Math.floor(winners.length / 2);
+    for (let i = 0; i < half; i++) {
+      finalMatches.push(
+        await this.createMatch(tournamentId, 'finals', winners[i], winners[winners.length - 1 - i])
+      );
+    }
+
+    // If only 1 final match, go straight to finals (no grand final needed)
+    // If 2+ final matches, they'll play finals then grand final
     await this.updateTournament(tournamentId, { current_phase: 'finals' });
-    return finalMatch;
+    return finalMatches.length === 1 ? finalMatches[0] : finalMatches;
   }
 }
 

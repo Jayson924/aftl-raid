@@ -703,7 +703,7 @@ export const ArenaHubPage = {
           <div class="arena-panel-header">
             <h3>Recent Matches</h3>
           </div>
-          <div class="arena-match-list">
+          <div class="arena-match-list arena-match-list-scrollable">
             ${completedMatches.map(m => this._renderMatchCard(m, false)).join('')}
           </div>
         </div>
@@ -849,6 +849,8 @@ export const ArenaHubPage = {
       }
     }
 
+    const tiebreakerBadge = match.phase === 'tiebreaker' ? '<span class="arena-badge badge-orange" style="margin-bottom: 0.25rem;">Tiebreaker</span>' : '';
+
     // Upcoming/pending cards get a dedicated matchup layout
     if (isPending) {
       return `
@@ -867,6 +869,7 @@ export const ArenaHubPage = {
               </div>
             </div>
           ` : ''}
+          ${tiebreakerBadge}
           <div class="upcoming-matchup">
             <div class="upcoming-fighter upcoming-fighter-left">
               ${this._renderAvatar(p1Discord, 32)}
@@ -920,6 +923,7 @@ export const ArenaHubPage = {
               <span class="live-match-vs">VS</span>
             `}
             <span class="arena-badge ${isLive ? 'badge-red' : 'badge-green'}">${statusLabel}</span>
+            ${tiebreakerBadge}
           </div>
           <div class="live-match-fighter live-match-fighter-right ${p2Won ? 'live-match-winner' : ''} ${p1Won ? 'live-match-loser' : ''}">
             <span class="live-match-avatar-wrap">${this._renderAvatar(p2Discord, 36)}${p2Won ? '<span class="winner-crown">&#9818;</span>' : ''}</span>
@@ -1228,18 +1232,31 @@ export const ArenaHubPage = {
     let finalResultsHtml = '';
     if (isComplete) {
       const semiMatches = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');
-      const finalMatch = matches.find(m => m.phase === 'finals' && m.status === 'complete');
+      const finalsMatches = matches.filter(m => m.phase === 'finals' && m.status === 'complete');
+      const grandFinalMatch = matches.find(m => m.phase === 'grand_final' && m.status === 'complete');
+      const championshipMatch = grandFinalMatch || (finalsMatches.length === 1 ? finalsMatches[0] : null);
+      const hasGrandFinal = grandFinalMatch || finalsMatches.length > 1;
       const startingGold = prizeDistribution?.participation || 0;
 
       // Build placements
       const placements = [];
-      if (finalMatch?.winner_id) {
-        placements.push({ pid: finalMatch.winner_id, place: '1st' });
-        const finalLoser = finalMatch.player1_id === finalMatch.winner_id ? finalMatch.player2_id : finalMatch.player1_id;
-        placements.push({ pid: finalLoser, place: '2nd' });
+      if (championshipMatch?.winner_id) {
+        placements.push({ pid: championshipMatch.winner_id, place: '1st' });
+        const champLoser = championshipMatch.player1_id === championshipMatch.winner_id ? championshipMatch.player2_id : championshipMatch.player1_id;
+        placements.push({ pid: champLoser, place: '2nd' });
       } else {
         const semiWinners = semiMatches.map(m => m.winner_id).filter(Boolean);
         if (semiWinners.length === 1) placements.push({ pid: semiWinners[0], place: '1st' });
+      }
+      // Finals losers get 3rd/4th when grand final exists
+      if (hasGrandFinal) {
+        const finalsLosers = finalsMatches
+          .map(m => m.winner_id ? (m.player1_id === m.winner_id ? m.player2_id : m.player1_id) : null)
+          .filter(pid => pid && !placements.some(s => s.pid === pid));
+        finalsLosers.forEach(pid => {
+          const usedPlaces = placements.map(s => s.place);
+          placements.push({ pid, place: !usedPlaces.includes('3rd') ? '3rd' : '4th' });
+        });
       }
       const placedIds = new Set(placements.map(s => s.pid));
       const semiLosers = semiMatches
@@ -1247,7 +1264,7 @@ export const ArenaHubPage = {
         .filter(pid => pid && !placedIds.has(pid));
       semiLosers.forEach(pid => {
         const usedPlaces = placements.map(s => s.place);
-        placements.push({ pid, place: !usedPlaces.includes('3rd') ? '3rd' : '4th' });
+        placements.push({ pid, place: !usedPlaces.includes('3rd') ? '3rd' : !usedPlaces.includes('4th') ? '4th' : `${placements.length + 1}th` });
       });
       const allPlacedIds = new Set(placements.map(s => s.pid));
       const rest = participants
@@ -1341,13 +1358,24 @@ export const ArenaHubPage = {
 
   _renderTournamentTree(matches, participants, isComplete = false) {
     const semiMatches = matches.filter(m => m.phase === 'semifinals');
-    const finalMatches = matches.filter(m => m.phase === 'finals');
+    const finalsMatches = matches.filter(m => m.phase === 'finals');
+    const grandFinalMatches = matches.filter(m => m.phase === 'grand_final');
 
-    // Don't show tree until semifinals exist or are upcoming
     const phase = this._tournament?.current_phase;
-    const showTree = phase === 'semifinals' || phase === 'finals' || phase === 'complete'
-      || semiMatches.length > 0 || finalMatches.length > 0;
-    if (!showTree) return '';
+    const isActive = phase === 'group_stage' || phase === 'tiebreaker' || phase === 'semifinals'
+      || phase === 'finals' || phase === 'grand_final' || phase === 'complete';
+    if (!isActive && semiMatches.length === 0 && finalsMatches.length === 0) return '';
+
+    // Determine bracket structure:
+    // From actual semi matches if they exist, otherwise predict from bracket count
+    const bracketNumbers = [...new Set(
+      participants.map(p => p.bracket_number).filter(bn => bn && bn > 0)
+    )];
+    const bracketCount = bracketNumbers.length || 1;
+    // 2+ brackets each send 2 → bracketCount semi matches. Single bracket → 2 semis (top 4 → 2 matches)
+    const expectedSemiCount = semiMatches.length > 0 ? semiMatches.length
+      : (bracketCount >= 2 ? bracketCount : 2);
+    const needsGrandFinal = expectedSemiCount > 2;
 
     const getName = (pid) => {
       if (!pid) return 'TBD';
@@ -1368,16 +1396,21 @@ export const ArenaHubPage = {
       </div>`;
     };
 
-    // Build semifinal slots (pad to 2 matches)
-    const semis = [...semiMatches];
-    while (semis.length < 2) semis.push(null);
-
+    // Render a match — accepts real match object, virtual match with just player IDs, or null for TBD
     const renderMatch = (m, label, isFinal = false) => {
       if (!m) {
         return `<div class="tree-match tree-match-tbd">
           <div class="tree-match-label">${label}</div>
           ${renderSlot(null, false, false)}
           ${renderSlot(null, false, false)}
+        </div>`;
+      }
+      // Virtual match — just has player1_id/player2_id, no status
+      if (!m.status) {
+        return `<div class="tree-match tree-match-tbd">
+          <div class="tree-match-label">${label}</div>
+          ${renderSlot(m.player1_id, false, false)}
+          ${renderSlot(m.player2_id, false, false)}
         </div>`;
       }
       const isDone = m.status === 'complete';
@@ -1390,29 +1423,81 @@ export const ArenaHubPage = {
       </div>`;
     };
 
-    const final = finalMatches[0] || null;
+    // Get semifinal winners (in order of SF 1, SF 2, etc.)
+    const semiWinners = semiMatches.map(m =>
+      m.status === 'complete' ? m.winner_id : null
+    );
+
+    // Build virtual finals slots from semi winners (if actual finals matches don't exist yet)
+    const buildFinalsSlots = () => {
+      if (finalsMatches.length > 0) return finalsMatches;
+      // Pair semi winners: SF1 winner vs SF(last) winner, SF2 winner vs SF(last-1) winner
+      const slots = [];
+      const half = Math.floor(semiWinners.length / 2);
+      for (let i = 0; i < half; i++) {
+        const p1 = semiWinners[i] || null;
+        const p2 = semiWinners[semiWinners.length - 1 - i] || null;
+        slots.push({ player1_id: p1, player2_id: p2 }); // virtual match
+      }
+      return slots;
+    };
+
+    // Build virtual grand final slot from finals winners
+    const buildGrandFinalSlot = (finalsSlots) => {
+      if (grandFinalMatches.length > 0) return grandFinalMatches[0];
+      const finalsWinners = finalsSlots.map(m =>
+        m.status === 'complete' ? m.winner_id : null
+      );
+      if (finalsWinners.some(w => w)) {
+        return { player1_id: finalsWinners[0] || null, player2_id: finalsWinners[1] || null };
+      }
+      return null; // fully TBD
+    };
+
+    // Build virtual final slot from semi winners (2-round bracket)
+    const buildFinalSlot = () => {
+      if (finalsMatches.length > 0) return finalsMatches[0];
+      const p1 = semiWinners[0] || null;
+      const p2 = semiWinners[1] || null;
+      if (p1 || p2) return { player1_id: p1, player2_id: p2 };
+      return null;
+    };
+
+    // The championship match for standings
+    const championshipMatch = grandFinalMatches[0] || (!needsGrandFinal && finalsMatches.length === 1 ? finalsMatches[0] : null);
 
     // Build standings from bracket results
     const standings = [];
-    // 1st = final winner
-    if (final?.status === 'complete' && final.winner_id) {
-      standings.push({ pid: final.winner_id, place: '1st' });
-      // 2nd = final loser
-      const finalLoser = final.player1_id === final.winner_id ? final.player2_id : final.player1_id;
-      standings.push({ pid: finalLoser, place: '2nd' });
+    if (championshipMatch?.status === 'complete' && championshipMatch.winner_id) {
+      standings.push({ pid: championshipMatch.winner_id, place: '1st' });
+      const champLoser = championshipMatch.player1_id === championshipMatch.winner_id ? championshipMatch.player2_id : championshipMatch.player1_id;
+      standings.push({ pid: champLoser, place: '2nd' });
     }
-    // 3rd/4th = semi losers
+    if (needsGrandFinal) {
+      const finalsLosers = finalsMatches
+        .filter(m => m.status === 'complete' && m.winner_id)
+        .map(m => m.player1_id === m.winner_id ? m.player2_id : m.player1_id)
+        .filter(pid => !standings.some(s => s.pid === pid));
+      finalsLosers.forEach(pid => standings.push({ pid, place: standings.length < 3 ? '3rd' : '4th' }));
+    }
     const semiLosers = semiMatches
       .filter(m => m.status === 'complete' && m.winner_id)
       .map(m => m.player1_id === m.winner_id ? m.player2_id : m.player1_id)
       .filter(pid => !standings.some(s => s.pid === pid));
-    semiLosers.forEach(pid => standings.push({ pid, place: standings.length < 3 ? '3rd' : '4th' }));
+    semiLosers.forEach(pid => {
+      const usedPlaces = standings.map(s => s.place);
+      const place = !usedPlaces.includes('3rd') ? '3rd' : !usedPlaces.includes('4th') ? '4th' : `${standings.length + 1}th`;
+      standings.push({ pid, place });
+    });
 
-    // Remaining participants not in semis/finals
     const placedIds = new Set(standings.map(s => s.pid));
-    const allSemiPlayerIds = new Set(semiMatches.flatMap(m => [m.player1_id, m.player2_id].filter(Boolean)));
+    const allBracketPlayerIds = new Set([
+      ...semiMatches.flatMap(m => [m.player1_id, m.player2_id]),
+      ...finalsMatches.flatMap(m => [m.player1_id, m.player2_id]),
+      ...grandFinalMatches.flatMap(m => [m.player1_id, m.player2_id])
+    ].filter(Boolean));
     const rest = participants
-      .filter(p => !placedIds.has(p.id) && !allSemiPlayerIds.has(p.id))
+      .filter(p => !placedIds.has(p.id) && !allBracketPlayerIds.has(p.id))
       .sort((a, b) => {
         if (b.wins !== a.wins) return b.wins - a.wins;
         if (a.losses !== b.losses) return a.losses - b.losses;
@@ -1426,9 +1511,43 @@ export const ArenaHubPage = {
 
     const placeClasses = { '1st': 'tree-place-1st', '2nd': 'tree-place-2nd', '3rd': 'tree-place-3rd', '4th': 'tree-place-4th' };
 
-    return `
-      <div class="tournament-tree">
-        <div class="tree-header">Tournament Bracket</div>
+    // Pad semis to expected count
+    const semis = [...semiMatches];
+    while (semis.length < expectedSemiCount) semis.push(null);
+
+    // Build bracket HTML
+    let bracketHtml;
+    if (needsGrandFinal) {
+      const finalsSlots = buildFinalsSlots();
+      const finals = [...finalsSlots];
+      while (finals.length < 2) finals.push(null);
+      const gf = buildGrandFinalSlot(finalsSlots);
+
+      bracketHtml = `
+        <div class="tree-bracket tree-bracket-3round">
+          <div class="tree-round tree-round-semis">
+            <div class="tree-round-label">Semifinals</div>
+            ${semis.map((m, i) => renderMatch(m, `SF ${i + 1}`)).join('')}
+          </div>
+          <div class="tree-connectors">
+            <div class="tree-connector"></div>
+          </div>
+          <div class="tree-round tree-round-finals">
+            <div class="tree-round-label">Finals</div>
+            ${finals.map((m, i) => renderMatch(m, `F ${i + 1}`)).join('')}
+          </div>
+          <div class="tree-connectors">
+            <div class="tree-connector"></div>
+          </div>
+          <div class="tree-round tree-round-grand-final">
+            <div class="tree-round-label">Grand Final</div>
+            ${renderMatch(gf, 'Grand Final', true)}
+          </div>
+        </div>
+      `;
+    } else {
+      const finalSlot = buildFinalSlot();
+      bracketHtml = `
         <div class="tree-bracket">
           <div class="tree-round tree-round-semis">
             <div class="tree-round-label">Semifinals</div>
@@ -1439,9 +1558,16 @@ export const ArenaHubPage = {
           </div>
           <div class="tree-round tree-round-final">
             <div class="tree-round-label">Final</div>
-            ${renderMatch(final, 'Final', true)}
+            ${renderMatch(finalSlot, 'Final', true)}
           </div>
         </div>
+      `;
+    }
+
+    return `
+      <div class="tournament-tree">
+        <div class="tree-header">Tournament Bracket</div>
+        ${bracketHtml}
         ${standings.length > 0 && !isComplete ? `
           <div class="tree-standings">
             <div class="tree-standings-label">Standings</div>

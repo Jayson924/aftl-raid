@@ -497,6 +497,14 @@ export const ArenaSetupPage = {
           <button class="arena-btn arena-btn-primary" id="advance-btn" ${totalCount === 0 ? 'disabled' : ''}>Advance to Semifinals</button>
           ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Advance (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
         `;
+    } else if (phase === 'tiebreaker') {
+      nextPhaseLabel = 'Semifinals';
+      actionHtml = allComplete
+        ? `<button class="arena-btn arena-btn-primary" id="advance-btn">Advance to Semifinals</button>`
+        : `
+          <button class="arena-btn arena-btn-primary" id="advance-btn" ${totalCount === 0 ? 'disabled' : ''}>Advance to Semifinals</button>
+          ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Advance (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
+        `;
     } else if (phase === 'semifinals') {
       nextPhaseLabel = 'Finals';
       actionHtml = allComplete
@@ -506,6 +514,25 @@ export const ArenaSetupPage = {
           ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Advance (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
         `;
     } else if (phase === 'finals') {
+      // If there are multiple finals matches, need to advance to grand final
+      const finalsCount = phaseMatches.length;
+      if (finalsCount > 1) {
+        nextPhaseLabel = 'Grand Final';
+        actionHtml = allComplete
+          ? `<button class="arena-btn arena-btn-primary" id="advance-btn">Advance to Grand Final</button>`
+          : `
+            <button class="arena-btn arena-btn-primary" id="advance-btn" ${totalCount === 0 ? 'disabled' : ''}>Advance to Grand Final</button>
+            ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Advance (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
+          `;
+      } else {
+        actionHtml = allComplete
+          ? `<button class="arena-btn arena-btn-primary" id="complete-tournament-btn">Complete Tournament</button>`
+          : `
+            <button class="arena-btn arena-btn-primary" id="complete-tournament-btn" disabled>Complete Tournament</button>
+            ${incompleteCount > 0 ? `<button class="arena-btn arena-btn-danger" id="force-advance-btn">Force Complete (forfeit ${incompleteCount} match${incompleteCount > 1 ? 'es' : ''})</button>` : ''}
+          `;
+      }
+    } else if (phase === 'grand_final') {
       actionHtml = allComplete
         ? `<button class="arena-btn arena-btn-primary" id="complete-tournament-btn">Complete Tournament</button>`
         : `
@@ -710,17 +737,21 @@ export const ArenaSetupPage = {
     if (advanceBtn) {
       advanceBtn.addEventListener('click', async () => {
         const phase = this._tournament.current_phase;
-        const nextLabel = phase === 'group_stage' ? 'Semifinals' : 'Finals';
+        const nextLabel = (phase === 'group_stage' || phase === 'tiebreaker') ? 'Semifinals'
+          : phase === 'finals' ? 'Grand Final' : 'Finals';
         if (!await arenaConfirm(`Advance to ${nextLabel} using current standings?`, { title: `Advance to ${nextLabel}`, confirmText: 'Advance' })) return;
         try {
           let result;
-          if (phase === 'group_stage') {
+          if (phase === 'group_stage' || phase === 'tiebreaker') {
             result = await arenaData.generateSemifinalMatches(this._tournament.id);
           } else {
             result = await arenaData.generateFinalMatch(this._tournament.id);
           }
-          if (result?.skipped) {
-            toast.success('Only 1 semifinal winner — tournament complete!');
+          if (result?.tiebreakerNeeded) {
+            toast.success(`Tiebreaker matches generated! ${result.matches.length} match(es) to resolve ties.`);
+            this._loadData().then(() => this._renderContent(container));
+          } else if (result?.skipped) {
+            toast.success('Only 1 winner — tournament complete!');
             router.navigate('arena');
           } else {
             toast.success(`${nextLabel} generated!`);
@@ -736,11 +767,12 @@ export const ArenaSetupPage = {
     if (forceAdvanceBtn) {
       forceAdvanceBtn.addEventListener('click', async () => {
         const phase = this._tournament.current_phase;
-        if (phase === 'finals') {
-          // Force complete finals — forfeit incomplete final matches
-          if (!await arenaConfirm('Forfeit all incomplete final matches (Player 1 wins by default) and complete the tournament? Placement prizes will be distributed.', { title: 'Force Complete', confirmText: 'Force Complete', danger: true })) return;
+        // Force complete — forfeit + complete tournament (for single-match finals or grand_final)
+        if ((phase === 'finals' && (this._matches || []).filter(m => m.phase === 'finals').length <= 1) || phase === 'grand_final') {
+          const phaseLabel = phase === 'grand_final' ? 'grand final' : 'final';
+          if (!await arenaConfirm(`Forfeit all incomplete ${phaseLabel} matches (Player 1 wins by default) and complete the tournament? Placement prizes will be distributed.`, { title: 'Force Complete', confirmText: 'Force Complete', danger: true })) return;
           try {
-            const incompleteMatches = (this._matches || []).filter(m => m.phase === 'finals' && m.status !== 'complete');
+            const incompleteMatches = (this._matches || []).filter(m => m.phase === phase && m.status !== 'complete');
             for (const m of incompleteMatches) {
               await arenaData.forfeitMatch(m.id, m.player1_id);
             }
@@ -755,17 +787,19 @@ export const ArenaSetupPage = {
             toast.error('Failed: ' + err.message);
           }
         } else {
-          const nextLabel = phase === 'group_stage' ? 'Semifinals' : 'Finals';
+          // Force advance to next phase
+          const nextLabel = (phase === 'group_stage' || phase === 'tiebreaker') ? 'Semifinals'
+            : phase === 'finals' ? 'Grand Final' : 'Finals';
           if (!await arenaConfirm(`Forfeit all incomplete matches (Player 1 wins by default) and advance to ${nextLabel}?`, { title: 'Force Advance', confirmText: 'Force Advance', danger: true })) return;
           try {
             let result;
-            if (phase === 'group_stage') {
+            if (phase === 'group_stage' || phase === 'tiebreaker') {
               result = await arenaData.generateSemifinalMatches(this._tournament.id, { forceAdvance: true });
             } else {
               result = await arenaData.generateFinalMatch(this._tournament.id, { forceAdvance: true });
             }
             if (result?.skipped) {
-              toast.success('Only 1 semifinal winner — tournament complete!');
+              toast.success('Only 1 winner — tournament complete!');
               router.navigate('arena');
             } else {
               toast.success(`${nextLabel} generated!`);
