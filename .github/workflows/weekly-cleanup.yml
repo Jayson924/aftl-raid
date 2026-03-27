@@ -2,8 +2,8 @@ name: Weekly Lineup Cleanup
 
 on:
   schedule:
-    # Runs daily at 01:00 UTC - job checks if it's Friday PT before running
-    - cron: '0 1 * * *'
+    # Runs daily at 23:00 UTC (4:00 PM PT) - job checks if it's Friday PT before running
+    - cron: '0 23 * * *'
 
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
