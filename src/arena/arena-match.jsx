@@ -216,13 +216,18 @@ export const ArenaMatchPage = {
     const p2Name = this._getParticipantName(m.player2_id);
     const round = this._currentRound;
 
-    const p1Hp = round?.player1_hp || BASE_HP;
-    const p2Hp = round?.player2_hp || BASE_HP;
+    // If the current round has no characters yet (between rounds), show previous round's final HP
+    const isNewRound = round && !round.player1_character && !round.player2_character;
+    const prevRound = isNewRound && this._allRounds.length > 1
+      ? this._allRounds[this._allRounds.length - 2] : null;
+    const hpSource = prevRound || round;
+    const p1Hp = hpSource?.player1_hp ?? BASE_HP;
+    const p2Hp = hpSource?.player2_hp ?? BASE_HP;
     const p1HpPct = Math.max(0, (p1Hp / MAX_HP) * 100);
     const p2HpPct = Math.max(0, (p2Hp / MAX_HP) * 100);
 
-    const p1Char = round?.player1_character;
-    const p2Char = round?.player2_character;
+    const p1Char = (prevRound || round)?.player1_character;
+    const p2Char = (prevRound || round)?.player2_character;
     const p1Ability = p1Char ? getAbilityForClass(p1Char.className) : null;
     const p2Ability = p2Char ? getAbilityForClass(p2Char.className) : null;
 
@@ -959,36 +964,34 @@ export const ArenaMatchPage = {
       if (this._timerInterval) { clearInterval(this._timerInterval); this._timerInterval = null; }
       const turnData = data; // the resolved turn from Realtime
 
-      this._playRevealSequence(turnData, () => {
+      this._playRevealSequence(turnData, async () => {
         this._committed = false;
         this._myAction = null;
         this._myAbility = false;
 
-        arenaData.getRounds(this._match.id).then(rounds => {
-          this._allRounds = rounds;
-          this._currentRound = rounds[rounds.length - 1] || null;
+        const rounds = await arenaData.getRounds(this._match.id);
+        this._allRounds = rounds;
+        this._currentRound = rounds[rounds.length - 1] || null;
 
-          if (this._currentRound) {
-            arenaData.getTurns(this._currentRound.id).then(turns => {
-              this._currentTurn = turns.find(t => !t.resolved) || null;
-              const content = document.querySelector('.arena-match');
-              if (content) this._renderContent(content);
+        if (this._currentRound) {
+          this._combat.subscribeToTurns(this._currentRound.id);
+          const turns = await arenaData.getTurns(this._currentRound.id);
+          this._currentTurn = turns.find(t => !t.resolved) || null;
+          const content = document.querySelector('.arena-match');
+          if (content) this._renderContent(content);
 
-              if (!this._currentTurn) {
-                setTimeout(() => {
-                  arenaData.getTurns(this._currentRound.id).then(retryTurns => {
-                    const newTurn = retryTurns.find(t => !t.resolved);
-                    if (newTurn && !this._currentTurn) {
-                      this._currentTurn = newTurn;
-                      const c = document.querySelector('.arena-match');
-                      if (c) this._renderContent(c);
-                    }
-                  });
-                }, 500);
+          if (!this._currentTurn) {
+            setTimeout(async () => {
+              const retryTurns = await arenaData.getTurns(this._currentRound.id);
+              const newTurn = retryTurns.find(t => !t.resolved);
+              if (newTurn && !this._currentTurn) {
+                this._currentTurn = newTurn;
+                const c = document.querySelector('.arena-match');
+                if (c) this._renderContent(c);
               }
-            });
+            }, 500);
           }
-        });
+        }
       });
     } else if (event === 'turn_update') {
       // New turn inserted or opponent committed
