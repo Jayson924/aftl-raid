@@ -71,6 +71,25 @@
   }
 }
 
+.match-filter-toggles {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.match-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--arena-primary, #6366f1);
+  }
+}
+
 .arena-match-card {
   display: flex;
   align-items: center;

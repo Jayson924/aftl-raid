@@ -30,6 +30,8 @@ export const ArenaHubPage = {
   _matchBets: {},          // matchId → bets array
   _myParticipant: null,    // current user's participant record
   _bettingTimers: {},      // matchId → interval ID
+  _showChallenges: false,
+  _showBotMatches: false,
 
   async render(container) {
     container.innerHTML = '';
@@ -64,9 +66,9 @@ export const ArenaHubPage = {
     // Find a real tournament (not a "Quick Match" throwaway)
     // Prefer active tournaments; fall back to most recently completed
     this._tournament = tournaments.find(t =>
-      t.status !== 'complete' && t.name !== 'Quick Match'
+      t.status !== 'complete' && t.name !== 'Quick Match' && t.name !== 'Solo Match'
     ) || tournaments.find(t =>
-      t.status === 'complete' && t.name !== 'Quick Match'
+      t.status === 'complete' && t.name !== 'Quick Match' && t.name !== 'Solo Match'
     ) || null;
 
     if (this._tournament) {
@@ -664,7 +666,13 @@ export const ArenaHubPage = {
   // ============================================
 
   _renderMatchList() {
-    const matches = this._recentMatches || [];
+    const allMatches = this._recentMatches || [];
+    const matches = allMatches.filter(m => {
+      const tName = m.arena_tournaments?.name;
+      if (tName === 'Solo Match' && !this._showBotMatches) return false;
+      if (tName === 'Quick Match' && !this._showChallenges) return false;
+      return true;
+    });
 
     const pendingMatches = matches.filter(m => m.status === 'pending');
     const liveMatches = matches.filter(m =>
@@ -719,28 +727,29 @@ export const ArenaHubPage = {
       `;
     }
 
-    if (completedMatches.length > 0) {
-      html += `
-        <div class="arena-panel">
-          <div class="arena-panel-header">
-            <h3>Recent Matches</h3>
+    const hasChallenges = allMatches.some(m => m.arena_tournaments?.name === 'Quick Match');
+    const hasBotMatches = allMatches.some(m => m.arena_tournaments?.name === 'Solo Match');
+
+    html += `
+      <div class="arena-panel">
+        <div class="arena-panel-header">
+          <h3>Recent Matches</h3>
+          <div class="match-filter-toggles">
+            ${hasChallenges ? `<label class="match-filter-toggle"><input type="checkbox" id="toggle-challenges" ${this._showChallenges ? 'checked' : ''}> Challenges</label>` : ''}
+            ${hasBotMatches ? `<label class="match-filter-toggle"><input type="checkbox" id="toggle-bot" ${this._showBotMatches ? 'checked' : ''}> Bot</label>` : ''}
           </div>
+        </div>
+        ${completedMatches.length > 0 ? `
           <div class="arena-match-list arena-match-list-scrollable">
             ${completedMatches.map(m => this._renderMatchCard(m, false)).join('')}
           </div>
-        </div>
-      `;
-    }
-
-    if (!html) {
-      html = `
-        <div class="arena-panel">
+        ` : `
           <div class="arena-empty" style="padding: 1.5rem;">
             <p>No matches yet. Challenge someone to get started!</p>
           </div>
-        </div>
-      `;
-    }
+        `}
+      </div>
+    `;
 
     return html;
   },
@@ -962,6 +971,22 @@ export const ArenaHubPage = {
   },
 
   _attachMatchListeners(container) {
+    // Match filter toggles
+    const toggleChallenges = container.querySelector('#toggle-challenges');
+    if (toggleChallenges) {
+      toggleChallenges.addEventListener('change', () => {
+        this._showChallenges = toggleChallenges.checked;
+        this._renderContent(container.closest('.arena-hub') || container);
+      });
+    }
+    const toggleBot = container.querySelector('#toggle-bot');
+    if (toggleBot) {
+      toggleBot.addEventListener('change', () => {
+        this._showBotMatches = toggleBot.checked;
+        this._renderContent(container.closest('.arena-hub') || container);
+      });
+    }
+
     // Start Match buttons (pending → drafting)
     container.querySelectorAll('.arena-start-match-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
