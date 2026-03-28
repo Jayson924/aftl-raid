@@ -100,6 +100,12 @@ export const CLASS_ABILITIES = {
   }
 };
 
+// Bot constants
+export const BOT_DISCORD_ID = 'BOT_PLAYER';
+export const BOT_NAME = 'Arena Bot';
+// All arena classes for bot roster
+export const BOT_CLASSES = Object.values(CLASS_ABILITIES).flatMap(a => a.classes);
+
 // Class name → base class icon file mapping
 const CLASS_TO_ICON = {};
 const ICON_MAP = {

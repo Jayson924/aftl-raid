@@ -3,7 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { ArenaCombat } from './arena-combat.js';
-import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassIconPath, MATCH_STATUS, getMatchFormat, getRemainingSeconds } from './arena-constants.js';
+import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassIconPath, MATCH_STATUS, getMatchFormat, getRemainingSeconds, BOT_DISCORD_ID } from './arena-constants.js';
 
 /**
  * Arena Match — The main combat screen.
@@ -173,8 +173,34 @@ export const ArenaMatchPage = {
   },
 
   _getDisplayName(discordId) {
+    if (discordId === 'BOT_PLAYER') return 'Arena Bot';
     const user = this._appUsers?.find(u => u.discord_id === discordId);
     return user?.display_name || user?.username || 'Unknown';
+  },
+
+  _isBotMatch() {
+    return this._opponentParticipant?.discord_id === BOT_DISCORD_ID;
+  },
+
+  // Auto-play bot actions after a short delay
+  async _botForceCharSend() {
+    if (!this._isBotMatch()) return;
+    await new Promise(r => setTimeout(r, 800));
+    try {
+      await arenaData.forceSendCharacter(
+        this._match.id, this._currentRound.id, this._myParticipant.discord_id
+      );
+    } catch (e) { console.log('[Bot] force-send error (may be already resolved):', e.message); }
+  },
+
+  async _botForceAction() {
+    if (!this._isBotMatch()) return;
+    await new Promise(r => setTimeout(r, 800));
+    try {
+      await arenaData.forceAction(
+        this._match.id, this._currentRound.id, this._currentTurn.id, this._myParticipant.discord_id
+      );
+    } catch (e) { console.log('[Bot] force-action error (may be already resolved):', e.message); }
   },
 
   _getParticipantName(participantId) {
@@ -216,10 +242,12 @@ export const ArenaMatchPage = {
         this._autoSending = true;
         needsCharacterSend = false; // Don't show select UI
         arenaData.sendCharacter(m.id, round.id, this._myParticipant.discord_id, draft[0]).then(async (result) => {
+          // Bot auto-send
+          if (!result.bothReady && this._isBotMatch()) await this._botForceCharSend();
           const rounds = await arenaData.getRounds(m.id);
           this._allRounds = rounds;
           this._currentRound = rounds[rounds.length - 1] || null;
-          if (result.bothReady && this._currentRound) {
+          if (this._currentRound) {
             const turns = await arenaData.getTurns(this._currentRound.id);
             this._currentTurn = turns.find(t => !t.resolved) || null;
           }
@@ -728,13 +756,15 @@ export const ArenaMatchPage = {
             character
           );
 
+          // Bot auto-send
+          if (!result.bothReady && this._isBotMatch()) await this._botForceCharSend();
+
           // Reload round data to get updated character fields
           const rounds = await arenaData.getRounds(this._match.id);
           this._allRounds = rounds;
           this._currentRound = rounds[rounds.length - 1] || null;
 
-          if (result.bothReady && this._currentRound) {
-            // Both characters sent — a turn should now exist
+          if (this._currentRound) {
             const turns = await arenaData.getTurns(this._currentRound.id);
             this._currentTurn = turns.find(t => !t.resolved) || null;
           }
@@ -846,6 +876,8 @@ export const ArenaMatchPage = {
       } else {
         // Waiting for opponent — just re-render with "Waiting..."
         this._renderContent(container);
+        // Bot auto-action
+        if (this._isBotMatch()) this._botForceAction();
       }
     } catch (err) {
       this._committed = false;
@@ -901,6 +933,9 @@ export const ArenaMatchPage = {
     if (this._revealInProgress) return;
 
     // If both characters are now set but no turn exists yet, check for new turn
+    if (updatedRound.player1_character && updatedRound.player2_character) {
+      if (this._charSendTimer) { clearInterval(this._charSendTimer); this._charSendTimer = null; }
+    }
     if (updatedRound.player1_character && updatedRound.player2_character && !this._currentTurn) {
       arenaData.getTurns(updatedRound.id).then(turns => {
         const unresolved = turns.find(t => !t.resolved);
@@ -920,7 +955,8 @@ export const ArenaMatchPage = {
 
   _onCombatEvent(event, data) {
     if (event === 'turn_resolved') {
-      // Turn resolved — play reveal animation, then refresh
+      // Turn resolved — clear action timer, play reveal animation, then refresh
+      if (this._timerInterval) { clearInterval(this._timerInterval); this._timerInterval = null; }
       const turnData = data; // the resolved turn from Realtime
 
       this._playRevealSequence(turnData, () => {

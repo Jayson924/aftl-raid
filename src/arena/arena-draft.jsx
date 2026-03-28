@@ -391,6 +391,7 @@ export const ArenaDraftPage = {
   },
 
   _getDisplayName(discordId) {
+    if (discordId === 'BOT_PLAYER') return 'Arena Bot';
     if (!this._appUsers) return discordId;
     const user = this._appUsers.find(u => u.discord_id === discordId);
     return user?.display_name || user?.username || discordId;

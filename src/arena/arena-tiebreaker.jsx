@@ -121,6 +121,7 @@ export const ArenaTiebreakerPage = {
   },
 
   _getDisplayName(discordId) {
+    if (discordId === 'BOT_PLAYER') return 'Arena Bot';
     const user = this._appUsers?.find(u => u.discord_id === discordId);
     return user?.display_name || user?.username || 'Unknown';
   },

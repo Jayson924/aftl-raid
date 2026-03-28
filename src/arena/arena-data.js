@@ -6,7 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { distributePrizePool, getMatchFormat } from './arena-constants.js';
+import { distributePrizePool, getMatchFormat, BOT_DISCORD_ID, BOT_CLASSES } from './arena-constants.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -144,6 +144,70 @@ class ArenaDataService {
         status: 'drafting',
         player1_rounds_won: 0,
         player2_rounds_won: 0
+      })
+      .select()
+      .single();
+    if (mErr) throw mErr;
+
+    return { tournamentId: tournament.id, matchId: match.id };
+  }
+
+  /**
+   * Create a solo match vs bot. Pre-drafts the bot with random characters
+   * and starts the match in drafting status so the player can pick their team.
+   */
+  async createSoloMatch(playerDiscordId, matchFormat = 1) {
+    const fmt = getMatchFormat(matchFormat);
+
+    // Create throwaway tournament
+    const { data: tournament, error: tErr } = await supabase
+      .from('arena_tournaments')
+      .insert({
+        name: 'Solo Match',
+        bracket_count: 1,
+        match_format: matchFormat,
+        status: 'active',
+        current_phase: 'group_stage'
+      })
+      .select()
+      .single();
+    if (tErr) throw tErr;
+
+    // Add player and bot as participants
+    const { data: parts, error: pErr } = await supabase
+      .from('arena_participants')
+      .insert([
+        { tournament_id: tournament.id, discord_id: playerDiscordId, bracket_number: 1, seed_position: 1, wins: 0, losses: 0 },
+        { tournament_id: tournament.id, discord_id: BOT_DISCORD_ID, bracket_number: 1, seed_position: 2, wins: 0, losses: 0 }
+      ])
+      .select();
+    if (pErr) throw pErr;
+
+    const p1 = parts.find(p => p.discord_id === playerDiscordId);
+    const p2 = parts.find(p => p.discord_id === BOT_DISCORD_ID);
+
+    // Generate bot's draft — random classes
+    const shuffled = [...BOT_CLASSES].sort(() => Math.random() - 0.5);
+    const botDraft = shuffled.slice(0, fmt.charsPerDraft).map((className, i) => ({
+      playerId: `bot-char-${i}`,
+      playerName: className,
+      className,
+      isHired: false
+    }));
+
+    // Create match with bot's draft already set
+    const { data: match, error: mErr } = await supabase
+      .from('arena_matches')
+      .insert({
+        tournament_id: tournament.id,
+        phase: 'group_stage',
+        player1_id: p1.id,
+        player2_id: p2.id,
+        match_format: matchFormat,
+        status: 'drafting',
+        player1_rounds_won: 0,
+        player2_rounds_won: 0,
+        player2_draft: botDraft
       })
       .select()
       .single();

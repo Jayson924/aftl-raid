@@ -89,9 +89,24 @@ export async function handler(event) {
     const actions = ['attack', 'defend', 'strong_attack'];
     const randomAction = actions[Math.floor(Math.random() * actions.length)];
 
+    // Bot ability logic: use ability when HP is low or randomly (~30% chance)
+    const absentDiscordId = absentSide === 'player1' ? p1.discord_id : p2.discord_id;
+    let useAbility = false;
+    if (absentDiscordId === 'BOT_PLAYER') {
+      const rounds = await sbGet('arena_rounds', `id=eq.${roundId}&select=*`);
+      const round = rounds[0];
+      if (round) {
+        const abilityUsed = round[`${absentSide}_ability_used`];
+        if (!abilityUsed) {
+          const hp = round[`${absentSide}_hp`] || 120;
+          // Use ability when HP < 50% or 30% random chance
+          useAbility = hp < 60 || Math.random() < 0.3;
+        }
+      }
+    }
+
     // Submit the action via the arena-action function logic by calling it internally
     // We'll use the absent player's discord_id to submit on their behalf
-    const absentDiscordId = absentSide === 'player1' ? p1.discord_id : p2.discord_id;
 
     // Call the arena-action function endpoint
     const actionRes = await fetch(`${SUPABASE_URL.replace('/rest/v1', '').replace('https://', 'https://')}/../.netlify/functions/arena-action`, {
@@ -103,7 +118,7 @@ export async function handler(event) {
         turnId,
         discordId: absentDiscordId,
         action: randomAction,
-        useAbility: false
+        useAbility
       })
     }).catch(() => null);
 
@@ -115,7 +130,7 @@ export async function handler(event) {
     const patchHeaders = { ...sbHeaders };
     const patchBody = {
       [`${absentSide}_action`]: randomAction,
-      [`${absentSide}_ability`]: false,
+      [`${absentSide}_ability`]: useAbility,
       [`${absentSide}_committed`]: true
     };
 

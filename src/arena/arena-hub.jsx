@@ -173,6 +173,7 @@ export const ArenaHubPage = {
   },
 
   _getDisplayName(discordId) {
+    if (discordId === 'BOT_PLAYER') return 'Arena Bot';
     const user = this._appUsers?.find(u => u.discord_id === discordId);
     return user?.display_name || user?.username || discordId;
   },
@@ -506,11 +507,32 @@ export const ArenaHubPage = {
           `).join('')}
         </div>
         <div class="challenge-status" id="challenge-status"></div>
+        <button class="arena-btn" id="solo-match-btn" style="width: 100%; margin-top: 0.75rem; opacity: 0.7;">Solo Bot Practice</button>
       </div>
     `;
   },
 
   _attachChallengeListeners(container) {
+    // Solo match button
+    const soloBtn = container.querySelector('#solo-match-btn');
+    if (soloBtn) {
+      soloBtn.addEventListener('click', async () => {
+        const currentUser = dataService.getUser();
+        if (!currentUser) { toast.error('You must be logged in'); return; }
+        soloBtn.disabled = true;
+        soloBtn.textContent = 'Creating...';
+        try {
+          const result = await arenaData.createSoloMatch(currentUser.id);
+          toast.success('Solo match created!');
+          router.navigate(`arena-draft?match=${result.matchId}`);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+          soloBtn.disabled = false;
+          soloBtn.textContent = 'Solo Bot Practice';
+        }
+      });
+    }
+
     const sendBtn = container.querySelector('#challenge-send-btn');
     if (!sendBtn) return;
 
