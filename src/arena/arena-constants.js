@@ -4,6 +4,8 @@
  * All combat values, ability definitions, and timer durations for the Guild Arena.
  */
 
+import { getClassSpriteStyle } from '../constants.js';
+
 // Base HP for all characters
 export const BASE_HP = 120;
 export const MAX_HP = 120;
@@ -60,42 +62,42 @@ export const CLASS_ABILITIES = {
     id: 'highlander',
     name: 'Highlander',
     description: 'Survive lethal damage at 1 HP once (lasts 2 turns)',
-    icon: '<span class="ability-icon"><img src="/icons/warrior.png" alt=""></span>',
+    icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Warrior')}"></div></span>`,
     classes: ['Gladiator', 'Moon Lord', 'Barbarian', 'Destroyer']
   },
   archer: {
     id: 'critical_buff',
     name: 'Critical Buff',
     description: 'This turn\'s outgoing damage x1.5',
-    icon: '<span class="ability-icon"><img src="/icons/archer.png" alt=""></span>',
+    icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Archer')}"></div></span>`,
     classes: ['Sniper', 'Artillery', 'Tempest', 'Wind Walker']
   },
   sorceress: {
     id: 'charged_missile',
     name: 'Charged Missile',
     description: 'Locked into Defend this turn, next turn damage x2',
-    icon: '<span class="ability-icon"><img src="/icons/sorceress.png" alt=""></span>',
+    icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Sorceress')}"></div></span>`,
     classes: ['Saleana', 'Elestra', 'Smasher', 'Majesty']
   },
   cleric: {
     id: 'heal',
     name: 'Heal',
     description: 'Restore 20 HP (cap 120) before damage resolution',
-    icon: '<span class="ability-icon"><img src="/icons/cleric.png" alt=""></span>',
+    icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Cleric')}"></div></span>`,
     classes: ['Saint', 'Inquisitor', 'Guardian', 'Crusader']
   },
   academic: {
     id: 'food_dispenser',
     name: 'Food Dispenser',
     description: 'Random: +5 damage, -5 incoming, or +10 HP',
-    icon: '<span class="ability-icon"><img src="/icons/academic.png" alt=""></span>',
+    icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Academic')}"></div></span>`,
     classes: ['Gear Master', 'Shooting Star', 'Adept', 'Physician']
   },
   kali: {
     id: 'ghost_guard',
     name: 'Ghost Guard',
     description: 'Opponent\'s damage halved this turn',
-    icon: '<span class="ability-icon"><img src="/icons/kali.png" alt=""></span>',
+    icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Kali')}"></div></span>`,
     classes: ['Dark Summoner', 'Soul Eater', 'Blade Dancer', 'Spirit Dancer']
   }
 };
@@ -106,28 +108,11 @@ export const BOT_NAME = 'Arena Bot';
 // All arena classes for bot roster
 export const BOT_CLASSES = Object.values(CLASS_ABILITIES).flatMap(a => a.classes);
 
-// Class name → base class icon file mapping
-const CLASS_TO_ICON = {};
-const ICON_MAP = {
-  warrior: 'warrior.png',
-  archer: 'archer.png',
-  sorceress: 'sorceress.png',
-  cleric: 'cleric.png',
-  academic: 'academic.png',
-  kali: 'kali.png'
-};
-for (const [family, data] of Object.entries(CLASS_ABILITIES)) {
-  for (const cls of data.classes) {
-    CLASS_TO_ICON[cls] = ICON_MAP[family];
-  }
-}
-
 /**
- * Get the base class icon path for a class name
+ * Get sprite inline style for a class name (used by arena-match for icons)
  */
-export function getClassIconPath(className) {
-  const file = CLASS_TO_ICON[className];
-  return file ? `/icons/${file}` : null;
+export function getClassSpriteStyleArena(className) {
+  return getClassSpriteStyle(className);
 }
 
 /**

@@ -1,25 +1,11 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, formatPlayerEquipmentHtml } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
 import { modal } from '../modal.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
-
-// Build a lookup: class name → specialization icon
-const CLASS_ICON_MAP = {};
-Object.values(CLASS_FAMILIES).forEach(family => {
-  Object.values(family.specializations).forEach(spec => {
-    spec.classes.forEach(cls => {
-      CLASS_ICON_MAP[cls] = spec.icon;
-    });
-  });
-});
-
-function getClassIcon(className) {
-  return CLASS_ICON_MAP[className] || null;
-}
 
 export const PlayersPage = {
   // Cache for app users (for owner dropdown)
@@ -171,7 +157,7 @@ export const PlayersPage = {
           <button class="class-family-btn ${this._selectedClassFamily === key ? 'active' : ''} ${this._expandedClassFamily === key ? 'expanded' : ''}"
                   data-family="${key}" title="${family.name} (${count})">
             <span class="class-icon-wrapper">
-              <img src="/icons/${family.icon}" alt="${family.name}">
+              <div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div>
             </span>
             ${count > 0 ? `<span class="class-count">${count}</span>` : ''}
           </button>
@@ -200,7 +186,7 @@ export const PlayersPage = {
       <button class="specialization-btn ${this._selectedSpecialization === key ? 'active' : ''}"
               data-spec="${key}" title="${spec.name} (${count})">
         <div class="spec-icon-wrapper">
-          <img src="/icons/${spec.icon}" alt="${spec.name}">
+          <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
         </div>
         <span class="spec-name">${spec.name}</span>
         <span class="spec-count">${count}</span>
@@ -581,7 +567,7 @@ export const PlayersPage = {
                 <div class="roster-family ${count === 0 ? 'missing' : ''}">
                   <div class="roster-family-header">
                     <span class="roster-family-dot" style="background: ${this._classFamilyColors[key]}"></span>
-                    <span class="roster-family-icon-wrapper"><img src="/icons/${family.icon}" alt="${family.name}"></span>
+                    <span class="roster-family-icon-wrapper"><div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div></span>
                     <span class="roster-family-name">${family.name}</span>
                     <span class="roster-family-count">${count}</span>
                   </div>
@@ -849,7 +835,7 @@ export const PlayersPage = {
           const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
-          const icon = getClassIcon(player.role);
+          const iconStyle = getClassSpriteStyle(player.role);
           const owner = player.discordId ? userMap[player.discordId] : null;
           const detailHtml = this._buildEquipDetailHtml(player);
 
@@ -857,7 +843,7 @@ export const PlayersPage = {
             <div class="char-card">
               <div class="char-card-header">
                 <div class="char-card-identity">
-                  ${icon ? `<div class="char-card-icon-wrap"><img src="/icons/${icon}" alt="${player.role}" class="char-card-icon"></div>` : ''}
+                  ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
                   <div class="char-card-name-block">
                     <span class="char-card-name ${canEdit ? 'editable' : ''}">
                       ${canEdit
@@ -1213,7 +1199,7 @@ export const PlayersPage = {
           const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
-          const icon = getClassIcon(player.role);
+          const iconStyle = getClassSpriteStyle(player.role);
 
           const detailHtml = this._buildEquipDetailHtml(player);
 
@@ -1221,7 +1207,7 @@ export const PlayersPage = {
             <div class="char-card">
               <div class="char-card-header">
                 <div class="char-card-identity">
-                  ${icon ? `<div class="char-card-icon-wrap"><img src="/icons/${icon}" alt="${player.role}" class="char-card-icon"></div>` : ''}
+                  ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
                   <div class="char-card-name-block">
                     <span class="char-card-name ${canEdit ? 'editable' : ''}">
                       ${canEdit
@@ -1393,7 +1379,7 @@ export const PlayersPage = {
           <button type="button" class="class-family-btn ${expandedFamily === key ? 'expanded' : ''}"
                   data-family="${key}" title="${fam.name}">
             <span class="class-icon-wrapper">
-              <img src="/icons/${fam.icon}" alt="${fam.name}">
+              <div class="class-sprite" style="${getClassSpriteStyle(fam.name)}"></div>
             </span>
           </button>
         `).join('')}
@@ -1406,7 +1392,7 @@ export const PlayersPage = {
             <button type="button" class="specialization-btn ${activeSpec === key ? 'active' : ''}"
                     data-spec="${key}" title="${spec.name}">
               <div class="spec-icon-wrapper">
-                <img src="/icons/${spec.icon}" alt="${spec.name}">
+                <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
               </div>
               <span class="spec-name">${spec.name}</span>
             </button>
@@ -1419,7 +1405,7 @@ export const PlayersPage = {
           html += `<div class="class-picker-finals">
             ${spec.classes.map(cls => `
               <button type="button" class="final-class-btn ${selectedClass === cls ? 'active' : ''}"
-                      data-class="${cls}">${cls}</button>
+                      data-class="${cls}"><span class="final-class-icon"><div class="class-sprite" style="${getClassSpriteStyle(cls)}"></div></span>${cls}</button>
             `).join('')}
           </div>`;
         }

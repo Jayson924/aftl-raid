@@ -3,7 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { ArenaCombat } from './arena-combat.js';
-import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassIconPath, MATCH_STATUS, getMatchFormat, getRemainingSeconds, BOT_DISCORD_ID } from './arena-constants.js';
+import { TIMERS, BASE_HP, MAX_HP, getAbilityForClass, getClassSpriteStyleArena, MATCH_STATUS, getMatchFormat, getRemainingSeconds, BOT_DISCORD_ID } from './arena-constants.js';
 
 /**
  * Arena Match — The main combat screen.
@@ -319,10 +319,10 @@ export const ArenaMatchPage = {
           <div class="bench bench-left ${this._playerSide === 'player1' ? 'your-side' : ''}">
             ${p1Bench.map(c => {
               const outcome = charOutcomes[c.playerId] || '';
-              const iconPath = getClassIconPath(c.className);
+              const iconStyle = getClassSpriteStyleArena(c.className);
               return `
                 <div class="bench-card ${outcome ? 'bench-' + outcome : ''}">
-                  ${iconPath ? `<div class="bench-card-icon"><img src="${iconPath}" alt="${c.className}"></div>` : ''}
+                  ${iconStyle ? `<div class="bench-card-icon"><div class="class-sprite" style="${iconStyle}"></div></div>` : ''}
                   <div class="bench-card-name">${c.playerName}</div>
                   <div class="bench-card-class">${c.className}</div>
                   ${c.isHired ? '<span class="bench-hired">Hired</span>' : ''}
@@ -335,7 +335,7 @@ export const ArenaMatchPage = {
         <div class="match-fighter match-fighter-left ${this._playerSide === 'player1' ? 'your-side' : ''}">
           <div class="fighter-portrait">
             <div class="fighter-portrait-inner">
-              ${p1Char ? `<img class="fighter-class-icon" src="${getClassIconPath(p1Char.className) || ''}" alt="${p1Char.className}">` : ''}
+              ${p1Char ? `<div class="class-sprite fighter-class-icon" style="${getClassSpriteStyleArena(p1Char.className)}"></div>` : ''}
             </div>
           </div>
           <div class="fighter-name">${p1Char?.playerName || p1Name}</div>
@@ -359,7 +359,7 @@ export const ArenaMatchPage = {
         <div class="match-fighter match-fighter-right ${this._playerSide === 'player2' ? 'your-side' : ''}">
           <div class="fighter-portrait">
             <div class="fighter-portrait-inner">
-              ${p2Char ? `<img class="fighter-class-icon" src="${getClassIconPath(p2Char.className) || ''}" alt="${p2Char.className}">` : ''}
+              ${p2Char ? `<div class="class-sprite fighter-class-icon" style="${getClassSpriteStyleArena(p2Char.className)}"></div>` : ''}
             </div>
           </div>
           <div class="fighter-name">${p2Char?.playerName || p2Name}</div>
@@ -380,10 +380,10 @@ export const ArenaMatchPage = {
           <div class="bench bench-right ${this._playerSide === 'player2' ? 'your-side' : ''}">
             ${p2Bench.map(c => {
               const outcome = charOutcomes[c.playerId] || '';
-              const iconPath = getClassIconPath(c.className);
+              const iconStyle = getClassSpriteStyleArena(c.className);
               return `
                 <div class="bench-card ${outcome ? 'bench-' + outcome : ''}">
-                  ${iconPath ? `<div class="bench-card-icon"><img src="${iconPath}" alt="${c.className}"></div>` : ''}
+                  ${iconStyle ? `<div class="bench-card-icon"><div class="class-sprite" style="${iconStyle}"></div></div>` : ''}
                   <div class="bench-card-name">${c.playerName}</div>
                   <div class="bench-card-class">${c.className}</div>
                   ${c.isHired ? '<span class="bench-hired">Hired</span>' : ''}

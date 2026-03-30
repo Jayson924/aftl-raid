@@ -156,18 +156,14 @@
   .bench-card-icon {
     width: 50px;
     height: 50px;
-    border-radius: 50%;
-    overflow: hidden;
     margin: 0 auto 0.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
 
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scale(2.2);
+    .class-sprite {
+      transform: scale(1.1);
+      transform-origin: center;
     }
   }
 
@@ -238,13 +234,9 @@
       justify-content: center;
       width: 100%;
       height: 100%;
-      overflow: hidden;
 
       .fighter-class-icon {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transform: scale(2.2);
+        // sprite is 44x46, no zoom needed
       }
     }
   }

@@ -180,12 +180,7 @@
     gap: 0.75rem;
 
     .class-icon {
-      width: 36px;
-      height: 36px;
-      object-fit: cover;
-      transform: scale(1.6);
-      clip-path: circle(50%);
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      // Uses .class-sprite — native 44x46 size
     }
 
     .character-name-link {
@@ -678,8 +673,8 @@
 
     .character-info {
       .class-icon {
-        width: 30px;
-        height: 30px;
+        transform: scale(0.7);
+        transform-origin: left center;
       }
 
       .character-name-link {

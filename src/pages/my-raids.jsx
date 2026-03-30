@@ -1,22 +1,8 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
-import { CLASS_FAMILIES } from '../constants.js';
+import { getClassSpriteStyle } from '../constants.js';
 import { PlayersPage } from './players.jsx';
-
-// Build a lookup: class name → specialization icon
-const CLASS_ICON_MAP = {};
-Object.values(CLASS_FAMILIES).forEach(family => {
-  Object.values(family.specializations).forEach(spec => {
-    spec.classes.forEach(cls => {
-      CLASS_ICON_MAP[cls] = spec.icon;
-    });
-  });
-});
-
-function getClassIcon(className) {
-  return CLASS_ICON_MAP[className] || null;
-}
 
 export const MyRaidsPage = {
   _myPlayers: [],
@@ -152,14 +138,14 @@ export const MyRaidsPage = {
         players.forEach(player => {
           const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
           const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
-          const icon = getClassIcon(player.role);
+          const iconStyle = getClassSpriteStyle(player.role);
           const playerRaids = raidsByPlayer[player.id] || [];
 
           html += `
             <div class="character-block" data-player-id="${player.id}">
               <div class="character-card">
                 <div class="character-info">
-                  ${icon ? `<img src="/icons/${icon}" alt="${player.role}" class="class-icon">` : ''}
+                  ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
                   <div>
                     <span class="character-name-link" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>
                     <span class="character-class">${player.role}</span>

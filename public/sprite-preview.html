@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { background: #1a1a2e; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
+  h1 { color: #f4c430; margin-bottom: 4px; }
+  p { color: #888; margin: 0 0 16px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;
+    background: #222; padding: 12px 16px; border-radius: 8px;
+  }
+  .control { display: flex; flex-direction: column; gap: 2px; }
+  .control label { font-size: 11px; color: #aaa; }
+  .control input {
+    width: 70px; padding: 4px 6px; background: #333; border: 1px solid #555;
+    color: #e0e0e0; border-radius: 4px; font-size: 13px;
+  }
+  .values { font-size: 12px; color: #f4c430; align-self: center; }
+
+  .tabs { margin-bottom: 16px; }
+  .tabs button {
+    padding: 6px 16px; background: #333; color: #e0e0e0; border: 1px solid #555;
+    border-radius: 6px; cursor: pointer; font-size: 13px; margin-right: 6px;
+  }
+  .tabs button.active { background: #f4c430; color: #1a1a2e; border-color: #f4c430; }
+
+  .sprite-container {
+    position: relative; display: inline-block;
+    border: 1px solid #444;
+  }
+  .sprite-container img { display: block; }
+  .grid-overlay {
+    position: absolute; top: 0; left: 0;
+    pointer-events: none;
+  }
+
+  /* Icon grid view */
+  .icon-grid { display: grid; gap: 6px; }
+  .icon-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 6px; border: 1px solid #333; border-radius: 6px;
+  }
+  .icon-cell:hover { border-color: #f4c430; background: rgba(244,196,48,0.1); }
+  .icon-box {
+    overflow: hidden; border: 1px solid #555; border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+  }
+  .icon-box div {
+    width: 100%; height: 100%;
+    background-image: url('/icons/classes.png');
+    background-repeat: no-repeat;
+  }
+  .icon-label { font-size: 11px; color: #aaa; font-weight: 600; }
+  .row-header {
+    grid-column: 1 / -1; color: #f4c430; margin-top: 12px; font-size: 14px;
+    padding: 4px 0; border-bottom: 1px solid #333;
+  }
+
+  #tuner-view, #icons-view { display: none; }
+  #tuner-view.active, #icons-view.active { display: block; }
+</style>
+</head>
+<body>
+<h1>Sprite Sheet Tool</h1>
+<p>Tune the grid, then switch to Icons view to see each one extracted.</p>
+
+<div class="tabs">
+  <button class="active" onclick="switchTab('tuner')">Grid Tuner</button>
+  <button onclick="switchTab('icons')">Icons View</button>
+</div>
+
+<!-- TUNER VIEW -->
+<div id="tuner-view" class="active">
+  <div class="controls">
+    <div class="control"><label>Cell W</label><input type="number" id="cellW" value="44" min="20" max="100"></div>
+    <div class="control"><label>Cell H</label><input type="number" id="cellH" value="46" min="20" max="100"></div>
+    <div class="control"><label>Gap X</label><input type="number" id="gapX" value="11" min="0" max="30"></div>
+    <div class="control"><label>Gap Y</label><input type="number" id="gapY" value="9" min="0" max="30"></div>
+    <div class="control"><label>Offset X</label><input type="number" id="offX" value="5" min="0" max="50"></div>
+    <div class="control"><label>Offset Y</label><input type="number" id="offY" value="5" min="0" max="50"></div>
+    <div class="values" id="info"></div>
+  </div>
+  <div class="sprite-container">
+    <img src="/icons/classes.png" width="512" height="1024">
+    <svg class="grid-overlay" id="overlay" width="512" height="1024"></svg>
+  </div>
+</div>
+
+<!-- ICONS VIEW -->
+<div id="icons-view">
+  <div class="icon-grid" id="icon-grid"></div>
+</div>
+
+<script>
+const ids = ['cellW','cellH','gapX','gapY','offX','offY'];
+const inputs = {};
+ids.forEach(id => { inputs[id] = document.getElementById(id); });
+
+function getConfig() {
+  return {
+    cw: +inputs.cellW.value, ch: +inputs.cellH.value,
+    gx: +inputs.gapX.value, gy: +inputs.gapY.value,
+    ox: +inputs.offX.value, oy: +inputs.offY.value,
+  };
+}
+
+function drawTuner() {
+  const { cw, ch, gx, gy, ox, oy } = getConfig();
+  const stepX = cw + gx, stepY = ch + gy;
+  const cols = Math.floor((512 - ox + gx) / stepX);
+  const rows = Math.floor((1024 - oy + gy) / stepY);
+  document.getElementById('info').textContent = cols + ' cols × ' + rows + ' rows | step: ' + stepX + '×' + stepY;
+
+  let svg = '';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = ox + c * stepX, y = oy + r * stepY;
+      svg += `<rect x="${x}" y="${y}" width="${cw}" height="${ch}" fill="none" stroke="rgba(244,196,48,0.4)" stroke-width="1"/>`;
+      svg += `<text x="${x+2}" y="${y+10}" fill="rgba(244,196,48,0.7)" font-size="9" font-family="monospace">${r},${c}</text>`;
+    }
+  }
+  document.getElementById('overlay').innerHTML = svg;
+}
+
+function drawIcons() {
+  const { cw, ch, gx, gy, ox, oy } = getConfig();
+  const stepX = cw + gx, stepY = ch + gy;
+  const cols = Math.floor((512 - ox + gx) / stepX);
+  const rows = Math.floor((1024 - oy + gy) / stepY);
+
+  const grid = document.getElementById('icon-grid');
+  grid.style.gridTemplateColumns = `repeat(${cols}, 70px)`;
+  grid.innerHTML = '';
+
+  for (let r = 0; r < rows; r++) {
+    const header = document.createElement('div');
+    header.className = 'row-header';
+    header.textContent = 'Row ' + r;
+    grid.appendChild(header);
+
+    for (let c = 0; c < cols; c++) {
+      const srcX = ox + c * stepX;
+      const srcY = oy + r * stepY;
+      const cell = document.createElement('div');
+      cell.className = 'icon-cell';
+      cell.innerHTML = `
+        <div class="icon-box" style="width:${cw}px;height:${ch}px">
+          <div style="background-position: ${-srcX}px ${-srcY}px; background-size: 512px 1024px"></div>
+        </div>
+        <span class="icon-label">${r},${c}</span>
+      `;
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tabs button').forEach((b, i) => {
+    b.classList.toggle('active', (tab === 'tuner' && i === 0) || (tab === 'icons' && i === 1));
+  });
+  document.getElementById('tuner-view').classList.toggle('active', tab === 'tuner');
+  document.getElementById('icons-view').classList.toggle('active', tab === 'icons');
+  if (tab === 'icons') drawIcons();
+}
+
+ids.forEach(id => { inputs[id].addEventListener('input', drawTuner); });
+drawTuner();
+</script>
+</body>
+</html>

@@ -1,3 +1,73 @@
+// ─── Class Icon Sprite Sheet ───
+// Sprite: /icons/classes.png (512×1024)
+// Grid: 44×46 cells, gap 11×9, offset 6×5
+export const SPRITE_CONFIG = {
+  url: '/icons/classes.png',
+  sheetW: 512, sheetH: 1024,
+  cellW: 44, cellH: 46,
+  gapX: 11, gapY: 9,
+  offX: 6, offY: 5,
+};
+
+// Sprite position map: class name → [row, col]
+export const CLASS_SPRITE_MAP = {
+  // Base classes
+  'Warrior':        [0, 0],
+  'Archer':         [0, 1],
+  'Sorceress':      [0, 2],
+  'Cleric':         [0, 3],
+  'Academic':       [0, 4],
+  'Kali':           [0, 5],
+  // 1st specializations
+  'Swordmaster':    [0, 8],
+  'Mercenary':      [1, 0],
+  'Bowmaster':      [1, 6],
+  'Acrobat':        [1, 7],
+  'Elemental Lord': [2, 4],
+  'Force User':     [2, 5],
+  'Paladin':        [3, 2],
+  'Priest':         [3, 3],
+  'Engineer':       [4, 0],
+  'Alchemist':      [4, 3],
+  'Screamer':       [4, 6],
+  'Dancer':         [5, 0],
+  // Final classes
+  'Gladiator':      [1, 2],
+  'Moon Lord':      [1, 3],
+  'Barbarian':      [1, 4],
+  'Destroyer':      [1, 5],
+  'Sniper':         [2, 0],
+  'Artillery':      [2, 1],
+  'Wind Walker':    [2, 2],
+  'Tempest':        [2, 3],
+  'Saleana':        [2, 7],
+  'Elestra':        [2, 8],
+  'Smasher':        [3, 0],
+  'Majesty':        [3, 1],
+  'Crusader':       [3, 5],
+  'Guardian':       [3, 6],
+  'Saint':          [3, 7],
+  'Inquisitor':     [3, 8],
+  'Shooting Star':  [4, 1],
+  'Gear Master':    [4, 2],
+  'Adept':          [4, 4],
+  'Physician':      [4, 5],
+  'Dark Summoner':  [4, 7],
+  'Soul Eater':     [4, 8],
+  'Blade Dancer':   [5, 1],
+  'Spirit Dancer':  [5, 2],
+};
+
+// Get inline style for a class sprite icon background
+export function getClassSpriteStyle(className) {
+  const pos = CLASS_SPRITE_MAP[className];
+  if (!pos) return '';
+  const { cellW, cellH, gapX, gapY, offX, offY } = SPRITE_CONFIG;
+  const srcX = offX + pos[1] * (cellW + gapX);
+  const srcY = offY + pos[0] * (cellH + gapY);
+  return `background-position: ${-srcX}px ${-srcY}px`;
+}
+
 // Game classes available for players
 export const CLASSES = [
   'Gladiator',

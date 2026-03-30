@@ -7,6 +7,7 @@ import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
 import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
+import { RecruitingPage } from './pages/recruiting.jsx'
 import { ArenaHubPage } from './arena/arena-hub.jsx'
 import { ArenaSetupPage } from './arena/arena-setup.jsx'
 import { ArenaDraftPage } from './arena/arena-draft.jsx'
@@ -73,6 +74,7 @@ async function initApp() {
   router.register('lavish', SpendingGuidePage); // No auth required
   router.register('my-raids', MyRaidsPage, 'player'); // Any authenticated user
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
+  router.register('recruiting', RecruitingPage); // Public standalone page - no nav
   router.register('arena', ArenaHubPage); // Arena hub - anyone can view
   router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
   router.register('arena-draft', ArenaDraftPage, 'player'); // Draft phase - players only

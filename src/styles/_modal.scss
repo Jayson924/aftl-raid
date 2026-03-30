@@ -134,7 +134,7 @@
 
     .class-family-btn {
       width: 48px;
-      height: 48px;
+      height: 50px;
       padding: 2px;
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: $border-radius;
@@ -144,22 +144,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
 
-      img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+      .class-sprite {
         opacity: 0.6;
         transition: $transition;
-        transform: scale(2.5);
+        transform: scale(0.85);
       }
 
       &:hover {
         border-color: rgba(255, 255, 255, 0.4);
         background-color: rgba(120, 120, 120, 0.4);
 
-        img {
+        .class-sprite {
           opacity: 0.8;
         }
       }
@@ -168,7 +164,7 @@
         border-color: $success-color;
         background-color: rgba(40, 167, 69, 0.3);
 
-        img {
+        .class-sprite {
           opacity: 1;
         }
       }
@@ -177,7 +173,7 @@
         border-color: rgba(255, 255, 255, 0.5);
         background-color: rgba(255, 255, 255, 0.15);
 
-        img {
+        .class-sprite {
           opacity: 0.9;
         }
       }
@@ -199,8 +195,8 @@
     .specialization-btn {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0.75rem;
+      gap: 0.35rem;
+      padding: 0.3rem 0.65rem 0.3rem 0.3rem;
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: $border-radius;
       background-color: rgba(100, 100, 100, 0.25);
@@ -209,23 +205,19 @@
 
       .spec-icon-wrapper {
         width: 28px;
-        height: 28px;
-        overflow: hidden;
+        height: 30px;
         flex-shrink: 0;
-        border-radius: 4px;
 
-        img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
+        .class-sprite {
           opacity: 0.7;
           transition: $transition;
-          transform: scale(2.3);
+          transform: scale(0.65);
+          transform-origin: top left;
         }
       }
 
       .spec-name {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         color: rgba(255, 255, 255, 0.7);
         font-weight: 500;
       }
@@ -234,7 +226,7 @@
         border-color: rgba(255, 255, 255, 0.4);
         background-color: rgba(120, 120, 120, 0.35);
 
-        .spec-icon-wrapper img {
+        .spec-icon-wrapper .class-sprite {
           opacity: 0.9;
         }
 
@@ -248,7 +240,7 @@
         background-color: rgba(244, 196, 48, 0.25);
         box-shadow: 0 0 8px rgba(244, 196, 48, 0.3);
 
-        .spec-icon-wrapper img {
+        .spec-icon-wrapper .class-sprite {
           opacity: 1;
         }
 
@@ -274,7 +266,10 @@
     margin-bottom: 0.5rem;
 
     .final-class-btn {
-      padding: 0.4rem 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.65rem 0.3rem 0.3rem;
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: $border-radius;
       background-color: rgba(100, 100, 100, 0.25);
@@ -284,10 +279,27 @@
       font-weight: 500;
       transition: all 0.2s ease;
 
+      .final-class-icon {
+        width: 28px;
+        height: 30px;
+        flex-shrink: 0;
+
+        .class-sprite {
+          transform: scale(0.65);
+          transform-origin: top left;
+          opacity: 0.7;
+          transition: $transition;
+        }
+      }
+
       &:hover {
         border-color: rgba(255, 255, 255, 0.4);
         background-color: rgba(120, 120, 120, 0.35);
         color: rgba(255, 255, 255, 0.9);
+
+        .final-class-icon .class-sprite {
+          opacity: 0.9;
+        }
       }
 
       &.active {
@@ -295,6 +307,10 @@
         background-color: rgba(40, 167, 69, 0.3);
         color: #fff;
         font-weight: 600;
+
+        .final-class-icon .class-sprite {
+          opacity: 1;
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
@@ -192,7 +192,7 @@ export const LineupEditorPage = {
               <div class="class-family-filter">
                 ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
                   <button class="class-family-btn" data-family="${key}" title="${family.name}">
-                    <img src="/icons/${family.icon}" alt="${family.name}">
+                    <div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div>
                   </button>
                 `).join('')}
               </div>
@@ -864,7 +864,7 @@ export const LineupEditorPage = {
               data-family="${this.expandedClassFamily}"
               title="${spec.name}">
         <div class="spec-icon-wrapper">
-          <img src="/icons/${spec.icon}" alt="${spec.name}">
+          <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
         </div>
         <span class="spec-name">${spec.name}</span>
       </button>
@@ -931,7 +931,7 @@ export const LineupEditorPage = {
           <button type="button" class="class-family-btn ${expandedFamily === key ? 'expanded' : ''}"
                   data-family="${key}" title="${fam.name}">
             <span class="class-icon-wrapper">
-              <img src="/icons/${fam.icon}" alt="${fam.name}">
+              <div class="class-sprite" style="${getClassSpriteStyle(fam.name)}"></div>
             </span>
           </button>
         `).join('')}
@@ -943,7 +943,7 @@ export const LineupEditorPage = {
             <button type="button" class="specialization-btn ${activeSpec === key ? 'active' : ''}"
                     data-spec="${key}" title="${spec.name}">
               <div class="spec-icon-wrapper">
-                <img src="/icons/${spec.icon}" alt="${spec.name}">
+                <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
               </div>
               <span class="spec-name">${spec.name}</span>
             </button>
@@ -955,7 +955,7 @@ export const LineupEditorPage = {
           html += `<div class="class-picker-finals">
             ${spec.classes.map(cls => `
               <button type="button" class="final-class-btn ${selectedClass === cls ? 'active' : ''}"
-                      data-class="${cls}">${cls}</button>
+                      data-class="${cls}"><span class="final-class-icon"><div class="class-sprite" style="${getClassSpriteStyle(cls)}"></div></span>${cls}</button>
             `).join('')}
           </div>`;
         }
@@ -1215,7 +1215,7 @@ export const LineupEditorPage = {
         <div class="modal-class-family-filter">
           ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
             <button class="class-family-btn" data-family="${key}" title="${family.name}">
-              <img src="/icons/${family.icon}" alt="${family.name}">
+              <div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div>
             </button>
           `).join('')}
         </div>
@@ -1370,7 +1370,7 @@ export const LineupEditorPage = {
                 data-family="${modalExpandedFamily}"
                 title="${spec.name}">
           <div class="spec-icon-wrapper">
-            <img src="/icons/${spec.icon}" alt="${spec.name}">
+            <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
           </div>
           <span class="spec-name">${spec.name}</span>
         </button>

@@ -33,6 +33,18 @@ body {
   width: 100%;
 }
 
+// ─── Class Icon Sprite ───
+// Uses /icons/classes.png sprite sheet
+// Apply .class-sprite to a div, set background-position via inline style or getClassSpriteStyle()
+.class-sprite {
+  display: inline-block;
+  background-image: url('/icons/classes.png');
+  background-size: 512px 1024px;
+  background-repeat: no-repeat;
+  width: 44px;
+  height: 46px;
+}
+
 // Presence indicator (who's viewing)
 .presence-indicator {
   display: flex;

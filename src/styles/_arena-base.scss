@@ -134,20 +134,18 @@
   }
 }
 
-// Ability icon — zoomed-in class icon (hides diamond frame)
+// Ability icon — class sprite in small circle
 .ability-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  overflow: hidden;
   vertical-align: middle;
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scale(2.2);
+  .class-sprite {
+    transform: scale(0.45);
+    transform-origin: center;
   }
 }
 
