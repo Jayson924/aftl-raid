@@ -6,7 +6,7 @@ import { join } from 'path'
 export default defineConfig({
   appType: 'spa',
   build: {
-    outDir: 'dist-recruit',
+    outDir: process.env.RECRUIT_BUILD ? 'dist' : 'dist-recruit',
     rollupOptions: {
       input: resolve(import.meta.dirname, 'recruit.html'),
     },
@@ -14,8 +14,9 @@ export default defineConfig({
   plugins: [{
     name: 'rename-recruit-html',
     closeBundle() {
-      const src = join('dist-recruit', 'recruit.html');
-      const dest = join('dist-recruit', 'index.html');
+      const outDir = process.env.RECRUIT_BUILD ? 'dist' : 'dist-recruit';
+      const src = join(outDir, 'recruit.html');
+      const dest = join(outDir, 'index.html');
       if (existsSync(src)) {
         renameSync(src, dest);
       }
