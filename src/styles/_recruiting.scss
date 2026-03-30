@@ -63,10 +63,53 @@
   strong { color: #f4c430; }
 }
 
+// ─── Admin Toolbar ───
+
+.recruiting-admin-toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+
+  .btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid;
+    font-family: inherit;
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ccc;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: #fff;
+    }
+  }
+
+  .btn-primary {
+    background: rgba(244, 196, 48, 0.15);
+    border-color: rgba(244, 196, 48, 0.4);
+    color: #f4c430;
+
+    &:hover {
+      background: rgba(244, 196, 48, 0.25);
+      box-shadow: 0 0 12px rgba(244, 196, 48, 0.2);
+    }
+  }
+}
+
 // ─── Web Canvas ───
 
 .recruit-web {
-  max-width: 750px;
+  max-width: 950px;
   margin: 0 auto;
   padding: 10px 20px;
 
@@ -105,6 +148,9 @@
 }
 
 .party-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.8rem;
   font-weight: 600;
   padding: 4px 14px;
@@ -113,6 +159,21 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid color-mix(in srgb, var(--party-color) 25%, transparent);
   cursor: default;
+
+  &__delete {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #e74c3c;
+    }
+  }
 }
 
 // ─── Web Nodes ───
@@ -160,8 +221,6 @@
   }
 
   &__icon {
-    // Sprite icon — inherits background from .class-sprite
-    // Size to fill the bubble
     width: 44px;
     height: 46px;
   }
@@ -232,6 +291,28 @@
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.08);
   }
 
+  // ─── Drag & drop ───
+
+  &[draggable="true"] {
+    cursor: grab;
+  }
+
+  &.dragging {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+
+  &.drag-over {
+    z-index: 10;
+
+    .web-node__bubble {
+      border-color: #f4c430 !important;
+      border-style: solid !important;
+      box-shadow: 0 0 20px rgba(244, 196, 48, 0.4) !important;
+      transform: scale(1.12);
+    }
+  }
+
   // ─── Hover highlight ───
 
   &--highlighted {
@@ -261,6 +342,96 @@
 @keyframes recruit-pulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
+}
+
+// ─── Available Characters Pool ───
+
+.recruit-pool {
+  max-width: 950px;
+  margin: 20px auto 0;
+  padding: 0 20px;
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #a0a0c0;
+    margin: 0 0 12px;
+    text-align: center;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  &__empty {
+    text-align: center;
+    color: #4ece73;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  &__card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: grab;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    &.dragging {
+      opacity: 0.3;
+    }
+  }
+
+  &__icon {
+    width: 36px;
+    height: 38px;
+    flex-shrink: 0;
+
+    .class-sprite {
+      transform: scale(0.8);
+      transform-origin: top left;
+    }
+  }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #d0d0d0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__class {
+    font-size: 0.7rem;
+    color: #888;
+  }
+
+  &__gs {
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
 }
 
 // ─── Summary ───
@@ -326,6 +497,127 @@
     color: #ffb347;
     border: 1px solid rgba(255, 152, 0, 0.25);
   }
+
+  &--ice {
+    background: rgba(100, 200, 255, 0.12);
+    color: #7dd3fc;
+    border: 1px solid rgba(100, 200, 255, 0.25);
+  }
+
+  &--cooldown {
+    background: rgba(192, 132, 252, 0.12);
+    color: #c084fc;
+    border: 1px solid rgba(192, 132, 252, 0.25);
+  }
+
+  &--utility {
+    background: rgba(34, 211, 238, 0.12);
+    color: #22d3ee;
+    border: 1px solid rgba(34, 211, 238, 0.25);
+  }
+
+  &--pairing {
+    background: rgba(244, 114, 182, 0.12);
+    color: #f472b6;
+    border: 1px solid rgba(244, 114, 182, 0.25);
+    cursor: help;
+  }
+
+  &--always {
+    opacity: 0.6;
+    border-style: dashed;
+    cursor: help;
+  }
+
+  // All badges with tooltips get pointer cursor + relative positioning
+  position: relative;
+  cursor: default;
+
+  .recruit-tip {
+    display: none;
+  }
+
+  &:hover .recruit-tip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 30, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 10px 14px;
+    z-index: 100;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+}
+
+.recruit-tip__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #d0d0d0;
+
+  .class-sprite {
+    transform: scale(0.55);
+    transform-origin: top left;
+    width: 44px;
+    height: 46px;
+    flex-shrink: 0;
+    // Collapse the extra space from scaling
+    margin-right: -20px;
+    margin-bottom: -21px;
+  }
+}
+
+.recruit-tip__msg {
+  font-size: 0.78rem;
+  color: #b0b0c8;
+  max-width: 240px;
+  white-space: normal;
+  line-height: 1.45;
+  text-align: center;
+}
+
+// ─── Gearscore requirement tooltip ───
+
+.gs-req {
+  cursor: help;
+  border-bottom: 1px dashed rgba(244, 196, 48, 0.5);
+}
+
+// ─── Mobile tooltip tap-to-show ───
+
+.recruiting-page .tooltip-visible {
+  &::before,
+  &::after {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateX(-50%) translateY(0) !important;
+  }
+
+  .recruit-tip {
+    display: flex !important;
+    flex-direction: column;
+    gap: 6px;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 30, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 10px 14px;
+    z-index: 100;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+    pointer-events: none;
+  }
 }
 
 // ─── Responsive ───
@@ -358,5 +650,14 @@
     &__question { font-size: 1.1rem; }
     &__label { font-size: 0.48rem; }
     &__recruiting { font-size: 0.48rem; }
+  }
+
+  .recruiting-admin-toolbar {
+    padding: 12px 16px;
+
+    .btn {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+    }
   }
 }
