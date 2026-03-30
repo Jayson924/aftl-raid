@@ -43,7 +43,7 @@ function detectPairingNeeds(parties, playerMap) {
     const hasSaleana = dpsRoles.includes('Saleana');
     const hasAdept = dpsRoles.includes('Adept');
     if (hasSaleana && !hasAdept) {
-      needs.push({ need: 'Adept', reason: 'Saleana needs an Adept for Ice Debuff synergy' });
+      needs.push({ need: 'Adept', reason: 'Saleana needs an Adept for synergy + ice debuffs' });
     }
     if (hasAdept && !hasSaleana) {
       needs.push({ need: 'Saleana', reason: 'Adept needs a Saleana for synergy' });
@@ -69,9 +69,16 @@ function calculateLayout(parties) {
   const rawNodes = [];
 
   const numParties = parties.length;
-  const corePairGap = 70;
-  const coreOrbitRadius = numParties <= 1 ? 0 : 120 + numParties * 30;
-  const dpsRadius = 180;
+  const corePairGap = numParties <= 2 ? 70 : 60;
+  const coreOrbitRadius = numParties <= 1 ? 0 : 100 + numParties * 35;
+  const dpsRadius = numParties <= 2 ? 180 : 160 + numParties * 10;
+
+  // Central hub node at origin (only for multi-party)
+  let hubNode = null;
+  if (numParties > 1) {
+    hubNode = { x: 0, y: 0, partyIndex: -1, player: null, slotType: 'hub', slotKey: 'hub', slotLabel: 'AFTL' };
+    rawNodes.push(hubNode);
+  }
 
   parties.forEach((party, pi) => {
     const partyAngle = numParties <= 1
@@ -91,7 +98,7 @@ function calculateLayout(parties) {
     rawNodes.push({ x: healerX, y: healerY, partyIndex: pi, player: party.healerPlayer, slotType: 'healer', slotKey: `${pi}-healer-0`, slotLabel: 'Healer' });
 
     const dpsCount = 6;
-    const fanArc = numParties <= 1 ? Math.PI * 1.5 : Math.PI * 0.9;
+    const fanArc = numParties <= 1 ? Math.PI * 1.5 : Math.PI * Math.min(1.1, 0.7 + numParties * 0.1);
     const halfFan = fanArc / 2;
 
     for (let d = 0; d < dpsCount; d++) {
@@ -108,7 +115,7 @@ function calculateLayout(parties) {
     }
   });
 
-  if (rawNodes.length === 0) return { nodes: [], edges: [] };
+  if (rawNodes.length === 0) return { nodes: [], edges: [], hubCenter: null };
 
   // Normalize all nodes to fit viewBox
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -133,14 +140,48 @@ function calculateLayout(parties) {
     n.y = (n.y - minY) * scale + offsetY;
   });
 
+  // Repulsion pass — push overlapping non-hub nodes apart
+  const minDist = 75; // minimum distance between node centers in viewBox units
+  const partyNodes = rawNodes.filter(n => n.slotType !== 'hub');
+  for (let iter = 0; iter < 8; iter++) {
+    let moved = false;
+    for (let i = 0; i < partyNodes.length; i++) {
+      for (let j = i + 1; j < partyNodes.length; j++) {
+        const a = partyNodes[i], b = partyNodes[j];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < minDist && dist > 0) {
+          const push = (minDist - dist) / 2;
+          const nx = dx / dist, ny = dy / dist;
+          a.x -= nx * push; a.y -= ny * push;
+          b.x += nx * push; b.y += ny * push;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
   rawNodes.forEach(n => nodes.push(n));
 
-  // Build edges for party nodes only
-  let nodeIdx = 0;
+  // Hub center coordinates (after normalization) for SVG text
+  const hubCenter = hubNode ? { x: hubNode.x, y: hubNode.y } : null;
+
+  // Offset for party node indexing (skip hub node if present)
+  const hubOffset = hubNode ? 1 : 0;
+
+  // Build edges for party nodes
+  let nodeIdx = hubOffset;
   parties.forEach((party, pi) => {
     const tankNode = nodes[nodeIdx];
     const healerNode = nodes[nodeIdx + 1];
     edges.push({ x1: tankNode.x, y1: tankNode.y, x2: healerNode.x, y2: healerNode.y, partyIndex: pi });
+
+    // Connect cores to hub
+    if (hubCenter) {
+      edges.push({ x1: hubCenter.x, y1: hubCenter.y, x2: tankNode.x, y2: tankNode.y, partyIndex: -2 });
+      edges.push({ x1: hubCenter.x, y1: hubCenter.y, x2: healerNode.x, y2: healerNode.y, partyIndex: -2 });
+    }
 
     const dpsStart = nodeIdx + 2;
     const dpsNodes = nodes.slice(dpsStart, dpsStart + 6);
@@ -163,25 +204,39 @@ function calculateLayout(parties) {
   if (numParties > 1) {
     for (let i = 0; i < numParties; i++) {
       const next = (i + 1) % numParties;
-      const healerNode = nodes[i * 8 + 1];
-      const tankNode = nodes[next * 8];
+      const healerNode = nodes[i * 8 + hubOffset + 1];
+      const tankNode = nodes[next * 8 + hubOffset];
       edges.push({ x1: healerNode.x, y1: healerNode.y, x2: tankNode.x, y2: tankNode.y, partyIndex: -1 });
     }
   }
 
-  return { nodes, edges };
+  return { nodes, edges, hubCenter };
 }
 
-function renderWebSVG(edges) {
+function renderWebSVG(edges, hubCenter) {
   const lines = edges.map(e => {
+    const isHubLink = e.partyIndex === -2;
     const isCrossLink = e.partyIndex === -1;
+    if (isHubLink) {
+      return `<line class="web-edge web-edge--hub" x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="rgba(244, 196, 48, 0.15)" stroke-opacity="0.4" stroke-width="1" />`;
+    }
     const color = isCrossLink ? 'rgba(255,255,255,0.08)' : PARTY_COLORS[e.partyIndex % PARTY_COLORS.length].main;
     const opacity = isCrossLink ? 0.3 : 0.18;
     const cls = isCrossLink ? 'web-edge web-edge--cross' : 'web-edge web-edge--party';
     return `<line class="${cls}" data-party="${e.partyIndex}" x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${isCrossLink ? 1 : 1.5}" />`;
   });
 
-  return `<svg class="recruit-web__svg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">${lines.join('')}</svg>`;
+  // Hub label in center
+  const hubSvg = hubCenter ? `
+    <text x="${hubCenter.x}" y="${hubCenter.y - 20}" text-anchor="middle" dominant-baseline="middle"
+          font-size="18" font-weight="700" fill="rgba(244, 196, 48, 0.45)" letter-spacing="3">Afterlight</text>
+    <text x="${hubCenter.x}" y="${hubCenter.y + 2}" text-anchor="middle" dominant-baseline="middle"
+          font-size="18" font-weight="700" fill="rgba(244, 196, 48, 0.45)" letter-spacing="3">Desert Dragon</text>
+    <text x="${hubCenter.x}" y="${hubCenter.y + 24}" text-anchor="middle" dominant-baseline="middle"
+          font-size="18" font-weight="700" fill="rgba(244, 196, 48, 0.45)" letter-spacing="3">Lineups</text>
+  ` : '';
+
+  return `<svg class="recruit-web__svg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">${lines.join('')}${hubSvg}</svg>`;
 }
 
 function renderNode(node, index, isAdmin) {
@@ -299,11 +354,24 @@ export const RecruitingPage = {
   isEditMode: false,
   isDirty: false,
   _container: null,
+  _currentPartyIndex: 0,
+  _isMobile: false,
+  _resizeHandler: null,
 
   async render(container) {
     this._container = container;
     const nav = document.querySelector('nav.main-nav');
     if (nav) nav.style.display = 'none';
+
+    // Mobile detection
+    this._isMobile = window.matchMedia('(max-width: 600px)').matches;
+    this._currentPartyIndex = 0;
+    this._resizeHandler = () => {
+      const wasMobile = this._isMobile;
+      this._isMobile = window.matchMedia('(max-width: 600px)').matches;
+      if (wasMobile !== this._isMobile) this.renderConstellation();
+    };
+    window.addEventListener('resize', this._resizeHandler);
 
     // Check admin status (session may already be loaded from main.js init)
     await dataService.loadSession();
@@ -417,10 +485,17 @@ export const RecruitingPage = {
       return;
     }
 
-    const { nodes, edges } = calculateLayout(resolved);
+    // Mobile: one party at a time with swipe
+    if (this._isMobile && this.parties.length > 0) {
+      this.renderMobileCarousel(webContainer, resolved, unassigned);
+      return;
+    }
 
-    const svgHtml = renderWebSVG(edges);
-    const nodesHtml = nodes.map((n, i) => renderNode(n, i, this.isEditMode)).join('');
+    const { nodes, edges, hubCenter } = calculateLayout(resolved);
+
+    const svgHtml = renderWebSVG(edges, hubCenter);
+    const partyNodes = nodes.filter(n => n.slotType !== 'hub');
+    const nodesHtml = partyNodes.map((n, i) => renderNode(n, i, this.isEditMode)).join('');
 
     webContainer.innerHTML = `
       <div class="recruit-web__canvas">
@@ -455,6 +530,105 @@ export const RecruitingPage = {
         });
       });
     }
+  },
+
+  renderMobileCarousel(webContainer, resolved, unassigned) {
+    // Clamp index
+    if (this._currentPartyIndex >= this.parties.length) {
+      this._currentPartyIndex = Math.max(0, this.parties.length - 1);
+    }
+
+    const pi = this._currentPartyIndex;
+    const singleResolved = [resolved[pi]];
+    const { nodes, edges, hubCenter } = calculateLayout(singleResolved);
+
+    // Remap nodes/edges to use real party index (not 0)
+    nodes.forEach(n => {
+      n.slotKey = n.slotKey.replace(/^0-/, `${pi}-`);
+      n.partyIndex = pi;
+    });
+    edges.forEach(e => {
+      if (e.partyIndex === 0) e.partyIndex = pi;
+    });
+
+    const svgHtml = renderWebSVG(edges, hubCenter);
+    const nodesHtml = nodes.map((n, i) => renderNode(n, i, this.isEditMode)).join('');
+
+    const party = this.parties[pi];
+    const filled = (party.tank ? 1 : 0) + (party.healer ? 1 : 0) + (party.dps || []).filter(Boolean).length;
+    const color = PARTY_COLORS[pi % PARTY_COLORS.length];
+    const deleteBtn = this.isEditMode ? `<button class="party-tag__delete" data-party-index="${pi}" title="Delete party">&times;</button>` : '';
+
+    // Dot indicators
+    const dots = this.parties.map((_, i) => {
+      const c = PARTY_COLORS[i % PARTY_COLORS.length];
+      const active = i === pi ? 'recruit-web__dot--active' : '';
+      return `<span class="recruit-web__dot ${active}" data-index="${i}" style="--dot-color: ${c.main}"></span>`;
+    }).join('');
+
+    webContainer.innerHTML = `
+      <div class="recruit-web__mobile-carousel">
+        <div class="recruit-web__canvas">
+          ${svgHtml}
+          <div class="recruit-web__nodes">${nodesHtml}</div>
+        </div>
+        <div class="recruit-web__party-label" style="--party-color: ${color.main}">
+          Party ${pi + 1}: ${filled}/8 ${deleteBtn}
+        </div>
+        ${this.parties.length > 1 ? `<div class="recruit-web__dots">${dots}</div>` : ''}
+      </div>
+      ${this.isEditMode ? this.renderUnassignedPool(unassigned) : ''}
+    `;
+
+    setupHoverInteraction(this._container);
+    setupMobileTooltips(this._container);
+    this.renderSummary();
+
+    // Swipe handling
+    this.setupMobileSwipe();
+
+    // Dot clicks
+    webContainer.querySelectorAll('.recruit-web__dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        this._currentPartyIndex = parseInt(dot.dataset.index);
+        this.renderConstellation();
+      });
+    });
+
+    // Delete party button
+    webContainer.querySelectorAll('.party-tag__delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.deleteParty(parseInt(btn.dataset.partyIndex));
+      });
+    });
+
+    if (this.isEditMode) {
+      this.setupDragAndDrop();
+      this.setupPoolDragHandlers();
+    }
+  },
+
+  setupMobileSwipe() {
+    const carousel = this._container.querySelector('.recruit-web__mobile-carousel');
+    if (!carousel) return;
+
+    let touchStartX = 0;
+    carousel.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    carousel.addEventListener('touchend', (e) => {
+      const diff = touchStartX - e.changedTouches[0].screenX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          this._currentPartyIndex = (this._currentPartyIndex + 1) % this.parties.length;
+        } else {
+          this._currentPartyIndex = (this._currentPartyIndex - 1 + this.parties.length) % this.parties.length;
+        }
+        this.renderConstellation();
+      }
+    }, { passive: true });
   },
 
   renderSummary() {
@@ -808,9 +982,15 @@ export const RecruitingPage = {
   destroy() {
     const nav = document.querySelector('nav.main-nav');
     if (nav) nav.style.display = '';
+    if (this._resizeHandler) {
+      window.removeEventListener('resize', this._resizeHandler);
+      this._resizeHandler = null;
+    }
     this.allPlayers = [];
     this.parties = [];
     this.isDirty = false;
+    this._currentPartyIndex = 0;
+    this._isMobile = false;
     this._container = null;
   }
 };

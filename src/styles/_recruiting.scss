@@ -620,6 +620,62 @@
   }
 }
 
+// ─── Mobile Carousel ───
+
+.recruit-web__mobile-carousel {
+  touch-action: pan-y;
+}
+
+.recruit-web__party-label {
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--party-color);
+  margin: 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  .party-tag__delete {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #e74c3c;
+    }
+  }
+}
+
+.recruit-web__dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 0 12px;
+}
+
+.recruit-web__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot-color);
+  opacity: 0.25;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+
+  &--active {
+    opacity: 1;
+    transform: scale(1.4);
+    box-shadow: 0 0 8px var(--dot-color);
+  }
+}
+
 // ─── Responsive ───
 
 @media (max-width: 600px) {
@@ -634,22 +690,12 @@
   }
 
   .web-node {
-    &--core .web-node__bubble {
-      width: 40px;
-      height: 40px;
-    }
-
-    &--dps-size .web-node__bubble {
-      width: 46px;
-      height: 46px;
-    }
-
-    &__name { font-size: 0.55rem; max-width: 55px; }
-    &__class { font-size: 0.48rem; }
-    &__gs { font-size: 0.52rem; }
-    &__question { font-size: 1.1rem; }
-    &__label { font-size: 0.48rem; }
-    &__recruiting { font-size: 0.48rem; }
+    &__name { font-size: 0.6rem; max-width: 65px; }
+    &__class { font-size: 0.5rem; }
+    &__gs { font-size: 0.55rem; }
+    &__question { font-size: 1.3rem; }
+    &__label { font-size: 0.5rem; }
+    &__recruiting { font-size: 0.5rem; }
   }
 
   .recruiting-admin-toolbar {
