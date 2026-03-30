@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:recruit": "vite build --config vite.config.recruit.js",
     "preview": "vite preview"
   },
   "devDependencies": {
