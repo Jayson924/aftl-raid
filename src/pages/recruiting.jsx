@@ -403,7 +403,7 @@ export const RecruitingPage = {
       this.allPlayers = players.map(p => {
         p._gearscore = calculateGearscore(p);
         return p;
-      }).filter(p => p._gearscore >= 65 && p.name !== 'LycanBolt');
+      }).filter(p => p._gearscore >= 65);
 
       // Load saved layout
       let saved = await dataService.getAppConfig(CONFIG_KEY);
