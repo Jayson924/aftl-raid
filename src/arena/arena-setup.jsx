@@ -2,7 +2,7 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
-import { TOURNAMENT_PHASES } from './arena-constants.js';
+import { TOURNAMENT_PHASES, distributePrizePool, estimateTotalMatches, calculateGoldPerWin } from './arena-constants.js';
 import { arenaConfirm } from './arena-confirm.js';
 
 /**
@@ -16,6 +16,7 @@ export const ArenaSetupPage = {
   _signups: null,
   _appUsers: null,
   _signupSubscription: null,
+  _adminLogOpen: false,
 
   async render(container) {
     container.innerHTML = '';
@@ -37,7 +38,7 @@ export const ArenaSetupPage = {
   async _loadData() {
     const tournaments = await arenaData.getTournaments();
     this._tournament = tournaments.find(t =>
-      t.status !== 'complete' && t.name !== 'Quick Match'
+      t.status !== 'complete' && t.name !== 'Quick Match' && t.name !== 'Solo Match'
     ) || null;
 
     this._appUsers = await arenaData.getAllAppUsers();
@@ -72,6 +73,12 @@ export const ArenaSetupPage = {
     if (discordId === 'BOT_PLAYER') return 'Arena Bot';
     const user = this._appUsers?.find(u => u.discord_id === discordId);
     return user?.display_name || user?.username || discordId;
+  },
+
+  _logAction(action) {
+    const user = dataService.getUser();
+    const adminName = user ? this._getDisplayName(user.id) : 'Admin';
+    return arenaData.logAdminAction(this._tournament.id, action, adminName);
   },
 
   _getAvatarUrl(discordId) {
@@ -240,6 +247,7 @@ export const ArenaSetupPage = {
             <span class="arena-badge ${isRegistration ? 'badge-green' : 'badge-gold'}">${phaseName}</span>
             ${isActive ? `<button class="arena-btn arena-btn-danger arena-btn-small" id="stop-tournament-btn">Stop Tournament</button>` : ''}
             <button class="arena-btn arena-btn-danger arena-btn-small" id="delete-tournament-btn">Delete</button>
+            <button class="arena-btn arena-btn-danger arena-btn-small" id="reset-everything-btn">Reset Everything</button>
           </div>
         </div>
         <div class="setup-prize-pool">
@@ -249,11 +257,13 @@ export const ArenaSetupPage = {
           <button class="arena-btn arena-btn-small" id="save-prize-pool-btn">Save</button>
           ${currentPool > 0 ? `<span class="prize-pool-current">${currentPool.toLocaleString()} Gold</span>` : ''}
         </div>
+        ${currentPool > 0 ? this._renderWinPoolSlider(t) : ''}
       </div>
 
       ${isRegistration ? this._renderRegistrationManagement() : ''}
       ${isSetup ? this._renderDragDropEditor() : ''}
       ${!isRegistration && !isSetup ? this._renderPhaseControls() : ''}
+      ${this._renderAdminLog()}
     `;
 
     this._attachPickerListeners(container);
@@ -301,10 +311,30 @@ export const ArenaSetupPage = {
         </div>
 
         <div class="registration-controls">
-          <div class="registration-add-manual">
-            ${this._renderPlayerPicker('manual-add-picker', 'Add player manually...', availableUsers)}
-            <button class="arena-btn arena-btn-small" id="manual-add-btn">Add</button>
-          </div>
+          ${availableUsers.length > 0 ? `
+            <div class="registration-add-multi">
+              <div class="registration-add-header">
+                <label>Add Players</label>
+                <span class="registration-add-summary" id="manual-add-summary">0 selected</span>
+              </div>
+              <div class="registration-user-list" id="manual-add-user-list">
+                ${availableUsers.map(u => {
+                  const avatarHtml = u.avatar_url
+                    ? `<img class="whos-around-avatar" src="${u.avatar_url}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                    : '';
+                  const initialsHtml = `<div class="whos-around-avatar whos-around-avatar-initials" style="${u.avatar_url ? 'display:none' : ''}">${(u.display_name || u.username || '?').charAt(0).toUpperCase()}</div>`;
+                  return `
+                    <div class="whos-around-user" data-discord-id="${u.discord_id}">
+                      ${avatarHtml}
+                      ${initialsHtml}
+                      <span class="whos-around-name">${u.display_name || u.username}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+              <button class="arena-btn arena-btn-primary arena-btn-small" id="manual-add-btn" disabled>Add Selected</button>
+            </div>
+          ` : ''}
           <button class="arena-btn arena-btn-primary" id="close-registration-btn" ${signups.length < 2 ? 'disabled' : ''}>
             Close Registration & Arrange Brackets
           </button>
@@ -328,20 +358,41 @@ export const ArenaSetupPage = {
       });
     });
 
-    // Manual add
+    // Multi-select user list for manual add
+    const selectedIds = new Set();
+    const userList = container.querySelector('#manual-add-user-list');
     const addBtn = container.querySelector('#manual-add-btn');
+    const addSummary = container.querySelector('#manual-add-summary');
+
+    if (userList) {
+      userList.querySelectorAll('.whos-around-user').forEach(row => {
+        row.addEventListener('click', () => {
+          const discordId = row.dataset.discordId;
+          if (selectedIds.has(discordId)) {
+            selectedIds.delete(discordId);
+            row.classList.remove('active');
+          } else {
+            selectedIds.add(discordId);
+            row.classList.add('active');
+          }
+          if (addSummary) addSummary.textContent = `${selectedIds.size} selected`;
+          if (addBtn) addBtn.disabled = selectedIds.size === 0;
+        });
+      });
+    }
+
     if (addBtn) {
       addBtn.addEventListener('click', async () => {
-        const discordId = this._getPickerValue('manual-add-picker');
-        if (!discordId) {
-          toast.error('Select a player to add');
-          return;
-        }
+        if (selectedIds.size === 0) return;
+        addBtn.disabled = true;
+        addBtn.textContent = 'Adding...';
         try {
-          await arenaData.signUp(this._tournament.id, discordId);
+          for (const discordId of selectedIds) {
+            await arenaData.signUp(this._tournament.id, discordId);
+          }
           this._signups = await arenaData.getSignups(this._tournament.id);
           this._renderContent(container);
-          toast.success('Player added');
+          toast.success(`${selectedIds.size} player${selectedIds.size !== 1 ? 's' : ''} added`);
         } catch (err) {
           toast.error('Failed: ' + err.message);
         }
@@ -475,6 +526,108 @@ export const ArenaSetupPage = {
     `;
   },
 
+  _renderWinPoolSlider(t) {
+    const pool = t.prizes?.pool || 0;
+    const winPct = t.prizes?.win_pool_percent || 0;
+    const participantCount = (this._participants?.length || 0) > 0 ? this._participants.length : (this._signups || []).length;
+    const bracketCount = t.bracket_count || 2;
+    const totalMatches = estimateTotalMatches(participantCount, bracketCount);
+    const goldPerWin = calculateGoldPerWin(pool, winPct, totalMatches);
+    const winPool = Math.floor(pool * (winPct / 100));
+    const placementPool = pool - (goldPerWin * totalMatches);
+    const placementPrizes = participantCount > 0 ? distributePrizePool(placementPool, participantCount) : null;
+
+    // Example wins for preview table
+    const exampleWins = [5, 4, 3, 2, 1];
+    const places = ['1st', '2nd', '3rd', '4th'];
+
+    return `
+      <div class="setup-win-pool">
+        <div class="win-pool-slider-row">
+          <label>Gold Per Win:</label>
+          <input type="range" id="win-pool-slider" min="0" max="50" step="5" value="${winPct}" class="win-pool-range">
+          <span class="win-pool-pct" id="win-pool-pct-label">${winPct}%</span>
+          <button class="arena-btn arena-btn-small" id="save-win-pool-btn">Save</button>
+        </div>
+        <div class="win-pool-preview" id="win-pool-preview">
+          ${winPct > 0 && totalMatches > 0 ? `
+            <div class="win-pool-summary">
+              <span>Win pool: <strong>${winPool.toLocaleString()}G</strong> (${winPct}%)</span>
+              <span>~${totalMatches} matches &rarr; <strong>${goldPerWin.toLocaleString()}G per win</strong></span>
+              <span>Placement pool: <strong>${placementPool.toLocaleString()}G</strong></span>
+            </div>
+            ${placementPrizes && participantCount >= 5 ? `
+              <table class="win-pool-table">
+                <thead>
+                  <tr>
+                    <th>Place</th>
+                    <th>Placement</th>
+                    <th>~Wins</th>
+                    <th>Win Gold</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${places.map((place, i) => {
+                    const placeGold = placementPrizes[place] || 0;
+                    const wins = exampleWins[i] || 0;
+                    const winGold = wins * goldPerWin;
+                    return `<tr>
+                      <td>${place}</td>
+                      <td>${placeGold.toLocaleString()}G</td>
+                      <td>${wins}</td>
+                      <td>+${winGold.toLocaleString()}G</td>
+                      <td><strong>${(placeGold + winGold).toLocaleString()}G</strong></td>
+                    </tr>`;
+                  }).join('')}
+                  <tr class="win-pool-table-participation">
+                    <td>Others</td>
+                    <td>${(placementPrizes['participation'] || 0).toLocaleString()}G</td>
+                    <td>1</td>
+                    <td>+${goldPerWin.toLocaleString()}G</td>
+                    <td><strong>${((placementPrizes['participation'] || 0) + goldPerWin).toLocaleString()}G</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            ` : ''}
+          ` : winPct > 0 ? `
+            <div class="win-pool-summary">
+              <span class="win-pool-hint">Add players to see preview calculations</span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  },
+
+  _renderAdminLog() {
+    const log = this._tournament?.admin_log;
+    const entries = Array.isArray(log) ? [...log].reverse() : [];
+
+    return `
+      <div class="arena-panel admin-log-panel" style="margin-top: 1rem;">
+        <div class="arena-panel-header admin-log-header" id="admin-log-toggle" style="cursor: pointer;">
+          <h3>Admin Log${entries.length > 0 ? ` (${entries.length})` : ''}</h3>
+          <span class="admin-log-chevron">${this._adminLogOpen ? '&#9650;' : '&#9660;'}</span>
+        </div>
+        <div class="admin-log-entries" id="admin-log-entries" style="display: ${this._adminLogOpen ? 'block' : 'none'};">
+          ${entries.length > 0 ? entries.map(e => {
+            const time = new Date(e.time);
+            const timeStr = time.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+              + ' ' + time.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            return `
+              <div class="admin-log-entry">
+                <span class="admin-log-time">${timeStr}</span>
+                <span class="admin-log-admin">${e.admin}</span>
+                <span class="admin-log-action">${e.action}</span>
+              </div>
+            `;
+          }).join('') : '<div class="admin-log-empty">No actions logged yet</div>'}
+        </div>
+      </div>
+    `;
+  },
+
   _renderPhaseControls() {
     const t = this._tournament;
     const phase = t.current_phase;
@@ -542,6 +695,66 @@ export const ArenaSetupPage = {
         `;
     }
 
+    // Build incomplete matches list
+    const incompleteMatches = phaseMatches.filter(m => m.status !== 'complete');
+    let incompleteHtml = '';
+    if (incompleteMatches.length > 0) {
+      incompleteHtml = `
+        <div class="phase-incomplete-matches">
+          <div class="phase-incomplete-label">Incomplete Matches</div>
+          ${incompleteMatches.map(m => {
+            const p1Name = this._getDisplayName(this._participants?.find(p => p.id === m.player1_id)?.discord_id);
+            const p2Name = this._getDisplayName(this._participants?.find(p => p.id === m.player2_id)?.discord_id);
+            const statusLabel = m.status.replace(/_/g, ' ');
+            return `
+              <div class="phase-incomplete-match">
+                <div class="phase-incomplete-info">
+                  <span class="phase-incomplete-players">${p1Name} vs ${p2Name}</span>
+                  <span class="arena-badge badge-orange">${statusLabel}</span>
+                </div>
+                <div class="phase-incomplete-actions">
+                  <button class="arena-btn arena-btn-small phase-forfeit-btn" data-match-id="${m.id}" data-winner-id="${m.player1_id}" data-winner-name="${p1Name}" data-loser-name="${p2Name}">${p1Name} wins</button>
+                  <button class="arena-btn arena-btn-small phase-forfeit-btn" data-match-id="${m.id}" data-winner-id="${m.player2_id}" data-winner-name="${p2Name}" data-loser-name="${p1Name}">${p2Name} wins</button>
+                  <button class="arena-btn arena-btn-small arena-btn-danger phase-dq-btn" data-match-id="${m.id}" data-p1-name="${p1Name}" data-p2-name="${p2Name}">DQ Both</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // Build completed matches list (for overrides)
+    const completedMatches = phaseMatches.filter(m => m.status === 'complete');
+    let completedHtml = '';
+    if (completedMatches.length > 0) {
+      completedHtml = `
+        <div class="phase-incomplete-matches phase-completed-matches">
+          <div class="phase-incomplete-label">Completed Matches</div>
+          ${completedMatches.map(m => {
+            const p1Name = this._getDisplayName(this._participants?.find(p => p.id === m.player1_id)?.discord_id);
+            const p2Name = this._getDisplayName(this._participants?.find(p => p.id === m.player2_id)?.discord_id);
+            const winnerName = m.winner_id ? this._getDisplayName(this._participants?.find(p => p.id === m.winner_id)?.discord_id) : 'DQ';
+            const isDq = !m.winner_id;
+            return `
+              <div class="phase-incomplete-match phase-completed-match">
+                <div class="phase-incomplete-info">
+                  <span class="phase-incomplete-players">${p1Name} vs ${p2Name}</span>
+                  <span class="arena-badge ${isDq ? 'badge-red' : 'badge-green'}">${isDq ? 'DQ' : `${winnerName} won`}</span>
+                  <span class="phase-match-score">${m.player1_rounds_won}-${m.player2_rounds_won}</span>
+                </div>
+                <div class="phase-incomplete-actions">
+                  ${m.winner_id !== m.player1_id ? `<button class="arena-btn arena-btn-small phase-override-btn" data-match-id="${m.id}" data-winner-id="${m.player1_id}" data-winner-name="${p1Name}" data-loser-name="${p2Name}">${p1Name} wins</button>` : ''}
+                  ${m.winner_id !== m.player2_id ? `<button class="arena-btn arena-btn-small phase-override-btn" data-match-id="${m.id}" data-winner-id="${m.player2_id}" data-winner-name="${p2Name}" data-loser-name="${p1Name}">${p2Name} wins</button>` : ''}
+                  ${m.winner_id ? `<button class="arena-btn arena-btn-small arena-btn-danger phase-override-dq-btn" data-match-id="${m.id}" data-p1-name="${p1Name}" data-p2-name="${p2Name}">DQ Both</button>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
     return `
       <div class="arena-panel" style="margin-top: 1rem;">
         <div class="arena-panel-header">
@@ -549,6 +762,8 @@ export const ArenaSetupPage = {
         </div>
         <p>Current phase: <strong>${phase?.replace(/_/g, ' ')}</strong></p>
         ${totalCount > 0 ? `<p>Matches: <strong>${completedCount}/${totalCount}</strong> complete${incompleteCount > 0 ? ` — <span style="color: #e8a44a;">${incompleteCount} incomplete</span>` : ''}</p>` : ''}
+        ${incompleteHtml}
+        ${completedHtml}
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
           ${actionHtml}
         </div>
@@ -711,6 +926,7 @@ export const ArenaSetupPage = {
             }
           }
           toast.success('Brackets randomized!');
+          this._tournament.admin_log = await this._logAction('Randomized brackets') || this._tournament.admin_log;
           this._renderContent(container);
         } catch (err) {
           toast.error('Failed: ' + err.message);
@@ -722,10 +938,30 @@ export const ArenaSetupPage = {
     const startBtn = document.getElementById('start-group-stage-btn');
     if (startBtn) {
       startBtn.addEventListener('click', async () => {
+        // Check for unsaved prize pool changes
+        const poolInput = document.getElementById('prize-pool-input');
+        const currentPool = this._tournament.prizes?.pool || 0;
+        const inputPool = parseInt(poolInput?.value) || 0;
+        const savedWinPct = this._tournament.prizes?.win_pool_percent || 0;
+        const sliderEl = document.getElementById('win-pool-slider');
+        const sliderPct = sliderEl ? parseInt(sliderEl.value) || 0 : savedWinPct;
+
+        if (inputPool !== currentPool || sliderPct !== savedWinPct) {
+          const unsaved = [];
+          if (inputPool !== currentPool) unsaved.push('Prize Pool');
+          if (sliderPct !== savedWinPct) unsaved.push('Gold Per Win %');
+          if (!await arenaConfirm(`You have unsaved changes to: ${unsaved.join(', ')}. Start anyway without saving?`, {
+            title: 'Unsaved Changes',
+            confirmText: 'Start Anyway',
+            danger: true
+          })) return;
+        }
+
         if (!await arenaConfirm('This will generate all bracket matches.', { title: 'Start Group Stage', confirmText: 'Start' })) return;
         try {
           await arenaData.generateGroupMatches(this._tournament.id);
           toast.success('Group stage started! Matches generated.');
+          await this._logAction('Started group stage');
           router.navigate('arena');
         } catch (err) {
           toast.error('Failed: ' + err.message);
@@ -750,12 +986,15 @@ export const ArenaSetupPage = {
           }
           if (result?.tiebreakerNeeded) {
             toast.success(`Tiebreaker matches generated! ${result.matches.length} match(es) to resolve ties.`);
+            await this._logAction(`Generated ${result.matches.length} tiebreaker match(es)`);
             this._loadData().then(() => this._renderContent(container));
           } else if (result?.skipped) {
             toast.success('Only 1 winner — tournament complete!');
+            await this._logAction('Tournament auto-completed (single winner)');
             router.navigate('arena');
           } else {
             toast.success(`${nextLabel} generated!`);
+            await this._logAction(`Advanced to ${nextLabel}`);
             this._loadData().then(() => this._renderContent(container));
           }
         } catch (err) {
@@ -783,6 +1022,7 @@ export const ArenaSetupPage = {
               current_phase: 'complete'
             });
             toast.success('Tournament force-completed! Prizes distributed.');
+            await this._logAction(`Force-completed tournament (forfeited ${incompleteMatches.length} match(es) in ${phaseLabel})`);
             router.navigate('arena');
           } catch (err) {
             toast.error('Failed: ' + err.message);
@@ -801,9 +1041,11 @@ export const ArenaSetupPage = {
             }
             if (result?.skipped) {
               toast.success('Only 1 winner — tournament complete!');
+              await this._logAction('Force-advanced — tournament auto-completed (single winner)');
               router.navigate('arena');
             } else {
               toast.success(`${nextLabel} generated!`);
+              await this._logAction(`Force-advanced to ${nextLabel} (forfeited incomplete matches)`);
               this._loadData().then(() => this._renderContent(container));
             }
           } catch (err) {
@@ -824,12 +1066,91 @@ export const ArenaSetupPage = {
             current_phase: 'complete'
           });
           toast.success('Tournament complete! Prizes distributed.');
+          await this._logAction('Completed tournament and distributed prizes');
           router.navigate('arena');
         } catch (err) {
           toast.error('Failed: ' + err.message);
         }
       });
     }
+
+    // Phase controls — per-match forfeit
+    container.querySelectorAll('.phase-forfeit-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        const winnerId = btn.dataset.winnerId;
+        const winnerName = btn.dataset.winnerName;
+        const loserName = btn.dataset.loserName;
+        if (!await arenaConfirm(`Forfeit this match? ${winnerName} wins, ${loserName} gets a loss.`, { title: 'Forfeit Match', confirmText: `${winnerName} Wins`, danger: true })) return;
+        try {
+          await arenaData.forfeitMatch(matchId, winnerId);
+          toast.success(`${winnerName} wins by forfeit`);
+          await this._logAction(`Forfeited match: ${winnerName} wins over ${loserName}`);
+          await this._loadData();
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    });
+
+    // Phase controls — disqualify both
+    container.querySelectorAll('.phase-dq-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        const p1Name = btn.dataset.p1Name;
+        const p2Name = btn.dataset.p2Name;
+        if (!await arenaConfirm(`Disqualify both ${p1Name} and ${p2Name}? Both get a loss, all bets are refunded.`, { title: 'Disqualify Both', confirmText: 'Disqualify Both', danger: true })) return;
+        try {
+          await arenaData.disqualifyMatch(matchId);
+          toast.success('Both players disqualified — bets refunded');
+          await this._logAction(`Disqualified both: ${p1Name} and ${p2Name}`);
+          await this._loadData();
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    });
+
+    // Phase controls — override completed match (swap winner)
+    container.querySelectorAll('.phase-override-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        const winnerId = btn.dataset.winnerId;
+        const winnerName = btn.dataset.winnerName;
+        const loserName = btn.dataset.loserName;
+        if (!await arenaConfirm(`Override this match result? ${winnerName} will be the new winner. Stats, bets, and gold will be recalculated.`, { title: 'Override Result', confirmText: `${winnerName} Wins`, danger: true })) return;
+        try {
+          await arenaData.overrideMatchResult(matchId, winnerId);
+          toast.success(`Result overridden — ${winnerName} wins`);
+          await this._logAction(`Overrode match result: ${winnerName} wins (was ${loserName})`);
+          await this._loadData();
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    });
+
+    // Phase controls — override to DQ both on completed match
+    container.querySelectorAll('.phase-override-dq-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        const p1Name = btn.dataset.p1Name;
+        const p2Name = btn.dataset.p2Name;
+        if (!await arenaConfirm(`Override to disqualify both ${p1Name} and ${p2Name}? Stats, bets, and gold will be reversed.`, { title: 'Override — DQ Both', confirmText: 'DQ Both', danger: true })) return;
+        try {
+          await arenaData.overrideMatchResult(matchId, null);
+          toast.success('Result overridden — both disqualified, bets refunded');
+          await this._logAction(`Overrode match to DQ both: ${p1Name} and ${p2Name}`);
+          await this._loadData();
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    });
 
     // Stop tournament
     const stopBtn = document.getElementById('stop-tournament-btn');
@@ -839,6 +1160,7 @@ export const ArenaSetupPage = {
         try {
           await arenaData.stopTournament(this._tournament.id);
           toast.success('Tournament stopped — back to setup');
+          await this._logAction('Stopped tournament (matches deleted, brackets kept)');
           await this._loadData();
           this._renderContent(container);
         } catch (err) {
@@ -867,21 +1189,138 @@ export const ArenaSetupPage = {
       });
     }
 
-    // Save prize pool
+    // Detect unsaved prize pool changes
+    const prizePoolInput = document.getElementById('prize-pool-input');
     const savePrizeBtn = document.getElementById('save-prize-pool-btn');
+    if (prizePoolInput && savePrizeBtn) {
+      prizePoolInput.addEventListener('input', () => {
+        const inputVal = parseInt(prizePoolInput.value) || 0;
+        const savedVal = this._tournament.prizes?.pool || 0;
+        savePrizeBtn.classList.toggle('unsaved', inputVal !== savedVal);
+      });
+    }
     if (savePrizeBtn) {
       savePrizeBtn.addEventListener('click', async () => {
         const poolInput = document.getElementById('prize-pool-input');
         const pool = parseInt(poolInput?.value) || 0;
         try {
-          const prizes = pool > 0 ? { pool } : null;
+          const existingWinPct = this._tournament.prizes?.win_pool_percent || 0;
+          const prizes = pool > 0 ? { pool, win_pool_percent: existingWinPct } : null;
           await arenaData.updateTournament(this._tournament.id, { prizes });
           this._tournament.prizes = prizes;
           toast.success(pool > 0 ? `Prize pool set to ${pool.toLocaleString()} Gold` : 'Prize pool removed');
+          this._tournament.admin_log = await this._logAction(pool > 0 ? `Set prize pool to ${pool.toLocaleString()}G` : 'Removed prize pool') || this._tournament.admin_log;
           this._renderContent(container);
         } catch (err) {
           toast.error('Failed: ' + err.message);
         }
+      });
+    }
+
+    // Win pool slider — live preview on input, save on button click
+    const winPoolSlider = document.getElementById('win-pool-slider');
+    const winPoolPctLabel = document.getElementById('win-pool-pct-label');
+    if (winPoolSlider) {
+      winPoolSlider.addEventListener('input', () => {
+        const pct = parseInt(winPoolSlider.value);
+        if (winPoolPctLabel) winPoolPctLabel.textContent = `${pct}%`;
+        const saveWinBtn = document.getElementById('save-win-pool-btn');
+        if (saveWinBtn) saveWinBtn.classList.toggle('unsaved', pct !== (this._tournament.prizes?.win_pool_percent || 0));
+        // Live-update the preview
+        const pool = this._tournament.prizes?.pool || 0;
+        const participantCount = (this._participants?.length || 0) > 0 ? this._participants.length : (this._signups || []).length;
+        const bracketCount = this._tournament.bracket_count || 2;
+        const totalMatches = estimateTotalMatches(participantCount, bracketCount);
+        const goldPerWin = calculateGoldPerWin(pool, pct, totalMatches);
+        const winPool = Math.floor(pool * (pct / 100));
+        const placementPool = pool - (goldPerWin * totalMatches);
+        const placementPrizes = participantCount > 0 ? distributePrizePool(placementPool, participantCount) : null;
+
+        const preview = document.getElementById('win-pool-preview');
+        if (preview && pct > 0 && totalMatches > 0) {
+          const places = ['1st', '2nd', '3rd', '4th'];
+          const exampleWins = [5, 4, 3, 2, 1];
+          preview.innerHTML = `
+            <div class="win-pool-summary">
+              <span>Win pool: <strong>${winPool.toLocaleString()}G</strong> (${pct}%)</span>
+              <span>~${totalMatches} matches &rarr; <strong>${goldPerWin.toLocaleString()}G per win</strong></span>
+              <span>Placement pool: <strong>${placementPool.toLocaleString()}G</strong></span>
+            </div>
+            ${placementPrizes && participantCount >= 5 ? `
+              <table class="win-pool-table">
+                <thead><tr><th>Place</th><th>Placement</th><th>~Wins</th><th>Win Gold</th><th>Total</th></tr></thead>
+                <tbody>
+                  ${places.map((place, i) => {
+                    const placeGold = placementPrizes[place] || 0;
+                    const wins = exampleWins[i] || 0;
+                    const winGold = wins * goldPerWin;
+                    return `<tr><td>${place}</td><td>${placeGold.toLocaleString()}G</td><td>${wins}</td><td>+${winGold.toLocaleString()}G</td><td><strong>${(placeGold + winGold).toLocaleString()}G</strong></td></tr>`;
+                  }).join('')}
+                  <tr class="win-pool-table-participation"><td>Others</td><td>${(placementPrizes['participation'] || 0).toLocaleString()}G</td><td>1</td><td>+${goldPerWin.toLocaleString()}G</td><td><strong>${((placementPrizes['participation'] || 0) + goldPerWin).toLocaleString()}G</strong></td></tr>
+                </tbody>
+              </table>
+            ` : ''}
+          `;
+        } else if (preview) {
+          preview.innerHTML = '';
+        }
+      });
+    }
+
+    const saveWinPoolBtn = document.getElementById('save-win-pool-btn');
+    if (saveWinPoolBtn) {
+      saveWinPoolBtn.addEventListener('click', async () => {
+        const slider = document.getElementById('win-pool-slider');
+        const pct = parseInt(slider?.value) || 0;
+        try {
+          const prizes = { ...(this._tournament.prizes || {}), win_pool_percent: pct };
+          await arenaData.updateTournament(this._tournament.id, { prizes });
+          this._tournament.prizes = prizes;
+          toast.success(pct > 0 ? `Win pool set to ${pct}%` : 'Win pool disabled');
+          this._tournament.admin_log = await this._logAction(pct > 0 ? `Set win pool to ${pct}%` : 'Disabled win pool') || this._tournament.admin_log;
+          this._renderContent(container);
+        } catch (err) {
+          toast.error('Failed: ' + err.message);
+        }
+      });
+    }
+
+    // Reset everything (nuclear option)
+    const resetBtn = document.getElementById('reset-everything-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        if (!await arenaConfirm(
+          'This will permanently delete ALL tournaments, matches, brackets, bets, gold balances, challenges, and history.',
+          { title: 'Reset Everything', confirmText: 'Reset Everything', danger: true }
+        )) return;
+        // Double confirm
+        if (!await arenaConfirm(
+          'Are you absolutely sure? This cannot be undone.',
+          { title: 'Final Confirmation', confirmText: 'Yes, wipe it all', danger: true }
+        )) return;
+        try {
+          await arenaData.resetEverything();
+          toast.success('All arena data has been reset');
+          this._tournament = null;
+          this._participants = [];
+          this._matches = [];
+          this._signups = [];
+          this._renderCreateForm(container);
+        } catch (err) {
+          toast.error('Reset failed: ' + err.message);
+        }
+      });
+    }
+
+    // Admin log toggle
+    const logToggle = document.getElementById('admin-log-toggle');
+    if (logToggle) {
+      logToggle.addEventListener('click', () => {
+        this._adminLogOpen = !this._adminLogOpen;
+        const entries = document.getElementById('admin-log-entries');
+        const chevron = logToggle.querySelector('.admin-log-chevron');
+        if (entries) entries.style.display = this._adminLogOpen ? 'block' : 'none';
+        if (chevron) chevron.textContent = this._adminLogOpen ? '\u25B2' : '\u25BC';
       });
     }
 

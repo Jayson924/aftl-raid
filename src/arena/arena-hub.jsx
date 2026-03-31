@@ -3,7 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
 import { arenaConfirm } from './arena-confirm.js';
-import { distributePrizePool, BET_INCREMENTS, getDynamicBetIncrements, MAX_BET_PERCENTAGE, getRemainingSeconds } from './arena-constants.js';
+import { distributePrizePool, BET_INCREMENTS, getDynamicBetIncrements, MAX_BET_PERCENTAGE, getRemainingSeconds, estimateTotalMatches, calculateGoldPerWin } from './arena-constants.js';
 
 /**
  * Arena Hub — Challenge-first landing page.
@@ -91,9 +91,18 @@ export const ArenaHubPage = {
 
       // Subscribe to tournament changes (e.g. prize pool updates)
       if (this._tournamentSubscription) arenaData.unsubscribe(this._tournamentSubscription);
-      this._tournamentSubscription = arenaData.subscribeToTournament(this._tournament.id, (payload) => {
+      this._tournamentSubscription = arenaData.subscribeToTournament(this._tournament.id, async (payload) => {
         if (payload.new) {
           this._tournament = payload.new;
+          try {
+            const [tParticipants, tMatches] = await Promise.all([
+              arenaData.getParticipants(this._tournament.id),
+              arenaData.getMatches(this._tournament.id)
+            ]);
+            this._tournamentParticipants = tParticipants;
+            this._tournamentMatches = tMatches;
+            this._updateMyParticipant();
+          } catch (e) { console.error('Failed to refresh tournament data:', e); }
           const content = document.querySelector('.arena-hub');
           if (content) this._renderContent(content);
         }
@@ -139,7 +148,20 @@ export const ArenaHubPage = {
 
     // Subscribe to match changes
     if (this._matchSubscription) arenaData.unsubscribe(this._matchSubscription);
-    this._matchSubscription = arenaData.subscribeToAllMatches(() => {
+    this._matchSubscription = arenaData.subscribeToAllMatches((payload) => {
+      // If a match I'm in just moved to drafting (both readied up), navigate to draft
+      if (payload.eventType === 'UPDATE' && payload.new?.status === 'drafting') {
+        const m = payload.new;
+        const currentUser = dataService.getUser();
+        if (currentUser) {
+          const p1Discord = this._getParticipantDiscordId(m.player1_id);
+          const p2Discord = this._getParticipantDiscordId(m.player2_id);
+          if (p1Discord === currentUser.id || p2Discord === currentUser.id) {
+            router.navigate(`arena-draft?match=${m.id}`);
+            return;
+          }
+        }
+      }
       this._refreshMatches();
     });
 
@@ -682,6 +704,29 @@ export const ArenaHubPage = {
 
     let html = '';
 
+    // "Your Matches" — pending matches the current user is in
+    const currentUser = dataService.getUser();
+    if (currentUser && pendingMatches.length > 0) {
+      const myPendingMatches = pendingMatches.filter(m => {
+        const p1Discord = this._getParticipantDiscordId(m.player1_id);
+        const p2Discord = this._getParticipantDiscordId(m.player2_id);
+        return p1Discord === currentUser.id || p2Discord === currentUser.id;
+      });
+      if (myPendingMatches.length > 0) {
+        html += `
+          <div class="arena-panel arena-your-matches-panel">
+            <div class="arena-panel-header">
+              <h3>Your Matches</h3>
+              <span class="arena-badge badge-gold">${myPendingMatches.length}</span>
+            </div>
+            <div class="arena-match-list">
+              ${myPendingMatches.map(m => this._renderMatchCard(m, false, true)).join('')}
+            </div>
+          </div>
+        `;
+      }
+    }
+
     if (pendingMatches.length > 0) {
       // Group pending matches by bracket (via participant lookup)
       const bracketGroups = {};
@@ -913,11 +958,39 @@ export const ArenaHubPage = {
             </div>
           </div>
           ${bettingHtml}
-          ${isParticipant ? `
-            <div class="upcoming-footer">
-              <button class="arena-btn arena-btn-primary arena-btn-small arena-start-match-btn" data-match-id="${match.id}">Start Match</button>
-            </div>
-          ` : ''}
+          ${(() => {
+            const myP = this._myParticipant;
+            const isP1 = myP && myP.id === match.player1_id;
+            const isP2 = myP && myP.id === match.player2_id;
+            const imReady = (isP1 && match.player1_ready) || (isP2 && match.player2_ready);
+            const opponentReady = (isP1 && match.player2_ready) || (isP2 && match.player1_ready);
+
+            if (isParticipant) {
+              return `
+                <div class="upcoming-footer ready-up-footer">
+                  <div class="ready-status">
+                    <span class="ready-indicator ${match.player1_ready ? 'ready-yes' : 'ready-no'}">${p1Name}</span>
+                    <span class="ready-indicator ${match.player2_ready ? 'ready-yes' : 'ready-no'}">${p2Name}</span>
+                  </div>
+                  <button class="arena-btn arena-btn-small arena-ready-btn ${imReady ? 'arena-btn-danger arena-unready-btn' : 'arena-btn-primary'}"
+                    data-match-id="${match.id}" data-ready="${imReady ? '1' : '0'}">
+                    ${imReady ? 'Unready' : 'Ready Up'}
+                  </button>
+                  ${opponentReady && !imReady ? '<div class="ready-hint">Opponent is ready!</div>' : ''}
+                </div>
+              `;
+            } else if (match.player1_ready || match.player2_ready) {
+              return `
+                <div class="upcoming-footer ready-up-footer">
+                  <div class="ready-status">
+                    <span class="ready-indicator ${match.player1_ready ? 'ready-yes' : 'ready-no'}">${p1Name}</span>
+                    <span class="ready-indicator ${match.player2_ready ? 'ready-yes' : 'ready-no'}">${p2Name}</span>
+                  </div>
+                </div>
+              `;
+            }
+            return '';
+          })()}
         </div>
       `;
     }
@@ -987,40 +1060,30 @@ export const ArenaHubPage = {
       });
     }
 
-    // Start Match buttons (pending → drafting)
-    container.querySelectorAll('.arena-start-match-btn').forEach(btn => {
+    // Ready Up / Unready buttons
+    container.querySelectorAll('.arena-ready-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const matchId = btn.dataset.matchId;
-        const match = this._recentMatches?.find(m => m.id === matchId);
-        if (!match) return;
+        const isReady = btn.dataset.ready === '1';
+        const myP = this._myParticipant;
+        if (!myP) return;
 
         btn.disabled = true;
-        btn.textContent = 'Checking...';
         try {
-          // Check if either player is already in an active match
-          const [p1Active, p2Active] = await Promise.all([
-            arenaData.getActiveMatchForParticipant(match.player1_id),
-            arenaData.getActiveMatchForParticipant(match.player2_id)
-          ]);
-
-          const busyPlayers = [];
-          if (p1Active) busyPlayers.push(this._getParticipantName(match.player1_id));
-          if (p2Active) busyPlayers.push(this._getParticipantName(match.player2_id));
-
-          if (busyPlayers.length > 0) {
-            toast.error(`Can't start — ${busyPlayers.join(' and ')} already in an active match`);
-            btn.disabled = false;
-            btn.textContent = 'Start Match';
-            return;
+          if (isReady) {
+            await arenaData.unready(matchId, myP.id);
+          } else {
+            const updated = await arenaData.readyUp(matchId, myP.id);
+            // If both ready, the match transitions to drafting — navigate to draft
+            if (updated.player1_ready && updated.player2_ready) {
+              router.navigate(`arena-draft?match=${matchId}`);
+              return;
+            }
           }
-
-          btn.textContent = 'Starting...';
-          await arenaData.updateMatch(matchId, { status: 'drafting' });
-          router.navigate(`arena-draft?match=${matchId}`);
+          // Refresh will happen via realtime subscription
         } catch (err) {
-          toast.error('Failed to start match: ' + err.message);
+          toast.error(err.message);
           btn.disabled = false;
-          btn.textContent = 'Start Match';
         }
       });
     });
@@ -1099,7 +1162,7 @@ export const ArenaHubPage = {
             return;
           }
 
-          await arenaData.updateMatch(matchId, { status: 'drafting' });
+          await arenaData.updateMatch(matchId, { status: 'drafting', player1_ready: true, player2_ready: true });
           toast.success('Match started');
           await this._loadData();
           const content = document.querySelector('.arena-hub');
@@ -1271,9 +1334,16 @@ export const ArenaHubPage = {
     const isComplete = t.status === 'complete';
 
     // Current user's gold callout
-    const myGoldHtml = this._myParticipant != null && !isComplete
-      ? `<div class="tournament-my-gold">Your Gold: <strong>${(this._myParticipant.gold || 0).toLocaleString()}G</strong></div>`
-      : '';
+    // Current user's gold callout with active bets
+    let myGoldHtml = '';
+    if (this._myParticipant != null && !isComplete) {
+      const myId = this._myParticipant.id;
+      const totalInBets = Object.values(this._matchBets)
+        .flat()
+        .filter(b => b.bettor_id === myId && b.status === 'active')
+        .reduce((s, b) => s + b.amount, 0);
+      myGoldHtml = `<div class="tournament-my-gold">Your Gold: <strong>${(this._myParticipant.gold || 0).toLocaleString()}G</strong>${totalInBets > 0 ? `<span class="gold-in-bets">(${totalInBets.toLocaleString()}G in bets)</span>` : ''}</div>`;
+    }
 
     // Final results for completed tournaments
     let finalResultsHtml = '';
@@ -1362,15 +1432,22 @@ export const ArenaHubPage = {
           ${pool > 0 ? `<span class="tournament-prize-pool-label">${pool.toLocaleString()} Gold Prize Pool</span>` : ''}
         </div>
         ${myGoldHtml}
-        ${!isComplete && pool > 0 && prizeDistribution ? `
-          <div class="tournament-prize-breakdown">
-            ${prizeDistribution['1st'] ? `<span class="prize-tier prize-1st">1st: ${prizeDistribution['1st'].toLocaleString()}G</span>` : ''}
-            ${prizeDistribution['2nd'] ? `<span class="prize-tier prize-2nd">2nd: ${prizeDistribution['2nd'].toLocaleString()}G</span>` : ''}
-            ${prizeDistribution['3rd'] ? `<span class="prize-tier prize-3rd">3rd: ${prizeDistribution['3rd'].toLocaleString()}G</span>` : ''}
-            ${prizeDistribution['4th'] ? `<span class="prize-tier prize-4th">4th: ${prizeDistribution['4th'].toLocaleString()}G</span>` : ''}
-            ${prizeDistribution['participation'] ? `<span class="prize-tier prize-participation">Participation: ${prizeDistribution['participation'].toLocaleString()}G</span>` : ''}
-          </div>
-        ` : ''}
+        ${(() => {
+          if (isComplete || !pool || !prizeDistribution) return '';
+          const winPct = t.prizes?.win_pool_percent || 0;
+          const totalMatches = estimateTotalMatches(participants.length, t.bracket_count || 2);
+          const goldPerWin = calculateGoldPerWin(pool, winPct, totalMatches);
+          return `
+            <div class="tournament-prize-breakdown">
+              ${goldPerWin > 0 ? `<span class="prize-tier prize-per-win">${goldPerWin.toLocaleString()}G per win</span>` : ''}
+              ${prizeDistribution['1st'] ? `<span class="prize-tier prize-1st">1st: ${prizeDistribution['1st'].toLocaleString()}G</span>` : ''}
+              ${prizeDistribution['2nd'] ? `<span class="prize-tier prize-2nd">2nd: ${prizeDistribution['2nd'].toLocaleString()}G</span>` : ''}
+              ${prizeDistribution['3rd'] ? `<span class="prize-tier prize-3rd">3rd: ${prizeDistribution['3rd'].toLocaleString()}G</span>` : ''}
+              ${prizeDistribution['4th'] ? `<span class="prize-tier prize-4th">4th: ${prizeDistribution['4th'].toLocaleString()}G</span>` : ''}
+              ${prizeDistribution['participation'] ? `<span class="prize-tier prize-participation">Participation: ${prizeDistribution['participation'].toLocaleString()}G</span>` : ''}
+            </div>
+          `;
+        })()}
         ${finalResultsHtml}
         ${!isComplete && bracketNumbers.length > 0 ? `
           <div class="arena-brackets-mini">
@@ -1615,7 +1692,7 @@ export const ArenaHubPage = {
       <div class="tournament-tree">
         <div class="tree-header">Tournament Bracket</div>
         ${bracketHtml}
-        ${standings.length > 0 && !isComplete ? `
+        ${standings.length > 0 && !isComplete && [...semiMatches, ...finalsMatches, ...grandFinalMatches].some(m => m.status === 'complete') ? `
           <div class="tree-standings">
             <div class="tree-standings-label">Standings</div>
             <div class="tree-standings-list">

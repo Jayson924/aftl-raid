@@ -565,6 +565,10 @@ export const ArenaSpectatePage = {
           const content = document.querySelector('.arena-spectate');
           if (content) this._renderContent(content);
         });
+      } else {
+        // No rounds yet (draft/roster phases) — still re-render to show updated status
+        const content = document.querySelector('.arena-spectate');
+        if (content) this._renderContent(content);
       }
     });
   },

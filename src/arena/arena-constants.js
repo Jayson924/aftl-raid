@@ -302,3 +302,30 @@ export function distributePrizePool(pool, participantCount) {
 
   return prizes;
 }
+
+/**
+ * Estimate total matches in a tournament.
+ * Group stage: round-robin per bracket, then semis (2), finals (1), possible grand final (1).
+ */
+export function estimateTotalMatches(participantCount, bracketCount) {
+  if (!participantCount || !bracketCount || participantCount < 2) return 0;
+
+  const perBracket = Math.ceil(participantCount / bracketCount);
+  // Round-robin: n*(n-1)/2 per bracket
+  const groupMatches = bracketCount * (perBracket * (perBracket - 1)) / 2;
+  // Semis: bracket winners play (bracketCount / 2 matches, minimum 1)
+  const semiMatches = Math.max(1, Math.floor(bracketCount / 2));
+  // Finals + possible grand final
+  const playoffMatches = semiMatches + 1 + (semiMatches > 1 ? 1 : 0);
+
+  return Math.round(groupMatches + playoffMatches);
+}
+
+/**
+ * Calculate gold-per-win from pool, win percentage, and match count.
+ */
+export function calculateGoldPerWin(pool, winPoolPercent, totalMatches) {
+  if (!pool || !winPoolPercent || !totalMatches) return 0;
+  const winPool = pool * (winPoolPercent / 100);
+  return Math.floor(winPool / totalMatches);
+}

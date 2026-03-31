@@ -2,7 +2,7 @@ import { arenaData } from './arena-data.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { router } from '../router.js';
-import { TIMERS, DRAFT_RULES, CLASS_ABILITIES, getAbilityForClass, getMatchFormat, getRemainingSeconds } from './arena-constants.js';
+import { TIMERS, DRAFT_RULES, CLASS_ABILITIES, getAbilityForClass, getMatchFormat, getRemainingSeconds, BOT_DISCORD_ID } from './arena-constants.js';
 
 /**
  * Arena Draft — Character selection phase before a match.
@@ -398,6 +398,12 @@ export const ArenaDraftPage = {
   },
 
   destroy() {
+    // Auto-cleanup abandoned bot matches
+    const isBotMatch = this._opponentParticipant?.discord_id === BOT_DISCORD_ID;
+    if (isBotMatch && this._match && this._match.status !== 'complete') {
+      arenaData.deleteTournament(this._match.tournament_id).catch(() => {});
+    }
+
     if (this._matchSubscription) {
       arenaData.unsubscribe(this._matchSubscription);
       this._matchSubscription = null;
@@ -406,6 +412,5 @@ export const ArenaDraftPage = {
       clearInterval(this._timerInterval);
       this._timerInterval = null;
     }
-    // cleanup done
   }
 };

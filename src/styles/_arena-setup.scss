@@ -70,6 +70,100 @@
   }
 }
 
+// Win pool slider & preview
+.setup-win-pool {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba($arena-border, 0.15);
+
+  .win-pool-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    label {
+      color: $arena-text-muted;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .win-pool-range {
+      flex: 1;
+      max-width: 200px;
+      accent-color: $arena-gold;
+    }
+
+    .win-pool-pct {
+      color: $arena-gold;
+      font-weight: 600;
+      font-size: 0.85rem;
+      min-width: 2.5rem;
+      text-align: center;
+    }
+  }
+
+  .win-pool-preview {
+    margin-top: 0.5rem;
+  }
+
+  .win-pool-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 0.5rem;
+
+    strong {
+      color: rgba(255, 255, 255, 0.9);
+    }
+  }
+
+  .win-pool-hint {
+    color: $arena-text-muted;
+    font-style: italic;
+  }
+
+  .win-pool-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+
+    th, td {
+      padding: 0.3rem 0.5rem;
+      text-align: center;
+      border-bottom: 1px solid rgba($arena-border, 0.15);
+    }
+
+    th {
+      color: $arena-text-muted;
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      letter-spacing: 0.5px;
+    }
+
+    td:first-child {
+      text-align: left;
+      font-weight: 600;
+    }
+
+    td:last-child {
+      color: $arena-gold;
+    }
+
+    .win-pool-table-participation {
+      td {
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      td:last-child {
+        color: rgba($arena-gold, 0.7);
+      }
+    }
+  }
+}
+
 // ============================================
 // DRAG-AND-DROP LAYOUT
 // Brackets on left, player pool on right
@@ -222,10 +316,14 @@
 // Registration management (admin view during registration phase)
 .setup-registration-management {
   .registration-player-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.35rem;
     margin-bottom: 1rem;
+
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   .registration-empty {
@@ -242,13 +340,103 @@
     margin-top: 0.5rem;
   }
 
-  .registration-add-manual {
+  .registration-add-multi {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
-    align-items: center;
 
-    select {
+    .registration-add-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      label {
+        font-size: 0.85rem;
+        color: $arena-text-muted;
+        font-weight: 500;
+      }
+
+      .registration-add-summary {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    .registration-user-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.35rem;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 0.5rem;
+      background: rgba($arena-bg, 0.3);
+      border: 1px solid rgba($arena-border, 0.2);
+      border-radius: $arena-radius;
+
+      @media (max-width: 768px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .whos-around-user {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: $arena-radius;
+      background-color: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      &.active {
+        border-color: #28a745;
+        background-color: rgba(40, 167, 69, 0.15);
+        box-shadow: 0 0 8px rgba(40, 167, 69, 0.2);
+
+        .whos-around-name {
+          color: #28a745;
+        }
+
+        &::after {
+          content: '\2713';
+          color: #28a745;
+          font-weight: 700;
+          font-size: 1.1rem;
+        }
+      }
+    }
+
+    .whos-around-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .whos-around-avatar-initials {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .whos-around-name {
       flex: 1;
+      font-weight: 500;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.9);
+      transition: color 0.2s ease;
     }
   }
 }
@@ -281,4 +469,142 @@
   &:hover {
     color: $arena-red;
   }
+}
+
+// Phase controls — incomplete matches list
+.phase-incomplete-matches {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.phase-incomplete-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: $arena-text-muted;
+}
+
+.phase-incomplete-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  background: rgba($arena-bg-lighter, 0.5);
+  border: 1px solid rgba($arena-border, 0.3);
+  border-radius: $arena-radius;
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.phase-incomplete-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.phase-incomplete-players {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phase-incomplete-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+
+  @media (max-width: 600px) {
+    justify-content: flex-end;
+  }
+}
+
+.phase-completed-match {
+  opacity: 0.75;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.phase-match-score {
+  font-size: 0.8rem;
+  color: $arena-text-muted;
+  font-weight: 600;
+}
+
+// Admin action log
+.admin-log-panel {
+  opacity: 0.8;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.admin-log-header {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom: none !important;
+  user-select: none;
+}
+
+.admin-log-chevron {
+  font-size: 0.7rem;
+  color: $arena-text-muted;
+}
+
+.admin-log-entries {
+  margin-top: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+
+  &:nth-child(odd) {
+    background: rgba($arena-bg-lighter, 0.3);
+  }
+}
+
+.admin-log-time {
+  color: $arena-text-muted;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.admin-log-admin {
+  color: $arena-gold-dim;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.admin-log-action {
+  color: $arena-text;
+}
+
+.admin-log-empty {
+  color: $arena-text-muted;
+  font-size: 0.8rem;
+  padding: 0.5rem;
 }

@@ -175,6 +175,16 @@
   }
 }
 
+// "Your Matches" panel — highlighted so it stands out
+.arena-your-matches-panel {
+  border: 1px solid rgba($arena-gold, 0.3);
+  background: rgba($arena-gold, 0.04);
+
+  .arena-panel-header h3 {
+    color: $arena-gold;
+  }
+}
+
 // Upcoming matches — bracket columns with scroll
 .upcoming-brackets-grid {
   display: grid;
@@ -219,7 +229,6 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  min-height: 170px;
 }
 
 // Top matchup row — P1 | VS | P2
@@ -390,6 +399,51 @@
   .arena-btn-small {
     font-size: 0.75rem;
   }
+}
+
+.ready-up-footer {
+  gap: 0.5rem;
+
+  .ready-status {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.7rem;
+  }
+
+  .ready-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    &::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      flex-shrink: 0;
+    }
+
+    &.ready-yes::before {
+      background: #4ade80;
+      box-shadow: 0 0 4px rgba(74, 222, 128, 0.5);
+    }
+
+    &.ready-no {
+      opacity: 0.5;
+    }
+  }
+
+  .ready-hint {
+    font-size: 0.65rem;
+    color: #4ade80;
+    animation: ready-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes ready-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 
@@ -739,10 +793,14 @@
   }
 
   .registration-player-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.35rem;
     margin-bottom: 1rem;
+
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   .registration-player-row {
@@ -876,6 +934,12 @@
   strong {
     font-size: 1.05rem;
   }
+
+  .gold-in-bets {
+    color: $arena-text-muted;
+    font-size: 0.8rem;
+    margin-left: 0.15rem;
+  }
 }
 
 // Tournament prize pool label
@@ -912,6 +976,11 @@
 .prize-3rd, .prize-4th {
   background: rgba(205, 127, 50, 0.15);
   color: #cd7f32;
+}
+
+.prize-per-win {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
 }
 
 .prize-participation {
@@ -1172,6 +1241,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .tree-standings-row {
@@ -1264,6 +1335,7 @@
   padding: 0.5rem 0.6rem 0.6rem;
   background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid rgba($arena-border, 0.15);
+  overflow: hidden;
 }
 
 .hub-bet-timer {
@@ -1370,7 +1442,7 @@
 .hub-bet-btns {
   display: flex;
   gap: 0.3rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: center;
   margin-top: 0.15rem;
   width: 100%;

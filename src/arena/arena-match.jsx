@@ -1083,6 +1083,11 @@ export const ArenaMatchPage = {
   },
 
   destroy() {
+    // Auto-cleanup abandoned bot matches
+    if (this._isBotMatch() && this._match && this._match.status !== 'complete') {
+      arenaData.deleteTournament(this._match.tournament_id).catch(() => {});
+    }
+
     if (this._matchSubscription) {
       arenaData.unsubscribe(this._matchSubscription);
       this._matchSubscription = null;

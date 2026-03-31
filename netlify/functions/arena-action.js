@@ -11,6 +11,7 @@
  */
 
 import { resolveBets } from './arena-resolve-bets.js';
+import { awardWinGold } from './arena-win-gold.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -539,9 +540,10 @@ export async function handler(event) {
 
       await sbPatch('arena_matches', `id=eq.${matchId}`, matchUpdate);
 
-      // Resolve bets if match completed
+      // Resolve bets and award win gold if match completed
       if (matchUpdate.winner_id) {
         try { await resolveBets(matchId, matchUpdate.winner_id); } catch (e) { console.error('Bet resolution error:', e); }
+        try { await awardWinGold(matchId, matchUpdate.winner_id); } catch (e) { console.error('Win gold error:', e); }
       }
     } else {
       // No KO — create next turn

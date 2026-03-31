@@ -6,7 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { distributePrizePool, getMatchFormat, BOT_DISCORD_ID, BOT_CLASSES } from './arena-constants.js';
+import { distributePrizePool, getMatchFormat, BOT_DISCORD_ID, BOT_CLASSES, estimateTotalMatches, calculateGoldPerWin } from './arena-constants.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -65,12 +65,55 @@ class ArenaDataService {
     return data;
   }
 
+  /**
+   * Append an admin action to the tournament's log.
+   */
+  async logAdminAction(tournamentId, action, adminName = 'Admin') {
+    try {
+      const entry = {
+        time: new Date().toISOString(),
+        admin: adminName,
+        action
+      };
+      const { data: t, error: fetchErr } = await supabase.from('arena_tournaments').select('admin_log').eq('id', tournamentId).single();
+      if (fetchErr) { console.error('Admin log fetch error:', fetchErr); return null; }
+      const log = Array.isArray(t?.admin_log) ? t.admin_log : [];
+      log.push(entry);
+      const { error: updateErr } = await supabase.from('arena_tournaments').update({ admin_log: log }).eq('id', tournamentId);
+      if (updateErr) { console.error('Admin log update error:', updateErr); return null; }
+      console.log('[Admin Log] Saved:', entry.action, '| Total entries:', log.length);
+      return log;
+    } catch (e) {
+      console.error('Failed to log admin action:', e);
+      return null;
+    }
+  }
+
   async deleteTournament(id) {
     const { error } = await supabase
       .from('arena_tournaments')
       .delete()
       .eq('id', id);
     if (error) throw error;
+  }
+
+  /**
+   * Nuclear reset — delete ALL arena data.
+   * Removes all tournaments (cascades to participants, matches, rounds, turns, bets, tiebreakers, reactions, signups)
+   * and all challenges.
+   */
+  async resetEverything() {
+    const { error: tErr } = await supabase
+      .from('arena_tournaments')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all rows
+    if (tErr) throw tErr;
+
+    const { error: cErr } = await supabase
+      .from('arena_challenges')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    if (cErr) throw cErr;
   }
 
   /**
@@ -495,6 +538,68 @@ class ArenaDataService {
   }
 
   /**
+   * Ready up for a match. Sets the appropriate player's ready flag.
+   * If both players are now ready, transitions match to 'drafting'.
+   * Returns the updated match.
+   */
+  async readyUp(matchId, participantId) {
+    const match = await this.getMatch(matchId);
+    if (!match) throw new Error('Match not found');
+    if (match.status !== 'pending') throw new Error('Match is not pending');
+
+    const isP1 = participantId === match.player1_id;
+    const isP2 = participantId === match.player2_id;
+    if (!isP1 && !isP2) throw new Error('Not a participant in this match');
+
+    // Check if already readied up in another pending match
+    const { data: readyMatches } = await supabase
+      .from('arena_matches')
+      .select('id')
+      .eq('status', 'pending')
+      .neq('id', matchId)
+      .or(`and(player1_id.eq.${participantId},player1_ready.eq.true),and(player2_id.eq.${participantId},player2_ready.eq.true)`);
+    if (readyMatches && readyMatches.length > 0) {
+      throw new Error('Already readied up in another match — unready first');
+    }
+
+    const readyField = isP1 ? 'player1_ready' : 'player2_ready';
+    const updated = await this.updateMatch(matchId, { [readyField]: true });
+
+    // If both players are now ready, check for busy players then start
+    if (updated.player1_ready && updated.player2_ready) {
+      const [p1Active, p2Active] = await Promise.all([
+        this.getActiveMatchForParticipant(match.player1_id),
+        this.getActiveMatchForParticipant(match.player2_id)
+      ]);
+      if (p1Active || p2Active) {
+        // Reset ready flags — can't start yet
+        await this.updateMatch(matchId, { player1_ready: false, player2_ready: false });
+        const busy = p1Active ? 'Player 1' : 'Player 2';
+        throw new Error(`${busy} is already in an active match`);
+      }
+      await this.updateMatch(matchId, { status: 'drafting' });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Unready from a match. Clears the player's ready flag.
+   */
+  async unready(matchId, participantId) {
+    const match = await this.getMatch(matchId);
+    if (!match) throw new Error('Match not found');
+    if (match.status !== 'pending') throw new Error('Match is not pending');
+
+    const isP1 = participantId === match.player1_id;
+    const isP2 = participantId === match.player2_id;
+    if (!isP1 && !isP2) throw new Error('Not a participant in this match');
+
+    const readyField = isP1 ? 'player1_ready' : 'player2_ready';
+    return await this.updateMatch(matchId, { [readyField]: false });
+  }
+
+  /**
    * Forfeit a match — admin picks a winner, match is marked complete.
    * Updates participant win/loss stats.
    */
@@ -517,6 +622,9 @@ class ArenaDataService {
 
     // Resolve bets — pay out winners as if the match ended normally
     try { await this.resolveBetsForMatch(matchId, winnerId); } catch (e) { console.error('Bet resolve on forfeit:', e); }
+
+    // Award win gold
+    try { await this.awardWinGold(match.tournament_id, winnerId); } catch (e) { console.error('Win gold on forfeit:', e); }
 
     // Update participant stats
     const winnerPart = await supabase
@@ -542,6 +650,202 @@ class ArenaDataService {
         .update({ losses: (loserPart.data.losses || 0) + 1 })
         .eq('id', loserId);
     }
+  }
+
+  /**
+   * Disqualify both players in a match — no winner, refund all bets, both get a loss.
+   */
+  async disqualifyMatch(matchId) {
+    const match = await this.getMatch(matchId);
+    if (!match) throw new Error('Match not found');
+    if (match.status === 'complete') throw new Error('Match already complete');
+
+    // Mark match complete with no winner
+    await this.updateMatch(matchId, {
+      status: 'complete',
+      winner_id: null
+    });
+
+    // Refund all active bets
+    const { data: bets } = await supabase
+      .from('arena_bets')
+      .select('*')
+      .eq('match_id', matchId)
+      .eq('status', 'active');
+    if (bets && bets.length > 0) {
+      for (const bet of bets) {
+        await supabase.from('arena_bets').update({ status: 'refunded', payout: bet.amount }).eq('id', bet.id);
+        const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+        if (bettor) {
+          await supabase.from('arena_participants').update({ gold: bettor.gold + bet.amount }).eq('id', bet.bettor_id);
+        }
+      }
+    }
+
+    // Both players get a loss
+    for (const pid of [match.player1_id, match.player2_id]) {
+      if (!pid) continue;
+      const { data: part } = await supabase.from('arena_participants').select('losses').eq('id', pid).single();
+      if (part) {
+        await supabase.from('arena_participants').update({ losses: (part.losses || 0) + 1 }).eq('id', pid);
+      }
+    }
+  }
+
+  /**
+   * Override a completed match result. Reverses old stats/bets/win-gold, then applies new result.
+   * newWinnerId = participant ID of new winner, or null to DQ both.
+   */
+  async overrideMatchResult(matchId, newWinnerId) {
+    const match = await this.getMatch(matchId);
+    if (!match) throw new Error('Match not found');
+    if (match.status !== 'complete') throw new Error('Match is not complete');
+
+    const oldWinnerId = match.winner_id;
+    const oldLoserId = oldWinnerId
+      ? (oldWinnerId === match.player1_id ? match.player2_id : match.player1_id)
+      : null;
+
+    // 1. Reverse old bet payouts
+    const { data: bets } = await supabase
+      .from('arena_bets')
+      .select('*')
+      .eq('match_id', matchId);
+    if (bets && bets.length > 0) {
+      for (const bet of bets) {
+        if (bet.status === 'won') {
+          // Claw back payout from winner
+          const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+          if (bettor) {
+            await supabase.from('arena_participants').update({ gold: Math.max(0, bettor.gold - bet.payout) }).eq('id', bet.bettor_id);
+          }
+        }
+        // Lost bets: gold was already deducted at placement, nothing to reverse
+        // Refunded bets: gold was returned, claw it back
+        if (bet.status === 'refunded') {
+          const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+          if (bettor) {
+            await supabase.from('arena_participants').update({ gold: Math.max(0, bettor.gold - bet.amount) }).eq('id', bet.bettor_id);
+          }
+        }
+        // Reset all bets to active
+        await supabase.from('arena_bets').update({ status: 'active', payout: 0 }).eq('id', bet.id);
+      }
+    }
+
+    // 2. Reverse old win/loss stats
+    if (oldWinnerId) {
+      const { data: w } = await supabase.from('arena_participants').select('wins').eq('id', oldWinnerId).single();
+      if (w) await supabase.from('arena_participants').update({ wins: Math.max(0, (w.wins || 0) - 1) }).eq('id', oldWinnerId);
+      if (oldLoserId) {
+        const { data: l } = await supabase.from('arena_participants').select('losses').eq('id', oldLoserId).single();
+        if (l) await supabase.from('arena_participants').update({ losses: Math.max(0, (l.losses || 0) - 1) }).eq('id', oldLoserId);
+      }
+    } else {
+      // Was a DQ-both — reverse both losses
+      for (const pid of [match.player1_id, match.player2_id]) {
+        if (!pid) continue;
+        const { data: p } = await supabase.from('arena_participants').select('losses').eq('id', pid).single();
+        if (p) await supabase.from('arena_participants').update({ losses: Math.max(0, (p.losses || 0) - 1) }).eq('id', pid);
+      }
+    }
+
+    // 3. Reverse old win gold
+    if (oldWinnerId) {
+      const tournament = await this.getTournament(match.tournament_id);
+      const pool = tournament?.prizes?.pool;
+      const winPct = tournament?.prizes?.win_pool_percent;
+      if (pool && winPct) {
+        const participants = await this.getParticipants(match.tournament_id);
+        const totalMatches = estimateTotalMatches(participants.length, tournament.bracket_count || 2);
+        const goldPerWin = calculateGoldPerWin(pool, winPct, totalMatches);
+        if (goldPerWin > 0) {
+          const { data: w } = await supabase.from('arena_participants').select('gold').eq('id', oldWinnerId).single();
+          if (w) await supabase.from('arena_participants').update({ gold: Math.max(0, (w.gold || 0) - goldPerWin) }).eq('id', oldWinnerId);
+        }
+      }
+    }
+
+    // 4. Apply new result
+    if (newWinnerId) {
+      const newLoserId = newWinnerId === match.player1_id ? match.player2_id : match.player1_id;
+      const isP1Winner = newWinnerId === match.player1_id;
+      const fmt = getMatchFormat(match.match_format);
+
+      await this.updateMatch(matchId, {
+        winner_id: newWinnerId,
+        player1_rounds_won: isP1Winner ? fmt.roundsToWin : 0,
+        player2_rounds_won: !isP1Winner ? fmt.roundsToWin : 0
+      });
+
+      // Re-resolve bets with new winner
+      try { await this.resolveBetsForMatch(matchId, newWinnerId); } catch (e) { console.error('Override bet resolve:', e); }
+      // Re-award win gold
+      try { await this.awardWinGold(match.tournament_id, newWinnerId); } catch (e) { console.error('Override win gold:', e); }
+
+      // New winner +1 win, new loser +1 loss
+      const { data: w } = await supabase.from('arena_participants').select('wins').eq('id', newWinnerId).single();
+      if (w) await supabase.from('arena_participants').update({ wins: (w.wins || 0) + 1 }).eq('id', newWinnerId);
+      const { data: l } = await supabase.from('arena_participants').select('losses').eq('id', newLoserId).single();
+      if (l) await supabase.from('arena_participants').update({ losses: (l.losses || 0) + 1 }).eq('id', newLoserId);
+    } else {
+      // DQ both — no winner, refund all bets, both get a loss
+      await this.updateMatch(matchId, {
+        winner_id: null,
+        player1_rounds_won: 0,
+        player2_rounds_won: 0
+      });
+
+      // Refund all bets (now reset to active from step 1)
+      const { data: activeBets } = await supabase
+        .from('arena_bets')
+        .select('*')
+        .eq('match_id', matchId)
+        .eq('status', 'active');
+      if (activeBets && activeBets.length > 0) {
+        for (const bet of activeBets) {
+          await supabase.from('arena_bets').update({ status: 'refunded', payout: bet.amount }).eq('id', bet.id);
+          const { data: bettor } = await supabase.from('arena_participants').select('gold').eq('id', bet.bettor_id).single();
+          if (bettor) {
+            await supabase.from('arena_participants').update({ gold: bettor.gold + bet.amount }).eq('id', bet.bettor_id);
+          }
+        }
+      }
+
+      // Both get a loss
+      for (const pid of [match.player1_id, match.player2_id]) {
+        if (!pid) continue;
+        const { data: p } = await supabase.from('arena_participants').select('losses').eq('id', pid).single();
+        if (p) await supabase.from('arena_participants').update({ losses: (p.losses || 0) + 1 }).eq('id', pid);
+      }
+    }
+  }
+
+  /**
+   * Award gold-per-win to a match winner based on tournament settings.
+   */
+  async awardWinGold(tournamentId, winnerId) {
+    const tournament = await this.getTournament(tournamentId);
+    if (!tournament) return;
+
+    const pool = tournament.prizes?.pool;
+    const winPct = tournament.prizes?.win_pool_percent;
+    if (!pool || !winPct) return;
+
+    const participants = await this.getParticipants(tournamentId);
+    const totalMatches = estimateTotalMatches(participants.length, tournament.bracket_count || 2);
+    if (totalMatches <= 0) return;
+
+    const goldPerWin = calculateGoldPerWin(pool, winPct, totalMatches);
+    if (goldPerWin <= 0) return;
+
+    const winner = participants.find(p => p.id === winnerId);
+    if (!winner) return;
+
+    await supabase
+      .from('arena_participants')
+      .update({ gold: (winner.gold || 0) + goldPerWin })
+      .eq('id', winnerId);
   }
 
   /**
@@ -1292,7 +1596,16 @@ class ArenaDataService {
 
     const participants = await this.getParticipants(tournamentId);
     const matches = await this.getMatches(tournamentId);
-    const prizes = distributePrizePool(pool, participants.length);
+
+    // Subtract win gold already paid from pool
+    const winPct = tournament.prizes?.win_pool_percent || 0;
+    const totalMatches = estimateTotalMatches(participants.length, tournament.bracket_count || 2);
+    const goldPerWin = calculateGoldPerWin(pool, winPct, totalMatches);
+    const completedMatches = matches.filter(m => m.status === 'complete' && m.winner_id).length;
+    const winGoldPaid = goldPerWin * completedMatches;
+    const placementPool = Math.max(0, pool - winGoldPaid);
+
+    const prizes = distributePrizePool(placementPool, participants.length);
     if (!prizes) return;
 
     const semiMatches = matches.filter(m => m.phase === 'semifinals' && m.status === 'complete');

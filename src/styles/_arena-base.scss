@@ -76,6 +76,17 @@
     padding: 0.3rem 0.6rem;
     font-size: 0.8rem;
   }
+
+  &.unsaved {
+    border-color: $arena-gold;
+    color: $arena-gold;
+    animation: unsaved-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes unsaved-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba($arena-gold, 0.3); }
+  50% { box-shadow: 0 0 8px 2px rgba($arena-gold, 0.3); }
 }
 
 // Arena badges
