@@ -191,6 +191,11 @@
   cursor: default;
   transition: opacity 0.3s ease, transform 0.3s ease;
 
+  &:hover,
+  &.tooltip-visible {
+    z-index: 100;
+  }
+
   // Core nodes are slightly smaller than DPS
   &--core .web-node__bubble {
     width: 52px;
@@ -578,8 +583,7 @@
 .recruit-tip__msg {
   font-size: 0.78rem;
   color: #b0b0c8;
-  max-width: 240px;
-  white-space: normal;
+  white-space: nowrap;
   line-height: 1.45;
   text-align: center;
 }

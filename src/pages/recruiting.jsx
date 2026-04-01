@@ -15,9 +15,9 @@ function getClassRole(role) {
 
 // DPS slot types — each party has 6 DPS slots in this order
 const DPS_SLOT_TYPES = [
-  { key: 'super_armor',    label: 'Super Armor',          classes: ['Dark Summoner', 'Barbarian', 'Destroyer'] },
+  { key: 'super_armor',    label: 'SA Buff',          classes: ['Dark Summoner', 'Barbarian', 'Destroyer'] },
   { key: 'ice_debuff',     label: 'Ice Debuff',           classes: ['Adept', 'Elestra'] },
-  { key: 'cooldown_mgmt',  label: 'Cooldown Buff',        classes: ['Smasher', 'Majesty'] },
+  { key: 'cooldown_mgmt',  label: 'CD Buff',        classes: ['Smasher', 'Majesty'] },
   { key: 'utility_buff',   label: 'Utility Buff',         classes: ['Tempest', 'Wind Walker', 'Physician'] },
   { key: 'open',           label: 'Open Slot',            classes: [] },
   { key: 'open',           label: 'Open Slot',            classes: [] },
@@ -43,10 +43,10 @@ function detectPairingNeeds(parties, playerMap) {
     const hasSaleana = dpsRoles.includes('Saleana');
     const hasAdept = dpsRoles.includes('Adept');
     if (hasSaleana && !hasAdept) {
-      needs.push({ need: 'Adept', reason: 'Saleana needs an Adept for synergy + ice debuffs' });
+      needs.push({ need: 'Adept', reason: 'Saleana needs an Adept for synergy' });
     }
     if (hasAdept && !hasSaleana) {
-      needs.push({ need: 'Saleana', reason: 'Adept needs a Saleana for synergy' });
+      needs.push({ need: 'Saleana', reason: 'Adept needs a Saleana to buff' });
     }
   });
   return needs;
