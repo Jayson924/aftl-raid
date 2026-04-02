@@ -8,6 +8,7 @@ import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
 import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
 import { RecruitingPage } from './pages/recruiting.jsx'
+import { EnhanceRacePage } from './pages/enhance-race.jsx'
 import { ArenaHubPage } from './arena/arena-hub.jsx'
 import { ArenaSetupPage } from './arena/arena-setup.jsx'
 import { ArenaDraftPage } from './arena/arena-draft.jsx'
@@ -82,6 +83,7 @@ async function initApp() {
   router.register('arena-spectate', ArenaSpectatePage); // Spectator view
   router.register('arena-tiebreaker', ArenaTiebreakerPage); // Tiebreaker race
   router.register('arena-results', ArenaResultsPage); // Results page
+  router.register('enhance-race', EnhanceRacePage); // Standalone enhancement race
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);

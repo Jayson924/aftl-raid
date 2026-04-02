@@ -1,0 +1,614 @@
+@import 'variables';
+
+// ============================================
+// Enhancement Race — Standalone Mini-Game
+// ============================================
+
+.enhance-race {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+// ============================================
+// Setup Screen
+// ============================================
+
+.er-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.er-title {
+  text-align: center;
+
+  h2 {
+    color: $primary-color;
+    margin: 0 0 0.25rem 0;
+    font-size: 1.8rem;
+  }
+
+  p {
+    color: $text-muted;
+    margin: 0;
+  }
+}
+
+.er-count-section {
+  text-align: center;
+
+  > label {
+    display: block;
+    color: $text-muted;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+  }
+}
+
+.er-count-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.er-count-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #4a4a4a;
+  background: #2f2f2f;
+  color: $text-light;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover:not(:disabled) {
+    border-color: $primary-color;
+    color: $primary-color;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+}
+
+.er-count-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: $primary-color;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.er-names-section {
+  width: 100%;
+  max-width: 320px;
+
+  > label {
+    display: block;
+    color: $text-muted;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+}
+
+.er-names-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.er-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.er-name-num {
+  width: 1.5rem;
+  text-align: center;
+  font-weight: 700;
+  color: $text-muted;
+  font-size: 0.85rem;
+}
+
+.er-name-input {
+  flex: 1;
+  background: #2a2a2a;
+  border: 1px solid #4a4a4a;
+  color: $text-light;
+  padding: 0.45rem 0.75rem;
+  border-radius: $border-radius;
+  font-size: 0.95rem;
+
+  &:focus {
+    border-color: $primary-color;
+    outline: none;
+  }
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.er-rates-section {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.er-rate {
+  font-size: 0.75rem;
+  color: $text-muted;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+}
+
+.er-start-btn {
+  background: linear-gradient(135deg, $primary-color, $primary-dark);
+  color: #1a1a1a;
+  border: none;
+  padding: 0.75rem 2.5rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+  border-radius: $border-radius;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+
+  &:hover {
+    background: linear-gradient(135deg, $primary-hover, $primary-color);
+    transform: scale(1.03);
+  }
+}
+
+// ============================================
+// Race Screen — Orbital Layout
+// ============================================
+
+.er-race {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 900px;
+}
+
+.er-orbit-container {
+  position: relative;
+  width: 1050px;
+  height: 1050px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.er-center {
+  position: absolute;
+  z-index: 2;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  // Center of container
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+
+.er-center-label {
+  color: $text-muted;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+@keyframes er-center-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.er-smith {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: #2f2f2f;
+  border: 2px solid #4a4a4a;
+  border-radius: $border-radius;
+  padding: 1.2rem 1.8rem;
+  min-width: 200px;
+  z-index: 3;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.er-smith-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  clip-path: inset(0 round $border-radius);
+}
+
+// Keep smith content above the background
+.er-smith-name,
+.er-smith-level,
+.er-smith-bar,
+.er-smith-taps {
+  position: relative;
+  z-index: 1;
+}
+
+.er-smith-name {
+  font-size: 1.1rem;
+  color: $text-muted;
+  font-weight: 600;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.er-smith-level {
+  font-size: 3.2rem;
+  font-weight: 900;
+  color: $primary-hover;
+  text-shadow: 0 0 8px rgba($primary-color, 0.3);
+  transition: color 0.15s ease;
+  line-height: 1;
+}
+
+.er-smith-bar {
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.er-smith-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, $primary-dark, $primary-hover);
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+
+.er-smith-taps {
+  font-size: 1rem;
+  color: $text-muted;
+  font-weight: 700;
+  min-height: 0.8em;
+}
+
+.er-smith-breakdown {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+
+  .er-bd-row {
+    gap: 0.3rem;
+  }
+
+  .er-bd-level {
+    font-size: 0.7rem;
+  }
+
+  .er-bd-count {
+    font-size: 0.75rem;
+  }
+}
+
+.er-smith-done {
+  border-color: $success-color;
+  box-shadow: 0 0 12px rgba($success-color, 0.3);
+
+  .er-smith-level {
+    color: $success-color;
+  }
+}
+
+.er-flash-success {
+  animation: er-level-pop 0.2s ease;
+  color: $success-color !important;
+}
+
+.er-flash-fail {
+  animation: er-level-shake 0.2s ease;
+  color: $danger-color !important;
+}
+
+@keyframes er-level-pop {
+  0% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+@keyframes er-level-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+// ============================================
+// Results Screen
+// ============================================
+
+.er-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.er-results-header {
+  text-align: center;
+
+  h2 {
+    color: $primary-color;
+    margin: 0;
+    font-size: 1.5rem;
+  }
+}
+
+.er-podium {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.er-result-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: #2f2f2f;
+  border-radius: $border-radius;
+  border: 1px solid transparent;
+}
+
+.er-result-top {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.er-result-row .er-breakdown {
+  padding-left: 2.5rem;
+}
+
+.er-result-winner {
+  border-color: $primary-color;
+  background: linear-gradient(135deg, rgba($primary-color, 0.1), transparent);
+
+  .er-result-name {
+    color: $primary-color;
+    font-weight: 800;
+  }
+}
+
+.er-result-rank {
+  text-align: center;
+  font-size: 1rem;
+}
+
+.er-result-name {
+  font-weight: 600;
+  color: $text-light;
+}
+
+.er-result-taps {
+  font-size: 0.85rem;
+  color: $text-muted;
+  font-weight: 700;
+}
+
+.er-results-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.er-btn {
+  background: #2f2f2f;
+  border: 1px solid #4a4a4a;
+  color: $text-light;
+  padding: 0.5rem 1.25rem;
+  border-radius: $border-radius;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: $primary-color;
+    color: $primary-color;
+  }
+}
+
+.er-btn-primary {
+  background: linear-gradient(135deg, $primary-color, $primary-dark);
+  color: #1a1a1a;
+  border-color: transparent;
+
+  &:hover {
+    background: linear-gradient(135deg, $primary-hover, $primary-color);
+    color: #1a1a1a;
+  }
+}
+
+// ============================================
+// Enhancement Log
+// ============================================
+
+.er-log-section {
+  width: 100%;
+
+  h3 {
+    color: $text-muted;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin: 0 0 0.5rem 0;
+    text-align: center;
+  }
+}
+
+.er-log-header {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0 0.25rem 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.4rem;
+}
+
+.er-log-header-name {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: $text-muted;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.er-log {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.er-log-row {
+  display: grid;
+  gap: 0.3rem;
+  align-items: center;
+  font-size: 0.7rem;
+}
+
+.er-log-num {
+  color: $text-muted;
+  font-size: 0.6rem;
+  text-align: center;
+}
+
+.er-log-entry {
+  padding: 0.15rem 0.25rem;
+  border-radius: 3px;
+  text-align: center;
+}
+
+.er-log-success {
+  color: $success-color;
+  background: rgba($success-color, 0.08);
+}
+
+.er-log-fail {
+  color: $danger-color;
+  background: rgba($danger-color, 0.08);
+}
+
+.er-log-empty {
+  color: $text-muted;
+  opacity: 0.3;
+}
+
+// ============================================
+// Tap Breakdown (inline on cards & results)
+// ============================================
+
+.er-breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.er-bd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.27);
+  border-right: 1px solid rgba(255, 255, 255, 0.27);
+
+  &:nth-child(even) {
+    border-right: none;
+  }
+
+  &:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+}
+
+.er-bd-level {
+  color: $primary-color;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.er-bd-count {
+  color: $text-light;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+// ============================================
+// Mobile
+// ============================================
+
+@media (max-width: 600px) {
+  .enhance-race {
+    padding: 0.75rem;
+  }
+
+  .er-orbit-container {
+    width: 380px;
+    height: 380px;
+  }
+
+  .er-smith {
+    min-width: 80px;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .er-smith-level {
+    font-size: 1.6rem;
+  }
+
+  .er-smith-name {
+    font-size: 0.7rem;
+    max-width: 75px;
+  }
+
+  .er-log-row {
+    font-size: 0.6rem;
+  }
+}

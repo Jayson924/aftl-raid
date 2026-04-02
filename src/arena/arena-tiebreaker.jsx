@@ -145,7 +145,7 @@ export const ArenaTiebreakerPage = {
     container.innerHTML = `
       <div class="tb-header arena-panel">
         <h2>Enhancement Race</h2>
-        <p>Auto-enhance from <strong>+${TIEBREAKER_START_LEVEL}</strong> to <strong>+${TIEBREAKER_TARGET_LEVEL}</strong> — fewest taps wins!</p>
+        <p>Auto-enhance from <strong>+${TIEBREAKER_START_LEVEL}</strong> to <strong>+${TIEBREAKER_TARGET_LEVEL}</strong>: fewest taps wins!</p>
       </div>
 
       <div class="tb-arena">
