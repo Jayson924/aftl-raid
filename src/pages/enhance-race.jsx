@@ -93,6 +93,18 @@ function buildBreakdownHTML(taps) {
 const MIN_SMITHS = 2;
 const MAX_SMITHS = 8;
 
+const ANON_NAMES = [
+  'Shadow Fox', 'Iron Wolf', 'Storm Hawk', 'Ghost Bear',
+  'Dark Raven', 'Frost Lion', 'Fire Drake', 'Stone Owl',
+  'Blood Hound', 'Night Viper', 'Thunder Ram', 'Wild Lynx',
+  'Bone Shark', 'Ash Cobra', 'Steel Crane', 'Dusk Mantis'
+];
+
+function pickAnonNames(count) {
+  const shuffled = [...ANON_NAMES].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
 export const EnhanceRacePage = {
   _container: null,
   _smithCount: 4,
@@ -101,6 +113,13 @@ export const EnhanceRacePage = {
   _animating: false,
   _animationTimer: null,
   _winnerId: null,
+  _hideNames: false,
+  _anonNames: [],
+  _revealed: [],
+  _positionOrder: null,
+  _orbitAngle: 0,
+  _orbitRAF: null,
+  _finishOrder: [],
 
   async render(container) {
     container.innerHTML = '';
@@ -149,6 +168,13 @@ export const EnhanceRacePage = {
           </div>
         </div>
 
+        <div class="er-hide-names-toggle">
+          <label class="er-toggle-label">
+            <input type="checkbox" id="hide-names-cb" ${this._hideNames ? 'checked' : ''} />
+            <span>Hide names until +${TIEBREAKER_TARGET_LEVEL}</span>
+          </label>
+        </div>
+
         <div class="er-rates-section">
           ${Object.entries(TIEBREAKER_RATES).map(([level, rate]) => `
             <span class="er-rate">+${level}: ${rate.success}%${rate.failDowngrade > 0 ? ` / -${rate.failDowngrade}` : ''}</span>
@@ -172,6 +198,10 @@ export const EnhanceRacePage = {
         this._smithCount++;
         this._renderSetup(container);
       }
+    });
+
+    document.getElementById('hide-names-cb').addEventListener('change', (e) => {
+      this._hideNames = e.target.checked;
     });
 
     document.getElementById('start-btn').addEventListener('click', () => {
@@ -207,6 +237,11 @@ export const EnhanceRacePage = {
     return this._names[i] || `Blacksmith ${i + 1}`;
   },
 
+  _getDisplayName(i) {
+    if (!this._hideNames || this._revealed[i]) return this._getSmithName(i);
+    return this._anonNames[i] || '???';
+  },
+
   _startRace(container) {
     let results;
     do {
@@ -217,6 +252,17 @@ export const EnhanceRacePage = {
 
     this._results = results;
     this._winnerId = results[0].index;
+    this._anonNames = pickAnonNames(this._smithCount);
+    this._revealed = new Array(this._smithCount).fill(false);
+    this._finishOrder = [];
+    this._orbitAngle = 0;
+
+    // Shuffle visual positions when hiding names so input order can't be deduced
+    if (this._hideNames) {
+      this._positionOrder = [...Array(this._smithCount).keys()].sort(() => Math.random() - 0.5);
+    } else {
+      this._positionOrder = [...Array(this._smithCount).keys()];
+    }
 
     this._renderRace(container);
     this._runAnimation(container);
@@ -231,13 +277,13 @@ export const EnhanceRacePage = {
       smithNodes.push(`
         <div class="er-smith" id="smith-${i}">
           <img src="${berlinImg}" alt="" class="er-smith-bg" />
-          <div class="er-smith-name">${this._getSmithName(i)}</div>
+          <div class="er-smith-name ${this._hideNames && !this._revealed[i] ? 'er-smith-name-hidden' : ''}" id="smith-name-${i}">${this._getDisplayName(i)}</div>
           <div class="er-smith-level" id="smith-level-${i}">+${TIEBREAKER_START_LEVEL}</div>
           <div class="er-smith-bar">
             <div class="er-smith-bar-fill" id="smith-bar-${i}" style="width: 0%"></div>
           </div>
-          <div class="er-smith-taps" id="smith-taps-${i}"></div>
-          <div class="er-smith-breakdown" id="smith-bd-${i}"></div>
+          <div class="er-smith-taps" id="smith-taps-${i}">&nbsp;</div>
+          <div class="er-smith-breakdown" id="smith-bd-${i}">${buildBreakdownHTML([])}</div>
         </div>
       `);
     }
@@ -266,12 +312,14 @@ export const EnhanceRacePage = {
   _positionSmiths() {
     const count = this._smithCount;
     const radius = this._getOrbitRadius();
+    const order = this._positionOrder || [...Array(count).keys()];
 
-    for (let i = 0; i < count; i++) {
-      const el = document.getElementById(`smith-${i}`);
+    for (let visualIdx = 0; visualIdx < count; visualIdx++) {
+      const smithIdx = order[visualIdx];
+      const el = document.getElementById(`smith-${smithIdx}`);
       if (!el) continue;
 
-      const angle = ((i / count) * 360 - 90) * (Math.PI / 180);
+      const angle = ((visualIdx / count) * 360 - 90) * (Math.PI / 180);
       const x = Math.cos(angle) * radius;
       const y = Math.sin(angle) * radius;
 
@@ -279,8 +327,55 @@ export const EnhanceRacePage = {
     }
   },
 
+  _startOrbit() {
+    if (!this._hideNames) return;
+    const ORBIT_SPEED = 0.12; // degrees per frame at 60fps
+    let lastTime = performance.now();
+
+    const animate = (now) => {
+      const dt = now - lastTime;
+      lastTime = now;
+      this._orbitAngle += ORBIT_SPEED * (dt / 16.67);
+
+      const count = this._smithCount;
+      const radius = this._getOrbitRadius();
+      const order = this._positionOrder || [...Array(count).keys()];
+
+      for (let visualIdx = 0; visualIdx < count; visualIdx++) {
+        const smithIdx = order[visualIdx];
+
+        // Revealed smiths are in the center — don't touch them
+        if (this._revealed[smithIdx]) continue;
+
+        const el = document.getElementById(`smith-${smithIdx}`);
+        if (!el) continue;
+
+        const baseAngle = (visualIdx / count) * 360 - 90;
+        const angle = (baseAngle + this._orbitAngle) * (Math.PI / 180);
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+
+        el.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+      }
+
+      if (this._animating) {
+        this._orbitRAF = requestAnimationFrame(animate);
+      }
+    };
+
+    this._orbitRAF = requestAnimationFrame(animate);
+  },
+
+  _stopOrbit() {
+    if (this._orbitRAF) {
+      cancelAnimationFrame(this._orbitRAF);
+      this._orbitRAF = null;
+    }
+  },
+
   async _runAnimation(container) {
     this._animating = true;
+    this._startOrbit();
 
     const maxTaps = Math.max(...this._results.map(r => r.totalTaps));
     const TAP_DELAY = 150;
@@ -302,6 +397,38 @@ export const EnhanceRacePage = {
           if (step + 1 === r.totalTaps) {
             const el = document.getElementById(`smith-${r.index}`);
             if (el) el.classList.add('er-smith-done');
+
+            if (this._hideNames && !this._revealed[r.index]) {
+              this._revealed[r.index] = true;
+              this._finishOrder.push(r.index);
+              const finishIdx = this._finishOrder.length - 1;
+
+              // Fly card to stacked center position
+              const stackGap = 55;
+              const totalSlots = this._smithCount;
+              const yOffset = (finishIdx - (totalSlots - 1) / 2) * stackGap;
+
+              if (el) {
+                // Hide center label on first arrival
+                if (finishIdx === 0) {
+                  const centerEl = container.querySelector('.er-center');
+                  if (centerEl) centerEl.style.display = 'none';
+                }
+                // Add transition class, then set target on next frame so browser animates from current position
+                el.classList.add('er-smith-to-center');
+                el.style.zIndex = 10 + finishIdx;
+                requestAnimationFrame(() => {
+                  el.style.transform = `translate(-50%, calc(-50% + ${yOffset}px)) scale(0.7)`;
+                });
+              }
+
+              const nameEl = document.getElementById(`smith-name-${r.index}`);
+              if (nameEl) {
+                nameEl.classList.remove('er-smith-name-hidden');
+                nameEl.classList.add('er-smith-name-reveal');
+                nameEl.textContent = this._getSmithName(r.index);
+              }
+            }
           }
         }
 
@@ -317,6 +444,7 @@ export const EnhanceRacePage = {
     });
 
     this._animating = false;
+    this._stopOrbit();
 
     await new Promise(r => setTimeout(r, 600));
     this._renderResults(container);
@@ -426,6 +554,7 @@ export const EnhanceRacePage = {
 
   destroy() {
     if (this._animationTimer) clearTimeout(this._animationTimer);
+    this._stopOrbit();
     this._animating = false;
     this._results = null;
     this._winnerId = null;

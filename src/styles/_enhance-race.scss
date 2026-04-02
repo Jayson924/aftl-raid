@@ -142,6 +142,24 @@
   }
 }
 
+.er-hide-names-toggle {
+  .er-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: $text-muted;
+    font-size: 0.9rem;
+
+    input[type="checkbox"] {
+      accent-color: $primary-color;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+  }
+}
+
 .er-rates-section {
   display: flex;
   gap: 1rem;
@@ -271,6 +289,33 @@
   white-space: nowrap;
 }
 
+.er-smith-name-hidden {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.er-smith-name-reveal {
+  animation: er-name-reveal 0.6s ease;
+  color: $primary-color;
+  font-style: normal;
+}
+
+@keyframes er-name-reveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+    filter: blur(8px);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+    filter: blur(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .er-smith-level {
   font-size: 3.2rem;
   font-weight: 900;
@@ -299,7 +344,7 @@
   font-size: 1rem;
   color: $text-muted;
   font-weight: 700;
-  min-height: 0.8em;
+  min-height: 1.2em;
 }
 
 .er-smith-breakdown {
@@ -318,6 +363,10 @@
   .er-bd-count {
     font-size: 0.75rem;
   }
+}
+
+.er-smith-to-center {
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .er-smith-done {
@@ -578,6 +627,7 @@
   font-weight: 800;
   font-size: 0.85rem;
   text-align: right;
+  min-width: 4ch;
 }
 
 // ============================================
