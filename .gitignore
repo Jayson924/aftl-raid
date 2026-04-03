@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Supabase SQL migrations (reference only)
+supabase/
+
 # Environment variables
 .env
 .env.local
@@ -19,6 +22,11 @@ dist-ssr
 
 # Netlify
 .netlify
+
+README.md
+
+# Claude Code
+.claude/
 
 # Editor directories and files
 .vscode/*
