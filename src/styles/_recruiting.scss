@@ -456,18 +456,19 @@
     color: #f4c430;
   }
 
-  &__needs {
+  &__slots {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 6px;
     margin-bottom: 16px;
+    text-align: left;
   }
 
   &__note {
     font-size: 0.85rem;
     color: #888;
     margin: 0;
+    text-align: center;
     strong { color: #f4c430; }
   }
 
@@ -478,121 +479,128 @@
   }
 }
 
-.recruit-need {
-  display: inline-block;
-  padding: 6px 16px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 600;
+// ─── Slot-based recruiting rows ───
 
-  &--tank {
-    background: rgba(59, 130, 246, 0.12);
-    color: #5b9cf6;
-    border: 1px solid rgba(59, 130, 246, 0.25);
-  }
-
-  &--healer {
-    background: rgba(40, 167, 69, 0.12);
-    color: #4ece73;
-    border: 1px solid rgba(40, 167, 69, 0.25);
-  }
-
-  &--dps {
-    background: rgba(255, 152, 0, 0.12);
-    color: #ffb347;
-    border: 1px solid rgba(255, 152, 0, 0.25);
-  }
-
-  &--ice {
-    background: rgba(100, 200, 255, 0.12);
-    color: #7dd3fc;
-    border: 1px solid rgba(100, 200, 255, 0.25);
-  }
-
-  &--cooldown {
-    background: rgba(192, 132, 252, 0.12);
-    color: #c084fc;
-    border: 1px solid rgba(192, 132, 252, 0.25);
-  }
-
-  &--utility {
-    background: rgba(34, 211, 238, 0.12);
-    color: #22d3ee;
-    border: 1px solid rgba(34, 211, 238, 0.25);
-  }
-
-  &--pairing {
-    background: rgba(244, 114, 182, 0.12);
-    color: #f472b6;
-    border: 1px solid rgba(244, 114, 182, 0.25);
-    cursor: help;
-  }
-
-  &--always {
-    opacity: 0.6;
-    border-style: dashed;
-    cursor: help;
-  }
-
-  // All badges with tooltips get pointer cursor + relative positioning
-  position: relative;
-  cursor: default;
-
-  .recruit-tip {
-    display: none;
-  }
-
-  &:hover .recruit-tip {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    position: absolute;
-    bottom: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(20, 20, 30, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 10px;
-    padding: 10px 14px;
-    z-index: 100;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
-    white-space: nowrap;
-    pointer-events: none;
-  }
-}
-
-.recruit-tip__item {
+.recruit-slot {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: #d0d0d0;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
 
-  .class-sprite {
-    transform: scale(0.55);
-    transform-origin: top left;
-    width: 44px;
-    height: 46px;
+  &__count {
     flex-shrink: 0;
-    // Collapse the extra space from scaling
-    margin-right: -20px;
-    margin-bottom: -21px;
+    width: 22px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #f4c430;
+    text-align: right;
+  }
+
+  &__label {
+    flex-shrink: 0;
+    width: 100px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #f4c430;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  &__classes {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  &__class {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+
+    .class-sprite {
+      transform: scale(0.45);
+      transform-origin: top left;
+      width: 44px;
+      height: 46px;
+      margin-right: -24px;
+      margin-bottom: -25px;
+    }
+  }
+
+  &__classname {
+    font-size: 0.82rem;
+    color: #d0d0d8;
+    white-space: nowrap;
+  }
+
+  &__or {
+    font-size: 0.72rem;
+    color: #666;
+    font-style: italic;
+    padding: 0 2px;
+  }
+
+  // DPS row — marquee fills remaining space
+  &--dps {
+    .recruit-marquee {
+      margin-top: 0;
+    }
   }
 }
 
-.recruit-tip__msg {
-  font-size: 0.78rem;
-  color: #b0b0c8;
-  white-space: nowrap;
-  line-height: 1.45;
-  text-align: center;
+// ─── DPS class marquee ───
+
+.recruit-marquee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+
+  &__track {
+    display: flex;
+    gap: 20px;
+    width: max-content;
+    animation: recruit-scroll 25s linear infinite;
+  }
+
+  &__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+
+    .class-sprite {
+      transform: scale(0.45);
+      transform-origin: top left;
+      width: 44px;
+      height: 46px;
+      margin-right: -24px;
+      margin-bottom: -25px;
+    }
+  }
+
+  &__name {
+    font-size: 0.78rem;
+    color: #999;
+    white-space: nowrap;
+  }
 }
 
-// ─── Gearscore requirement tooltip ───
-
-.gs-req {
-  cursor: help;
-  border-bottom: 1px dashed rgba(244, 196, 48, 0.5);
+@keyframes recruit-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 // ─── Mobile tooltip tap-to-show ───

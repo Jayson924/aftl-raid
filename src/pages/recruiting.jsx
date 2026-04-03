@@ -2,55 +2,49 @@ import { dataService } from '../data.js';
 import { calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
 import { toast } from '../toast.js';
 
-const TANK_CLASSES = ['Guardian'];
-const HEALER_CLASSES = ['Saint', 'Physician'];
-const SUPPORT_CLASSES = ['Crusader', 'Physician', 'Inquisitor'];
-
 function getClassRole(role) {
-  if (TANK_CLASSES.includes(role)) return 'tank';
-  if (HEALER_CLASSES.includes(role)) return 'healer';
-  if (SUPPORT_CLASSES.includes(role)) return 'support';
+  if (role === 'Guardian') return 'tank';
+  if (role === 'Saint') return 'healer';
   return 'dps';
 }
 
-// DPS slot types — each party has 6 DPS slots in this order
-const DPS_SLOT_TYPES = [
-  { key: 'super_armor',    label: 'SA Buff',          classes: ['Dark Summoner', 'Barbarian', 'Destroyer'] },
-  { key: 'ice_debuff',     label: 'Ice Debuff',           classes: ['Adept', 'Elestra'] },
-  { key: 'cooldown_mgmt',  label: 'CD Buff',        classes: ['Smasher', 'Majesty'] },
-  { key: 'utility_buff',   label: 'Utility Buff',         classes: ['Tempest', 'Wind Walker', 'Physician'] },
-  { key: 'open',           label: 'Open Slot',            classes: [] },
-  { key: 'open',           label: 'Open Slot',            classes: [] },
+// DPS slot definitions — each party has 6 DPS slots
+const DPS_SLOTS = [
+  { key: 'swordmaster', label: 'Swordmaster',  classes: ['Gladiator', 'Moon Lord'] },
+  { key: 'force_user',  label: 'Force User',   classes: ['Majesty', 'Smasher'] },
+  { key: 'ice',         label: 'Elestra',       classes: ['Elestra'] },
+  { key: 'mercenary',   label: 'Mercenary',     classes: ['Destroyer', 'Barbarian'] },
+  { key: 'acrobat',     label: 'Acrobat',       classes: ['Tempest', 'Wind Walker'] },
+  { key: 'dps',         label: 'DPS',           classes: ['Sniper', 'Artillery', 'Shooting Star', 'Gear Master', 'Dark Summoner', 'Soul Eater', 'Blade Dancer', 'Spirit Dancer', 'Crusader', 'Inquisitor', 'Physician', 'Adept', 'Saleana'] },
 ];
 
-function getDpsSlotLabel(dpsIndex) {
-  return DPS_SLOT_TYPES[dpsIndex]?.label || 'Open Slot';
+// Saleana/Adept/Elestra special pairing logic:
+// If Saleana is in DPS slot → ice slot must be Adept
+// If Adept is in ice slot but no Saleana → Elestra is preferred for ice
+function getIceSlotLabel(party, playerMap) {
+  const dps = party.dps || [];
+  const dpsSlotPlayer = dps[5] ? playerMap[dps[5]] : null;
+  const iceSlotPlayer = dps[2] ? playerMap[dps[2]] : null;
+
+  if (dpsSlotPlayer?.role === 'Saleana') return 'Adept';
+  if (iceSlotPlayer?.role === 'Adept') return 'Saleana';
+  if (iceSlotPlayer?.role === 'Saleana') return 'Adept';
+  return 'Elestra';
 }
 
-// Find the preferred DPS slot index for a given class
-function getPreferredDpsSlot(className) {
-  for (let i = 0; i < DPS_SLOT_TYPES.length; i++) {
-    if (DPS_SLOT_TYPES[i].classes.includes(className)) return i;
+function getDpsSlotLabel(dpsIndex, party, playerMap) {
+  if (dpsIndex === 2 && party && playerMap) {
+    return getIceSlotLabel(party, playerMap);
   }
-  return -1; // no preferred slot, use any open
+  if (dpsIndex === 5 && party && playerMap) {
+    // If Adept is in ice slot, show "Saleana" hint for DPS slot
+    const icePlayer = (party.dps || [])[2] ? playerMap[(party.dps || [])[2]] : null;
+    if (icePlayer?.role === 'Adept') return 'Saleana';
+  }
+  return DPS_SLOTS[dpsIndex]?.label || 'DPS';
 }
 
-// Saleana/Adept pairing detection
-function detectPairingNeeds(parties, playerMap) {
-  const needs = [];
-  parties.forEach((party, pi) => {
-    const dpsRoles = (party.dps || []).map(name => name ? playerMap[name]?.role : null);
-    const hasSaleana = dpsRoles.includes('Saleana');
-    const hasAdept = dpsRoles.includes('Adept');
-    if (hasSaleana && !hasAdept) {
-      needs.push({ need: 'Adept', reason: 'Saleana needs an Adept for synergy' });
-    }
-    if (hasAdept && !hasSaleana) {
-      needs.push({ need: 'Saleana', reason: 'Adept needs a Saleana to buff' });
-    }
-  });
-  return needs;
-}
+
 
 // Party accent colors
 const PARTY_COLORS = [
@@ -63,7 +57,7 @@ const PARTY_COLORS = [
 ];
 
 // Layout: parties in constellation
-function calculateLayout(parties) {
+function calculateLayout(parties, rawParties, playerMap) {
   const nodes = [];
   const edges = [];
   const rawNodes = [];
@@ -94,8 +88,8 @@ function calculateLayout(parties) {
     const healerX = coreCx - Math.cos(perpAngle) * corePairGap;
     const healerY = coreCy - Math.sin(perpAngle) * corePairGap;
 
-    rawNodes.push({ x: tankX, y: tankY, partyIndex: pi, player: party.tankPlayer, slotType: 'tank', slotKey: `${pi}-tank-0`, slotLabel: 'Tank (Guardian)' });
-    rawNodes.push({ x: healerX, y: healerY, partyIndex: pi, player: party.healerPlayer, slotType: 'healer', slotKey: `${pi}-healer-0`, slotLabel: 'Healer' });
+    rawNodes.push({ x: tankX, y: tankY, partyIndex: pi, player: party.tankPlayer, slotType: 'tank', slotKey: `${pi}-tank-0`, slotLabel: 'Guardian' });
+    rawNodes.push({ x: healerX, y: healerY, partyIndex: pi, player: party.healerPlayer, slotType: 'healer', slotKey: `${pi}-healer-0`, slotLabel: 'Saint' });
 
     const dpsCount = 6;
     const fanArc = numParties <= 1 ? Math.PI * 1.5 : Math.PI * Math.min(1.1, 0.7 + numParties * 0.1);
@@ -110,7 +104,7 @@ function calculateLayout(parties) {
       rawNodes.push({
         x: coreCx + Math.cos(angle) * r,
         y: coreCy + Math.sin(angle) * r,
-        partyIndex: pi, player: party.dpsPlayers[d] || null, slotType: 'dps', slotKey: `${pi}-dps-${d}`, slotLabel: getDpsSlotLabel(d)
+        partyIndex: pi, player: party.dpsPlayers[d] || null, slotType: 'dps', slotKey: `${pi}-dps-${d}`, slotLabel: getDpsSlotLabel(d, rawParties?.[pi], playerMap)
       });
     }
   });
@@ -383,7 +377,7 @@ export const RecruitingPage = {
           <h1 class="recruiting-hero__title">AFTL Guild</h1>
           <p class="recruiting-hero__subtitle">Raid Recruitment</p>
           <div class="recruiting-hero__divider"></div>
-          <p class="recruiting-hero__desc">We're recruiting geared players for endgame content. Every lineup will have a <strong>Guardian</strong> and a <strong>Healer</strong> at its core.</p>
+          <p class="recruiting-hero__desc">We're recruiting geared players for endgame content. Every party is built around a <strong>Guardian</strong> and a <strong>Saint</strong>.</p>
         </div>
         ${this.isEditMode ? `
           <div class="recruiting-admin-toolbar">
@@ -460,6 +454,8 @@ export const RecruitingPage = {
     if (!webContainer) return;
 
     const resolved = this.resolveParties();
+    const playerMap = {};
+    this.allPlayers.forEach(p => { playerMap[p.name] = p; });
     const assignedNames = this.getAssignedNames();
     const unassigned = this.allPlayers.filter(p => !assignedNames.has(p.name));
 
@@ -487,11 +483,11 @@ export const RecruitingPage = {
 
     // Mobile: one party at a time with swipe
     if (this._isMobile && this.parties.length > 0) {
-      this.renderMobileCarousel(webContainer, resolved, unassigned);
+      this.renderMobileCarousel(webContainer, resolved, unassigned, playerMap);
       return;
     }
 
-    const { nodes, edges, hubCenter } = calculateLayout(resolved);
+    const { nodes, edges, hubCenter } = calculateLayout(resolved, this.parties, playerMap);
 
     const svgHtml = renderWebSVG(edges, hubCenter);
     const partyNodes = nodes.filter(n => n.slotType !== 'hub');
@@ -532,7 +528,7 @@ export const RecruitingPage = {
     }
   },
 
-  renderMobileCarousel(webContainer, resolved, unassigned) {
+  renderMobileCarousel(webContainer, resolved, unassigned, playerMap) {
     // Clamp index
     if (this._currentPartyIndex >= this.parties.length) {
       this._currentPartyIndex = Math.max(0, this.parties.length - 1);
@@ -540,7 +536,7 @@ export const RecruitingPage = {
 
     const pi = this._currentPartyIndex;
     const singleResolved = [resolved[pi]];
-    const { nodes, edges, hubCenter } = calculateLayout(singleResolved);
+    const { nodes, edges, hubCenter } = calculateLayout(singleResolved, [this.parties[pi]], playerMap);
 
     // Remap nodes/edges to use real party index (not 0)
     nodes.forEach(n => {
@@ -640,103 +636,119 @@ export const RecruitingPage = {
       return;
     }
 
-    // Count open slots by role
-    const neededRoles = { tank: 0, healer: 0 };
-    // Count open DPS slots by type
-    const dpsSlotNeeds = {};
-    DPS_SLOT_TYPES.forEach(st => {
-      if (!dpsSlotNeeds[st.key]) dpsSlotNeeds[st.key] = { label: st.label, count: 0 };
-    });
+    // Build player map for label resolution
+    const playerMap = {};
+    this.allPlayers.forEach(p => { playerMap[p.name] = p; });
+
+    // Collect open slots, deduplicated by label with count
+    const slotMap = new Map(); // label -> { key, label, classes, count }
 
     this.parties.forEach(p => {
-      if (!p.tank) neededRoles.tank++;
-      if (!p.healer) neededRoles.healer++;
+      if (!p.tank) {
+        const existing = slotMap.get('Tank');
+        if (existing) { existing.count++; } else { slotMap.set('Tank', { key: 'tank', label: 'Tank', classes: ['Guardian'], count: 1 }); }
+      }
+      if (!p.healer) {
+        const existing = slotMap.get('Healer');
+        if (existing) { existing.count++; } else { slotMap.set('Healer', { key: 'healer', label: 'Healer', classes: ['Saint'], count: 1 }); }
+      }
       const dps = p.dps || [];
       for (let d = 0; d < 6; d++) {
         if (!dps[d]) {
-          const slotType = DPS_SLOT_TYPES[d];
-          dpsSlotNeeds[slotType.key].count++;
+          const slot = DPS_SLOTS[d];
+          if (!slot) continue;
+          const label = getDpsSlotLabel(d, p, playerMap);
+          const existing = slotMap.get(label);
+          if (existing) {
+            existing.count++;
+          } else {
+            let displayClasses;
+            if (slot.key === 'ice') {
+              // Ice slot: only show the specific class the pairing logic resolved
+              displayClasses = [label];
+            } else if (slot.key === 'dps') {
+              // DPS slot: handled by marquee, classes don't matter for display
+              displayClasses = [...slot.classes];
+            } else {
+              displayClasses = [...slot.classes];
+            }
+            slotMap.set(label, {
+              key: slot.key,
+              label,
+              classes: displayClasses,
+              count: 1,
+            });
+          }
         }
       }
     });
 
-    // Build player map for pairing detection
-    const playerMap = {};
-    this.allPlayers.forEach(p => { playerMap[p.name] = p; });
-    const pairingNeeds = detectPairingNeeds(this.parties, playerMap);
+    const openSlots = [...slotMap.values()];
 
-    let totalOpen = neededRoles.tank + neededRoles.healer;
-    Object.values(dpsSlotNeeds).forEach(s => { totalOpen += s.count; });
-
-    const needs = [];
-
-    // Helper: build HTML tooltip with class icons for a list of class names
-    function classIconTooltip(classNames) {
-      if (!classNames || classNames.length === 0) return '';
-      const items = classNames.map(cls => {
-        const style = getClassSpriteStyle(cls);
-        return `<div class="recruit-tip__item"><div class="class-sprite" style="${style}"></div><span>${cls}</span></div>`;
-      }).join('');
-      return `<div class="recruit-tip">${items}</div>`;
+    if (openSlots.length === 0) {
+      legendContainer.innerHTML = `
+        <div class="recruiting-summary recruiting-summary--full">
+          <h3>All Parties Full</h3>
+          <p class="recruiting-summary__note">Guardians and Saints are always welcome — we'll build a new team around you.</p>
+        </div>
+      `;
+      return;
     }
 
-    // Always show Guardian and Healer
-    const alwaysMsg = '<div class="recruit-tip"><div class="recruit-tip__msg">A new team will be created for new Guardians and Healers if the vibes are good!</div></div>';
-    if (neededRoles.tank > 0) {
-      needs.push(`<span class="recruit-need recruit-need--tank">${neededRoles.tank} Guardian${neededRoles.tank > 1 ? 's' : ''}${classIconTooltip(['Guardian'])}</span>`);
-    } else {
-      needs.push(`<span class="recruit-need recruit-need--tank recruit-need--always">Guardian${alwaysMsg}</span>`);
-    }
-    if (neededRoles.healer > 0) {
-      needs.push(`<span class="recruit-need recruit-need--healer">${neededRoles.healer} Healer${neededRoles.healer > 1 ? 's' : ''}${classIconTooltip(['Saint', 'Physician'])}</span>`);
-    } else {
-      needs.push(`<span class="recruit-need recruit-need--healer recruit-need--always">Healer${alwaysMsg}</span>`);
-    }
+    // Build marquee content for DPS slots
+    const dpsClasses = DPS_SLOTS.find(s => s.key === 'dps')?.classes || [];
+    const marqueeItems = dpsClasses.map(cls => {
+      const spriteStyle = getClassSpriteStyle(cls);
+      return `<span class="recruit-marquee__item">
+        <span class="recruit-marquee__icon"><span class="class-sprite" style="${spriteStyle}"></span></span>
+        <span class="recruit-marquee__name">${cls}</span>
+      </span>`;
+    }).join('');
 
-    // Show DPS needs by slot type (skip if 0)
-    const dpsTypeStyles = {
-      super_armor: 'dps',
-      ice_debuff: 'ice',
-      cooldown_mgmt: 'cooldown',
-      utility_buff: 'utility',
-      open: 'dps',
-    };
-    // Map slot keys to their class lists from DPS_SLOT_TYPES
-    const slotClassMap = {};
-    DPS_SLOT_TYPES.forEach(st => {
-      if (!slotClassMap[st.key]) slotClassMap[st.key] = st.classes;
-    });
+    // Build one row per slot type (deduplicated, with count)
+    const rows = openSlots.map(({ label, classes, key, count }) => {
+      const countBadge = `<span class="recruit-slot__count">${count > 1 ? count + 'x' : ''}</span>`;
 
-    Object.entries(dpsSlotNeeds).forEach(([key, { label, count }]) => {
-      if (count > 0) {
-        const style = dpsTypeStyles[key] || 'dps';
-        const tooltip = key !== 'open' ? classIconTooltip(slotClassMap[key] || []) : '';
-        needs.push(`<span class="recruit-need recruit-need--${style}">${count} ${label}${tooltip}</span>`);
+      // DPS slot — inline marquee instead of class list
+      if (key === 'dps') {
+        return `<div class="recruit-slot recruit-slot--dps">
+          ${countBadge}
+          <span class="recruit-slot__label">${label}</span>
+          <div class="recruit-marquee">
+            <div class="recruit-marquee__track">
+              ${marqueeItems}${marqueeItems}
+            </div>
+          </div>
+        </div>`;
       }
+
+      const classChips = classes.map(cls => {
+        const spriteStyle = getClassSpriteStyle(cls);
+        return `<span class="recruit-slot__class">
+          <span class="recruit-slot__icon"><span class="class-sprite" style="${spriteStyle}"></span></span>
+          <span class="recruit-slot__classname">${cls}</span>
+        </span>`;
+      });
+
+      // Join with "or" separators
+      const classesHtml = classChips.reduce((acc, chip, i) => {
+        if (i === 0) return chip;
+        return acc + '<span class="recruit-slot__or">or</span>' + chip;
+      }, '');
+
+      return `<div class="recruit-slot">
+        ${countBadge}
+        <span class="recruit-slot__label">${label}</span>
+        <div class="recruit-slot__classes">${classesHtml}</div>
+      </div>`;
     });
 
-    // Pairing needs
-    pairingNeeds.forEach(({ need, reason }) => {
-      needs.push(`<span class="recruit-need recruit-need--pairing"><span class="recruit-need__text">${need}</span><div class="recruit-tip"><div class="recruit-tip__msg">${reason}</div></div></span>`);
-    });
-
-    if (totalOpen > 0 || pairingNeeds.length > 0) {
-      legendContainer.innerHTML = `
-        <div class="recruiting-summary">
-          <h3>We're Looking For</h3>
-          <div class="recruiting-summary__needs">${needs.join('')}</div>
-          <p class="recruiting-summary__note">Minimum gearscore: <strong class="gs-req tooltip-wrap" data-tooltip="Legend +12 Weapons\nLegend +10 Armor\nLegend Accessories\n~950 FD">65</strong></p>
-        </div>
-      `;
-    } else {
-      legendContainer.innerHTML = `
-        <div class="recruiting-summary">
-          <h3>We're Looking For</h3>
-          <div class="recruiting-summary__needs">${needs.join('')}</div>
-          <p class="recruiting-summary__note">All current parties are full, but we're always welcoming new Guardians and Healers!</p>
-        </div>
-      `;
-    }
+    legendContainer.innerHTML = `
+      <div class="recruiting-summary">
+        <h3>Recruiting</h3>
+        <div class="recruiting-summary__slots">${rows.join('')}</div>
+      </div>
+    `;
   },
 
   renderUnassignedPool(unassigned) {
@@ -779,58 +791,6 @@ export const RecruitingPage = {
         card.classList.remove('dragging');
       });
 
-      // Double-click to auto-assign
-      card.addEventListener('dblclick', () => {
-        const playerName = card.dataset.playerName;
-        const player = this.allPlayers.find(p => p.name === playerName);
-        if (!player) return;
-
-        // Check tank/healer first
-        for (let pi = 0; pi < this.parties.length; pi++) {
-          const party = this.parties[pi];
-          if (!party.tank && TANK_CLASSES.includes(player.role)) {
-            this.assignToSlot(`${pi}-tank-0`, playerName);
-            this.isDirty = true;
-            this.renderConstellation();
-            return;
-          }
-          if (!party.healer && HEALER_CLASSES.includes(player.role)) {
-            this.assignToSlot(`${pi}-healer-0`, playerName);
-            this.isDirty = true;
-            this.renderConstellation();
-            return;
-          }
-        }
-
-        // For DPS: prefer the slot that matches the class role
-        const preferredIdx = getPreferredDpsSlot(player.role);
-
-        // First pass: try preferred slot index across all parties
-        if (preferredIdx >= 0) {
-          for (let pi = 0; pi < this.parties.length; pi++) {
-            const party = this.parties[pi];
-            if (!(party.dps || [])[preferredIdx]) {
-              this.assignToSlot(`${pi}-dps-${preferredIdx}`, playerName);
-              this.isDirty = true;
-              this.renderConstellation();
-              return;
-            }
-          }
-        }
-
-        // Second pass: any open DPS slot
-        for (let pi = 0; pi < this.parties.length; pi++) {
-          const party = this.parties[pi];
-          for (let d = 0; d < (party.dps || []).length; d++) {
-            if (!party.dps[d]) {
-              this.assignToSlot(`${pi}-dps-${d}`, playerName);
-              this.isDirty = true;
-              this.renderConstellation();
-              return;
-            }
-          }
-        }
-      });
     });
   },
 
