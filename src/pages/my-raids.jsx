@@ -32,7 +32,11 @@ export const MyRaidsPage = {
         <div class="section my-characters-section">
           <div class="section-header">
             <h2>My Characters</h2>
-            <button class="btn btn-primary" id="add-character-btn">+ Add Character</button>
+            <div class="section-header-actions">
+              <button class="btn btn-danger-outline" id="delete-raid-all-btn">Delete All Raids</button>
+              <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
+              <button class="btn btn-primary" id="add-character-btn">+ Add Character</button>
+            </div>
           </div>
           <div id="my-characters-list"></div>
         </div>
@@ -45,6 +49,8 @@ export const MyRaidsPage = {
 
     this.setupDisplayNameHandlers();
     this.setupAddCharacterHandler();
+    this.setupAddRaidToAllHandler();
+    this.setupDeleteAllRaidsHandler();
     await this.loadMyCharacters();
   },
 
@@ -251,6 +257,173 @@ export const MyRaidsPage = {
 
       PlayersPage.showAddPlayerModal();
     });
+  },
+
+  // ============================================
+  // ADD RAID TO ALL CHARACTERS
+  // ============================================
+
+  setupAddRaidToAllHandler() {
+    document.getElementById('add-raid-all-btn').addEventListener('click', () => {
+      this.showAddRaidToAllModal();
+    });
+  },
+
+  showAddRaidToAllModal() {
+    if (this._myPlayers.length === 0) {
+      toast.error('No characters to add raids to');
+      return;
+    }
+
+    // Get unique raid names for autocomplete
+    const uniqueRaidNames = [...new Set(this._personalRaids.map(r => r.name))].sort();
+    const datalistOptions = uniqueRaidNames.map(name => `<option value="${name}">`).join('');
+
+    const prefillMax = this._lastAddedRaid?.maxClears || 1;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.innerHTML = `
+      <div class="modal-content bulk-raid-modal">
+        <h2>Add Raid to All Characters</h2>
+        <div class="form-group">
+          <label for="bulk-raid-name">Raid Name</label>
+          <input type="text" id="bulk-raid-name" class="form-control" placeholder="e.g. Abyss Mire" maxlength="50" list="bulk-raid-suggestions" autocomplete="off">
+          <datalist id="bulk-raid-suggestions">${datalistOptions}</datalist>
+        </div>
+        <div class="form-group">
+          <label for="bulk-raid-max">Max Clears</label>
+          <input type="number" id="bulk-raid-max" class="form-control" min="1" max="99" value="${prefillMax}">
+        </div>
+        <p class="bulk-raid-hint">Adds to all ${this._myPlayers.length} characters.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" id="bulk-raid-confirm">Add to All</button>
+          <button type="button" class="btn btn-secondary" id="bulk-raid-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const nameInput = overlay.querySelector('#bulk-raid-name');
+    const maxInput = overlay.querySelector('#bulk-raid-max');
+    const confirmBtn = overlay.querySelector('#bulk-raid-confirm');
+    const cancelBtn = overlay.querySelector('#bulk-raid-cancel');
+
+    nameInput.focus();
+
+    // When user picks from autocomplete, fill in max clears
+    nameInput.addEventListener('input', () => {
+      const existingRaid = this._personalRaids.find(r => r.name === nameInput.value);
+      if (existingRaid) maxInput.value = existingRaid.maxClears;
+    });
+
+    const close = () => {
+      document.removeEventListener('keydown', handleKey);
+      if (overlay.parentNode) overlay.remove();
+    };
+
+    const submit = async () => {
+      const name = nameInput.value.trim();
+      const maxClears = parseInt(maxInput.value, 10);
+
+      if (!name) { toast.error('Raid name cannot be empty'); return; }
+      if (!maxClears || maxClears < 1) { toast.error('Max clears must be at least 1'); return; }
+
+      const existingPlayerIds = new Set(
+        this._personalRaids.filter(r => r.name === name).map(r => r.playerId)
+      );
+      const playersToAdd = this._myPlayers.filter(p => !existingPlayerIds.has(p.id));
+
+      if (playersToAdd.length === 0) {
+        toast.error('All characters already have this raid');
+        return;
+      }
+
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Adding...';
+
+      try {
+        let added = 0;
+        for (const player of playersToAdd) {
+          await dataService.addPersonalRaid(player.id, name, maxClears);
+          added++;
+        }
+        this._lastAddedRaid = { name, maxClears };
+        const skipped = this._myPlayers.length - added;
+        const msg = skipped > 0
+          ? `Added "${name}" to ${added} characters (${skipped} skipped)`
+          : `Added "${name}" to all ${added} characters`;
+        toast.success(msg);
+        close();
+        await this.loadPersonalRaids();
+        this.reloadAllPlayerRaids();
+      } catch (error) {
+        toast.error(`Failed: ${error.message}`);
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Add to All';
+      }
+    };
+
+    confirmBtn.addEventListener('click', submit);
+    cancelBtn.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') close();
+      if (e.key === 'Enter') submit();
+    };
+    document.addEventListener('keydown', handleKey);
+  },
+
+  reloadAllPlayerRaids() {
+    this._myPlayers.forEach(player => {
+      this.refreshPlayerRaids(player.id);
+    });
+  },
+
+  // ============================================
+  // DELETE ALL RAIDS
+  // ============================================
+
+  setupDeleteAllRaidsHandler() {
+    document.getElementById('delete-raid-all-btn').addEventListener('click', () => {
+      this.deleteAllRaids();
+    });
+  },
+
+  async deleteAllRaids() {
+    if (this._personalRaids.length === 0) {
+      toast.error('No personal raids to delete');
+      return;
+    }
+
+    const confirmed = await modal.confirm(
+      `Delete all ${this._personalRaids.length} personal raids across all your characters?`, {
+        title: 'Delete All Personal Raids',
+        confirmText: 'Delete All',
+        cancelText: 'Cancel',
+        danger: true
+      }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      let deleted = 0;
+      for (const raid of [...this._personalRaids]) {
+        await dataService.deletePersonalRaid(raid.id);
+        deleted++;
+      }
+      this._personalRaids = [];
+      this.reloadAllPlayerRaids();
+      toast.success(`Deleted ${deleted} raids`);
+    } catch (error) {
+      toast.error(`Failed: ${error.message}`);
+      // Reload to get accurate state
+      await this.loadPersonalRaids();
+      this.reloadAllPlayerRaids();
+    }
   },
 
   // ============================================

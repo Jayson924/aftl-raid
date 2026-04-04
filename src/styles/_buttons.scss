@@ -41,6 +41,17 @@
   }
 }
 
+.btn-danger-outline {
+  background: transparent;
+  color: $danger-color;
+  border: 1px solid rgba($danger-color, 0.4);
+
+  &:hover {
+    background-color: rgba($danger-color, 0.15);
+    border-color: $danger-color;
+  }
+}
+
 .btn-icon {
   background: none;
   border: none;
