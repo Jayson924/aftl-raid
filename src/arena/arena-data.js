@@ -103,10 +103,23 @@ class ArenaDataService {
    * and all challenges.
    */
   async resetEverything() {
+    // Delete in FK-safe order: matches (cascades to rounds/turns) → participants → tournaments
+    const { error: mErr } = await supabase
+      .from('arena_matches')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    if (mErr) throw mErr;
+
+    const { error: pErr } = await supabase
+      .from('arena_participants')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    if (pErr) throw pErr;
+
     const { error: tErr } = await supabase
       .from('arena_tournaments')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all rows
+      .neq('id', '00000000-0000-0000-0000-000000000000');
     if (tErr) throw tErr;
 
     const { error: cErr } = await supabase
