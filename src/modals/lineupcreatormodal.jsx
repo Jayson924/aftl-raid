@@ -84,10 +84,8 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
             ${usersWithChars.map(user => {
               const charCount = charCountByUser[user.discordId] || 0;
               const isSelected = selectedUsers.has(user.discordId);
-              const avatarHtml = user.avatarUrl
-                ? `<img class="whos-around-avatar" src="${user.avatarUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-                : '';
-              const initialsHtml = `<div class="whos-around-avatar whos-around-avatar-initials" style="${user.avatarUrl ? 'display:none' : ''}">${(user.displayName || '?').charAt(0).toUpperCase()}</div>`;
+              const avatarHtml = `<img class="whos-around-avatar" src="${user.avatarUrl || '/icons/avatar.svg'}" alt="" onerror="this.src='/icons/avatar.svg'">`;
+              const initialsHtml = '';
               return `
                 <div class="whos-around-user ${isSelected ? 'active' : ''}" data-discord-id="${user.discordId}">
                   ${avatarHtml}

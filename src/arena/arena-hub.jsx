@@ -220,10 +220,7 @@ export const ArenaHubPage = {
 
   _renderAvatar(discordId, size = 24) {
     const url = this._getAvatarUrl(discordId);
-    if (url) {
-      return `<img src="${url}" alt="" class="match-avatar" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;object-fit:cover;" onerror="this.outerHTML='<span class=\\'match-avatar match-avatar-empty\\' style=\\'width:${size}px;height:${size}px;\\'></span>'">`;
-    }
-    return `<span class="match-avatar match-avatar-empty" style="width:${size}px;height:${size}px;"></span>`;
+    return `<img src="${url || '/icons/avatar.svg'}" alt="" class="match-avatar" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;object-fit:cover;" onerror="this.src='/icons/avatar.svg'">`;
   },
 
   // ============================================
@@ -342,9 +339,7 @@ export const ArenaHubPage = {
         <div class="picker-dropdown">
           ${sorted.map(u => `
             <div class="picker-option" data-value="${u.discord_id}">
-              ${u.avatar_url
-                ? `<img src="${u.avatar_url}" alt="" class="picker-avatar" onerror="this.style.display='none'">`
-                : '<span class="picker-avatar picker-avatar-placeholder"></span>'}
+              <img src="${u.avatar_url || '/icons/avatar.svg'}" alt="" class="picker-avatar" onerror="this.src='/icons/avatar.svg'">
               <span class="picker-name">${u.display_name || u.username}</span>
             </div>
           `).join('')}

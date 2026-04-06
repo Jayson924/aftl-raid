@@ -106,9 +106,7 @@ export const ArenaSetupPage = {
         <div class="picker-dropdown">
           ${sorted.map(u => `
             <div class="picker-option" data-value="${u.discord_id}">
-              ${u.avatar_url
-                ? `<img src="${u.avatar_url}" alt="" class="picker-avatar" onerror="this.style.display='none'">`
-                : '<span class="picker-avatar picker-avatar-placeholder"></span>'}
+              <img src="${u.avatar_url || '/icons/avatar.svg'}" alt="" class="picker-avatar" onerror="this.src='/icons/avatar.svg'">
               <span class="picker-name">${u.display_name || u.username}</span>
             </div>
           `).join('')}
@@ -301,9 +299,7 @@ export const ArenaSetupPage = {
             ? '<div class="registration-empty">No one has signed up yet. Share the link or add players manually.</div>'
             : signups.map(s => `
               <div class="setup-player-card in-bracket">
-                ${this._getAvatarUrl(s.discord_id)
-                  ? `<img src="${this._getAvatarUrl(s.discord_id)}" alt="" class="setup-player-avatar" onerror="this.style.display='none'">`
-                  : '<span class="setup-player-avatar setup-avatar-placeholder"></span>'}
+                <img src="${this._getAvatarUrl(s.discord_id) || '/icons/avatar.svg'}" alt="" class="setup-player-avatar" onerror="this.src='/icons/avatar.svg'">
                 <span class="setup-player-name">${this._getDisplayName(s.discord_id)}</span>
                 <button class="setup-remove-btn registration-remove-btn" data-signup-id="${s.id}" data-discord-id="${s.discord_id}" title="Remove">&times;</button>
               </div>
@@ -319,14 +315,10 @@ export const ArenaSetupPage = {
               </div>
               <div class="registration-user-list" id="manual-add-user-list">
                 ${availableUsers.map(u => {
-                  const avatarHtml = u.avatar_url
-                    ? `<img class="whos-around-avatar" src="${u.avatar_url}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-                    : '';
-                  const initialsHtml = `<div class="whos-around-avatar whos-around-avatar-initials" style="${u.avatar_url ? 'display:none' : ''}">${(u.display_name || u.username || '?').charAt(0).toUpperCase()}</div>`;
+                  const avatarHtml = `<img class="whos-around-avatar" src="${u.avatar_url || '/icons/avatar.svg'}" alt="" onerror="this.src='/icons/avatar.svg'">`;
                   return `
                     <div class="whos-around-user" data-discord-id="${u.discord_id}">
                       ${avatarHtml}
-                      ${initialsHtml}
                       <span class="whos-around-name">${u.display_name || u.username}</span>
                     </div>
                   `;
@@ -504,9 +496,7 @@ export const ArenaSetupPage = {
     const name = user.display_name || user.username;
     return `
       <div class="setup-player-card" draggable="true" data-discord-id="${user.discord_id}" data-source="pool">
-        ${avatar
-          ? `<img src="${avatar}" alt="" class="setup-player-avatar" onerror="this.style.display='none'">`
-          : '<span class="setup-player-avatar setup-avatar-placeholder"></span>'}
+        <img src="${avatar || '/icons/avatar.svg'}" alt="" class="setup-player-avatar" onerror="this.src='/icons/avatar.svg'">
         <span class="setup-player-name">${name}</span>
       </div>
     `;
@@ -517,9 +507,7 @@ export const ArenaSetupPage = {
     const name = this._getDisplayName(participant.discord_id);
     return `
       <div class="setup-player-card in-bracket" draggable="true" data-participant-id="${participant.id}" data-discord-id="${participant.discord_id}" data-source="bracket">
-        ${avatar
-          ? `<img src="${avatar}" alt="" class="setup-player-avatar" onerror="this.style.display='none'">`
-          : '<span class="setup-player-avatar setup-avatar-placeholder"></span>'}
+        <img src="${avatar || '/icons/avatar.svg'}" alt="" class="setup-player-avatar" onerror="this.src='/icons/avatar.svg'">
         <span class="setup-player-name">${name}</span>
         <button class="setup-remove-btn" data-participant-id="${participant.id}" title="Remove">&times;</button>
       </div>

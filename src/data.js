@@ -134,7 +134,7 @@ class DataService {
 
     const { data, error } = await supabase
       .from('app_users')
-      .select('role, display_name')
+      .select('role, display_name, avatar_url')
       .eq('discord_id', this._user.id)
       .single();
 
@@ -164,6 +164,13 @@ class DataService {
     this._userRole = data?.role || 'player';
     // Store custom display name if it differs from Discord name
     this._customDisplayName = data?.display_name !== this._user.displayName ? data?.display_name : null;
+
+    // Sync avatar: if session has no avatar but DB does, use DB value
+    // (covers case where user set avatar on Discord and logged in from another device)
+    if (!this._user.avatar && data?.avatar_url) {
+      this._user.avatar = data.avatar_url;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(this._user));
+    }
 
     // Update avatar and username in DB in case they changed on Discord
     await supabase

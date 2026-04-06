@@ -43,7 +43,7 @@ export const ArenaShell = {
       </nav>
       ${displayName ? `
         <div class="arena-user-info">
-          ${avatarUrl ? `<img src="${avatarUrl}" alt="" class="arena-user-avatar" onerror="this.style.display='none'">` : ''}
+          <img src="${avatarUrl || '/icons/avatar.svg'}" alt="" class="arena-user-avatar" onerror="this.src='/icons/avatar.svg'">
           <span>${displayName}</span>
         </div>
       ` : ''}

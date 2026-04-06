@@ -2608,12 +2608,7 @@ export const LineupEditorPage = {
     const extraCount = this.viewingUsers.length - maxAvatars;
 
     const avatarsHtml = displayUsers.map(user => {
-      if (user.avatar) {
-        return `<img src="${user.avatar}" alt="${user.name}" title="${user.name}" class="presence-avatar" onerror="this.style.display='none'">`;
-      }
-      // Fallback to initials
-      const initials = (user.name || '?').charAt(0).toUpperCase();
-      return `<div class="presence-avatar presence-avatar-initials" title="${user.name}">${initials}</div>`;
+      return `<img src="${user.avatar || '/icons/avatar.svg'}" alt="${user.name}" title="${user.name}" class="presence-avatar" onerror="this.src='/icons/avatar.svg'">`;
     }).join('');
 
     const countHtml = extraCount > 0 ? `<span class="presence-extra">+${extraCount}</span>` : '';
