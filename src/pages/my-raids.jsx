@@ -31,7 +31,11 @@ export const MyRaidsPage = {
 
         <div class="section my-characters-section">
           <div class="section-header">
-            <h2>My Characters</h2>
+            <h2>My Characters
+              <button class="btn btn-icon-toggle" id="toggle-columns-btn" title="Toggle two-column layout">
+                <img class="col-icon" src="/icons/onecolumn.svg" alt="Toggle columns">
+              </button>
+            </h2>
             <div class="section-header-actions">
               <button class="btn btn-danger-outline" id="delete-raid-all-btn">Delete All Raids</button>
               <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
@@ -51,6 +55,7 @@ export const MyRaidsPage = {
     this.setupAddCharacterHandler();
     this.setupAddRaidToAllHandler();
     this.setupDeleteAllRaidsHandler();
+    this.setupColumnToggle();
     await this.loadMyCharacters();
   },
 
@@ -256,6 +261,27 @@ export const MyRaidsPage = {
       };
 
       PlayersPage.showAddPlayerModal();
+    });
+  },
+
+  setupColumnToggle() {
+    const btn = document.getElementById('toggle-columns-btn');
+    const icon = btn.querySelector('.col-icon');
+    const stored = localStorage.getItem('myRaidsTwoColumns');
+    const isTwoCol = stored === null ? true : stored === 'true';
+    if (isTwoCol) {
+      document.getElementById('my-characters-list')?.classList.add('two-columns');
+      btn.classList.add('active');
+      icon.src = '/icons/twocolumns.svg';
+    }
+
+    btn.addEventListener('click', () => {
+      const list = document.getElementById('my-characters-list');
+      if (!list) return;
+      const nowTwo = list.classList.toggle('two-columns');
+      btn.classList.toggle('active', nowTwo);
+      icon.src = nowTwo ? '/icons/twocolumns.svg' : '/icons/onecolumn.svg';
+      localStorage.setItem('myRaidsTwoColumns', nowTwo);
     });
   },
 
