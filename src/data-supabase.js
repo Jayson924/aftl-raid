@@ -139,17 +139,17 @@ class DataService {
         .from('profiles')
         .insert({
           id: this._session.user.id,
-          role: 'player',
+          role: 'guildmate',
           display_name: this.getDisplayName()
         })
         .select('role')
         .single();
 
-      this._userRole = newProfile?.role || 'player';
+      this._userRole = newProfile?.role || 'guildmate';
       return;
     }
 
-    this._userRole = data?.role || 'player';
+    this._userRole = data?.role || 'guildmate';
   }
 
   /**
@@ -196,7 +196,7 @@ class DataService {
   }
 
   isPlayer() {
-    return this._userRole === 'player' || this._userRole === 'admin';
+    return this._userRole === 'guildmate' || this._userRole === 'admin';
   }
 
   /**
@@ -207,8 +207,8 @@ class DataService {
 
     if (requiredRole === 'admin') {
       return this._userRole === 'admin';
-    } else if (requiredRole === 'player') {
-      return this._userRole === 'admin' || this._userRole === 'player';
+    } else if (requiredRole === 'guildmate') {
+      return this._userRole === 'admin' || this._userRole === 'guildmate';
     }
 
     return false;

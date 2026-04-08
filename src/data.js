@@ -249,7 +249,7 @@ class DataService {
   }
 
   isPlayer() {
-    return this._userRole === 'player' || this._userRole === 'admin';
+    return this._userRole === 'guildmate' || this._userRole === 'admin';
   }
 
   isGuest() {
@@ -261,8 +261,8 @@ class DataService {
 
     if (requiredRole === 'admin') {
       return this._userRole === 'admin';
-    } else if (requiredRole === 'player') {
-      return this._userRole === 'admin' || this._userRole === 'player';
+    } else if (requiredRole === 'guildmate') {
+      return this._userRole === 'admin' || this._userRole === 'guildmate';
     }
 
     return false;
@@ -331,7 +331,7 @@ class DataService {
   async getAppUsers() {
     const { data, error } = await supabase
       .from('app_users')
-      .select('discord_id, username, display_name, avatar_url, role')
+      .select('discord_id, username, display_name, avatar_url, role, created_at')
       .order('display_name');
 
     if (error) {
@@ -344,7 +344,8 @@ class DataService {
       username: u.username,
       displayName: u.display_name || u.username,
       avatarUrl: u.avatar_url,
-      role: u.role
+      role: u.role,
+      createdAt: u.created_at
     }));
   }
 

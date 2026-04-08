@@ -3,6 +3,8 @@ import { toast } from '../toast.js';
 
 export const AdminPage = {
   _users: [],
+  _sortBy: 'name', // 'name' or 'date'
+  _sortAsc: true,
 
   async render(container) {
     if (!dataService.isAdmin()) {
@@ -14,7 +16,13 @@ export const AdminPage = {
       <div class="admin-page">
         <h1 class="page-title">Admin</h1>
         <div class="section">
-          <h2>Users</h2>
+          <div class="admin-section-header">
+            <h2>Users</h2>
+            <div class="admin-sort-buttons">
+              <button class="admin-sort-btn active" data-sort="name">Name</button>
+              <button class="admin-sort-btn" data-sort="date">Date Joined</button>
+            </div>
+          </div>
           <div id="admin-users-list" class="admin-users-list">
             <p class="loading">Loading users...</p>
           </div>
@@ -28,6 +36,23 @@ export const AdminPage = {
       </div>
     `;
 
+    // Sort button listeners
+    document.querySelectorAll('.admin-sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sort = btn.dataset.sort;
+        if (this._sortBy === sort) {
+          this._sortAsc = !this._sortAsc;
+        } else {
+          this._sortBy = sort;
+          this._sortAsc = sort === 'name'; // name defaults asc, date defaults asc (oldest first)
+        }
+        document.querySelectorAll('.admin-sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        btn.dataset.dir = this._sortAsc ? 'asc' : 'desc';
+        this._renderUsers();
+      });
+    });
+
     await this._loadUsers();
     this._renderUsers();
   },
@@ -36,9 +61,29 @@ export const AdminPage = {
     this._users = await dataService.getAppUsers();
   },
 
+  _sortUsers(users) {
+    return [...users].sort((a, b) => {
+      let cmp;
+      if (this._sortBy === 'date') {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        cmp = da - db;
+      } else {
+        cmp = (a.displayName || '').localeCompare(b.displayName || '');
+      }
+      return this._sortAsc ? cmp : -cmp;
+    });
+  },
+
+  _formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  },
+
   _renderUsers() {
-    const nonAdmins = this._users.filter(u => u.role !== 'admin');
-    const admins = this._users.filter(u => u.role === 'admin');
+    const nonAdmins = this._sortUsers(this._users.filter(u => u.role !== 'admin'));
+    const admins = this._sortUsers(this._users.filter(u => u.role === 'admin'));
 
     const usersList = document.getElementById('admin-users-list');
     const adminsList = document.getElementById('admin-admins-list');
@@ -66,12 +111,13 @@ export const AdminPage = {
           <div class="admin-user-details">
             <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${user.discordId}" ${isOtherAdmin(user) ? '' : 'title="Click to edit name"'}>${user.displayName}</span>
             <span class="admin-user-username">${user.username}</span>
+            ${user.createdAt ? `<span class="admin-user-joined">Joined ${this._formatDate(user.createdAt)}</span>` : ''}
           </div>
         </div>
         <div class="admin-user-actions">
           <select class="admin-role-select" data-discord-id="${user.discordId}" ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>
             <option value="guest" ${user.role === 'guest' ? 'selected' : ''}>Guest</option>
-            <option value="player" ${user.role === 'player' ? 'selected' : ''}>Player</option>
+            <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
           <button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${user.discordId}"

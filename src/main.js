@@ -74,21 +74,21 @@ async function initApp() {
   renderNavigation();
 
   // Register routes
-  router.register('lineups', LineupsPage, 'player'); // Players and admins only
+  router.register('lineups', LineupsPage, 'guildmate'); // Guildmates and admins only
   router.register('characters', PlayersPage); // Public - guests see roster only
-  router.register('editor', LineupEditorPage, 'player'); // Players and admins only
+  router.register('editor', LineupEditorPage, 'guildmate'); // Guildmates and admins only
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // Public
-  router.register('my-raids', MyRaidsPage, 'player'); // Players and admins only
+  router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
-  router.register('arena', ArenaHubPage, 'player'); // Players and admins only
+  router.register('arena', ArenaHubPage, 'guildmate'); // Guildmates and admins only
   router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
-  router.register('arena-draft', ArenaDraftPage, 'player'); // Draft phase - players only
-  router.register('arena-match', ArenaMatchPage, 'player'); // Players and admins only
-  router.register('arena-spectate', ArenaSpectatePage, 'player'); // Players and admins only
-  router.register('arena-tiebreaker', ArenaTiebreakerPage, 'player'); // Players and admins only
-  router.register('arena-results', ArenaResultsPage, 'player'); // Players and admins only
+  router.register('arena-draft', ArenaDraftPage, 'guildmate'); // Draft phase - guildmates only
+  router.register('arena-match', ArenaMatchPage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-spectate', ArenaSpectatePage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-tiebreaker', ArenaTiebreakerPage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-results', ArenaResultsPage, 'guildmate'); // Guildmates and admins only
   router.register('admin', AdminPage, 'admin'); // Admin panel
   router.register('enhance-race', EnhanceRacePage); // Standalone enhancement race
 
