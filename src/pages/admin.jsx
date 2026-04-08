@@ -1,5 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
+import { modal } from '../modal.js';
 
 export const AdminPage = {
   _users: [],
@@ -120,8 +121,7 @@ export const AdminPage = {
             <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
-          <button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${user.discordId}"
-            ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>Delete</button>
+          ${user.role !== 'admin' ? `<button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${user.discordId}">Delete</button>` : ''}
         </div>
       </div>
     `).join('');
@@ -150,7 +150,12 @@ export const AdminPage = {
       btn.addEventListener('click', async () => {
         const discordId = btn.dataset.discordId;
         const user = this._users.find(u => u.discordId === discordId);
-        if (!confirm(`Delete user "${user.displayName}"? This cannot be undone.`)) return;
+        const confirmed = await modal.confirm(`Delete user "${user.displayName}"? This cannot be undone.`, {
+          title: 'Delete User',
+          confirmText: 'Delete',
+          danger: true
+        });
+        if (!confirmed) return;
 
         try {
           await dataService.deleteAppUser(discordId);
