@@ -553,7 +553,6 @@ class DataService {
   async _saveLineup(lineup, isUpdate) {
     let lineupId = lineup.id;
 
-    // Upsert lineup
     const lineupData = {
       name: lineup.name,
       raid_type: lineup.raidType,
@@ -564,15 +563,24 @@ class DataService {
       raid_time: lineup.raidTime || null
     };
 
-    if (lineupId) {
-      lineupData.id = lineupId;
-    }
+    let savedLineup, error;
 
-    const { data: savedLineup, error } = await supabase
-      .from('lineups')
-      .upsert(lineupData)
-      .select()
-      .single();
+    if (isUpdate && lineupId) {
+      // Update existing lineup by ID
+      ({ data: savedLineup, error } = await supabase
+        .from('lineups')
+        .update(lineupData)
+        .eq('id', lineupId)
+        .select()
+        .single());
+    } else {
+      // Insert new lineup
+      ({ data: savedLineup, error } = await supabase
+        .from('lineups')
+        .insert(lineupData)
+        .select()
+        .single());
+    }
 
     if (error) throw error;
 
