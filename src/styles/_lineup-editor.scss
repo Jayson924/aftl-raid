@@ -1099,6 +1099,15 @@
           text-shadow: none;
         }
 
+        .pub-name-edit {
+          cursor: pointer;
+          border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+
+          &:hover {
+            border-bottom-color: rgba(255, 255, 255, 0.6);
+          }
+        }
+
         .no-class {
           color: rgba(255, 193, 7, 0.7);
           font-style: italic;

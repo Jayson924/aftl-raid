@@ -829,7 +829,7 @@ export const PlayersPage = {
                   </div>
                 ` : '<span class="no-owner">—</span>'}
               </td>
-              <td data-label="Class">${player.role}</td>
+              <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
                 ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}
               </td>
@@ -1186,7 +1186,7 @@ export const PlayersPage = {
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
               </td>
-              <td data-label="Class">${player.role}</td>
+              <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
                 ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}
               </td>

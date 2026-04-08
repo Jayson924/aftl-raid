@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
@@ -26,6 +26,7 @@ export const LineupEditorPage = {
   selectedClassFamily: null,
   expandedClassFamily: null,
   selectedSpecialization: null,
+  selectedFinalClass: null,
   showCarouselLineups: true,
   showCarouselNextWeek: false,
   lineupSubscription: null, // Supabase realtime subscription
@@ -54,6 +55,7 @@ export const LineupEditorPage = {
     this.selectedClassFamily = null;
     this.expandedClassFamily = null;
     this.selectedSpecialization = null;
+    this.selectedFinalClass = null;
     this.viewingUsers = [];
 
     container.innerHTML = `
@@ -184,10 +186,6 @@ export const LineupEditorPage = {
               <h3>Available Characters <span style="font-size: 0.85rem; color: #888; font-weight: normal;">(Drag & drop, double click, click slots)</span></h3>
               <div class="player-filter">
                 <input type="text" id="player-search" placeholder="Search characters...">
-                <select id="class-filter">
-                  <option value="">All Classes</option>
-                  ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
-                </select>
               </div>
               <div class="class-family-filter">
                 ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
@@ -197,6 +195,7 @@ export const LineupEditorPage = {
                 `).join('')}
               </div>
               <div class="specialization-filter" id="specialization-filter"></div>
+              <div class="final-class-filter" id="final-class-filter"></div>
               <div class="player-filter-checkboxes">
                 <label class="hide-cleared-filter">
                   <input type="checkbox" id="hide-cleared-checkbox">
@@ -295,6 +294,17 @@ export const LineupEditorPage = {
     document.querySelectorAll('.slot').forEach(slot => {
       slot.addEventListener('click', (e) => {
         const slotIndex = parseInt(e.currentTarget.dataset.slot);
+        const playerName = this.currentLineup.players[slotIndex];
+        // If slot has a guest with a class set, edit the guest instead
+        if (playerName && playerName.startsWith('[PUB]')) {
+          const parts = playerName.substring(5).split('|');
+          const name = parts[0];
+          const role = parts[1];
+          if (role) {
+            this.showEditGuestModal(slotIndex, name, role);
+            return;
+          }
+        }
         this.showPlayerSelector(slotIndex);
       });
     });
@@ -302,18 +312,6 @@ export const LineupEditorPage = {
     this.setupDragAndDrop();
 
     document.getElementById('player-search').addEventListener('input', () => {
-      this.filterPlayers();
-    });
-
-    document.getElementById('class-filter').addEventListener('change', (e) => {
-      // If a specific class is selected, deactivate all class family buttons and clear expansion
-      if (e.target.value) {
-        this.selectedClassFamily = null;
-        this.expandedClassFamily = null;
-        this.selectedSpecialization = null;
-        document.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active', 'expanded'));
-        this.renderSpecializations();
-      }
       this.filterPlayers();
     });
 
@@ -335,12 +333,14 @@ export const LineupEditorPage = {
           // If a specialization is selected, deselect it but keep expanded
           if (this.selectedSpecialization) {
             this.selectedSpecialization = null;
+            this.selectedFinalClass = null;
             this.selectedClassFamily = family;
             document.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
           } else if (this.selectedClassFamily === family) {
             // If base class was filtering, collapse everything
             this.expandedClassFamily = null;
             this.selectedClassFamily = null;
+            this.selectedFinalClass = null;
             btn.classList.remove('active', 'expanded');
             this.renderSpecializations();
           } else {
@@ -354,9 +354,8 @@ export const LineupEditorPage = {
           this.expandedClassFamily = family;
           this.selectedClassFamily = family;
           this.selectedSpecialization = null;
+          this.selectedFinalClass = null;
           btn.classList.add('active', 'expanded');
-          // Reset class dropdown to "All Classes"
-          document.getElementById('class-filter').value = '';
           this.renderSpecializations();
         }
 
@@ -509,6 +508,7 @@ export const LineupEditorPage = {
           return `
             <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
               ${ticketIndicator}
+              ${player.role ? `<div class="class-sprite mini-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
               <div class="mini-player-info">
                 <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
                 ${pilotDisplay}
@@ -748,6 +748,7 @@ export const LineupEditorPage = {
           ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
           ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
+          ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
             <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
             <div class="player-role">${player.role}</div>
@@ -768,7 +769,6 @@ export const LineupEditorPage = {
 
   getFilteredPlayers() {
     const searchTerm = document.getElementById('player-search').value.toLowerCase();
-    const classFilter = document.getElementById('class-filter').value;
     const hideCleared = document.getElementById('hide-cleared-checkbox').checked;
     const hideInLineup = document.getElementById('hide-in-lineup-checkbox').checked;
 
@@ -776,12 +776,12 @@ export const LineupEditorPage = {
       .filter(player => {
         const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
                             player.role.toLowerCase().includes(searchTerm);
-        const matchesClass = !classFilter || player.role === classFilter;
 
-        // Class family or specialization filter
+        // Class family, specialization, or final class filter
         let matchesClassFamily = true;
-        if (this.selectedSpecialization && this.expandedClassFamily) {
-          // Filter by specialization classes
+        if (this.selectedFinalClass) {
+          matchesClassFamily = player.role === this.selectedFinalClass;
+        } else if (this.selectedSpecialization && this.expandedClassFamily) {
           const family = CLASS_FAMILIES[this.expandedClassFamily];
           const specClasses = family.specializations[this.selectedSpecialization]?.classes || [];
           matchesClassFamily = specClasses.includes(player.role);
@@ -813,7 +813,7 @@ export const LineupEditorPage = {
           matchesNotInLineup = !inOtherLineup;
         }
 
-        return matchesSearch && matchesClass && matchesClassFamily && matchesCompletion && matchesNotInLineup;
+        return matchesSearch && matchesClassFamily && matchesCompletion && matchesNotInLineup;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -845,16 +845,19 @@ export const LineupEditorPage = {
 
   renderSpecializations() {
     const container = document.getElementById('specialization-filter');
+    const finalsContainer = document.getElementById('final-class-filter');
     if (!container) return;
 
     if (!this.expandedClassFamily) {
       container.innerHTML = '';
+      if (finalsContainer) finalsContainer.innerHTML = '';
       return;
     }
 
     const family = CLASS_FAMILIES[this.expandedClassFamily];
     if (!family || !family.specializations) {
       container.innerHTML = '';
+      if (finalsContainer) finalsContainer.innerHTML = '';
       return;
     }
 
@@ -870,27 +873,51 @@ export const LineupEditorPage = {
       </button>
     `).join('');
 
-    // Attach click handlers
+    // Show final classes in separate container
+    if (finalsContainer) {
+      if (this.selectedSpecialization && family.specializations[this.selectedSpecialization]) {
+        const spec = family.specializations[this.selectedSpecialization];
+        finalsContainer.innerHTML = `<div class="class-picker-finals">
+          ${spec.classes.map(cls => `
+            <button type="button" class="final-class-btn ${this.selectedFinalClass === cls ? 'active' : ''}"
+                    data-class="${cls}"><span class="final-class-icon"><div class="class-sprite" style="${getClassSpriteStyle(cls)}"></div></span>${cls}</button>
+          `).join('')}
+        </div>`;
+
+        finalsContainer.querySelectorAll('.final-class-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const cls = btn.dataset.class;
+            this.selectedFinalClass = this.selectedFinalClass === cls ? null : cls;
+            this.renderSpecializations();
+            this.filterPlayers();
+          });
+        });
+      } else {
+        finalsContainer.innerHTML = '';
+      }
+    }
+
+    // Attach specialization click handlers
     container.querySelectorAll('.specialization-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const spec = btn.dataset.specialization;
 
         if (this.selectedSpecialization === spec) {
-          // Deselect specialization, revert to base class filter
           this.selectedSpecialization = null;
+          this.selectedFinalClass = null;
           this.selectedClassFamily = this.expandedClassFamily;
           btn.classList.remove('active');
         } else {
-          // Select this specialization
           container.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
           this.selectedSpecialization = spec;
-          this.selectedClassFamily = null; // Clear base class filter
+          this.selectedFinalClass = null;
+          this.selectedClassFamily = null;
           btn.classList.add('active');
-          // Also remove active from base class buttons (but keep expanded)
           document.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
           document.querySelector(`.class-family-btn[data-family="${this.expandedClassFamily}"]`)?.classList.add('expanded');
         }
 
+        this.renderSpecializations();
         this.filterPlayers();
       });
     });
@@ -1206,10 +1233,6 @@ export const LineupEditorPage = {
 
         <div class="modal-filters">
           <input type="text" id="modal-player-search" placeholder="Search characters...">
-          <select id="modal-class-filter">
-            <option value="">All Classes</option>
-            ${CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join('')}
-          </select>
         </div>
 
         <div class="modal-class-family-filter">
@@ -1220,6 +1243,7 @@ export const LineupEditorPage = {
           `).join('')}
         </div>
         <div class="modal-specialization-filter" id="modal-specialization-filter"></div>
+        <div id="modal-final-class-filter"></div>
 
         <label class="modal-hide-cleared-filter">
           <input type="checkbox" id="modal-hide-cleared-checkbox">
@@ -1243,22 +1267,23 @@ export const LineupEditorPage = {
     let modalSelectedFamily = null;
     let modalExpandedFamily = null;
     let modalSelectedSpecialization = null;
+    let modalSelectedFinalClass = null;
 
     // Function to render filtered players
     const renderModalPlayers = () => {
       const searchTerm = document.getElementById('modal-player-search').value.toLowerCase();
-      const classFilter = document.getElementById('modal-class-filter').value;
       const hideCleared = document.getElementById('modal-hide-cleared-checkbox').checked;
 
       const filteredPlayers = this.players
         .filter(player => {
           const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
                               player.role.toLowerCase().includes(searchTerm);
-          const matchesClass = !classFilter || player.role === classFilter;
 
-          // Class family or specialization filter
+          // Class family, specialization, or final class filter
           let matchesClassFamily = true;
-          if (modalSelectedSpecialization && modalExpandedFamily) {
+          if (modalSelectedFinalClass) {
+            matchesClassFamily = player.role === modalSelectedFinalClass;
+          } else if (modalSelectedSpecialization && modalExpandedFamily) {
             const family = CLASS_FAMILIES[modalExpandedFamily];
             const specClasses = family.specializations[modalSelectedSpecialization]?.classes || [];
             matchesClassFamily = specClasses.includes(player.role);
@@ -1273,7 +1298,7 @@ export const LineupEditorPage = {
             matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
           }
 
-          return matchesSearch && matchesClass && matchesClassFamily && matchesCompletion;
+          return matchesSearch && matchesClassFamily && matchesCompletion;
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1335,32 +1360,24 @@ export const LineupEditorPage = {
     // Attach filter event listeners
     document.getElementById('modal-player-search').addEventListener('input', renderModalPlayers);
 
-    document.getElementById('modal-class-filter').addEventListener('change', (e) => {
-      if (e.target.value) {
-        modalSelectedFamily = null;
-        modalExpandedFamily = null;
-        modalSelectedSpecialization = null;
-        modalElement.querySelectorAll('.class-family-btn').forEach(btn => btn.classList.remove('active', 'expanded'));
-        renderModalSpecializations();
-      }
-      renderModalPlayers();
-    });
-
     document.getElementById('modal-hide-cleared-checkbox').addEventListener('change', renderModalPlayers);
 
     // Function to render modal specializations
     const renderModalSpecializations = () => {
       const container = document.getElementById('modal-specialization-filter');
+      const finalsContainer = document.getElementById('modal-final-class-filter');
       if (!container) return;
 
       if (!modalExpandedFamily) {
         container.innerHTML = '';
+        if (finalsContainer) finalsContainer.innerHTML = '';
         return;
       }
 
       const family = CLASS_FAMILIES[modalExpandedFamily];
       if (!family || !family.specializations) {
         container.innerHTML = '';
+        if (finalsContainer) finalsContainer.innerHTML = '';
         return;
       }
 
@@ -1376,24 +1393,51 @@ export const LineupEditorPage = {
         </button>
       `).join('');
 
-      // Attach click handlers
+      // Render finals in separate container
+      if (finalsContainer) {
+        if (modalSelectedSpecialization && family.specializations[modalSelectedSpecialization]) {
+          const spec = family.specializations[modalSelectedSpecialization];
+          finalsContainer.innerHTML = `<div class="class-picker-finals">
+            ${spec.classes.map(cls => `
+              <button type="button" class="final-class-btn ${modalSelectedFinalClass === cls ? 'active' : ''}"
+                      data-class="${cls}"><span class="final-class-icon"><div class="class-sprite" style="${getClassSpriteStyle(cls)}"></div></span>${cls}</button>
+            `).join('')}
+          </div>`;
+
+          finalsContainer.querySelectorAll('.final-class-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const cls = btn.dataset.class;
+              modalSelectedFinalClass = modalSelectedFinalClass === cls ? null : cls;
+              renderModalSpecializations();
+              renderModalPlayers();
+            });
+          });
+        } else {
+          finalsContainer.innerHTML = '';
+        }
+      }
+
+      // Attach specialization click handlers
       container.querySelectorAll('.specialization-btn').forEach(specBtn => {
         specBtn.addEventListener('click', () => {
           const spec = specBtn.dataset.specialization;
 
           if (modalSelectedSpecialization === spec) {
             modalSelectedSpecialization = null;
+            modalSelectedFinalClass = null;
             modalSelectedFamily = modalExpandedFamily;
             specBtn.classList.remove('active');
           } else {
             container.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
             modalSelectedSpecialization = spec;
+            modalSelectedFinalClass = null;
             modalSelectedFamily = null;
             specBtn.classList.add('active');
             modalElement.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active'));
             modalElement.querySelector(`.class-family-btn[data-family="${modalExpandedFamily}"]`)?.classList.add('expanded');
           }
 
+          renderModalSpecializations();
           renderModalPlayers();
         });
       });
@@ -1407,11 +1451,13 @@ export const LineupEditorPage = {
         if (modalExpandedFamily === family) {
           if (modalSelectedSpecialization) {
             modalSelectedSpecialization = null;
+            modalSelectedFinalClass = null;
             modalSelectedFamily = family;
             document.querySelectorAll('#modal-specialization-filter .specialization-btn').forEach(b => b.classList.remove('active'));
           } else if (modalSelectedFamily === family) {
             modalExpandedFamily = null;
             modalSelectedFamily = null;
+            modalSelectedFinalClass = null;
             btn.classList.remove('active', 'expanded');
             renderModalSpecializations();
           } else {
@@ -1423,8 +1469,8 @@ export const LineupEditorPage = {
           modalExpandedFamily = family;
           modalSelectedFamily = family;
           modalSelectedSpecialization = null;
+          modalSelectedFinalClass = null;
           btn.classList.add('active', 'expanded');
-          document.getElementById('modal-class-filter').value = '';
           renderModalSpecializations();
         }
 
@@ -1745,6 +1791,62 @@ export const LineupEditorPage = {
     });
   },
 
+  showEditGuestModal(slotIndex, currentName, currentRole) {
+    const modalElement = document.createElement('div');
+    modalElement.className = 'modal';
+
+    modalElement.innerHTML = `
+      <div class="modal-content">
+        <h2>Edit Guest Character</h2>
+        <form id="edit-guest-form">
+          <div class="form-group">
+            <label for="edit-guest-name">Character Name:</label>
+            <input type="text" id="edit-guest-name" value="${currentName || ''}" placeholder="Leave empty for placeholder">
+          </div>
+          <div class="form-group">
+            <label>Class: *</label>
+            <input type="hidden" id="edit-guest-class" value="${currentRole || ''}">
+            <div class="class-picker" id="edit-guest-class-picker"></div>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="cancel-edit-guest-btn" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modalElement);
+
+    this.renderClassPicker('edit-guest-class-picker', 'edit-guest-class', currentRole || '');
+
+    const input = document.getElementById('edit-guest-name');
+    input.focus();
+    input.select();
+
+    document.getElementById('edit-guest-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = input.value.trim();
+      const role = document.getElementById('edit-guest-class').value;
+      if (!role) {
+        toast.error('Please select a class');
+        return;
+      }
+      this.assignPubPlayerToSlot(slotIndex, name, role);
+      document.body.removeChild(modalElement);
+    });
+
+    document.getElementById('cancel-edit-guest-btn').addEventListener('click', () => {
+      document.body.removeChild(modalElement);
+    });
+
+    modalElement.addEventListener('click', (e) => {
+      if (e.target === modalElement) {
+        document.body.removeChild(modalElement);
+      }
+    });
+  },
+
   showPilotModal(slotIndex) {
     const playerName = this.currentLineup.players[slotIndex];
     const currentPilot = this.currentLineup.pilotSlots[slotIndex] || '';
@@ -1817,10 +1919,20 @@ export const LineupEditorPage = {
 
     slotContent.innerHTML = `
       <div class="assigned-player pub-player">
-        <div class="player-name">${displayName} <span class="pub-badge">GUEST</span></div>
+        <div class="player-name"><span class="pub-name-edit" title="Click to rename">${displayName}</span> <span class="pub-badge">GUEST</span></div>
         ${role ? `<div class="player-role">${role}</div>` : `<div class="player-role no-class">Click to set class</div>`}
       </div>
     `;
+
+    // Click on guest name to edit it
+    const nameEl = slotContent.querySelector('.pub-name-edit');
+    if (nameEl) {
+      nameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        this.showEditGuestModal(slotIndex, name, role);
+      });
+    }
 
     // If no class set, clicking the slot opens class picker instead of player selector
     if (!role) {
@@ -1889,6 +2001,7 @@ export const LineupEditorPage = {
     const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
 
     slotContent.innerHTML = `
+      ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
       <div class="assigned-player">
         <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
         ${pilotDisplay}
