@@ -9,6 +9,7 @@ import { MyRaidsPage } from './pages/my-raids.jsx'
 import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
 import { RecruitingPage } from './pages/recruiting.jsx'
 import { EnhanceRacePage } from './pages/enhance-race.jsx'
+import { AdminPage } from './pages/admin.jsx'
 import { ArenaHubPage } from './arena/arena-hub.jsx'
 import { ArenaSetupPage } from './arena/arena-setup.jsx'
 import { ArenaDraftPage } from './arena/arena-draft.jsx'
@@ -88,6 +89,7 @@ async function initApp() {
   router.register('arena-spectate', ArenaSpectatePage, 'player'); // Players and admins only
   router.register('arena-tiebreaker', ArenaTiebreakerPage, 'player'); // Players and admins only
   router.register('arena-results', ArenaResultsPage, 'player'); // Players and admins only
+  router.register('admin', AdminPage, 'admin'); // Admin panel
   router.register('enhance-race', EnhanceRacePage); // Standalone enhancement race
 
   // Set up auth required handler
@@ -137,6 +139,7 @@ function renderNavigation() {
           ${isAuthenticated ? `
             ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>` : ''}
             <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
+            ${isAdmin ? `<a href="#" class="nav-link" id="admin-btn-mobile">Admin</a>` : ''}
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
           ` : `
             <a href="#" class="nav-link" id="login-btn-mobile">Login with Discord</a>
@@ -157,6 +160,7 @@ function renderNavigation() {
               </div>
               ${isPlayer ? `<button class="dropdown-item" id="my-raids-btn">My Raids</button>` : ''}
               <button class="dropdown-item" id="change-name-btn">Change Name</button>
+              ${isAdmin ? `<button class="dropdown-item" id="admin-btn">Admin</button>` : ''}
               <button class="dropdown-item" id="logout-btn">Logout</button>
             </div>
           </div>
@@ -237,6 +241,12 @@ function renderNavigation() {
       dropdownToggle.classList.remove('open');
       showChangeNameModal();
     });
+
+    document.getElementById('admin-btn')?.addEventListener('click', () => {
+      dropdownMenu.classList.remove('open');
+      dropdownToggle.classList.remove('open');
+      router.navigate('admin');
+    });
   } else {
     document.getElementById('login-btn').addEventListener('click', handleDiscordLogin);
   }
@@ -255,6 +265,13 @@ function renderNavigation() {
       hamburgerBtn.classList.remove('active');
       navLinks.classList.remove('open');
       showChangeNameModal();
+    });
+
+    document.getElementById('admin-btn-mobile')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      hamburgerBtn.classList.remove('active');
+      navLinks.classList.remove('open');
+      router.navigate('admin');
     });
 
     document.getElementById('logout-btn-mobile').addEventListener('click', async (e) => {

@@ -349,6 +349,51 @@ class DataService {
   }
 
   /**
+   * Update a user's role (admin only)
+   */
+  async updateUserRole(discordId, newRole) {
+    if (!this.isAdmin()) throw new Error('Only admins can update roles');
+
+    const { error } = await supabase
+      .from('app_users')
+      .update({ role: newRole })
+      .eq('discord_id', discordId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
+   * Delete a user from app_users (admin only)
+   */
+  async deleteAppUser(discordId) {
+    if (!this.isAdmin()) throw new Error('Only admins can delete users');
+
+    const { error } = await supabase
+      .from('app_users')
+      .delete()
+      .eq('discord_id', discordId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
+   * Update any user's display name (admin only)
+   */
+  async adminUpdateDisplayName(discordId, newName) {
+    if (!this.isAdmin()) throw new Error('Only admins can update other users');
+
+    const { error } = await supabase
+      .from('app_users')
+      .update({ display_name: newName })
+      .eq('discord_id', discordId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
    * Assign a character to a Discord user (admin only)
    */
   async assignCharacterOwner(playerId, discordId) {

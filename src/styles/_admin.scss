@@ -1,0 +1,155 @@
+.admin-page {
+  max-width: 700px;
+  margin: 0 auto;
+
+  .page-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.5rem;
+    color: $primary-color;
+    text-shadow: 0 0 12px rgba(244, 196, 48, 0.3);
+  }
+
+  .section {
+    h2 {
+      margin: 0 0 1rem 0;
+      font-size: 1.1rem;
+      color: $text-light;
+    }
+  }
+
+  .empty-state {
+    color: $text-muted;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .loading {
+    color: $text-muted;
+    text-align: center;
+    padding: 2rem;
+  }
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: $border-radius;
+  margin-bottom: 0.5rem;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.admin-user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.admin-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-user-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  .admin-user-name {
+    font-weight: 600;
+    color: $text-light;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+
+    &:hover {
+      color: $primary-color;
+      border-bottom-color: $primary-color;
+    }
+
+    &.not-editable {
+      cursor: default;
+      border-bottom: none;
+
+      &:hover {
+        color: $text-light;
+      }
+    }
+  }
+
+  .admin-name-input {
+    font-weight: 600;
+    font-size: inherit;
+    color: $text-light;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid $primary-color;
+    border-radius: 4px;
+    padding: 0.1rem 0.3rem;
+    outline: none;
+    width: 100%;
+  }
+
+  .admin-user-username {
+    font-size: 0.8rem;
+    color: $text-muted;
+  }
+}
+
+.admin-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.admin-role-select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: $text-light;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  option {
+    background: $background-dark;
+  }
+}
+
+.btn-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+// Mobile responsive
+@media (max-width: 600px) {
+  .admin-user-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .admin-user-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
