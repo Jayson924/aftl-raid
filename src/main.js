@@ -77,17 +77,17 @@ async function initApp() {
   router.register('characters', PlayersPage, 'player'); // Players and admins only
   router.register('editor', LineupEditorPage, 'player'); // Players and admins only
   router.register('enhancement', EnhancementPage); // No auth required
-  router.register('lavish', SpendingGuidePage); // No auth required
+  router.register('lavish', SpendingGuidePage, 'player'); // Players and admins only
   router.register('my-raids', MyRaidsPage, 'player'); // Players and admins only
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
-  router.register('arena', ArenaHubPage); // Arena hub - anyone can view
+  router.register('arena', ArenaHubPage, 'player'); // Players and admins only
   router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
   router.register('arena-draft', ArenaDraftPage, 'player'); // Draft phase - players only
-  router.register('arena-match', ArenaMatchPage); // Match screen - anyone can view (actions gated)
-  router.register('arena-spectate', ArenaSpectatePage); // Spectator view
-  router.register('arena-tiebreaker', ArenaTiebreakerPage); // Tiebreaker race
-  router.register('arena-results', ArenaResultsPage); // Results page
+  router.register('arena-match', ArenaMatchPage, 'player'); // Players and admins only
+  router.register('arena-spectate', ArenaSpectatePage, 'player'); // Players and admins only
+  router.register('arena-tiebreaker', ArenaTiebreakerPage, 'player'); // Players and admins only
+  router.register('arena-results', ArenaResultsPage, 'player'); // Players and admins only
   router.register('enhance-race', EnhanceRacePage); // Standalone enhancement race
 
   // Set up auth required handler
@@ -114,7 +114,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.2.11</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.2.12</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -125,10 +125,10 @@ function renderNavigation() {
           <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
           <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
+          <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+          <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
-        <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
-        <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
             ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>` : ''}

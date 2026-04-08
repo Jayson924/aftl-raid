@@ -44,16 +44,7 @@ class Router {
     const requiredRole = this.routePermissions[basePath];
 
     if (requiredRole) {
-      if (!authService.isAuthenticated()) {
-        toast.error('Where password');
-        if (this.onAuthRequired) {
-          this.onAuthRequired();
-        }
-        return;
-      }
-
-      if (!authService.hasAccess(requiredRole)) {
-        toast.error('Hu dis');
+      if (!authService.isAuthenticated() || !authService.hasAccess(requiredRole)) {
         this.navigate(this.fallbackRoute);
         return;
       }
