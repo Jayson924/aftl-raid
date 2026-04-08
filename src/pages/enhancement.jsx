@@ -82,6 +82,7 @@ export const EnhancementPage = {
   currentLevel: 0,
   useProtection: false,
   useGoldenGoose: false,
+  useEventBoost: false,
   useLoadingBar: false,
   attempts: 0,
   successes: 0,
@@ -130,6 +131,22 @@ export const EnhancementPage = {
     if (copper > 0) result.push(`${copper}c`);
 
     return result.join(' ');
+  },
+
+  getEffectiveRate(rateEntry) {
+    if (!this.useEventBoost) return rateEntry;
+    const boostedSuccess = Math.min(100, rateEntry.success * 1.3);
+    const boostedFailure = 100 - boostedSuccess;
+    // Scale failure sub-rates proportionally
+    const failureScale = rateEntry.failure > 0 ? boostedFailure / rateEntry.failure : 0;
+    return {
+      ...rateEntry,
+      success: boostedSuccess,
+      failure: boostedFailure,
+      destruction: rateEntry.destruction * failureScale,
+      downgrade: rateEntry.downgrade * failureScale,
+      disappear: rateEntry.disappear * failureScale
+    };
   },
 
   showLoadingBar() {
@@ -235,6 +252,10 @@ export const EnhancementPage = {
                     <label class="protection-toggle">
                       <input type="checkbox" id="golden-goose-toggle" ${this.useGoldenGoose ? 'checked' : ''}>
                       <span>Golden Goose Ticket</span>
+                    </label>
+                    <label class="protection-toggle">
+                      <input type="checkbox" id="event-boost-toggle" ${this.useEventBoost ? 'checked' : ''}>
+                      <span>Event Boost (+30%)</span>
                     </label>
                   </div>
                   <div class="enhance-row">
@@ -421,7 +442,12 @@ export const EnhancementPage = {
   },
 
   renderRatesTable() {
-    const rates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
+    const baseRates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
+
+    const formatRate = (value) => {
+      if (value <= 0) return '-';
+      return Number.isInteger(value) ? value + '%' : value.toFixed(1) + '%';
+    };
 
     return `
       <table class="rates-table${this.isAutoEnhancing ? ' locked' : ''}">
@@ -436,7 +462,8 @@ export const EnhancementPage = {
           </tr>
         </thead>
         <tbody>
-          ${rates.map(rate => {
+          ${baseRates.map(baseRate => {
+            const rate = this.getEffectiveRate(baseRate);
             const isCurrent = this.currentLevel === rate.level - 1;
             const isGoal = this.goalLevel === rate.level;
             const classes = [];
@@ -453,11 +480,11 @@ export const EnhancementPage = {
                     </div>
                   ` : rate.level}
                 </td>
-                <td class="success-rate">${rate.success}%</td>
-                <td class="failure-rate">${rate.failure}%</td>
-                <td class="destruction-rate">${rate.destruction > 0 ? rate.destruction + '%' : '-'}</td>
-                <td class="downgrade-rate">${rate.downgrade > 0 ? rate.downgrade + '%' : '-'}</td>
-                <td class="disappear-rate">${rate.disappear > 0 ? rate.disappear + '%' : '-'}</td>
+                <td class="success-rate">${formatRate(rate.success)}</td>
+                <td class="failure-rate">${formatRate(rate.failure)}</td>
+                <td class="destruction-rate">${formatRate(rate.destruction)}</td>
+                <td class="downgrade-rate">${formatRate(rate.downgrade)}</td>
+                <td class="disappear-rate">${formatRate(rate.disappear)}</td>
               </tr>
             `;
           }).join('')}
@@ -533,6 +560,11 @@ export const EnhancementPage = {
 
     document.getElementById('golden-goose-toggle').addEventListener('change', (e) => {
       this.useGoldenGoose = e.target.checked;
+    });
+
+    document.getElementById('event-boost-toggle').addEventListener('change', (e) => {
+      this.useEventBoost = e.target.checked;
+      this.updateRatesTable();
     });
 
     document.getElementById('loading-bar-toggle').addEventListener('change', (e) => {
@@ -899,7 +931,7 @@ export const EnhancementPage = {
     }
 
     const rates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
-    const currentRates = rates[this.currentLevel];
+    const currentRates = this.getEffectiveRate(rates[this.currentLevel]);
 
     // Store current level before incrementing attempts
     const levelBeforeAttempt = this.currentLevel;
