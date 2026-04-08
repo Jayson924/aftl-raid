@@ -49,10 +49,15 @@ async function initApp() {
     if (event === 'SIGNED_IN') {
       toast.success(`Welcome, ${dataService.getDisplayName()}!`);
       renderNavigation();
-      router.refresh();
+      // Navigate players/admins to lineups, guests stay on current page
+      if (dataService.isPlayer()) {
+        router.navigate('lineups');
+      } else {
+        router.refresh();
+      }
     } else if (event === 'SIGNED_OUT') {
       renderNavigation();
-      router.navigate('lineups');
+      router.navigate('enhancement');
     }
   });
 
@@ -68,12 +73,12 @@ async function initApp() {
   renderNavigation();
 
   // Register routes
-  router.register('lineups', LineupsPage);
-  router.register('characters', PlayersPage); // Public - anyone can view
-  router.register('editor', LineupEditorPage); // Viewable by all, save/delete gated to admin
+  router.register('lineups', LineupsPage, 'player'); // Players and admins only
+  router.register('characters', PlayersPage, 'player'); // Players and admins only
+  router.register('editor', LineupEditorPage, 'player'); // Players and admins only
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // No auth required
-  router.register('my-raids', MyRaidsPage, 'player'); // Any authenticated user
+  router.register('my-raids', MyRaidsPage, 'player'); // Players and admins only
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
   router.register('arena', ArenaHubPage); // Arena hub - anyone can view
@@ -109,24 +114,24 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.2.10</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.2.11</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
       </button>
       <ul class="nav-links" id="nav-links">
-        <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
-        ${isAuthenticated ? `
+        ${isPlayer ? `
+          <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
           <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
+          <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
-        <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
-            <a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>
+            ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>` : ''}
             <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
           ` : `
@@ -146,7 +151,7 @@ function renderNavigation() {
               <div class="dropdown-header">
                 <span class="dropdown-role">${dataService.getUserRole()}</span>
               </div>
-              <button class="dropdown-item" id="my-raids-btn">My Raids</button>
+              ${isPlayer ? `<button class="dropdown-item" id="my-raids-btn">My Raids</button>` : ''}
               <button class="dropdown-item" id="change-name-btn">Change Name</button>
               <button class="dropdown-item" id="logout-btn">Logout</button>
             </div>
@@ -214,10 +219,10 @@ function renderNavigation() {
       await dataService.signOut();
       toast.info('Bye bye na');
       renderNavigation();
-      router.navigate('lineups');
+      router.navigate('enhancement');
     });
 
-    document.getElementById('my-raids-btn').addEventListener('click', () => {
+    document.getElementById('my-raids-btn')?.addEventListener('click', () => {
       dropdownMenu.classList.remove('open');
       dropdownToggle.classList.remove('open');
       router.navigate('my-raids');
@@ -234,7 +239,7 @@ function renderNavigation() {
 
   // Login/Logout buttons (mobile)
   if (isAuthenticated) {
-    document.getElementById('my-raids-btn-mobile').addEventListener('click', (e) => {
+    document.getElementById('my-raids-btn-mobile')?.addEventListener('click', (e) => {
       e.preventDefault();
       hamburgerBtn.classList.remove('active');
       navLinks.classList.remove('open');
@@ -253,7 +258,7 @@ function renderNavigation() {
       await dataService.signOut();
       toast.info('Bye bye na');
       renderNavigation();
-      router.navigate('lineups');
+      router.navigate('enhancement');
     });
   } else {
     document.getElementById('login-btn-mobile').addEventListener('click', (e) => {

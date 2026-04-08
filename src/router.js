@@ -9,6 +9,7 @@ class Router {
     this.currentComponent = null;
     this.onAuthRequired = null;
     this.defaultRoute = 'lineups';
+    this.fallbackRoute = 'enhancement';
   }
 
   register(path, component, requiredRole = null) {
@@ -53,7 +54,7 @@ class Router {
 
       if (!authService.hasAccess(requiredRole)) {
         toast.error('Hu dis');
-        this.navigate('lineups');
+        this.navigate(this.fallbackRoute);
         return;
       }
     }

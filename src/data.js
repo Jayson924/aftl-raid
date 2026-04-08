@@ -147,7 +147,7 @@ class DataService {
           username: this._user.username,
           display_name: this._user.displayName,
           avatar_url: this._user.avatar,
-          role: 'player'
+          role: 'guest'
         })
         .select('role, display_name')
         .single();
@@ -156,12 +156,12 @@ class DataService {
         console.error('Failed to create user:', insertError);
       }
 
-      this._userRole = newUser?.role || 'player';
+      this._userRole = newUser?.role || 'guest';
       this._customDisplayName = null; // New user, no custom name yet
       return;
     }
 
-    this._userRole = data?.role || 'player';
+    this._userRole = data?.role || 'guest';
     // Store custom display name if it differs from Discord name
     this._customDisplayName = data?.display_name !== this._user.displayName ? data?.display_name : null;
 
@@ -250,6 +250,10 @@ class DataService {
 
   isPlayer() {
     return this._userRole === 'player' || this._userRole === 'admin';
+  }
+
+  isGuest() {
+    return this._userRole === 'guest';
   }
 
   hasAccess(requiredRole) {
