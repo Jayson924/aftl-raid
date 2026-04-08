@@ -43,22 +43,35 @@ export const PlayersPage = {
   },
 
   async render(container) {
+    const canViewFull = dataService.isPlayer();
+
+    // Guests can only see roster view
+    if (!canViewFull) {
+      this._viewMode = 'roster';
+    }
+
     container.innerHTML = `
       <div class="players-page">
         <div class="page-header">
           <div class="page-title-tabs">
-            <h1 class="view-tab ${this._viewMode === 'characters' ? 'active' : ''}" data-view="characters">Characters</h1>
-            <span class="title-divider">/</span>
-            <h1 class="view-tab ${this._viewMode === 'roster' ? 'active' : ''}" data-view="roster">Roster</h1>
+            ${canViewFull ? `
+              <h1 class="view-tab ${this._viewMode === 'characters' ? 'active' : ''}" data-view="characters">Characters</h1>
+              <span class="title-divider">/</span>
+              <h1 class="view-tab ${this._viewMode === 'roster' ? 'active' : ''}" data-view="roster">Roster</h1>
+            ` : `
+              <h1 class="view-tab active">Roster</h1>
+            `}
           </div>
-          <div class="page-header-actions">
-            <label class="toggle-switch" id="group-by-owner-wrapper" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>
-              <input type="checkbox" id="group-by-owner-toggle" ${this._groupByOwner ? 'checked' : ''}>
-              <span class="toggle-slider"></span>
-              <span class="toggle-label">Group by owner</span>
-            </label>
-            <button id="add-player-btn" class="btn btn-primary" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>+ Add Character</button>
-          </div>
+          ${canViewFull ? `
+            <div class="page-header-actions">
+              <label class="toggle-switch" id="group-by-owner-wrapper" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>
+                <input type="checkbox" id="group-by-owner-toggle" ${this._groupByOwner ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Group by owner</span>
+              </label>
+              <button id="add-player-btn" class="btn btn-primary" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>+ Add Character</button>
+            </div>
+          ` : ''}
         </div>
         <div id="players-list" class="players-list">
           <div class="loading">Loading characters...</div>
@@ -66,28 +79,30 @@ export const PlayersPage = {
       </div>
     `;
 
-    document.getElementById('add-player-btn').addEventListener('click', () => {
-      this.showAddPlayerModal();
-    });
+    if (canViewFull) {
+      document.getElementById('add-player-btn').addEventListener('click', () => {
+        this.showAddPlayerModal();
+      });
 
-    document.getElementById('group-by-owner-toggle').addEventListener('change', (e) => {
-      this._groupByOwner = e.target.checked;
-      localStorage.setItem('playersGroupByOwner', this._groupByOwner);
-      this.loadPlayers();
-    });
-
-    // View tab listeners
-    document.querySelectorAll('.view-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        this._viewMode = tab.dataset.view;
-        document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === this._viewMode));
-        // Show/hide character-specific controls
-        const isRoster = this._viewMode === 'roster';
-        document.getElementById('group-by-owner-wrapper').style.display = isRoster ? 'none' : '';
-        document.getElementById('add-player-btn').style.display = isRoster ? 'none' : '';
+      document.getElementById('group-by-owner-toggle').addEventListener('change', (e) => {
+        this._groupByOwner = e.target.checked;
+        localStorage.setItem('playersGroupByOwner', this._groupByOwner);
         this.loadPlayers();
       });
-    });
+
+      // View tab listeners
+      document.querySelectorAll('.view-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          this._viewMode = tab.dataset.view;
+          document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === this._viewMode));
+          // Show/hide character-specific controls
+          const isRoster = this._viewMode === 'roster';
+          document.getElementById('group-by-owner-wrapper').style.display = isRoster ? 'none' : '';
+          document.getElementById('add-player-btn').style.display = isRoster ? 'none' : '';
+          this.loadPlayers();
+        });
+      });
+    }
 
     this.loadPlayers();
   },
@@ -471,7 +486,20 @@ export const PlayersPage = {
     };
 
     // Build tooltip HTML for a list of players, grouped by owner
+    const hideNames = !dataService.isPlayer();
     const buildTooltipHtml = (clsPlayers) => {
+      if (hideNames) {
+        // Guests only see gearscore and equipment, no names
+        return clsPlayers
+          .sort((a, b) => calculateGearscore(b) - calculateGearscore(a))
+          .map(p => {
+            const gs = calculateGearscore(p);
+            const tier = getGearscoreTier(gs);
+            return `<div class="roster-tooltip-row"><span class="roster-tooltip-gs" style="color: ${tier.color}">${gs}</span> <span class="roster-tooltip-gear">${EQUIPMENT_ICONS.weapon} ${formatEquipText(p, 'weapon')} ${EQUIPMENT_ICONS.armor} ${formatEquipText(p, 'armor')}</span></div>`;
+          })
+          .join('');
+      }
+
       // Group by owner
       const byOwner = {};
       clsPlayers.forEach(p => {
@@ -533,10 +561,10 @@ export const PlayersPage = {
     listElement.innerHTML = `
       <div class="roster-view">
         <div class="roster-summary">
-          <div class="roster-stat roster-stat-tip">
+          <div class="roster-stat ${hideNames ? '' : 'roster-stat-tip'}">
             <span class="roster-stat-value">${totalPlayers}</span>
             <span class="roster-stat-label">Characters</span>
-            <div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>
+            ${hideNames ? '' : `<div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>`}
           </div>
           <div class="roster-stat">
             <span class="roster-stat-value" style="color: ${avgTier.color}" data-tooltip="Gearscore">${avgGearscore}</span>

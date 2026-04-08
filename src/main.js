@@ -74,10 +74,10 @@ async function initApp() {
 
   // Register routes
   router.register('lineups', LineupsPage, 'player'); // Players and admins only
-  router.register('characters', PlayersPage, 'player'); // Players and admins only
+  router.register('characters', PlayersPage); // Public - guests see roster only
   router.register('editor', LineupEditorPage, 'player'); // Players and admins only
   router.register('enhancement', EnhancementPage); // No auth required
-  router.register('lavish', SpendingGuidePage, 'player'); // Players and admins only
+  router.register('lavish', SpendingGuidePage); // Public
   router.register('my-raids', MyRaidsPage, 'player'); // Players and admins only
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
@@ -114,7 +114,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.2.12</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.3.00</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -123,9 +123,13 @@ function renderNavigation() {
       <ul class="nav-links" id="nav-links">
         ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
-          <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
+        ` : ''}
+        <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
+        ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
-          <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        ` : ''}
+        <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
