@@ -2,42 +2,12 @@ import { EQUIPMENT_RARITIES, getGearscoreTier } from '../constants.js';
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 
-// Default FD breakpoints: { fdValue: damagePercent }
-// Community-sourced data + estimates for 56-59%
-const DEFAULT_FD_TABLE = [
-  { fd: 1191, pct: 35 },
-  { fd: 1224, pct: 36 },
-  { fd: 1260, pct: 37 },
-  { fd: 1292, pct: 38 },
-  { fd: 1326, pct: 39 },
-  { fd: 1359, pct: 40 },
-  { fd: 1394, pct: 41 },
-  { fd: 1427, pct: 42 },
-  { fd: 1461, pct: 43 },
-  { fd: 1492, pct: 44 },
-  { fd: 1529, pct: 45 },
-  { fd: 1599, pct: 46 },
-  { fd: 1668, pct: 47 },
-  { fd: 1742, pct: 48 },
-  { fd: 1842, pct: 49 },
-  { fd: 1892, pct: 50 },
-  { fd: 1983, pct: 51 },
-  { fd: 2044, pct: 52 },
-  { fd: 2128, pct: 53 },
-  { fd: 2208, pct: 54 },
-  { fd: 2287, pct: 55 },
-  { fd: 2369, pct: 56 },
-  { fd: 2453, pct: 57 },
-  { fd: 2539, pct: 58 },
-  { fd: 2627, pct: 59 },
-  { fd: 2718, pct: 60 }
-];
-
 // Convert raw FD to damage percentage using lookup table with interpolation
 function fdToPercent(rawFd, fdTable) {
   if (!rawFd || rawFd <= 0) return 0;
+  if (!fdTable || fdTable.length === 0) return 0;
 
-  const table = fdTable || DEFAULT_FD_TABLE;
+  const table = fdTable;
 
   // Below lowest entry: linear extrapolation from 0
   if (rawFd <= table[0].fd) {
@@ -95,17 +65,17 @@ function calcGearPortion(equipment) {
 
 function calcScreenshotGearscore(equipment, finalDamage, fdTable) {
   const gearScore = calcGearPortion(equipment);
-  const maxPct = fdTable[fdTable.length - 1].pct;
+  const maxPct = fdTable && fdTable.length > 0 ? fdTable[fdTable.length - 1].pct : 0;
   const fdPct = fdToPercent(finalDamage, fdTable);
-  const fdScore = FD_WEIGHT * (fdPct / maxPct);
+  const fdScore = maxPct > 0 ? FD_WEIGHT * (fdPct / maxPct) : 0;
   return Math.round(gearScore + fdScore);
 }
 
 export const ScreenshotTestPage = {
-  fdTable: DEFAULT_FD_TABLE,
+  fdTable: [],
 
   async render(container) {
-    // Load FD table from config
+    // Load FD table from Supabase
     try {
       const saved = await dataService.getAppConfig('fd_table');
       if (saved && saved.length > 0) this.fdTable = saved;

@@ -355,18 +355,8 @@ const ACCESSORY_TOTAL = GEAR_WEIGHT * 0.3; // 18 pts for 4 accessories
 const PER_EQUIP = EQUIP_TOTAL / 7;
 const PER_ACCESSORY = ACCESSORY_TOTAL / 4;
 
-const DEFAULT_FD_TABLE = [
-  { fd: 1191, pct: 35 }, { fd: 1224, pct: 36 }, { fd: 1260, pct: 37 }, { fd: 1292, pct: 38 },
-  { fd: 1326, pct: 39 }, { fd: 1359, pct: 40 }, { fd: 1394, pct: 41 }, { fd: 1427, pct: 42 },
-  { fd: 1461, pct: 43 }, { fd: 1492, pct: 44 }, { fd: 1529, pct: 45 }, { fd: 1599, pct: 46 },
-  { fd: 1668, pct: 47 }, { fd: 1742, pct: 48 }, { fd: 1842, pct: 49 }, { fd: 1892, pct: 50 },
-  { fd: 1983, pct: 51 }, { fd: 2044, pct: 52 }, { fd: 2128, pct: 53 }, { fd: 2208, pct: 54 },
-  { fd: 2287, pct: 55 }, { fd: 2369, pct: 56 }, { fd: 2453, pct: 57 }, { fd: 2539, pct: 58 },
-  { fd: 2627, pct: 59 }, { fd: 2718, pct: 60 }
-];
-
-// Cached FD table — loaded from Supabase by initGearscoreConfig()
-let _fdTable = DEFAULT_FD_TABLE;
+// FD table — loaded from Supabase via setFdTable()
+let _fdTable = [];
 
 export function setFdTable(table) {
   if (table && table.length > 0) _fdTable = table;
@@ -379,6 +369,7 @@ export function getFdTable() {
 export function fdToPercent(rawFd, fdTable) {
   if (!rawFd || rawFd <= 0) return 0;
   const table = fdTable || _fdTable;
+  if (!table || table.length === 0) return 0;
   if (rawFd <= table[0].fd) return (rawFd / table[0].fd) * table[0].pct;
   const max = table[table.length - 1];
   if (rawFd >= max.fd) return max.pct;
@@ -422,9 +413,9 @@ export function calculateGearscore(player) {
 
   // FD portion
   const fd = stats.finalDamage || 0;
-  const maxPct = _fdTable[_fdTable.length - 1].pct;
+  const maxPct = _fdTable.length > 0 ? _fdTable[_fdTable.length - 1].pct : 0;
   const fdPct = fdToPercent(fd);
-  const fdScore = FD_WEIGHT * (fdPct / maxPct);
+  const fdScore = maxPct > 0 ? FD_WEIGHT * (fdPct / maxPct) : 0;
 
   // If no equipment data at all and no FD, fall back to legacy calculation
   if (!hasAnyGear && !fd) {

@@ -184,6 +184,154 @@
   font-size: 0.8rem;
 }
 
+// Tabs (matches .raid-tabs / .tab-button in lineups)
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-tab {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: $text-light;
+  cursor: pointer;
+  transition: $transition;
+  font-size: 1rem;
+  font-weight: 500;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  &.active {
+    color: $primary-color;
+    border-bottom-color: $primary-color;
+    background-color: rgba(244, 196, 48, 0.1);
+  }
+}
+
+// FD Table Section
+.admin-fd-desc {
+  font-size: 0.85rem;
+  color: $text-muted;
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+}
+
+.admin-fd-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-fd-table {
+  max-height: 500px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: $border-radius;
+  padding: 0.5rem;
+}
+
+.fd-table-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--fd-rows), auto);
+  grid-template-columns: auto auto auto;
+  gap: 0.2rem 1.5rem;
+  justify-content: start;
+}
+
+.fd-table-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: $border-radius;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.04);
+
+    .fd-row-delete {
+      opacity: 1;
+    }
+  }
+}
+
+// Hide number input spinners
+.fd-input::-webkit-outer-spin-button,
+.fd-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.fd-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.fd-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: $text-light;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.fd-input-pct {
+  width: 50px;
+  text-align: right;
+  padding-right: 0.1rem;
+}
+
+.fd-input-fd {
+  width: 70px;
+}
+
+.fd-row-separator {
+  color: $text-muted;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-left: -0.3rem;
+}
+
+.fd-row-delete {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: $text-muted;
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-radius: $border-radius;
+  opacity: 0;
+  transition: $transition;
+
+  &:hover {
+    color: $danger-color;
+    background: rgba($danger-color, 0.15);
+  }
+}
+
 // Mobile responsive
 @media (max-width: 600px) {
   .admin-user-row {
@@ -195,5 +343,14 @@
   .admin-user-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .fd-row-delete {
+    opacity: 1;
+  }
+
+  .fd-table-grid {
+    grid-template-columns: auto auto;
+    grid-auto-flow: column;
   }
 }
