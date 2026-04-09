@@ -33,6 +33,7 @@ export const LineupsPage = {
         <div class="raid-tabs">
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
+          <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
         </div>
         <div class="tab-content-wrapper">
           <div class="showcase-area">
@@ -354,7 +355,14 @@ export const LineupsPage = {
             </h3>
             ${raidTimeDisplay ? `<span class="raid-time-display"><img src="/icons/calendarclock.svg" alt="" class="raid-time-icon">${raidTimeDisplay}</span>` : ''}
           </div>
-          ${isAdmin ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
+          ${isAdmin && this.currentRaidType === 'Unspecified' ? `
+            <select class="raid-type-reassign" data-lineup-id="${lineup.id}">
+              <option value="Unspecified" selected>Unspecified</option>
+              <option value="Hardcore">GDN Hardcore</option>
+              <option value="Classic">GDN Classic</option>
+            </select>
+          ` : ''}
+          ${isAdmin && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">
           <div class="damage-amp-bar physical">
@@ -448,6 +456,25 @@ export const LineupsPage = {
           e.stopPropagation();
           const lineupId = clearedBtn.dataset.lineupId;
           await this.handleClearedClick(lineupId);
+        });
+      }
+
+      // Add handler for raid type reassign dropdown (Unspecified tab only)
+      const reassignSelect = showcaseContainer.querySelector('.raid-type-reassign');
+      if (reassignSelect) {
+        reassignSelect.addEventListener('change', async (e) => {
+          const newType = e.target.value;
+          if (newType === 'Unspecified') return;
+          const lineupId = e.target.dataset.lineupId;
+          try {
+            await dataService.updateLineupRaidType(lineupId, newType);
+            toast.show(`Lineup moved to GDN ${newType}`, 'success');
+            this.currentShowcaseLineup = null;
+            await this.loadLineups();
+          } catch (err) {
+            toast.show('Failed to update raid type', 'error');
+            e.target.value = 'Unspecified';
+          }
         });
       }
 
@@ -555,7 +582,7 @@ export const LineupsPage = {
               ${lineup.name}
             </span>
             <div class="mini-lineup-header-actions">
-              <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
+              <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : `GDN ${lineup.raidType || 'Hardcore'}`}</span>
             </div>
           </div>
           <div class="mini-lineup-grid">

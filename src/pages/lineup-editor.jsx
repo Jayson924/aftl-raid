@@ -73,6 +73,7 @@ export const LineupEditorPage = {
                   <select id="raid-type">
                     <option value="Hardcore">GDN Hardcore</option>
                     <option value="Classic">GDN Classic</option>
+                    <option value="Unspecified">Unspecified</option>
                   </select>
                 </div>
                 <div class="form-group lineup-name-group">
@@ -526,7 +527,7 @@ export const LineupEditorPage = {
                 ${lineup.name}
               </span>
               <div class="mini-lineup-header-actions">
-                <span class="mini-lineup-raid-type">GDN ${lineup.raidType || 'Hardcore'}</span>
+                <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : `GDN ${lineup.raidType || 'Hardcore'}`}</span>
                 ${dataService.isAdmin() ? `<button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>` : ''}
               </div>
             </div>

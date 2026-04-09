@@ -625,6 +625,16 @@ class DataService {
     return { success: true };
   }
 
+  async updateLineupRaidType(lineupId, raidType) {
+    const { error } = await supabase
+      .from('lineups')
+      .update({ raid_type: raidType })
+      .eq('id', lineupId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
   async toggleLineupCompleted(lineupId) {
     // Get current state with full lineup data
     const { data: lineup } = await supabase
@@ -652,7 +662,8 @@ class DataService {
     if (error) throw error;
 
     // Handle player completion based on lineup completion status
-    if (lineup.lineup_players && lineup.lineup_players.length > 0) {
+    // Skip for Unspecified raid type - can't mark HC/CL completion without knowing which
+    if (lineup.raid_type !== 'Unspecified' && lineup.lineup_players && lineup.lineup_players.length > 0) {
       const playerNames = lineup.lineup_players
         .map(lp => lp.player_name)
         .filter(name => name && name.trim() !== '');
