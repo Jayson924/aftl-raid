@@ -62,6 +62,83 @@ class ModalService {
     });
   }
 
+  // Show a prompt modal for single-line text input.
+  // Resolves with the trimmed input string, or null if cancelled.
+  prompt(message, options = {}) {
+    return new Promise((resolve) => {
+      const {
+        title = 'Input',
+        okText = 'OK',
+        cancelText = 'Cancel',
+        placeholder = '',
+        defaultValue = '',
+        required = true
+      } = options;
+
+      const modalEl = document.createElement('div');
+      modalEl.className = 'modal';
+      modalEl.innerHTML = `
+        <div class="modal-content confirmation-modal">
+          <h2>${title}</h2>
+          <p class="confirmation-message">${message}</p>
+          <input type="text" class="prompt-input" id="prompt-input" placeholder="${placeholder}" value="${defaultValue.replace(/"/g, '&quot;')}">
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="ok-btn">${okText}</button>
+            <button type="button" class="btn btn-secondary" id="cancel-btn">${cancelText}</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modalEl);
+
+      const input = modalEl.querySelector('#prompt-input');
+      const okBtn = modalEl.querySelector('#ok-btn');
+      const cancelBtn = modalEl.querySelector('#cancel-btn');
+
+      const cleanup = (result) => {
+        document.removeEventListener('keydown', handleKey);
+        document.body.removeChild(modalEl);
+        resolve(result);
+      };
+
+      const submit = () => {
+        const value = input.value.trim();
+        if (required && !value) {
+          input.focus();
+          input.classList.add('prompt-input-error');
+          return;
+        }
+        cleanup(value);
+      };
+
+      input.addEventListener('input', () => {
+        input.classList.remove('prompt-input-error');
+      });
+
+      okBtn.addEventListener('click', submit);
+      cancelBtn.addEventListener('click', () => cleanup(null));
+
+      modalEl.addEventListener('click', (e) => {
+        if (e.target === modalEl) cleanup(null);
+      });
+
+      const handleKey = (e) => {
+        if (e.key === 'Escape') {
+          cleanup(null);
+        } else if (e.key === 'Enter' && document.activeElement === input) {
+          e.preventDefault();
+          submit();
+        }
+      };
+      document.addEventListener('keydown', handleKey);
+
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 0);
+    });
+  }
+
   // Show an alert modal with just an OK button
   alert(message, options = {}) {
     return new Promise((resolve) => {

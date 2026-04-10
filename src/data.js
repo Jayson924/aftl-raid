@@ -535,6 +535,7 @@ class DataService {
         isNextWeek: lineup.is_template,
         notes: lineup.notes || '',
         raidTime: lineup.raid_time || null,
+        threadId: lineup.thread_id || null,
         players,
         ticketPlayers,
         pilotPlayers
@@ -1018,6 +1019,53 @@ class DataService {
 
   unsubscribe(subscription) {
     supabase.removeChannel(subscription);
+  }
+
+  // ============================================
+  // DISCORD THREAD REQUESTS
+  // ============================================
+
+  /**
+   * Request the Discord bot to create a thread for a lineup.
+   * Inserts a row into thread_requests; the bot subscribes via Realtime and processes it.
+   * @param {string} lineupId - UUID of the lineup
+   * @param {string} [channelId] - Optional override channel (defaults to server-side default)
+   * @returns {Promise<{ id: string }>} the inserted request row
+   */
+  async requestDiscordThread(lineupId, channelId = '1492287028220395601') {
+    if (!this.isAdmin()) throw new Error('Only admins can create Discord threads');
+    if (!lineupId) throw new Error('lineupId is required');
+
+    const { data, error } = await supabase
+      .from('thread_requests')
+      .insert({
+        lineup_id: lineupId,
+        channel_id: channelId,
+        requested_by: this._user?.id || null,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Subscribe to status updates for a specific thread request.
+   * @param {string} requestId
+   * @param {(row: Object) => void} callback - Called with the updated row on each change
+   * @returns {Object} subscription channel (pass to unsubscribe())
+   */
+  subscribeToThreadRequest(requestId, callback) {
+    return supabase
+      .channel(`thread-request:${requestId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'thread_requests', filter: `id=eq.${requestId}` },
+        (payload) => callback(payload.new)
+      )
+      .subscribe();
   }
 
   // ============================================

@@ -21,7 +21,8 @@ export const LineupEditorPage = {
     completed: false,
     isNextWeek: false,
     notes: '',
-    raidTime: null // Scheduled raid time (ISO string)
+    raidTime: null, // Scheduled raid time (ISO string)
+    threadId: null // Discord thread ID (null if none created)
   },
   selectedClassFamily: null,
   expandedClassFamily: null,
@@ -33,6 +34,7 @@ export const LineupEditorPage = {
   presenceChannel: null, // Presence channel for showing who's viewing
   viewingUsers: [], // Other users currently viewing this page
   pendingDeleteId: null, // Track lineup being deleted by current user to skip self-notification
+  pendingUpdateIds: new Set(), // Track lineup IDs being updated by current user (or bot at user's request) to skip self-notification
   flatpickrInstance: null, // Flatpickr date/time picker instance
 
   async render(container) {
@@ -50,7 +52,8 @@ export const LineupEditorPage = {
       completed: false,
       isNextWeek: false,
       notes: '',
-      raidTime: null
+      raidTime: null,
+      threadId: null
     };
     this.selectedClassFamily = null;
     this.expandedClassFamily = null;
@@ -112,7 +115,10 @@ export const LineupEditorPage = {
                   <button id="generate-lineup-btn" class="btn btn-ghost whos-around-btn">Generate Lineup</button>
                   <button id="scan-lineup-btn" class="btn btn-ghost whos-around-btn">Lineup Screenshot</button>
                 </div>
-                <div id="presence-indicator" class="presence-indicator"></div>
+                <div class="lineup-slots-header-right">
+                  <div id="presence-indicator" class="presence-indicator"></div>
+                  ${isAdmin ? `<button id="discord-thread-btn" class="btn btn-ghost whos-around-btn" title="Save the lineup and create a Discord thread">Create Discord Thread</button>` : ''}
+                </div>
               </div>
               <div class="damage-amp-display">
                 <div class="damage-amp-bar physical">
@@ -366,6 +372,10 @@ export const LineupEditorPage = {
 
     document.getElementById('save-lineup-btn')?.addEventListener('click', () => {
       this.saveLineup();
+    });
+
+    document.getElementById('discord-thread-btn')?.addEventListener('click', () => {
+      this.handleDiscordThreadClick();
     });
 
     document.getElementById('clear-slots-btn').addEventListener('click', () => {
@@ -2164,7 +2174,8 @@ export const LineupEditorPage = {
       completed: false,
       isNextWeek: false,
       notes: '',
-      raidTime: null
+      raidTime: null,
+      threadId: null
     };
 
     const lineupNameInput = document.getElementById('lineup-name');
@@ -2183,6 +2194,7 @@ export const LineupEditorPage = {
     this._clearSlotElements();
     this.renderAvailablePlayers();
     this.updateDamageAmpDisplay();
+    this.updateDiscordThreadButton();
 
     this.leaveLineupPresence();
   },
@@ -2204,23 +2216,40 @@ export const LineupEditorPage = {
   async saveLineup() {
     if (!dataService.isAdmin()) {
       toast.error('Only admins can save lineups.');
-      return;
+      return false;
     }
+
+    // Prompt for a name if one isn't set yet
     if (!this.currentLineup.name || !this.currentLineup.name.trim()) {
-      toast.warning('Lineup name po');
-      return;
+      const enteredName = await modal.prompt(
+        'Give this lineup a name so you can find it later.',
+        {
+          title: 'Lineup Name',
+          placeholder: 'e.g. HC Tuesday Run',
+          okText: 'Save',
+          cancelText: 'Cancel'
+        }
+      );
+      if (!enteredName) return false;
+
+      this.currentLineup.name = enteredName;
+      const nameInput = document.getElementById('lineup-name');
+      if (nameInput) {
+        nameInput.value = enteredName;
+        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     }
 
     const filledSlots = this.currentLineup.players.filter(p => p).length;
 
     if (filledSlots === 0) {
       toast.warning('??? Save mo na walang tao?');
-      return;
+      return false;
     }
 
     if (!dataService.hasWriteAccess()) {
       toast.warning('You need to be logged in to save lineups.', 5000);
-      return;
+      return false;
     }
 
     const saveBtn = document.getElementById('save-lineup-btn');
@@ -2260,6 +2289,7 @@ export const LineupEditorPage = {
       if (isUpdate) {
         // We have an ID — try to update directly (no confirmation needed)
         lineupData.id = this.currentLineup.id;
+        this._markPendingUpdate(this.currentLineup.id);
 
         // We need the previous cleared state for completion tracking
         // Use the cached version from allLineups instead of re-fetching
@@ -2274,7 +2304,7 @@ export const LineupEditorPage = {
           if (!saveAsNew) {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save Lineup';
-            return;
+            return false;
           }
           this.currentLineup.id = null;
           delete lineupData.id;
@@ -2287,7 +2317,7 @@ export const LineupEditorPage = {
           await this._handleCompletionChanges(cachedLineup, playerNames, ticketPlayerNames);
 
           this._refreshAfterSave(saveBtn);
-          return;
+          return true;
         }
       }
 
@@ -2295,6 +2325,10 @@ export const LineupEditorPage = {
       const result = await dataService.addLineup(lineupData);
       if (result.data?.id) {
         this.currentLineup.id = result.data.id;
+        // Mark the new ID as a pending self-update so the realtime INSERT/UPDATE
+        // echoes from our own save (e.g. _handleCompletionChanges re-updates)
+        // don't trigger the "lineup changed" toast
+        this._markPendingUpdate(result.data.id);
       }
       toast.success(`${trimmedName} saved!`);
 
@@ -2309,10 +2343,12 @@ export const LineupEditorPage = {
       }
 
       this._refreshAfterSave(saveBtn);
+      return true;
     } catch (error) {
       toast.error(`Error dong: ${error.message}`);
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Lineup';
+      return false;
     }
   },
 
@@ -2356,8 +2392,17 @@ export const LineupEditorPage = {
     this.players = players;
     this.renderAvailablePlayers();
 
+    // Sync threadId from the refreshed cached lineup in case the bot created one
+    if (this.currentLineup.id) {
+      const cached = this.allLineups.find(l => l.id === this.currentLineup.id);
+      if (cached && cached.threadId) {
+        this.currentLineup.threadId = cached.threadId;
+      }
+    }
+
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Lineup';
+    this.updateDiscordThreadButton();
   },
 
   async deleteLineup(lineupId) {
@@ -2425,7 +2470,8 @@ export const LineupEditorPage = {
       completed: lineup.completed || false,
       isNextWeek: lineup.isNextWeek || false,
       notes: lineup.notes || '',
-      raidTime: lineup.raidTime || null
+      raidTime: lineup.raidTime || null,
+      threadId: lineup.threadId || null
     };
 
     document.getElementById('lineup-name').value = lineup.name;
@@ -2470,9 +2516,124 @@ export const LineupEditorPage = {
 
     this.updateDamageAmpDisplay();
     this.updateConflictWarnings();
+    this.updateDiscordThreadButton();
 
     // Join presence channel for this specific lineup
     this.joinLineupPresence(lineup.id);
+  },
+
+  /**
+   * Update the "Create Discord Thread" button state based on currentLineup
+   */
+  updateDiscordThreadButton() {
+    const btn = document.getElementById('discord-thread-btn');
+    if (!btn) return;
+
+    const { id, threadId } = this.currentLineup;
+
+    if (threadId) {
+      btn.disabled = false;
+      btn.textContent = 'Open Discord Thread';
+      btn.title = 'Open the Discord thread for this lineup';
+      return;
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Create Discord Thread';
+    btn.title = id
+      ? 'Create a Discord thread and ping the lineup'
+      : 'Save the lineup and create a Discord thread';
+  },
+
+  /**
+   * Handle Discord thread button click — create or open thread
+   */
+  async handleDiscordThreadClick() {
+    const btn = document.getElementById('discord-thread-btn');
+    if (!btn) return;
+
+    let { id, threadId } = this.currentLineup;
+
+    // If a thread already exists, open it
+    if (threadId) {
+      const guildId = import.meta.env.VITE_DISCORD_GUILD_ID;
+      if (guildId) {
+        window.open(`https://discord.com/channels/${guildId}/${threadId}`, '_blank');
+      } else {
+        toast.info(`Discord thread ID: ${threadId}`);
+      }
+      return;
+    }
+
+    if (!dataService.isAdmin()) {
+      toast.error('Only admins can create Discord threads.');
+      return;
+    }
+
+    // If the lineup isn't saved yet, confirm + save first
+    if (!id) {
+      const confirmed = await modal.confirm(
+        'This lineup needs to be saved before a Discord thread can be created. Save and create thread?',
+        {
+          title: 'Save Lineup?',
+          confirmText: 'Save & Create Thread',
+          cancelText: 'Cancel'
+        }
+      );
+      if (!confirmed) return;
+
+      const saved = await this.saveLineup();
+      if (!saved || !this.currentLineup.id) return;
+
+      id = this.currentLineup.id;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating thread...';
+
+    // Bot will write thread_id (and later reminder flags) to this lineup.
+    // Mark as a pending self-update so we don't get the "someone updated this" toast.
+    this._markPendingUpdate(id, 60000);
+
+    let subscription = null;
+    let timeoutId = null;
+
+    const cleanup = () => {
+      if (subscription) dataService.unsubscribe(subscription);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+
+    try {
+      const request = await dataService.requestDiscordThread(id);
+
+      // Subscribe to status updates for this request
+      subscription = dataService.subscribeToThreadRequest(request.id, (row) => {
+        if (row.status === 'done') {
+          cleanup();
+          this.currentLineup.threadId = row.thread_id;
+          // Also update the cached lineup so we don't re-prompt
+          const cached = this.allLineups.find(l => l.id === id);
+          if (cached) cached.threadId = row.thread_id;
+          toast.success('Discord thread created!');
+          this.updateDiscordThreadButton();
+        } else if (row.status === 'error') {
+          cleanup();
+          toast.error(`Failed to create thread: ${row.error || 'Unknown error'}`);
+          this.updateDiscordThreadButton();
+        }
+      });
+
+      // Safety timeout in case the bot is offline
+      timeoutId = setTimeout(() => {
+        cleanup();
+        toast.warning('Thread creation is taking longer than expected — the bot may be offline.');
+        this.updateDiscordThreadButton();
+      }, 30000);
+    } catch (error) {
+      cleanup();
+      toast.error(`Failed to request thread: ${error.message}`);
+      this.updateDiscordThreadButton();
+    }
   },
 
   setupPlayerDragHandlers() {
@@ -2625,6 +2786,20 @@ export const LineupEditorPage = {
   },
 
   /**
+   * Mark a lineup ID as "pending self-update" so the realtime echo from our own
+   * save (or a bot update we triggered) doesn't surface the "lineup was changed" toast.
+   * @param {string} lineupId
+   * @param {number} ttlMs - how long to keep the mark (default 5s)
+   */
+  _markPendingUpdate(lineupId, ttlMs = 5000) {
+    if (!lineupId) return;
+    this.pendingUpdateIds.add(lineupId);
+    setTimeout(() => {
+      this.pendingUpdateIds.delete(lineupId);
+    }, ttlMs);
+  },
+
+  /**
    * Setup realtime subscription for lineup changes
    */
   setupRealtimeSubscription() {
@@ -2637,6 +2812,12 @@ export const LineupEditorPage = {
 
       // Skip notification if this user initiated the delete
       if (eventType === 'DELETE' && this.pendingDeleteId === changedLineupId) {
+        return;
+      }
+
+      // Skip notification if this user initiated the update (own save,
+      // or a bot-side update triggered by the user like thread creation)
+      if (eventType === 'UPDATE' && this.pendingUpdateIds.has(changedLineupId)) {
         return;
       }
 

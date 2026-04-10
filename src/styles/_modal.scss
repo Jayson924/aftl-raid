@@ -34,6 +34,27 @@
         line-height: 1.6;
       }
 
+      .prompt-input {
+        width: 100%;
+        padding: 0.6rem 0.85rem;
+        background-color: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: $border-radius;
+        color: $text-light;
+        font-size: 1rem;
+        transition: border-color 0.2s ease;
+        box-sizing: border-box;
+
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+
+        &.prompt-input-error {
+          border-color: #e74c3c;
+        }
+      }
+
       .form-actions {
         justify-content: flex-end;
         margin-top: 2rem;
