@@ -284,11 +284,11 @@ export const LineupsPage = {
 
       this.cachedPlayerMap = new Map(players.map(p => [p.name, p]));
 
-      // Sort lineups: cleared ones last
+      // Sort lineups: cleared ones last, then by name using natural numeric order
       this.allLineups.sort((a, b) => {
         // Non-cleared first (false < true)
-        if (a.completed === b.completed) return 0;
-        return a.completed ? 1 : -1;
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
       });
 
       // Auto-select first lineup if none selected or current selection not in filtered list
