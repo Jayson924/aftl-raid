@@ -218,21 +218,23 @@
           transform: translate(-50%, -50%) rotate(-20deg);
           font-size: 1.4rem;
           font-weight: 800;
-          color: rgba(40, 167, 69, 0.5);
+          color: rgba(76, 209, 106, 0.75);
           letter-spacing: 0.12em;
           padding: 0.15rem 0.75rem;
-          border: 2px solid rgba(40, 167, 69, 0.5);
+          border: 2px solid rgba(76, 209, 106, 0.7);
           border-radius: 5px;
+          background: rgba(0, 0, 0, 0.3);
+          text-shadow: 0 0 8px rgba(76, 209, 106, 0.4);
           pointer-events: none;
-          z-index: 3;
+          z-index: 5;
           white-space: nowrap;
         }
 
         // Selected + cleared
         &.selected {
           filter: saturate(0.5) brightness(0.9);
-          border: 2px solid rgba(40, 167, 69, 0.5);
-          box-shadow: 0 0 10px rgba(40, 167, 69, 0.2);
+          border: 2px solid rgba(76, 209, 106, 0.6);
+          box-shadow: 0 0 10px rgba(76, 209, 106, 0.25);
           transform: scale(1.05);
           z-index: 10;
         }
@@ -698,13 +700,15 @@
         transform: translate(-50%, -50%) rotate(-20deg);
         font-size: 3.5rem;
         font-weight: 800;
-        color: rgba(40, 167, 69, 0.4);
+        color: rgba(76, 209, 106, 0.7);
         letter-spacing: 0.15em;
         padding: 0.3rem 1.5rem;
-        border: 3px solid rgba(40, 167, 69, 0.4);
+        border: 3px solid rgba(76, 209, 106, 0.65);
         border-radius: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        text-shadow: 0 0 10px rgba(76, 209, 106, 0.35);
         pointer-events: none;
-        z-index: 3;
+        z-index: 5;
         white-space: nowrap;
       }
 

@@ -1302,13 +1302,15 @@
           transform: translate(-50%, -50%) rotate(-20deg);
           font-size: 1.4rem;
           font-weight: 800;
-          color: rgba(40, 167, 69, 0.5);
+          color: rgba(76, 209, 106, 0.75);
           letter-spacing: 0.12em;
           padding: 0.15rem 0.75rem;
-          border: 2px solid rgba(40, 167, 69, 0.5);
+          border: 2px solid rgba(76, 209, 106, 0.7);
           border-radius: 5px;
+          background: rgba(0, 0, 0, 0.3);
+          text-shadow: 0 0 8px rgba(76, 209, 106, 0.4);
           pointer-events: none;
-          z-index: 3;
+          z-index: 5;
           white-space: nowrap;
         }
 
