@@ -405,7 +405,13 @@ export const RecruitingPage = {
         try { saved = JSON.parse(saved); } catch { saved = null; }
       }
       if (saved && Array.isArray(saved) && saved.length > 0) {
-        this.parties = saved;
+        // Clean up stale names — characters that were deleted from the database
+        const validNames = new Set(players.map(p => p.name));
+        this.parties = saved.map(party => ({
+          tank: party.tank && validNames.has(party.tank) ? party.tank : null,
+          healer: party.healer && validNames.has(party.healer) ? party.healer : null,
+          dps: (party.dps || []).map(name => name && validNames.has(name) ? name : null),
+        }));
       } else {
         this.parties = [];
       }

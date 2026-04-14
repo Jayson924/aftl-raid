@@ -812,9 +812,20 @@ export const EnhancementPage = {
   },
 
   updateMaterialsDisplay() {
+    if (this.attempts === 0) return;
+
     // Update the materials tracker display without full re-render
-    const materialsTracker = document.querySelector('.materials-tracker');
-    if (materialsTracker && this.attempts > 0) {
+    let materialsTracker = document.querySelector('.materials-tracker');
+    if (!materialsTracker) {
+      // Create it — insert after highest-level-section or after .stats
+      const anchor = document.querySelector('.highest-level-section') || document.querySelector('.stats');
+      if (anchor) {
+        materialsTracker = document.createElement('div');
+        materialsTracker.className = 'materials-tracker';
+        anchor.after(materialsTracker);
+      }
+    }
+    if (materialsTracker) {
       const materialsHtml = `
         <div class="materials-header">
           <h3>Total Materials Used</h3>
@@ -1182,6 +1193,27 @@ export const EnhancementPage = {
       statValues[1].textContent = this.formatNumber(this.successes);
       statValues[2].textContent = this.formatNumber(this.failures);
     }
+
+    // Update or inject highest level section
+    if (this.highestLevel >= 7) {
+      let highestSection = document.querySelector('.highest-level-section');
+      if (!highestSection) {
+        const statsDiv = document.querySelector('.stats');
+        if (statsDiv) {
+          highestSection = document.createElement('div');
+          highestSection.className = 'highest-level-section';
+          statsDiv.after(highestSection);
+        }
+      }
+      if (highestSection) {
+        highestSection.innerHTML = `
+          <h3>Highest Level Reached: <span class="highest-value">+${this.highestLevel}</span></h3>
+          ${this.renderMilestones()}
+        `;
+      }
+    }
+
+    this.updateMaterialsDisplay();
   },
 
   updateRatesTable() {
