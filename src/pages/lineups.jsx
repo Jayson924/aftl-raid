@@ -3,6 +3,7 @@ import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
 import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
+import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
 
 export const LineupsPage = {
@@ -160,28 +161,7 @@ export const LineupsPage = {
   },
 
   getEquipmentBackground(player) {
-    if (!player) return '';
-
-    const equip = player.equipment || {};
-    const weaponRarityVal = equip.mainWeapon?.rarity || player.weapon || '';
-    const armorRarityVal = equip.helmet?.rarity || player.armor || '';
-
-    const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === weaponRarityVal);
-    const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === armorRarityVal);
-
-    const weaponColor = weaponRarity?.color || '';
-    const armorColor = armorRarity?.color || '';
-
-    if (!weaponColor && !armorColor) {
-      return '';
-    }
-
-    if (weaponColor === armorColor || !weaponColor || !armorColor) {
-      const color = weaponColor || armorColor;
-      return `background: linear-gradient(135deg, ${color}22 0%, ${color}44 100%);`;
-    }
-
-    return `background: linear-gradient(180deg, ${weaponColor}33 0%, ${armorColor}33 100%);`;
+    return getEquipmentBackground(player);
   },
 
   calculateDamageAmp(lineup, playerMap) {
@@ -522,85 +502,8 @@ export const LineupsPage = {
     }
 
     carouselContainer.innerHTML = lineupsToShow.map(lineup => {
-      // Check if lineup is cleared
-      const isCleared = lineup.completed;
       const isSelected = this.currentShowcaseLineup && lineup.id === this.currentShowcaseLineup.id;
-
-      // Create 8 mini player cards in 2x4 grid
-      const playerCards = Array(8).fill(0).map((_, idx) => {
-        const playerName = lineup.players[idx];
-
-        // Check ticket status for this player (Classic only)
-        const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
-        const showTicketFlag = lineup.raidType === 'Classic';
-
-        // Check if this is a guest character
-        let player = null;
-        let isPub = false;
-        if (playerName && playerName.startsWith('[PUB]')) {
-          isPub = true;
-          const parts = playerName.substring(5).split('|');
-          const pubName = parts[0];
-          const pubRole = parts[1];
-          // If no name, use class name as display name
-          player = { name: pubName || pubRole || 'Guest', role: (pubName ? pubRole : '') || '' };
-        } else {
-          player = playerName ? playerMap.get(playerName) : null;
-        }
-
-        if (!player && !playerName) {
-          return `
-            <div class="mini-player-card empty">
-              <div class="mini-player-empty">Empty</div>
-            </div>
-          `;
-        }
-
-        if (!player) {
-          // Character was deleted but was in the lineup
-          return `
-            <div class="mini-player-card">
-              <div class="mini-player-info">
-                <div class="mini-player-name">${playerName}</div>
-              </div>
-            </div>
-          `;
-        }
-
-        const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
-
-        // Check pilot status for this player (only for non-guest)
-        const pilotName = !isPub && lineup.pilotPlayers && lineup.pilotPlayers[idx] ? lineup.pilotPlayers[idx] : '';
-        const pilotDisplay = pilotName ? `<span class="pilot-info-mini"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon-mini">${pilotName}</span>` : '';
-
-        return `
-          <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>` : ''}
-            ${player.role ? `<div class="class-sprite mini-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
-            <div class="mini-player-info">
-              <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
-              ${pilotDisplay}
-              ${player.role ? `<div class="mini-player-role">${player.role}</div>` : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${isSelected ? 'selected' : ''} ${lineup.isNextWeek ? 'next-week' : ''}" data-lineup-id="${lineup.id}">
-          <div class="mini-lineup-header">
-            <span class="mini-lineup-name">
-              ${lineup.isNextWeek ? '<span class="next-week-badge-mini">NW</span>' : ''}
-              ${lineup.name}
-            </span>
-            <div class="mini-lineup-header-actions">
-              <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : `GDN ${lineup.raidType || 'Hardcore'}`}</span>
-            </div>
-          </div>
-          <div class="mini-lineup-grid">
-            ${playerCards}
-          </div>
-        </div>
-      `;
+      return renderMiniLineupCard(lineup, playerMap, { selected: isSelected });
     }).join('');
   },
 

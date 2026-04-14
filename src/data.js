@@ -413,9 +413,9 @@ class DataService {
 
   async addPlayer(player) {
     const insertData = {
-      name: player.name,
-      role: player.role,
-      notes: player.notes,
+      name: player.name || '',
+      role: player.role || '',
+      notes: player.notes || '',
       // Legacy fields (kept for backward compat)
       weapon: player.weapon || '',
       weapon_enhance: player.weaponEnhance || '',
@@ -447,9 +447,9 @@ class DataService {
   async updatePlayer(player, oldName) {
     // Find by old name if provided, otherwise use id or current name
     let query = supabase.from('players').update({
-      name: player.name,
-      role: player.role,
-      notes: player.notes,
+      name: player.name || '',
+      role: player.role || '',
+      notes: player.notes || '',
       // Legacy fields
       weapon: player.weapon || '',
       weapon_enhance: player.weaponEnhance || '',

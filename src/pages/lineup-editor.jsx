@@ -1,6 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
+import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import moment from 'moment';
@@ -474,78 +475,7 @@ export const LineupEditorPage = {
       });
 
       container.innerHTML = lineups.map(lineup => {
-        // Check if lineup is cleared
-        const isCleared = lineup.completed;
-
-        // Create 8 mini player cards in 2x4 grid
-        const playerCards = Array(8).fill(0).map((_, idx) => {
-          const playerName = lineup.players[idx];
-
-          // Check ticket status for this player
-          const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
-
-          // Check if this is a guest character
-          let player = null;
-          let isPub = false;
-          if (playerName && playerName.startsWith('[PUB]')) {
-            isPub = true;
-            const parts = playerName.substring(5).split('|');
-            const pubName = parts[0];
-            const pubRole = parts[1];
-            // If no name, use class name as display name
-            player = { name: pubName || pubRole, role: pubName ? pubRole : '' };
-          } else {
-            player = playerName ? playerMap.get(playerName) : null;
-          }
-
-          if (!player) {
-            return `
-              <div class="mini-player-card empty">
-                <div class="mini-player-empty">Empty</div>
-              </div>
-            `;
-          }
-
-          const backgroundStyle = isPub ? 'background: repeating-linear-gradient(45deg, rgba(255, 193, 7, 0.11), rgba(255, 193, 7, 0.15) 10px, rgba(0, 0, 0, 0.3) 10px, rgba(0, 0, 0, 0.3) 20px);' : this.getEquipmentBackground(player);
-
-          // Mini ticket indicator (only for Classic raid)
-          const showTicketFlag = lineup.raidType === 'Classic';
-          const ticketIndicator = showTicketFlag ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>` : '';
-
-          // Check pilot status for this player (only for non-guest)
-          const pilotName = !isPub && lineup.pilotPlayers && lineup.pilotPlayers[idx] ? lineup.pilotPlayers[idx] : '';
-          const pilotDisplay = pilotName ? `<span class="pilot-info-mini"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon-mini">${pilotName}</span>` : '';
-
-          return `
-            <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
-              ${ticketIndicator}
-              ${player.role ? `<div class="class-sprite mini-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
-              <div class="mini-player-info">
-                <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
-                ${pilotDisplay}
-                <div class="mini-player-role">${player.role}</div>
-              </div>
-            </div>
-          `;
-        }).join('');
-
-        return `
-          <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isNextWeek ? 'next-week' : ''}" data-lineup-id="${lineup.id}">
-            <div class="mini-lineup-header">
-              <span class="mini-lineup-name">
-                ${lineup.isNextWeek ? '<span class="next-week-badge-mini">NW</span>' : ''}
-                ${lineup.name}
-              </span>
-              <div class="mini-lineup-header-actions">
-                <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : `GDN ${lineup.raidType || 'Hardcore'}`}</span>
-                ${dataService.isAdmin() ? `<button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>` : ''}
-              </div>
-            </div>
-            <div class="mini-lineup-grid">
-              ${playerCards}
-            </div>
-          </div>
-        `;
+        return renderMiniLineupCard(lineup, playerMap, { showDeleteButton: true });
       }).join('');
 
       // Add click handlers to load lineups
@@ -1046,24 +976,7 @@ export const LineupEditorPage = {
   },
 
   getEquipmentBackground(player) {
-    if (!player) return '';
-
-    const weaponRarity = EQUIPMENT_RARITIES.find(r => r.value === player.weapon);
-    const armorRarity = EQUIPMENT_RARITIES.find(r => r.value === player.armor);
-
-    const weaponColor = weaponRarity?.color || '';
-    const armorColor = armorRarity?.color || '';
-
-    if (!weaponColor && !armorColor) {
-      return '';
-    }
-
-    if (weaponColor === armorColor || !weaponColor || !armorColor) {
-      const color = weaponColor || armorColor;
-      return `background: linear-gradient(135deg, ${color}22 0%, ${color}44 100%);`;
-    }
-
-    return `background: linear-gradient(180deg, ${weaponColor}33 0%, ${armorColor}33 100%);`;
+    return getEquipmentBackground(player);
   },
 
   calculateDamageAmp() {
@@ -1919,7 +1832,7 @@ export const LineupEditorPage = {
 
   assignPubPlayerToSlot(slotIndex, name, role) {
     // Store guest character with special format: [PUB]Name|Class
-    const pubPlayerString = `[PUB]${name}|${role}`;
+    const pubPlayerString = `[PUB]${name || ''}|${role || ''}`;
     this.currentLineup.players[slotIndex] = pubPlayerString;
 
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
@@ -1991,8 +1904,8 @@ export const LineupEditorPage = {
     // Check if this is a guest character
     if (playerName.startsWith('[PUB]')) {
       const parts = playerName.substring(5).split('|');
-      const name = parts[0];
-      const role = parts[1];
+      const name = parts[0] || '';
+      const role = parts[1] || '';
       this.assignPubPlayerToSlot(slotIndex, name, role);
       return;
     }

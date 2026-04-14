@@ -1,8 +1,14 @@
-// Navigation
+// Navigation — Glassmorphism style
 .main-nav {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 1rem 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+  padding: 0.75rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 
   .nav-container {
     max-width: 1400px;
@@ -14,15 +20,16 @@
 
   .app-title {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     color: $primary-color;
-    text-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
-    font-weight: 700;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 20px rgba(244, 196, 48, 0.3);
   }
 
   .nav-links {
     display: flex;
-    gap: 1rem;
+    gap: 0.25rem;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -30,21 +37,38 @@
   }
 
   .nav-link {
-    color: $text-light;
+    color: rgba(255, 255, 255, 0.6);
     text-decoration: none;
-    padding: 0.5rem 1rem;
-    border-radius: $border-radius;
-    transition: $transition;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    position: relative;
 
     &:hover {
-      background-color: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
+      background-color: rgba(255, 255, 255, 0.08);
     }
 
+    // Desktop: underline accent
     &.active {
-      background-color: $primary-color;
-      color: #1a1a1a;
+      color: $primary-color;
+      background: none;
+      box-shadow: none;
       font-weight: 600;
-      box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 20%;
+        right: 20%;
+        height: 2px;
+        background: $primary-color;
+        border-radius: 1px;
+        box-shadow: 0 0 8px rgba(244, 196, 48, 0.4);
+      }
     }
   }
 
@@ -62,15 +86,16 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.25rem 0.75rem;
+      padding: 0.25rem 0.65rem;
       background-color: rgba(255, 255, 255, 0.05);
-      border: 1px solid transparent;
-      border-radius: $border-radius;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
       cursor: pointer;
-      transition: $transition;
+      transition: all 0.2s ease;
 
       &:hover {
         background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.15);
       }
 
       &.open {
@@ -79,24 +104,26 @@
       }
 
       .user-avatar {
-        width: 28px;
-        height: 28px;
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
         object-fit: cover;
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .user-name {
-        font-size: 0.9rem;
-        color: $text-light;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.8);
         max-width: 120px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-weight: 500;
       }
 
       .dropdown-arrow {
-        font-size: 0.6rem;
-        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.55rem;
+        color: rgba(255, 255, 255, 0.4);
         transition: transform 0.2s ease;
       }
 
@@ -110,15 +137,18 @@
       top: calc(100% + 0.5rem);
       right: 0;
       min-width: 150px;
-      background-color: #2a2a2a;
+      background: rgba(30, 30, 30, 0.9);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: $border-radius;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       opacity: 0;
       visibility: hidden;
       transform: translateY(-10px);
       transition: all 0.2s ease;
       z-index: 1000;
+      overflow: hidden;
 
       &.open {
         opacity: 1;
@@ -128,11 +158,11 @@
 
       .dropdown-header {
         padding: 0.5rem 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
         .dropdown-role {
           font-size: 0.75rem;
-          color: rgba(255, 255, 255, 0.5);
+          color: rgba(255, 255, 255, 0.4);
           text-transform: capitalize;
         }
       }
@@ -140,17 +170,19 @@
       .dropdown-item {
         display: block;
         width: 100%;
-        padding: 0.75rem 1rem;
+        padding: 0.7rem 1rem;
         background: none;
         border: none;
-        color: $text-light;
-        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.85rem;
         text-align: left;
         cursor: pointer;
-        transition: $transition;
+        transition: all 0.15s ease;
+        font-weight: 500;
 
         &:hover {
-          background-color: rgba(255, 255, 255, 0.1);
+          background-color: rgba(255, 255, 255, 0.08);
+          color: $text-light;
         }
       }
     }

@@ -1385,28 +1385,28 @@
 
 // Guest character badges
 .pub-badge {
-  background-color: #ffc107;
-  color: #000;
+  background-color: rgba(255, 193, 7, 0.3);
+  color: rgba(255, 193, 7, 0.8);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-size: 0.65rem;
   font-weight: 700;
   margin-left: 0.25rem;
   display: inline-block;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 193, 7, 0.25);
   text-shadow: none;
 }
 
 .pub-badge-mini {
-  background-color: #ffc107;
-  color: #000;
+  background-color: rgba(255, 193, 7, 0.3);
+  color: rgba(255, 193, 7, 0.8);
   padding: 0.1rem 0.3rem;
   border-radius: 3px;
   font-size: 0.6rem;
   font-weight: 700;
   margin-left: 0.2rem;
   display: inline-block;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 193, 7, 0.25);
 }
 
 .pub-player {
