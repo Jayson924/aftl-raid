@@ -404,7 +404,7 @@ export const LineupsPage = {
               const pubName = parts[0];
               const pubRole = parts[1];
               // If no name, use class name as display name
-              player = { name: pubName || pubRole, role: pubName ? pubRole : '' };
+              player = { name: pubName || pubRole || 'Guest', role: (pubName ? pubRole : '') || '' };
             } else {
               player = playerMap.get(playerName);
             }
@@ -543,15 +543,26 @@ export const LineupsPage = {
           const pubName = parts[0];
           const pubRole = parts[1];
           // If no name, use class name as display name
-          player = { name: pubName || pubRole, role: pubName ? pubRole : '' };
+          player = { name: pubName || pubRole || 'Guest', role: (pubName ? pubRole : '') || '' };
         } else {
           player = playerName ? playerMap.get(playerName) : null;
         }
 
-        if (!player) {
+        if (!player && !playerName) {
           return `
             <div class="mini-player-card empty">
               <div class="mini-player-empty">Empty</div>
+            </div>
+          `;
+        }
+
+        if (!player) {
+          // Character was deleted but was in the lineup
+          return `
+            <div class="mini-player-card">
+              <div class="mini-player-info">
+                <div class="mini-player-name">${playerName}</div>
+              </div>
             </div>
           `;
         }
@@ -568,7 +579,7 @@ export const LineupsPage = {
             <div class="mini-player-info">
               <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
               ${pilotDisplay}
-              <div class="mini-player-role">${player.role}</div>
+              ${player.role ? `<div class="mini-player-role">${player.role}</div>` : ''}
             </div>
           </div>
         `;
