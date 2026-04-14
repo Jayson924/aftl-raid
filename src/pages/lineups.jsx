@@ -30,7 +30,7 @@ export const LineupsPage = {
   async render(container) {
     container.innerHTML = `
       <div class="lineups-page">
-        <h1>Ready Raid Lineups</h1>
+        <h1>Raid Lineups</h1>
         <div class="raid-tabs">
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
