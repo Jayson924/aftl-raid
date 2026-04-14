@@ -385,7 +385,7 @@ export const SpendingGuidePage = {
     btn.textContent = '...';
 
     try {
-      const response = await fetch('https://api.frankfurter.app/latest?from=USD&to=PHP,AUD,IDR');
+      const response = await fetch('https://api.frankfurter.dev/v1/latest?from=USD&to=PHP,AUD,IDR');
       if (!response.ok) throw new Error('Failed to fetch');
 
       const data = await response.json();
