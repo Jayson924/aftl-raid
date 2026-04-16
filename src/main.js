@@ -131,10 +131,10 @@ function renderNavigation() {
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         ` : ''}
-        <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
             ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>` : ''}
