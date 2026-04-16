@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize } from '../constants.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
@@ -77,6 +77,7 @@ export const LineupEditorPage = {
                   <select id="raid-type">
                     <option value="Hardcore">GDN Hardcore</option>
                     <option value="Classic">GDN Classic</option>
+                    <option value="4-man">4-Man</option>
                     <option value="Unspecified">Unspecified</option>
                   </select>
                 </div>
@@ -143,7 +144,7 @@ export const LineupEditorPage = {
                   </div>
                 </div>
               </div>
-              <div id="lineup-slots-container" class="slots-container">
+              <div id="lineup-slots-container" class="slots-container ${this.currentLineup.raidType === '4-man' ? 'four-man' : ''}">
                 ${Array(8).fill(0).map((_, idx) => `
                   <div class="slot" data-slot="${idx}">
                     <span class="slot-number">${idx + 1}</span>
@@ -235,10 +236,43 @@ export const LineupEditorPage = {
     });
 
     document.getElementById('raid-type').addEventListener('change', (e) => {
-      this.currentLineup.raidType = e.target.value;
+      const newRaidType = e.target.value;
+      this.currentLineup.raidType = newRaidType;
+
+      // If switching to 4-man, clear slots 4-7 so only 1-4 remain
+      if (newRaidType === '4-man') {
+        for (let i = 4; i < 8; i++) {
+          if (this.currentLineup.players[i]) {
+            this.currentLineup.players[i] = '';
+          }
+          this.currentLineup.ticketSlots[i] = false;
+          this.currentLineup.pilotSlots[i] = '';
+        }
+        // Reset slot DOM for 4-7
+        document.querySelectorAll('.slot').forEach(slotEl => {
+          const idx = parseInt(slotEl.dataset.slot);
+          if (idx >= 4) {
+            const slotContent = slotEl.querySelector('.slot-content');
+            slotContent.innerHTML = '<div class="empty-slot">Drop or click</div>';
+            const removeBtn = slotEl.querySelector('.slot-remove-btn');
+            if (removeBtn) removeBtn.remove();
+            slotEl.style.cssText = '';
+            slotContent.style.cssText = '';
+          }
+        });
+      }
+
+      // Toggle the four-man class on the slots container
+      const slotsContainer = document.getElementById('lineup-slots-container');
+      if (slotsContainer) {
+        slotsContainer.classList.toggle('four-man', newRaidType === '4-man');
+      }
+
       this.renderAvailablePlayers(); // Re-render to update completion badges
       this.loadExistingLineups(); // Re-filter existing lineups by raid type
       this.reRenderLineupSlots(); // Re-render slots to show/hide ticket toggle
+      this.updateDamageAmpDisplay();
+      this.updateConflictWarnings();
     });
 
     document.getElementById('lineup-notes').addEventListener('input', (e) => {
@@ -1424,8 +1458,15 @@ export const LineupEditorPage = {
 
     // Handle double-click on "Add Guest" card
     addPubCard.addEventListener('dblclick', () => {
-      // Find first empty slot
-      const emptySlotIndex = this.currentLineup.players.findIndex((p, idx) => !p || p === '');
+      // Find first empty slot within the current raid size
+      const size = getLineupSize(this.currentLineup.raidType);
+      let emptySlotIndex = -1;
+      for (let i = 0; i < size; i++) {
+        if (!this.currentLineup.players[i]) {
+          emptySlotIndex = i;
+          break;
+        }
+      }
       if (emptySlotIndex !== -1) {
         this.showPubCharacterModal(emptySlotIndex);
       } else {
@@ -2389,6 +2430,11 @@ export const LineupEditorPage = {
 
     document.getElementById('lineup-name').value = lineup.name;
     document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
+    // Apply four-man class based on raid type
+    const slotsContainer = document.getElementById('lineup-slots-container');
+    if (slotsContainer) {
+      slotsContainer.classList.toggle('four-man', (lineup.raidType || 'Hardcore') === '4-man');
+    }
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('next-week-toggle').checked = lineup.isNextWeek || false;
     document.getElementById('lineup-notes').value = lineup.notes || '';
@@ -2573,9 +2619,10 @@ export const LineupEditorPage = {
           return;
         }
 
-        // Find first empty slot
+        // Find first empty slot within the current raid size
+        const size = getLineupSize(this.currentLineup.raidType);
         let firstEmptySlot = -1;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < size; i++) {
           if (!this.currentLineup.players[i]) {
             firstEmptySlot = i;
             break;

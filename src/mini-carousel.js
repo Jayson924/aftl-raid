@@ -1,4 +1,4 @@
-import { EQUIPMENT_RARITIES, getClassSpriteStyle } from './constants.js';
+import { EQUIPMENT_RARITIES, getClassSpriteStyle, getLineupSize } from './constants.js';
 import { dataService } from './data.js';
 
 /**
@@ -92,10 +92,12 @@ function renderMiniPlayerCard(playerName, playerMap, lineup, idx) {
 }
 
 /**
- * Render 8 mini player cards for a lineup (the 2x4 grid content).
+ * Render mini player cards for a lineup (size depends on raid type).
+ * 4-man raids render 4 cards, all others render 8.
  */
 export function renderMiniPlayerCards(lineup, playerMap) {
-  return Array(8).fill(0).map((_, idx) => {
+  const size = getLineupSize(lineup.raidType);
+  return Array(size).fill(0).map((_, idx) => {
     const playerName = lineup.players[idx];
     return renderMiniPlayerCard(playerName, playerMap, lineup, idx);
   }).join('');
@@ -127,11 +129,11 @@ export function renderMiniLineupCard(lineup, playerMap, options = {}) {
           ${lineup.name}
         </span>
         <div class="mini-lineup-header-actions">
-          <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : `GDN ${lineup.raidType || 'Hardcore'}`}</span>
+          <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : (lineup.raidType === '4-man' ? '4-Man' : `GDN ${lineup.raidType || 'Hardcore'}`)}</span>
           ${deleteBtn}
         </div>
       </div>
-      <div class="mini-lineup-grid">
+      <div class="mini-lineup-grid ${lineup.raidType === '4-man' ? 'four-man' : ''}">
         ${playerCards}
       </div>
     </div>

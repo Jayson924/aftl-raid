@@ -299,6 +299,8 @@
       .mini-lineup-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(4, auto);
+        grid-auto-flow: column;
         gap: 0.4rem;
         position: relative;
         z-index: 2;
@@ -717,6 +719,8 @@
     .lineup-players {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(4, auto);
+      grid-auto-flow: column;
       gap: 1rem;
       position: relative;
       z-index: 2;

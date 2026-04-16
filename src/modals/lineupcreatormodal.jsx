@@ -9,7 +9,7 @@
 
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, DAMAGE_AMP_SOURCES, calculateGearscore, getGearscoreTier } from '../constants.js';
+import { CLASSES, DAMAGE_AMP_SOURCES, calculateGearscore, getGearscoreTier, getLineupSize } from '../constants.js';
 
 // Essential roles that a lineup should always contain
 const TANK_CLASSES = ['Guardian', 'Crusader', 'Destroyer'];
@@ -68,6 +68,7 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
           <div class="creator-toggle-group">
             <button class="creator-toggle ${raidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">Hardcore</button>
             <button class="creator-toggle ${raidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">Classic</button>
+            <button class="creator-toggle ${raidType === '4-man' ? 'active' : ''}" data-raid-type="4-man">4-Man</button>
             <button class="creator-toggle ${raidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
           </div>
         </div>
@@ -434,7 +435,8 @@ function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { inclu
     const lineup = [...seedPair];
     const usedUsers = new Set(seedPair.map(p => p.discordId));
 
-    const maxSlots = Math.min(aroundDiscordIds.length, 8 - reservedSlots);
+    const targetSize = getLineupSize(currentLineup.raidType);
+    const maxSlots = Math.min(aroundDiscordIds.length, targetSize - reservedSlots);
     for (let i = lineup.length; i < maxSlots; i++) {
       let bestCandidate = null;
       let bestCandidateScore = -1;
@@ -478,7 +480,7 @@ function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { inclu
 
   // Phase 2: Fill remaining slots with guest class suggestions
   const result = bestRealLineup.map(p => ({ name: p.name, role: p.role, isGuest: false }));
-  const slotsRemaining = 8 - result.length;
+  const slotsRemaining = getLineupSize(currentLineup.raidType) - result.length;
 
   if (slotsRemaining > 0) {
     const needsTank = () => !result.some(p => TANK_CLASSES.includes(p.role));

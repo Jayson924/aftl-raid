@@ -2,7 +2,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize } from '../constants.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
 
@@ -34,6 +34,7 @@ export const LineupsPage = {
         <div class="raid-tabs">
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
+          <button class="tab-button ${this.currentRaidType === '4-man' ? 'active' : ''}" data-raid-type="4-man">4-Man</button>
           <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
         </div>
         <div class="tab-content-wrapper">
@@ -340,6 +341,7 @@ export const LineupsPage = {
               <option value="Unspecified" selected>Unspecified</option>
               <option value="Hardcore">GDN Hardcore</option>
               <option value="Classic">GDN Classic</option>
+              <option value="4-man">4-Man</option>
             </select>
           ` : ''}
           ${isAdmin && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
@@ -366,8 +368,8 @@ export const LineupsPage = {
             </div>
           </div>
         </div>
-        <div class="lineup-players">
-          ${lineup.players.map((playerName, idx) => {
+        <div class="lineup-players ${lineup.raidType === '4-man' ? 'four-man' : ''}">
+          ${lineup.players.slice(0, getLineupSize(lineup.raidType)).map((playerName, idx) => {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
 
@@ -417,12 +419,16 @@ export const LineupsPage = {
             </div>
           `;
           }).join('')}
-          ${Array(8 - lineup.players.length).fill(0).map((_, idx) => `
-            <div class="player-slot empty">
-              <span class="slot-number">${lineup.players.length + idx + 1}</span>
-              <span class="player-name">Empty</span>
-            </div>
-          `).join('')}
+          ${(() => {
+            const size = getLineupSize(lineup.raidType);
+            const filled = Math.min(lineup.players.length, size);
+            return Array(Math.max(0, size - filled)).fill(0).map((_, idx) => `
+              <div class="player-slot empty">
+                <span class="slot-number">${filled + idx + 1}</span>
+                <span class="player-name">Empty</span>
+              </div>
+            `).join('');
+          })()}
         </div>
         ${lineup.notes ? `<div class="lineup-notes-display"><span class="notes-label">Notes:</span> ${lineup.notes}</div>` : ''}
       </div>
@@ -448,7 +454,7 @@ export const LineupsPage = {
           const lineupId = e.target.dataset.lineupId;
           try {
             await dataService.updateLineupRaidType(lineupId, newType);
-            toast.show(`Lineup moved to GDN ${newType}`, 'success');
+            toast.show(newType === '4-man' ? 'Lineup moved to 4-Man' : `Lineup moved to GDN ${newType}`, 'success');
             this.currentShowcaseLineup = null;
             await this.loadLineups();
           } catch (err) {

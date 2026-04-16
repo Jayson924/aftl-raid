@@ -12,7 +12,8 @@ export const PlayersPage = {
   _appUsers: [],
 
   // Group by owner toggle state (persisted in localStorage)
-  _groupByOwner: localStorage.getItem('playersGroupByOwner') === 'true',
+  // Flat view disabled for now - grouped view is the only option
+  _groupByOwner: true,
 
   // View mode: 'characters' or 'roster'
   _viewMode: 'characters',
@@ -64,11 +65,13 @@ export const PlayersPage = {
           </div>
           ${canViewFull ? `
             <div class="page-header-actions">
+              <!-- Flat view disabled for now - grouped view is the only option
               <label class="toggle-switch" id="group-by-owner-wrapper" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>
                 <input type="checkbox" id="group-by-owner-toggle" ${this._groupByOwner ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
                 <span class="toggle-label">Group by owner</span>
               </label>
+              -->
               <button id="add-player-btn" class="btn btn-primary" ${this._viewMode === 'roster' ? 'style="display:none"' : ''}>+ Add Character</button>
             </div>
           ` : ''}
@@ -84,11 +87,12 @@ export const PlayersPage = {
         this.showAddPlayerModal();
       });
 
-      document.getElementById('group-by-owner-toggle').addEventListener('change', (e) => {
-        this._groupByOwner = e.target.checked;
-        localStorage.setItem('playersGroupByOwner', this._groupByOwner);
-        this.loadPlayers();
-      });
+      // Flat view disabled for now - group-by-owner toggle hidden
+      // document.getElementById('group-by-owner-toggle').addEventListener('change', (e) => {
+      //   this._groupByOwner = e.target.checked;
+      //   localStorage.setItem('playersGroupByOwner', this._groupByOwner);
+      //   this.loadPlayers();
+      // });
 
       // View tab listeners
       document.querySelectorAll('.view-tab').forEach(tab => {
@@ -97,7 +101,6 @@ export const PlayersPage = {
           document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === this._viewMode));
           // Show/hide character-specific controls
           const isRoster = this._viewMode === 'roster';
-          document.getElementById('group-by-owner-wrapper').style.display = isRoster ? 'none' : '';
           document.getElementById('add-player-btn').style.display = isRoster ? 'none' : '';
           this.loadPlayers();
         });
@@ -363,12 +366,13 @@ export const PlayersPage = {
         return;
       }
 
-      // Render based on toggle state
-      if (this._groupByOwner) {
-        this.renderGroupedView(listElement, players, userMap, hasAnyEditableCharacters);
-      } else {
-        this.renderFlatView(listElement, players, userMap, hasAnyEditableCharacters);
-      }
+      // Flat view disabled for now - always use grouped view
+      this.renderGroupedView(listElement, players, userMap, hasAnyEditableCharacters);
+      // if (this._groupByOwner) {
+      //   this.renderGroupedView(listElement, players, userMap, hasAnyEditableCharacters);
+      // } else {
+      //   this.renderFlatView(listElement, players, userMap, hasAnyEditableCharacters);
+      // }
 
       // Add event listeners for clickable player names
       document.querySelectorAll('.player-name-link').forEach(link => {
@@ -932,10 +936,6 @@ export const PlayersPage = {
     // Build grouped HTML with filters at top
     let html = `
       ${this.renderClassFamilyFilter()}
-      <div class="raid-priority-filter grouped-filter">
-        <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
-        <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
-      </div>
       <div class="owner-groups">`;
 
     // Render each owner group

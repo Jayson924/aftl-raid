@@ -58,6 +58,12 @@ export const CLASS_SPRITE_MAP = {
   'Spirit Dancer':  [5, 2],
 };
 
+// Returns the number of lineup slots for a given raid type
+// 4-man raids have 4 slots, all others have 8
+export function getLineupSize(raidType) {
+  return raidType === '4-man' ? 4 : 8;
+}
+
 // Get inline style for a class sprite icon background
 export function getClassSpriteStyle(className) {
   const pos = CLASS_SPRITE_MAP[className];

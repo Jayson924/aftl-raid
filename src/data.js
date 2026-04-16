@@ -663,8 +663,8 @@ class DataService {
     if (error) throw error;
 
     // Handle player completion based on lineup completion status
-    // Skip for Unspecified raid type - can't mark HC/CL completion without knowing which
-    if (lineup.raid_type !== 'Unspecified' && lineup.lineup_players && lineup.lineup_players.length > 0) {
+    // Skip for Unspecified and 4-man raid types - no weekly HC/CL completion tracking
+    if (lineup.raid_type !== 'Unspecified' && lineup.raid_type !== '4-man' && lineup.lineup_players && lineup.lineup_players.length > 0) {
       const playerNames = lineup.lineup_players
         .map(lp => lp.player_name)
         .filter(name => name && name.trim() !== '');
@@ -738,6 +738,8 @@ class DataService {
   }
 
   playerNeedsRaid(player, raidType) {
+    // 4-man and Unspecified don't track weekly completion — treat as always needing (no one is "completed")
+    if (raidType === 'Unspecified' || raidType === '4-man') return true;
     const timestamp = raidType === 'Hardcore' ? player.hardcoreCompleted : player.classicCompleted;
     return !this.isCompletedThisWeek(timestamp);
   }
@@ -748,6 +750,8 @@ class DataService {
   }
 
   async markPlayersCompleted(playerNames, raidType, ticketPlayerNames = []) {
+    // 4-man and Unspecified don't track weekly completion
+    if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
     const column = raidType === 'Hardcore' ? 'hardcore_completed' : 'classic_completed';
     const now = new Date().toISOString();
 
@@ -773,6 +777,8 @@ class DataService {
   }
 
   async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName, ticketPlayerNames = []) {
+    // 4-man and Unspecified don't track weekly completion
+    if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
     const column = raidType === 'Hardcore' ? 'hardcore_completed' : 'classic_completed';
 
     // Clear completion timestamp
