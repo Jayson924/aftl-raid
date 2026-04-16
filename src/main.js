@@ -82,16 +82,15 @@ async function initApp() {
   router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
-  // Arena routes hidden for now
-  // router.register('arena', ArenaHubPage, 'guildmate');
-  // router.register('arena-setup', ArenaSetupPage, 'admin');
-  // router.register('arena-draft', ArenaDraftPage, 'guildmate');
-  // router.register('arena-match', ArenaMatchPage, 'guildmate');
-  // router.register('arena-spectate', ArenaSpectatePage, 'guildmate');
-  // router.register('arena-tiebreaker', ArenaTiebreakerPage, 'guildmate');
-  // router.register('arena-results', ArenaResultsPage, 'guildmate');
+  router.register('arena', ArenaHubPage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
+  router.register('arena-draft', ArenaDraftPage, 'guildmate'); // Draft phase - guildmates only
+  router.register('arena-match', ArenaMatchPage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-spectate', ArenaSpectatePage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-tiebreaker', ArenaTiebreakerPage, 'guildmate'); // Guildmates and admins only
+  router.register('arena-results', ArenaResultsPage, 'guildmate'); // Guildmates and admins only
   router.register('admin', AdminPage, 'admin'); // Admin panel
-  // router.register('enhance-race', EnhanceRacePage); // Hidden for now
+  router.register('enhance-race', EnhanceRacePage); // Standalone enhancement race
 
   // Set up auth required handler
   router.setAuthRequiredHandler(showLoginModal);
@@ -132,7 +131,9 @@ function renderNavigation() {
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
-        ${/* Arena hidden for now */ ''}
+        ${isPlayer ? `
+          <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
+        ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
