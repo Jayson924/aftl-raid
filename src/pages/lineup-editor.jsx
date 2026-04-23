@@ -2267,6 +2267,13 @@ export const LineupEditorPage = {
           await dataService.updateLineup(lineupData);
           toast.success(`${trimmedName} updated!`);
 
+          // If this lineup has a Discord thread, ask the bot to sync it.
+          // Fire-and-forget — bot processes via Realtime, no UI dependency.
+          if (this.currentLineup.threadId) {
+            dataService.requestDiscordThreadUpdate(this.currentLineup.id)
+              .catch(err => console.error('[DiscordThread] Update request failed:', err));
+          }
+
           // Handle completion status changes
           await this._handleCompletionChanges(cachedLineup, playerNames, ticketPlayerNames);
 

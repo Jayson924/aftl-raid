@@ -1038,7 +1038,7 @@ class DataService {
    * @param {string} [channelId] - Optional override channel (defaults to server-side default)
    * @returns {Promise<{ id: string }>} the inserted request row
    */
-  async requestDiscordThread(lineupId, channelId = '1492287028220395601') {
+  async requestDiscordThread(lineupId, channelId = '1496954808324587680') {
     if (!this.isAdmin()) throw new Error('Only admins can create Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
 
@@ -1048,7 +1048,35 @@ class DataService {
         lineup_id: lineupId,
         channel_id: channelId,
         requested_by: this._user?.id || null,
-        status: 'pending'
+        status: 'pending',
+        action: 'create'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Request the Discord bot to sync an existing thread with the latest lineup state.
+   * Bot will edit the roster embed in place, rename the thread if the time changed,
+   * and ping any newly added players.
+   * @param {string} lineupId
+   * @returns {Promise<{ id: string }>} the inserted request row
+   */
+  async requestDiscordThreadUpdate(lineupId) {
+    if (!this.isAdmin()) throw new Error('Only admins can update Discord threads');
+    if (!lineupId) throw new Error('lineupId is required');
+
+    const { data, error } = await supabase
+      .from('thread_requests')
+      .insert({
+        lineup_id: lineupId,
+        channel_id: '',
+        requested_by: this._user?.id || null,
+        status: 'pending',
+        action: 'update'
       })
       .select()
       .single();
