@@ -1,8 +1,7 @@
-// Recruiting page - web/constellation visualization
+// Recruiting page — party cards + roster-driven gap analysis
 
 .recruiting-page {
   min-height: 100vh;
-  background: #1a1a2e;
   color: #e0e0e0;
   padding: 0 0 60px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -13,7 +12,6 @@
 .recruiting-hero {
   text-align: center;
   padding: 50px 20px 20px;
-  background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
 
   &__title {
     font-size: 3rem;
@@ -46,16 +44,17 @@
     font-size: 1rem;
     line-height: 1.6;
     color: #b0b0c8;
-    strong { color: #f4c430; }
+  }
+
+  &__gs {
+    color: #f4c430;
+    font-weight: 700;
+    cursor: help;
+    border-bottom: 1px dashed rgba(244, 196, 48, 0.5);
   }
 }
 
-.recruiting-loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: #888;
-}
-
+.recruiting-loading,
 .recruiting-empty {
   text-align: center;
   padding: 60px 20px;
@@ -69,7 +68,7 @@
   display: flex;
   justify-content: center;
   gap: 12px;
-  padding: 16px 20px;
+  padding: 16px 20px 0;
 
   .btn {
     padding: 8px 20px;
@@ -106,241 +105,241 @@
   }
 }
 
-// ─── Web Canvas ───
+// ─── Stats Bar ───
 
-.recruit-web {
-  max-width: 950px;
-  margin: 0 auto;
-  padding: 10px 20px;
+.recruiting-stats {
+  text-align: center;
+  padding: 24px 20px 12px;
 
-  &__canvas {
-    position: relative;
-    width: 100%;
-    padding-bottom: 100%; // square
+  &__big {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: #f4c430;
+    text-shadow: 0 0 16px rgba(244, 196, 48, 0.3);
+    line-height: 1;
   }
 
-  &__svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
+  &__text {
+    font-size: 0.95rem;
+    color: #a0a0c0;
+    margin-left: 10px;
+  }
 
-    line {
-      transition: stroke-opacity 0.3s ease, stroke-width 0.3s ease;
+  &--full {
+    .recruiting-stats__text {
+      margin-left: 0;
+      color: #4ece73;
     }
-  }
-
-  &__nodes {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-
-  &__parties {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 12px;
   }
 }
 
-.party-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 4px 14px;
-  border-radius: 12px;
-  color: var(--party-color);
-  background: rgba(255, 255, 255, 0.04);
+// ─── Party Grid ───
+
+.party-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 20px;
+}
+
+.party-card {
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid color-mix(in srgb, var(--party-color) 25%, transparent);
-  cursor: default;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 24px color-mix(in srgb, var(--party-color) 8%, transparent);
+
+  &:has(.slot-chip:hover),
+  &:has(.slot-chip.tooltip-visible) {
+    z-index: 200;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--party-color) 20%, transparent);
+  }
+
+  &__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--party-color);
+    letter-spacing: 0.5px;
+  }
+
+  &__count {
+    margin-left: auto;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #888;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+
+    &--full {
+      color: #4ece73;
+      background: rgba(78, 206, 115, 0.1);
+    }
+  }
 
   &__delete {
     background: none;
     border: none;
     color: rgba(255, 255, 255, 0.3);
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     cursor: pointer;
-    padding: 0 2px;
+    padding: 0 4px;
     line-height: 1;
     transition: color 0.2s ease;
 
-    &:hover {
-      color: #e74c3c;
-    }
+    &:hover { color: #e74c3c; }
+  }
+
+  &__slots {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
   }
 }
 
-// ─── Web Nodes ───
+// ─── Slot Chip ───
 
-.web-node {
-  position: absolute;
-  left: calc(var(--nx) / 10 * 1%);
-  top: calc(var(--ny) / 10 * 1%);
-  transform: translate(-50%, -50%);
+.slot-chip {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  z-index: 2;
-  cursor: default;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  padding: 10px 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1.5px solid #333;
+  border-radius: 8px;
+  text-align: center;
+  position: relative;
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  min-height: 96px;
 
-  &:hover,
-  &.tooltip-visible {
-    z-index: 100;
+  &--empty {
+    border-style: dashed;
+    border-color: rgba(244, 196, 48, 0.25);
+    background: rgba(244, 196, 48, 0.03);
   }
 
-  // Core nodes are slightly smaller than DPS
-  &--core .web-node__bubble {
-    width: 52px;
-    height: 52px;
-  }
-
-  &--dps-size .web-node__bubble {
-    width: 62px;
-    height: 62px;
-  }
-
-  &__bubble {
-    border-radius: 50%;
-    border: 2.5px solid #444;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(26, 26, 46, 0.92);
-    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease, background 0.3s ease;
-    position: relative;
-    overflow: hidden;
-
-    &--empty {
-      border-style: dashed;
-      border-color: rgba(244, 196, 48, 0.3);
-      background: rgba(244, 196, 48, 0.04);
-    }
+  &--filled {
+    border-color: var(--tier-color);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tier-color) 20%, transparent) inset;
   }
 
   &__icon {
     width: 44px;
     height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  &__question {
+  &__icon-placeholder {
+    width: 44px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 1.6rem;
     font-weight: 700;
     color: rgba(244, 196, 48, 0.4);
   }
 
-  &__info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    pointer-events: none;
-  }
-
-  &__name {
-    font-size: 0.72rem;
-    font-weight: 600;
+  &__class {
+    font-size: 0.7rem;
     color: #d0d0d0;
-    white-space: nowrap;
-    max-width: 85px;
+    line-height: 1.1;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
-  }
-
-  &__class {
-    font-size: 0.6rem;
-    color: #888;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  }
-
-  &__gs {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    white-space: nowrap;
   }
 
   &__label {
-    font-size: 0.6rem;
-    color: rgba(244, 196, 48, 0.5);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    font-size: 0.7rem;
+    color: rgba(244, 196, 48, 0.65);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  &__recruiting {
+  &__sub {
     font-size: 0.6rem;
-    color: #f4c430;
+    color: rgba(244, 196, 48, 0.7);
     font-weight: 600;
     animation: recruit-pulse 2s ease-in-out infinite;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   }
 
-  // ─── Role glows ───
-
-  &--tank .web-node__bubble:not(.web-node__bubble--empty) {
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+  &__name {
+    font-size: 0.62rem;
+    color: #888;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  &--healer .web-node__bubble:not(.web-node__bubble--empty) {
-    box-shadow: 0 0 12px rgba(40, 167, 69, 0.25);
+  &__gs {
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
   }
 
-  &--dps .web-node__bubble:not(.web-node__bubble--empty),
-  &--support .web-node__bubble:not(.web-node__bubble--empty) {
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.08);
+  // Role-specific subtle accents
+  &--tank.slot-chip--filled {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.18), 0 0 0 1px color-mix(in srgb, var(--tier-color) 20%, transparent) inset;
   }
 
-  // ─── Drag & drop ───
+  &--healer.slot-chip--filled {
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.18), 0 0 0 1px color-mix(in srgb, var(--tier-color) 20%, transparent) inset;
+  }
 
+  &--tank.slot-chip--empty,
+  &--healer.slot-chip--empty {
+    border-color: rgba(244, 196, 48, 0.4);
+    background: rgba(244, 196, 48, 0.05);
+  }
+
+  // Drag states
   &[draggable="true"] {
     cursor: grab;
   }
 
   &.dragging {
     opacity: 0.3;
-    transform: translate(-50%, -50%) scale(0.9);
+    transform: scale(0.95);
+  }
+
+  &--ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 3000;
+    opacity: 0.95;
+    border-color: #f4c430 !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+    transform: scale(1.05);
   }
 
   &.drag-over {
-    z-index: 10;
-
-    .web-node__bubble {
-      border-color: #f4c430 !important;
-      border-style: solid !important;
-      box-shadow: 0 0 20px rgba(244, 196, 48, 0.4) !important;
-      transform: scale(1.12);
-    }
+    border-color: #f4c430 !important;
+    border-style: solid !important;
+    box-shadow: 0 0 18px rgba(244, 196, 48, 0.45) !important;
+    transform: scale(1.04);
+    background: rgba(244, 196, 48, 0.1);
   }
 
-  // ─── Hover highlight ───
-
-  &--highlighted {
-    z-index: 5;
-
-    .web-node__bubble {
-      border-color: var(--party-color) !important;
-      box-shadow: 0 0 18px var(--party-glow), 0 0 36px var(--party-glow) !important;
-      background: color-mix(in srgb, var(--party-color) 12%, rgba(26, 26, 46, 0.95));
-      transform: scale(1.08);
-    }
-
-    &.web-node--empty .web-node__bubble {
-      border-color: var(--party-color) !important;
-      border-style: dashed;
-      box-shadow: 0 0 14px var(--party-glow) !important;
-    }
-
-    .web-node__name { color: #fff; }
-  }
-
-  &--dimmed {
-    opacity: 0.15;
+  &:hover {
+    transform: translateY(-1px);
   }
 }
 
@@ -349,11 +348,316 @@
   50% { opacity: 1; }
 }
 
-// ─── Available Characters Pool ───
+// ─── Actively Recruiting ───
+
+.actively-recruiting {
+  width: calc(100% - 40px);
+  max-width: 1360px;
+  margin: 24px auto 0;
+  padding: 18px 20px;
+  background: rgba(244, 196, 48, 0.04);
+  border: 1px solid rgba(244, 196, 48, 0.22);
+  border-radius: 12px;
+  box-sizing: border-box;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  &__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f4c430;
+    margin: 0;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f4c430;
+      margin-right: 8px;
+      vertical-align: middle;
+      animation: recruit-pulse 1.4s ease-in-out infinite;
+      box-shadow: 0 0 10px #f4c430;
+    }
+  }
+
+  &__edit {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ccc;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: rgba(244, 196, 48, 0.1);
+      border-color: rgba(244, 196, 48, 0.4);
+      color: #f4c430;
+    }
+  }
+
+  &__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  &__card {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 8px;
+    background: #2a2a2a;
+    border: 1px solid rgba(244, 196, 48, 0.3);
+    border-radius: 999px;
+    box-shadow: 0 0 12px rgba(244, 196, 48, 0.1);
+  }
+
+  &__icon {
+    width: 32px;
+    height: 34px;
+    flex-shrink: 0;
+
+    .class-sprite {
+      transform: scale(0.75);
+      transform-origin: top left;
+    }
+  }
+
+  &__name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e8e8e8;
+  }
+
+  &__note {
+    font-size: 0.85rem;
+    color: #a0a0a0;
+    text-align: center;
+    margin: 0;
+    line-height: 1.5;
+
+    strong {
+      color: #f4c430;
+      font-weight: 700;
+    }
+  }
+
+  &__empty {
+    font-size: 0.85rem;
+    color: #888;
+    margin: 0;
+    text-align: center;
+
+    strong { color: #f4c430; }
+  }
+}
+
+// ─── Active Classes Editor Modal ───
+
+.active-classes-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: slot-picker-fade 0.18s ease;
+
+  @keyframes slot-picker-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+.active-classes {
+  width: 100%;
+  max-width: 600px;
+  max-height: 85vh;
+  background: #1e1e1e;
+  border: 1px solid rgba(244, 196, 48, 0.35);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: #181818;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px 14px 0 0;
+
+    h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #f4c430;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+  }
+
+  &__close {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #888;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover { background: rgba(255, 255, 255, 0.06); color: #e0e0e0; }
+  }
+
+  &__body {
+    padding: 14px 16px;
+    overflow-y: auto;
+  }
+
+  &__family {
+    margin-bottom: 14px;
+
+    &:last-child { margin-bottom: 0; }
+  }
+
+  &__family-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+  }
+
+  &__items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #2a2a2a;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    input { display: none; }
+
+    &:hover { background: #333; }
+
+    &.is-selected {
+      background: rgba(244, 196, 48, 0.1);
+      border-color: rgba(244, 196, 48, 0.5);
+      box-shadow: 0 0 10px rgba(244, 196, 48, 0.15);
+    }
+  }
+
+  &__icon {
+    width: 30px;
+    height: 32px;
+    flex-shrink: 0;
+
+    .class-sprite {
+      transform: scale(0.7);
+      transform-origin: top left;
+    }
+  }
+
+  &__name {
+    font-size: 0.8rem;
+    color: #d8d8d8;
+    font-weight: 500;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+    .btn {
+      padding: 7px 18px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: #ccc;
+
+      &:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+    }
+
+    .btn-primary {
+      background: rgba(244, 196, 48, 0.15);
+      border-color: rgba(244, 196, 48, 0.5);
+      color: #f4c430;
+
+      &:hover { background: rgba(244, 196, 48, 0.25); }
+    }
+  }
+}
+
+// ─── Embedded Guild Roster (reuses Roster view from Players page) ───
+
+.recruiting-roster-host {
+  max-width: 1400px;
+  margin: 30px auto 0;
+  padding: 24px 20px 10px;
+
+  .roster-missing { display: none; }
+
+  &__title {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #f4c430;
+    margin: 0 0 18px;
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+}
+
+// ─── Available Characters Pool (admin) ───
 
 .recruit-pool {
-  max-width: 950px;
-  margin: 20px auto 0;
+  max-width: 1400px;
+  margin: 30px auto 0;
   padding: 0 20px;
 
   &__title {
@@ -388,6 +692,8 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
     transition: all 0.2s ease;
 
     &:hover {
@@ -395,8 +701,16 @@
       border-color: rgba(255, 255, 255, 0.25);
     }
 
-    &.dragging {
-      opacity: 0.3;
+    &.dragging { opacity: 0.3; }
+
+    &--ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 3000;
+      opacity: 0.95;
+      border-color: #f4c430 !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      transform: scale(1.05);
     }
   }
 
@@ -439,283 +753,454 @@
   }
 }
 
-// ─── Summary ───
+// ─── Chip Rich Tooltip ───
 
-.recruiting-summary {
-  max-width: 600px;
-  margin: 20px auto 0;
-  text-align: center;
-  padding: 30px;
-  background: rgba(244, 196, 48, 0.04);
-  border: 1px solid rgba(244, 196, 48, 0.12);
-  border-radius: 16px;
-
-  h3 {
-    margin: 0 0 16px;
-    font-size: 1.2rem;
-    color: #f4c430;
-  }
-
-  &__slots {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 16px;
-    text-align: left;
-  }
-
-  &__note {
-    font-size: 0.85rem;
-    color: #888;
-    margin: 0;
-    text-align: center;
-    strong { color: #f4c430; }
-  }
-
-  &--full {
-    background: rgba(40, 167, 69, 0.05);
-    border-color: rgba(40, 167, 69, 0.15);
-    h3 { color: #28a745; }
+.slot-chip {
+  &:hover .chip-tip,
+  &.tooltip-visible .chip-tip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
   }
 }
 
-// ─── Slot-based recruiting rows ───
+.chip-tip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  z-index: 1000;
 
-.recruit-slot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  min-width: 220px;
+  padding: 12px 14px;
+  background: #1e1e1e;
+  border: 1px solid rgba(244, 196, 48, 0.28);
+  border-radius: 10px;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
 
-  &__count {
-    flex-shrink: 0;
-    width: 22px;
-    font-size: 0.75rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+
+  // Caret arrow pointing to the chip
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+  }
+
+  &::before {
+    top: 100%;
+    border-top-color: rgba(244, 196, 48, 0.28);
+  }
+
+  &::after {
+    top: calc(100% - 1px);
+    border-top-color: #1e1e1e;
+    border-width: 6px;
+  }
+
+  &__section {
+    & + & {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  &__heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(244, 196, 48, 0.95);
+    font-size: 0.68rem;
     font-weight: 700;
-    color: #f4c430;
-    text-align: right;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+
+    svg {
+      width: 12px;
+      height: 12px;
+      opacity: 0.85;
+    }
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-size: 0.78rem;
+    line-height: 1.4;
   }
 
   &__label {
-    flex-shrink: 0;
-    width: 100px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #f4c430;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: #888;
+    font-weight: 500;
   }
 
-  &__classes {
+  &__val {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+
+    &--legend { color: #d62d49; }
+    &--unique { color: #8f5ce0; }
+    &--epic   { color: #ff9800; }
+    &--rare   { color: #3b82f6; }
+    &--low    { color: #888; }
+  }
+
+  &__dash {
+    color: #4a4a5a;
+    font-weight: 400;
+  }
+
+  &__fd {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(244, 196, 48, 0.18);
   }
 
-  &__class {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+  &__fd-label {
+    color: rgba(244, 196, 48, 0.9);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
   }
 
-  &__icon {
-    flex-shrink: 0;
-
-    .class-sprite {
-      transform: scale(0.45);
-      transform-origin: top left;
-      width: 44px;
-      height: 46px;
-      margin-right: -24px;
-      margin-bottom: -25px;
-    }
-  }
-
-  &__classname {
-    font-size: 0.82rem;
-    color: #d0d0d8;
-    white-space: nowrap;
-  }
-
-  &__or {
-    font-size: 0.72rem;
-    color: #666;
-    font-style: italic;
-    padding: 0 2px;
-  }
-
-  // DPS row — marquee fills remaining space
-  &--dps {
-    .recruit-marquee {
-      margin-top: 0;
-    }
+  &__fd-val {
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(244, 196, 48, 0.3);
   }
 }
 
-// ─── DPS class marquee ───
+// On mobile, flip tooltip below if chip is near the top of the viewport.
+// Simpler: keep above but constrain max-width so it doesn't overflow.
+@media (max-width: 600px) {
+  .chip-tip {
+    min-width: 180px;
+    padding: 10px 12px;
+  }
+}
 
-.recruit-marquee {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+// ─── Slot Picker (sticky bottom dock — drag from picker into party slots) ───
 
-  &__track {
+body.slot-picker-open {
+  padding-bottom: 50vh;
+}
+
+@keyframes slot-picker-slide {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.slot-picker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 560px;
+  max-height: 50vh;
+  background: #1e1e1e;
+  border-top: 1px solid rgba(244, 196, 48, 0.5);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  z-index: 2000;
+  animation: slot-picker-slide 0.22s ease;
+
+  &__header {
     display: flex;
-    gap: 20px;
-    width: max-content;
-    animation: recruit-scroll 25s linear infinite;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: #181818;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px 14px 0 0;
+    flex-shrink: 0;
   }
 
-  &__item {
-    display: inline-flex;
+  &__title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b0b0b0;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
+  &__close {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #888;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
+    justify-content: center;
+    transition: all 0.15s ease;
+
+    &:hover, &:active {
+      background: rgba(255, 255, 255, 0.06);
+      color: #e0e0e0;
+    }
+  }
+
+  &__body {
+    overflow-y: auto;
+    padding: 12px 14px 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  &__section {
+    & + & {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  &__section-title {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 8px;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  &__empty {
+    padding: 18px 8px;
+    text-align: center;
+    color: #888;
+    font-size: 0.85rem;
+  }
+
+}
+
+.slot-picker-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  min-width: 0;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  color: inherit;
+  cursor: grab;
+  text-align: left;
+  font-family: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover, &:active {
+    background: #333;
+    border-color: rgba(244, 196, 48, 0.3);
+  }
+
+  &.dragging {
+    opacity: 0.4;
+  }
+
+  &--ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 3000;
+    opacity: 0.95;
+    border-color: #f4c430 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    transform: scale(1.05);
+  }
+
+  &--remove {
+    cursor: pointer;
+    touch-action: auto;
+    border-color: rgba(231, 76, 60, 0.3);
+    background: rgba(231, 76, 60, 0.06);
+
+    &:hover, &:active {
+      background: rgba(231, 76, 60, 0.15);
+      border-color: rgba(231, 76, 60, 0.5);
+    }
+
+    &::after {
+      content: 'Remove';
+      margin-left: auto;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #e74c3c;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
   }
 
   &__icon {
+    width: 40px;
+    height: 42px;
     flex-shrink: 0;
+    display: block;
 
     .class-sprite {
-      transform: scale(0.45);
+      transform: scale(0.85);
       transform-origin: top left;
-      width: 44px;
-      height: 46px;
-      margin-right: -24px;
-      margin-bottom: -25px;
     }
+  }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
   }
 
   &__name {
-    font-size: 0.78rem;
-    color: #999;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #d8d8d8;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__class {
+    font-size: 0.72rem;
+    color: #888;
+  }
+
+  &__gs {
+    font-size: 0.85rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    margin-left: 6px;
   }
 }
 
-@keyframes recruit-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-// ─── Mobile tooltip tap-to-show ───
-
-.recruiting-page .tooltip-visible {
-  &::before,
-  &::after {
-    opacity: 1 !important;
-    visibility: visible !important;
-    transform: translateX(-50%) translateY(0) !important;
-  }
-
-  .recruit-tip {
-    display: flex !important;
-    flex-direction: column;
-    gap: 6px;
-    position: absolute;
-    bottom: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(20, 20, 30, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 10px;
-    padding: 10px 14px;
-    z-index: 100;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
-    white-space: nowrap;
-    pointer-events: none;
-  }
-}
-
-// ─── Mobile Carousel ───
-
-.recruit-web__mobile-carousel {
-  touch-action: pan-y;
-}
-
-.recruit-web__party-label {
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--party-color);
-  margin: 4px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  .party-tag__delete {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.3);
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 0 2px;
-    line-height: 1;
-    transition: color 0.2s ease;
-
-    &:hover {
-      color: #e74c3c;
-    }
-  }
-}
-
-.recruit-web__dots {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 6px 0 12px;
-}
-
-.recruit-web__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--dot-color);
-  opacity: 0.25;
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-
-  &--active {
-    opacity: 1;
-    transform: scale(1.4);
-    box-shadow: 0 0 8px var(--dot-color);
-  }
-}
 
 // ─── Responsive ───
+
+@media (max-width: 768px) {
+  .party-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
+  }
+}
 
 @media (max-width: 600px) {
   .recruiting-hero {
     padding: 36px 16px 16px;
     &__title { font-size: 2rem; }
     &__subtitle { font-size: 0.9rem; letter-spacing: 2px; }
+    &__desc { font-size: 0.9rem; }
   }
 
-  .recruit-web {
-    padding: 6px 10px;
+  .recruiting-stats {
+    padding: 18px 16px 8px;
+    &__big { font-size: 1.8rem; }
+    &__text { font-size: 0.85rem; }
   }
 
-  .web-node {
-    &__name { font-size: 0.6rem; max-width: 65px; }
-    &__class { font-size: 0.5rem; }
-    &__gs { font-size: 0.55rem; }
-    &__question { font-size: 1.3rem; }
-    &__label { font-size: 0.5rem; }
-    &__recruiting { font-size: 0.5rem; }
+  .party-card {
+    padding: 12px;
+
+    &__slots {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+  }
+
+  .slot-chip {
+    padding: 8px 4px 6px;
+    min-height: 86px;
+
+    &__class { font-size: 0.62rem; }
+    &__label { font-size: 0.62rem; }
+    &__sub { font-size: 0.55rem; }
+    &__name { font-size: 0.56rem; }
+    &__gs { font-size: 0.65rem; }
+
+    &__icon, &__icon-placeholder {
+      width: 38px;
+      height: 40px;
+    }
+  }
+
+  .hunting {
+    padding: 24px 14px 8px;
+
+    &__title { font-size: 1.2rem; }
+    &__grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .recruiting-admin-toolbar {
-    padding: 12px 16px;
+    padding: 12px 16px 0;
 
     .btn {
       padding: 6px 14px;
       font-size: 0.8rem;
+    }
+  }
+
+  .recruit-pool__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .recruit-pool__card {
+    padding: 5px 8px;
+    gap: 6px;
+
+    .recruit-pool__name { font-size: 0.75rem; }
+    .recruit-pool__class { font-size: 0.65rem; }
+    .recruit-pool__gs { font-size: 0.75rem; }
+
+    .recruit-pool__icon {
+      width: 30px;
+      height: 32px;
+
+      .class-sprite { transform: scale(0.7); }
     }
   }
 }

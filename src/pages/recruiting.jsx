@@ -1,50 +1,7 @@
 import { dataService } from '../data.js';
-import { calculateGearscore, getGearscoreTier, getClassSpriteStyle } from '../constants.js';
+import { calculateGearscore, getGearscoreTier, getClassSpriteStyle, EQUIPMENT_ICONS, CLASS_FAMILIES, CLASSES } from '../constants.js';
 import { toast } from '../toast.js';
-
-function getClassRole(role) {
-  if (role === 'Guardian') return 'tank';
-  if (role === 'Saint') return 'healer';
-  return 'dps';
-}
-
-// DPS slot definitions — each party has 6 DPS slots
-const DPS_SLOTS = [
-  { key: 'swordmaster', label: 'Swordmaster',  classes: ['Gladiator', 'Moon Lord'] },
-  { key: 'force_user',  label: 'Force User',   classes: ['Majesty', 'Smasher'] },
-  { key: 'ice',         label: 'Elestra',       classes: ['Elestra'] },
-  { key: 'mercenary',   label: 'Mercenary',     classes: ['Destroyer', 'Barbarian'] },
-  { key: 'acrobat',     label: 'Acrobat',       classes: ['Tempest', 'Wind Walker'] },
-  { key: 'dps',         label: 'DPS',           classes: ['Sniper', 'Artillery', 'Shooting Star', 'Gear Master', 'Dark Summoner', 'Soul Eater', 'Blade Dancer', 'Spirit Dancer', 'Crusader', 'Inquisitor', 'Physician', 'Adept', 'Saleana'] },
-];
-
-// Saleana/Adept/Elestra special pairing logic:
-// If Saleana is in DPS slot → ice slot must be Adept
-// If Adept is in ice slot but no Saleana → Elestra is preferred for ice
-function getIceSlotLabel(party, playerMap) {
-  const dps = party.dps || [];
-  const dpsSlotPlayer = dps[5] ? playerMap[dps[5]] : null;
-  const iceSlotPlayer = dps[2] ? playerMap[dps[2]] : null;
-
-  if (dpsSlotPlayer?.role === 'Saleana') return 'Adept';
-  if (iceSlotPlayer?.role === 'Adept') return 'Saleana';
-  if (iceSlotPlayer?.role === 'Saleana') return 'Adept';
-  return 'Elestra';
-}
-
-function getDpsSlotLabel(dpsIndex, party, playerMap) {
-  if (dpsIndex === 2 && party && playerMap) {
-    return getIceSlotLabel(party, playerMap);
-  }
-  if (dpsIndex === 5 && party && playerMap) {
-    // If Adept is in ice slot, show "Saleana" hint for DPS slot
-    const icePlayer = (party.dps || [])[2] ? playerMap[(party.dps || [])[2]] : null;
-    if (icePlayer?.role === 'Adept') return 'Saleana';
-  }
-  return DPS_SLOTS[dpsIndex]?.label || 'DPS';
-}
-
-
+import { PlayersPage } from './players.jsx';
 
 // Party accent colors
 const PARTY_COLORS = [
@@ -56,274 +13,79 @@ const PARTY_COLORS = [
   { main: '#22d3ee', glow: 'rgba(34, 211, 238, 0.35)' },
 ];
 
-// Layout: parties in constellation
-function calculateLayout(parties, rawParties, playerMap) {
-  const nodes = [];
-  const edges = [];
-  const rawNodes = [];
+const RARITY_CLASSES = new Set(['legend', 'unique', 'epic', 'rare']);
 
-  const numParties = parties.length;
-  const corePairGap = numParties <= 2 ? 70 : 60;
-  const coreOrbitRadius = numParties <= 1 ? 0 : 100 + numParties * 35;
-  const dpsRadius = numParties <= 2 ? 180 : 160 + numParties * 10;
-
-  // Central hub node at origin (only for multi-party)
-  let hubNode = null;
-  if (numParties > 1) {
-    hubNode = { x: 0, y: 0, partyIndex: -1, player: null, slotType: 'hub', slotKey: 'hub', slotLabel: 'AFTL' };
-    rawNodes.push(hubNode);
-  }
-
-  parties.forEach((party, pi) => {
-    const partyAngle = numParties <= 1
-      ? -Math.PI / 2
-      : (2 * Math.PI * pi / numParties) - Math.PI / 2;
-
-    const coreCx = Math.cos(partyAngle) * coreOrbitRadius;
-    const coreCy = Math.sin(partyAngle) * coreOrbitRadius;
-
-    const perpAngle = partyAngle + Math.PI / 2;
-    const tankX = coreCx + Math.cos(perpAngle) * corePairGap;
-    const tankY = coreCy + Math.sin(perpAngle) * corePairGap;
-    const healerX = coreCx - Math.cos(perpAngle) * corePairGap;
-    const healerY = coreCy - Math.sin(perpAngle) * corePairGap;
-
-    rawNodes.push({ x: tankX, y: tankY, partyIndex: pi, player: party.tankPlayer, slotType: 'tank', slotKey: `${pi}-tank-0`, slotLabel: 'Guardian' });
-    rawNodes.push({ x: healerX, y: healerY, partyIndex: pi, player: party.healerPlayer, slotType: 'healer', slotKey: `${pi}-healer-0`, slotLabel: 'Saint' });
-
-    const dpsCount = 6;
-    const fanArc = numParties <= 1 ? Math.PI * 1.5 : Math.PI * Math.min(1.1, 0.7 + numParties * 0.1);
-    const halfFan = fanArc / 2;
-
-    for (let d = 0; d < dpsCount; d++) {
-      const t = dpsCount === 1 ? 0.5 : d / (dpsCount - 1);
-      const angle = partyAngle - halfFan + fanArc * t;
-      const stagger = (d % 2 === 0) ? 0 : 30;
-      const r = dpsRadius + stagger;
-
-      rawNodes.push({
-        x: coreCx + Math.cos(angle) * r,
-        y: coreCy + Math.sin(angle) * r,
-        partyIndex: pi, player: party.dpsPlayers[d] || null, slotType: 'dps', slotKey: `${pi}-dps-${d}`, slotLabel: getDpsSlotLabel(d, rawParties?.[pi], playerMap)
-      });
-    }
-  });
-
-  if (rawNodes.length === 0) return { nodes: [], edges: [], hubCenter: null };
-
-  // Normalize all nodes to fit viewBox
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  rawNodes.forEach(n => {
-    if (n.x < minX) minX = n.x;
-    if (n.x > maxX) maxX = n.x;
-    if (n.y < minY) minY = n.y;
-    if (n.y > maxY) maxY = n.y;
-  });
-
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
-  const pad = 100;
-  const vbSize = 1000;
-  const usable = vbSize - pad * 2;
-  const scale = Math.min(usable / rangeX, usable / rangeY);
-  const offsetX = (vbSize - rangeX * scale) / 2;
-  const offsetY = (vbSize - rangeY * scale) / 2;
-
-  rawNodes.forEach(n => {
-    n.x = (n.x - minX) * scale + offsetX;
-    n.y = (n.y - minY) * scale + offsetY;
-  });
-
-  // Repulsion pass — push overlapping non-hub nodes apart
-  const minDist = 75; // minimum distance between node centers in viewBox units
-  const partyNodes = rawNodes.filter(n => n.slotType !== 'hub');
-  for (let iter = 0; iter < 8; iter++) {
-    let moved = false;
-    for (let i = 0; i < partyNodes.length; i++) {
-      for (let j = i + 1; j < partyNodes.length; j++) {
-        const a = partyNodes[i], b = partyNodes[j];
-        const dx = b.x - a.x, dy = b.y - a.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < minDist && dist > 0) {
-          const push = (minDist - dist) / 2;
-          const nx = dx / dist, ny = dy / dist;
-          a.x -= nx * push; a.y -= ny * push;
-          b.x += nx * push; b.y += ny * push;
-          moved = true;
-        }
-      }
-    }
-    if (!moved) break;
-  }
-
-  rawNodes.forEach(n => nodes.push(n));
-
-  // Hub center coordinates (after normalization) for SVG text
-  const hubCenter = hubNode ? { x: hubNode.x, y: hubNode.y } : null;
-
-  // Offset for party node indexing (skip hub node if present)
-  const hubOffset = hubNode ? 1 : 0;
-
-  // Build edges for party nodes
-  let nodeIdx = hubOffset;
-  parties.forEach((party, pi) => {
-    const tankNode = nodes[nodeIdx];
-    const healerNode = nodes[nodeIdx + 1];
-    edges.push({ x1: tankNode.x, y1: tankNode.y, x2: healerNode.x, y2: healerNode.y, partyIndex: pi });
-
-    // Connect cores to hub
-    if (hubCenter) {
-      edges.push({ x1: hubCenter.x, y1: hubCenter.y, x2: tankNode.x, y2: tankNode.y, partyIndex: -2 });
-      edges.push({ x1: hubCenter.x, y1: hubCenter.y, x2: healerNode.x, y2: healerNode.y, partyIndex: -2 });
-    }
-
-    const dpsStart = nodeIdx + 2;
-    const dpsNodes = nodes.slice(dpsStart, dpsStart + 6);
-
-    dpsNodes.forEach(dn => {
-      const distToTank = Math.hypot(dn.x - tankNode.x, dn.y - tankNode.y);
-      const distToHealer = Math.hypot(dn.x - healerNode.x, dn.y - healerNode.y);
-      const connectTo = distToTank < distToHealer ? tankNode : healerNode;
-      edges.push({ x1: connectTo.x, y1: connectTo.y, x2: dn.x, y2: dn.y, partyIndex: pi });
-    });
-
-    for (let d = 0; d < dpsNodes.length - 1; d++) {
-      edges.push({ x1: dpsNodes[d].x, y1: dpsNodes[d].y, x2: dpsNodes[d + 1].x, y2: dpsNodes[d + 1].y, partyIndex: pi });
-    }
-
-    nodeIdx += 8;
-  });
-
-  // Cross-links between adjacent parties
-  if (numParties > 1) {
-    for (let i = 0; i < numParties; i++) {
-      const next = (i + 1) % numParties;
-      const healerNode = nodes[i * 8 + hubOffset + 1];
-      const tankNode = nodes[next * 8 + hubOffset];
-      edges.push({ x1: healerNode.x, y1: healerNode.y, x2: tankNode.x, y2: tankNode.y, partyIndex: -1 });
-    }
-  }
-
-  return { nodes, edges, hubCenter };
+function fmtEnh(n, rarity) {
+  if (n == null) return `<span class="chip-tip__dash">–</span>`;
+  const cls = RARITY_CLASSES.has(rarity) ? rarity : 'low';
+  return `<span class="chip-tip__val chip-tip__val--${cls}">+${n}</span>`;
 }
 
-function renderWebSVG(edges, hubCenter) {
-  const lines = edges.map(e => {
-    const isHubLink = e.partyIndex === -2;
-    const isCrossLink = e.partyIndex === -1;
-    if (isHubLink) {
-      return `<line class="web-edge web-edge--hub" x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="rgba(244, 196, 48, 0.15)" stroke-opacity="0.4" stroke-width="1" />`;
-    }
-    const color = isCrossLink ? 'rgba(255,255,255,0.08)' : PARTY_COLORS[e.partyIndex % PARTY_COLORS.length].main;
-    const opacity = isCrossLink ? 0.3 : 0.18;
-    const cls = isCrossLink ? 'web-edge web-edge--cross' : 'web-edge web-edge--party';
-    return `<line class="${cls}" data-party="${e.partyIndex}" x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${isCrossLink ? 1 : 1.5}" />`;
-  });
+function renderChipTip(player) {
+  const equip = player.equipment || {};
+  const enhVal = (slot, fallback) => {
+    const e = equip[slot]?.enhancement;
+    if (e != null && e !== '') return Number(e);
+    if (fallback != null && fallback !== '') return Number(fallback);
+    return null;
+  };
+  const rarityFor = (slot, fallback) => {
+    const r = equip[slot]?.rarity;
+    if (r) return r;
+    return fallback || null;
+  };
 
-  // Hub label in center
-  const hubSvg = hubCenter ? `
-    <text x="${hubCenter.x}" y="${hubCenter.y - 20}" text-anchor="middle" dominant-baseline="middle"
-          font-size="18" font-weight="700" fill="rgba(244, 196, 48, 0.45)" letter-spacing="3">Afterlight</text>
-    <text x="${hubCenter.x}" y="${hubCenter.y + 2}" text-anchor="middle" dominant-baseline="middle"
-          font-size="18" font-weight="700" fill="rgba(244, 196, 48, 0.45)" letter-spacing="3">Desert Dragon</text>
-    <text x="${hubCenter.x}" y="${hubCenter.y + 24}" text-anchor="middle" dominant-baseline="middle"
-          font-size="18" font-weight="700" fill="rgba(244, 196, 48, 0.45)" letter-spacing="3">Lineups</text>
-  ` : '';
-
-  return `<svg class="recruit-web__svg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">${lines.join('')}${hubSvg}</svg>`;
-}
-
-function renderNode(node, index, isAdmin) {
-  const { x, y, partyIndex, player, slotType, slotLabel, slotKey } = node;
-  const color = PARTY_COLORS[partyIndex % PARTY_COLORS.length];
-  const isCore = slotType === 'tank' || slotType === 'healer';
-  const sizeClass = isCore ? 'web-node--core' : 'web-node--dps-size';
-  const draggable = isAdmin && player ? 'draggable="true"' : '';
-  const droppable = isAdmin ? 'data-droppable="true"' : '';
-
-  if (!player) {
-    const dropLabel = isAdmin ? 'Drop here' : 'Recruiting';
-    return `<div class="web-node web-node--empty ${sizeClass}" data-party="${partyIndex}" data-index="${index}" data-slot-key="${slotKey}" ${droppable}
-              style="--nx: ${x}; --ny: ${y}; --party-color: ${color.main}; --party-glow: ${color.glow}">
-      <div class="web-node__bubble web-node__bubble--empty">
-        <span class="web-node__question">?</span>
-      </div>
-      <div class="web-node__info">
-        <span class="web-node__label">${slotLabel}</span>
-        <span class="web-node__recruiting">${dropLabel}</span>
-      </div>
-    </div>`;
-  }
-
-  const gs = player._gearscore || 0;
-  const tier = getGearscoreTier(gs);
-  const spriteStyle = getClassSpriteStyle(player.role);
-  const roleType = getClassRole(player.role);
-
-  // Build equipment tooltip
-  const tooltipParts = [];
-  if (player.weaponEnhance) tooltipParts.push(`Weapon: +${player.weaponEnhance}`);
-  if (player.armorEnhance) tooltipParts.push(`Armor: +${player.armorEnhance}`);
+  const mw = enhVal('mainWeapon', player.weaponEnhance);
+  const mwR = rarityFor('mainWeapon', player.weapon);
+  const sw = enhVal('subWeapon', null);
+  const swR = rarityFor('subWeapon', player.weapon);
+  const armor = [
+    ['Helmet', enhVal('helmet', player.armorEnhance), rarityFor('helmet', player.armor)],
+    ['Top',    enhVal('top',    player.armorEnhance), rarityFor('top',    player.armor)],
+    ['Bottom', enhVal('bottom', player.armorEnhance), rarityFor('bottom', player.armor)],
+    ['Gloves', enhVal('gloves', player.armorEnhance), rarityFor('gloves', player.armor)],
+    ['Boots',  enhVal('boots',  player.armorEnhance), rarityFor('boots',  player.armor)],
+  ];
   const fd = player.characterStats?.finalDamage;
-  if (fd) tooltipParts.push(`FD: ${Number(fd).toLocaleString()}`);
-  const tooltipAttr = tooltipParts.length > 0 ? `data-tooltip="${tooltipParts.join('\n')}"` : '';
-  const tooltipClass = tooltipParts.length > 0 ? 'tooltip-wrap' : '';
 
-  return `<div class="web-node web-node--filled web-node--${roleType} ${sizeClass} ${tooltipClass}" ${tooltipAttr} data-party="${partyIndex}" data-index="${index}" data-slot-key="${slotKey}" data-player-name="${player.name}" ${draggable} ${droppable}
-            style="--nx: ${x}; --ny: ${y}; --party-color: ${color.main}; --party-glow: ${color.glow}; --tier-color: ${tier.color}">
-    <div class="web-node__bubble" style="border-color: ${tier.color}">
-      <div class="class-sprite web-node__icon" style="${spriteStyle}"></div>
-    </div>
-    <div class="web-node__info">
-      ${isAdmin ? `<span class="web-node__name">${player.name}</span>` : ''}
-      <span class="web-node__class">${player.role}</span>
-      <span class="web-node__gs" style="color: ${tier.color}">${gs}</span>
-    </div>
-  </div>`;
+  const hasWeapon = mw != null || sw != null;
+  const hasArmor = armor.some(([, v]) => v != null);
+  if (!hasWeapon && !hasArmor && !fd) return '';
+
+  const weaponSection = hasWeapon ? `
+    <div class="chip-tip__section">
+      <div class="chip-tip__heading">${EQUIPMENT_ICONS.weapon}<span>Weapons</span></div>
+      <div class="chip-tip__rows">
+        <div class="chip-tip__row"><span class="chip-tip__label">Main</span>${fmtEnh(mw, mwR)}</div>
+        <div class="chip-tip__row"><span class="chip-tip__label">Sub</span>${fmtEnh(sw, swR)}</div>
+      </div>
+    </div>` : '';
+
+  const armorRows = armor
+    .map(([label, v, r]) => `<div class="chip-tip__row"><span class="chip-tip__label">${label}</span>${fmtEnh(v, r)}</div>`)
+    .join('');
+  const armorSection = hasArmor ? `
+    <div class="chip-tip__section">
+      <div class="chip-tip__heading">${EQUIPMENT_ICONS.armor}<span>Armor</span></div>
+      <div class="chip-tip__rows">${armorRows}</div>
+    </div>` : '';
+
+  const fdSection = fd ? `
+    <div class="chip-tip__fd">
+      <span class="chip-tip__fd-label">Final Damage</span>
+      <span class="chip-tip__fd-val">${Number(fd).toLocaleString()}</span>
+    </div>` : '';
+
+  return `<div class="chip-tip" role="tooltip">${weaponSection}${armorSection}${fdSection}</div>`;
 }
 
-function setupHoverInteraction(container) {
-  const allNodes = container.querySelectorAll('.web-node');
-  const allEdges = container.querySelectorAll('.web-edge--party');
-  const webEl = container.querySelector('.recruit-web');
-  if (!webEl) return;
-
-  function highlightParty(partyIndex) {
-    webEl.classList.add('has-highlight');
-    allNodes.forEach(n => {
-      n.classList.toggle('web-node--highlighted', n.dataset.party === partyIndex);
-      n.classList.toggle('web-node--dimmed', n.dataset.party !== partyIndex);
-    });
-    allEdges.forEach(e => {
-      const isMatch = e.dataset.party === partyIndex;
-      e.style.strokeOpacity = isMatch ? '0.7' : '0.04';
-      e.style.strokeWidth = isMatch ? '2.5' : '1';
-    });
-  }
-
-  function clearHighlight() {
-    webEl.classList.remove('has-highlight');
-    container.querySelectorAll('.web-node').forEach(n => n.classList.remove('web-node--highlighted', 'web-node--dimmed'));
-    allEdges.forEach(e => { e.style.strokeOpacity = ''; e.style.strokeWidth = ''; });
-  }
-
-  allNodes.forEach(node => {
-    node.addEventListener('mouseenter', () => highlightParty(node.dataset.party));
-    node.addEventListener('mouseleave', clearHighlight);
-    node.addEventListener('touchstart', (e) => { e.preventDefault(); highlightParty(node.dataset.party); }, { passive: false });
-  });
-
-  webEl.addEventListener('touchstart', (e) => {
-    if (!e.target.closest('.web-node')) clearHighlight();
-  });
-}
-
-function setupMobileTooltips(container) {
-  const tooltipEls = container.querySelectorAll('[data-tooltip], .recruit-need');
+function setupMobileTooltips(container, { skipFilledChips = false } = {}) {
+  const selector = skipFilledChips ? '[data-tooltip]' : '[data-tooltip], .slot-chip--filled';
+  const tooltipEls = container.querySelectorAll(selector);
   tooltipEls.forEach(el => {
+    const hasTip = el.hasAttribute('data-tooltip') || el.querySelector('.chip-tip');
+    if (!hasTip) return;
     el.addEventListener('touchstart', (e) => {
-      const hasTooltip = el.hasAttribute('data-tooltip') || el.querySelector('.recruit-tip');
-      if (!hasTooltip) return;
       const wasVisible = el.classList.contains('tooltip-visible');
       container.querySelectorAll('.tooltip-visible').forEach(t => t.classList.remove('tooltip-visible'));
       if (!wasVisible) {
@@ -334,50 +96,44 @@ function setupMobileTooltips(container) {
   });
 
   container.addEventListener('touchstart', (e) => {
-    if (!e.target.closest('[data-tooltip]') && !e.target.closest('.recruit-need')) {
+    if (!e.target.closest(selector)) {
       container.querySelectorAll('.tooltip-visible').forEach(t => t.classList.remove('tooltip-visible'));
     }
   });
 }
 
+function isTouchDevice() {
+  return window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(max-width: 768px)').matches;
+}
+
 const CONFIG_KEY = 'recruiting_lineups';
+const ACTIVE_CLASSES_KEY = 'recruiting_active_classes';
 
 export const RecruitingPage = {
   allPlayers: [],
-  parties: [],       // [{tank: 'name'|null, healer: 'name'|null, dps: ['name'|null x6]}]
+  _fullPlayers: [],
+  _userMap: {},
+  parties: [],
+  activeClasses: [],
   isEditMode: false,
   isDirty: false,
   _container: null,
-  _currentPartyIndex: 0,
-  _isMobile: false,
-  _resizeHandler: null,
 
   async render(container) {
     this._container = container;
     const nav = document.querySelector('nav.main-nav');
     if (nav) nav.style.display = 'none';
 
-    // Mobile detection
-    this._isMobile = window.matchMedia('(max-width: 600px)').matches;
-    this._currentPartyIndex = 0;
-    this._resizeHandler = () => {
-      const wasMobile = this._isMobile;
-      this._isMobile = window.matchMedia('(max-width: 600px)').matches;
-      if (wasMobile !== this._isMobile) this.renderConstellation();
-    };
-    window.addEventListener('resize', this._resizeHandler);
-
-    // Check admin status (session may already be loaded from main.js init)
     await dataService.loadSession();
     this.isEditMode = dataService.isAdmin();
 
     container.innerHTML = `
       <div class="recruiting-page">
         <div class="recruiting-hero">
-          <h1 class="recruiting-hero__title">AFTL Guild</h1>
+          <h1 class="recruiting-hero__title">Afterlight Guild</h1>
           <p class="recruiting-hero__subtitle">Raid Recruitment</p>
           <div class="recruiting-hero__divider"></div>
-          <p class="recruiting-hero__desc">We're recruiting geared players for endgame content. Every party is built around a <strong>Guardian</strong> and a <strong>Saint</strong>.</p>
+          <p class="recruiting-hero__desc">We run raids together weekly. Goal is <span class="recruiting-hero__gs tooltip-wrap" data-tooltip="Legend +12 Weapons&#10;Legend +10 Armor&#10;Legend Accessories&#10;~950 FD">65 Gearscore</span> for DDN parties.</p>
         </div>
         ${this.isEditMode ? `
           <div class="recruiting-admin-toolbar">
@@ -386,27 +142,30 @@ export const RecruitingPage = {
           </div>
         ` : ''}
         <div class="recruiting-loading">Loading roster...</div>
-        <div class="recruit-web" id="recruit-web"></div>
-        <div class="recruiting-legend" id="recruiting-legend"></div>
+        <div class="recruiting-content" id="recruiting-content"></div>
       </div>
     `;
 
     try {
-      // Load all players
-      const players = await dataService.getPlayers();
-      this.allPlayers = players.map(p => {
+      const [players, appUsers] = await Promise.all([
+        dataService.getPlayers(),
+        dataService.getAppUsers().catch(() => []),
+      ]);
+      const playersWithGs = players.map(p => {
         p._gearscore = calculateGearscore(p);
         return p;
-      }).filter(p => p._gearscore >= 65);
+      });
+      this._fullPlayers = playersWithGs;
+      this._userMap = {};
+      (appUsers || []).forEach(u => { this._userMap[u.discordId] = u; });
+      this.allPlayers = playersWithGs.filter(p => p._gearscore >= 65);
 
-      // Load saved layout
       let saved = await dataService.getAppConfig(CONFIG_KEY);
       if (typeof saved === 'string') {
         try { saved = JSON.parse(saved); } catch { saved = null; }
       }
       if (saved && Array.isArray(saved) && saved.length > 0) {
-        // Clean up stale names — characters that were deleted from the database
-        const validNames = new Set(players.map(p => p.name));
+        const validNames = new Set(this.allPlayers.map(p => p.name));
         this.parties = saved.map(party => ({
           tank: party.tank && validNames.has(party.tank) ? party.tank : null,
           healer: party.healer && validNames.has(party.healer) ? party.healer : null,
@@ -416,12 +175,17 @@ export const RecruitingPage = {
         this.parties = [];
       }
 
+      let savedActive = await dataService.getAppConfig(ACTIVE_CLASSES_KEY);
+      if (typeof savedActive === 'string') {
+        try { savedActive = JSON.parse(savedActive); } catch { savedActive = null; }
+      }
+      this.activeClasses = Array.isArray(savedActive) ? savedActive.filter(c => CLASSES.includes(c)) : [];
+
       const loadingEl = container.querySelector('.recruiting-loading');
       if (loadingEl) loadingEl.remove();
 
-      this.renderConstellation();
+      this.renderContent();
 
-      // Wire up admin buttons
       if (this.isEditMode) {
         document.getElementById('recruiting-new-party')?.addEventListener('click', () => this.addParty());
         document.getElementById('recruiting-save')?.addEventListener('click', () => this.saveLayout());
@@ -431,18 +195,6 @@ export const RecruitingPage = {
       const loadingEl = container.querySelector('.recruiting-loading');
       if (loadingEl) loadingEl.textContent = 'Failed to load roster data.';
     }
-  },
-
-  // Resolve party data (names) into party objects with player references
-  resolveParties() {
-    const playerMap = {};
-    this.allPlayers.forEach(p => { playerMap[p.name] = p; });
-
-    return this.parties.map(party => ({
-      tankPlayer: party.tank ? (playerMap[party.tank] || null) : null,
-      healerPlayer: party.healer ? (playerMap[party.healer] || null) : null,
-      dpsPlayers: (party.dps || []).map(name => name ? (playerMap[name] || null) : null),
-    }));
   },
 
   getAssignedNames() {
@@ -455,310 +207,160 @@ export const RecruitingPage = {
     return names;
   },
 
-  renderConstellation() {
-    const webContainer = document.getElementById('recruit-web');
-    if (!webContainer) return;
+  renderContent() {
+    const content = document.getElementById('recruiting-content');
+    if (!content) return;
 
-    const resolved = this.resolveParties();
     const playerMap = {};
     this.allPlayers.forEach(p => { playerMap[p.name] = p; });
     const assignedNames = this.getAssignedNames();
     const unassigned = this.allPlayers.filter(p => !assignedNames.has(p.name));
 
-    if (this.parties.length === 0 && !this.isEditMode) {
-      webContainer.innerHTML = `
-        <div class="recruiting-empty">
-          <p>No raid parties configured yet.</p>
-          <p>Check back soon!</p>
-        </div>
-      `;
-      this.renderSummary();
-      return;
-    }
-
-    if (this.parties.length === 0 && this.isEditMode) {
-      webContainer.innerHTML = `
-        <div class="recruiting-empty" style="margin-top: 12px;">
-          <p>No parties yet. Click <strong>+ New Party</strong> to get started.</p>
-        </div>
-        ${this.renderUnassignedPool(unassigned)}
-      `;
-      this.setupPoolDragHandlers();
-      return;
-    }
-
-    // Mobile: one party at a time with swipe
-    if (this._isMobile && this.parties.length > 0) {
-      this.renderMobileCarousel(webContainer, resolved, unassigned, playerMap);
-      return;
-    }
-
-    const { nodes, edges, hubCenter } = calculateLayout(resolved, this.parties, playerMap);
-
-    const svgHtml = renderWebSVG(edges, hubCenter);
-    const partyNodes = nodes.filter(n => n.slotType !== 'hub');
-    const nodesHtml = partyNodes.map((n, i) => renderNode(n, i, this.isEditMode)).join('');
-
-    webContainer.innerHTML = `
-      <div class="recruit-web__canvas">
-        ${svgHtml}
-        <div class="recruit-web__nodes">${nodesHtml}</div>
-      </div>
-      <div class="recruit-web__parties">
-        ${this.parties.map((p, i) => {
-          const filled = (p.tank ? 1 : 0) + (p.healer ? 1 : 0) + (p.dps || []).filter(Boolean).length;
-          const c = PARTY_COLORS[i % PARTY_COLORS.length];
-          const deleteBtn = this.isEditMode ? `<button class="party-tag__delete" data-party-index="${i}" title="Delete party">&times;</button>` : '';
-          return `<span class="party-tag" data-party="${i}" style="--party-color: ${c.main}">
-            Party ${i + 1}: ${filled}/8 ${deleteBtn}
-          </span>`;
-        }).join('')}
-      </div>
+    content.innerHTML = `
+      ${this.renderStatsBar()}
+      ${this.renderPartyGrid(playerMap)}
       ${this.isEditMode ? this.renderUnassignedPool(unassigned) : ''}
+      ${this.renderActivelyRecruiting()}
+      <div class="players-page recruiting-roster-host">
+        <h3 class="recruiting-roster-host__title">Guild Roster</h3>
+        <div id="recruiting-roster-list"></div>
+      </div>
     `;
 
-    setupHoverInteraction(this._container);
-    setupMobileTooltips(this._container);
-    this.renderSummary();
+    const rosterEl = document.getElementById('recruiting-roster-list');
+    if (rosterEl && this._fullPlayers) {
+      PlayersPage._gsFilter = 65;
+      PlayersPage.renderRosterView(rosterEl, this._fullPlayers, this._userMap);
+    }
+
+    const touch = isTouchDevice();
+    setupMobileTooltips(this._container, { skipFilledChips: this.isEditMode && touch });
 
     if (this.isEditMode) {
       this.setupDragAndDrop();
       this.setupPoolDragHandlers();
-      // Delete party buttons
-      webContainer.querySelectorAll('.party-tag__delete').forEach(btn => {
+      if (touch) this.setupPickerTaps();
+      content.querySelectorAll('.party-card__delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.deleteParty(parseInt(btn.dataset.partyIndex));
         });
       });
+      const editBtn = content.querySelector('.actively-recruiting__edit');
+      if (editBtn) editBtn.addEventListener('click', () => this.openActiveClassesEditor());
     }
   },
 
-  renderMobileCarousel(webContainer, resolved, unassigned, playerMap) {
-    // Clamp index
-    if (this._currentPartyIndex >= this.parties.length) {
-      this._currentPartyIndex = Math.max(0, this.parties.length - 1);
-    }
-
-    const pi = this._currentPartyIndex;
-    const singleResolved = [resolved[pi]];
-    const { nodes, edges, hubCenter } = calculateLayout(singleResolved, [this.parties[pi]], playerMap);
-
-    // Remap nodes/edges to use real party index (not 0)
-    nodes.forEach(n => {
-      n.slotKey = n.slotKey.replace(/^0-/, `${pi}-`);
-      n.partyIndex = pi;
-    });
-    edges.forEach(e => {
-      if (e.partyIndex === 0) e.partyIndex = pi;
-    });
-
-    const svgHtml = renderWebSVG(edges, hubCenter);
-    const nodesHtml = nodes.map((n, i) => renderNode(n, i, this.isEditMode)).join('');
-
-    const party = this.parties[pi];
-    const filled = (party.tank ? 1 : 0) + (party.healer ? 1 : 0) + (party.dps || []).filter(Boolean).length;
-    const color = PARTY_COLORS[pi % PARTY_COLORS.length];
-    const deleteBtn = this.isEditMode ? `<button class="party-tag__delete" data-party-index="${pi}" title="Delete party">&times;</button>` : '';
-
-    // Dot indicators
-    const dots = this.parties.map((_, i) => {
-      const c = PARTY_COLORS[i % PARTY_COLORS.length];
-      const active = i === pi ? 'recruit-web__dot--active' : '';
-      return `<span class="recruit-web__dot ${active}" data-index="${i}" style="--dot-color: ${c.main}"></span>`;
-    }).join('');
-
-    webContainer.innerHTML = `
-      <div class="recruit-web__mobile-carousel">
-        <div class="recruit-web__canvas">
-          ${svgHtml}
-          <div class="recruit-web__nodes">${nodesHtml}</div>
-        </div>
-        <div class="recruit-web__party-label" style="--party-color: ${color.main}">
-          Party ${pi + 1}: ${filled}/8 ${deleteBtn}
-        </div>
-        ${this.parties.length > 1 ? `<div class="recruit-web__dots">${dots}</div>` : ''}
-      </div>
-      ${this.isEditMode ? this.renderUnassignedPool(unassigned) : ''}
-    `;
-
-    setupHoverInteraction(this._container);
-    setupMobileTooltips(this._container);
-    this.renderSummary();
-
-    // Swipe handling
-    this.setupMobileSwipe();
-
-    // Dot clicks
-    webContainer.querySelectorAll('.recruit-web__dot').forEach(dot => {
-      dot.addEventListener('click', () => {
-        this._currentPartyIndex = parseInt(dot.dataset.index);
-        this.renderConstellation();
-      });
-    });
-
-    // Delete party button
-    webContainer.querySelectorAll('.party-tag__delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.deleteParty(parseInt(btn.dataset.partyIndex));
-      });
-    });
-
-    if (this.isEditMode) {
-      this.setupDragAndDrop();
-      this.setupPoolDragHandlers();
-    }
-  },
-
-  setupMobileSwipe() {
-    const carousel = this._container.querySelector('.recruit-web__mobile-carousel');
-    if (!carousel) return;
-
-    let touchStartX = 0;
-    carousel.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    carousel.addEventListener('touchend', (e) => {
-      const diff = touchStartX - e.changedTouches[0].screenX;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0) {
-          this._currentPartyIndex = (this._currentPartyIndex + 1) % this.parties.length;
-        } else {
-          this._currentPartyIndex = (this._currentPartyIndex - 1 + this.parties.length) % this.parties.length;
-        }
-        this.renderConstellation();
-      }
-    }, { passive: true });
-  },
-
-  renderSummary() {
-    const legendContainer = document.getElementById('recruiting-legend');
-    if (!legendContainer) return;
-
-    if (this.parties.length === 0) {
-      legendContainer.innerHTML = '';
-      return;
-    }
-
-    // Build player map for label resolution
-    const playerMap = {};
-    this.allPlayers.forEach(p => { playerMap[p.name] = p; });
-
-    // Collect open slots, deduplicated by label with count
-    const slotMap = new Map(); // label -> { key, label, classes, count }
-
+  calculateStats() {
+    let openSlots = 0;
     this.parties.forEach(p => {
-      if (!p.tank) {
-        const existing = slotMap.get('Tank');
-        if (existing) { existing.count++; } else { slotMap.set('Tank', { key: 'tank', label: 'Tank', classes: ['Guardian'], count: 1 }); }
-      }
-      if (!p.healer) {
-        const existing = slotMap.get('Healer');
-        if (existing) { existing.count++; } else { slotMap.set('Healer', { key: 'healer', label: 'Healer', classes: ['Saint'], count: 1 }); }
-      }
-      const dps = p.dps || [];
-      for (let d = 0; d < 6; d++) {
-        if (!dps[d]) {
-          const slot = DPS_SLOTS[d];
-          if (!slot) continue;
-          const label = getDpsSlotLabel(d, p, playerMap);
-          const existing = slotMap.get(label);
-          if (existing) {
-            existing.count++;
-          } else {
-            let displayClasses;
-            if (slot.key === 'ice') {
-              // Ice slot: only show the specific class the pairing logic resolved
-              displayClasses = [label];
-            } else if (slot.key === 'dps') {
-              // DPS slot: handled by marquee, classes don't matter for display
-              displayClasses = [...slot.classes];
-            } else {
-              displayClasses = [...slot.classes];
-            }
-            slotMap.set(label, {
-              key: slot.key,
-              label,
-              classes: displayClasses,
-              count: 1,
-            });
-          }
-        }
-      }
+      if (!p.tank) openSlots++;
+      if (!p.healer) openSlots++;
+      for (let d = 0; d < 6; d++) if (!(p.dps && p.dps[d])) openSlots++;
     });
+    return { openSlots, partyCount: this.parties.length };
+  },
 
-    const openSlots = [...slotMap.values()];
+  renderStatsBar() {
+    if (this.parties.length === 0 && !this.isEditMode) {
+      return `<div class="recruiting-empty">
+        <p>No raid parties configured yet.</p>
+        <p>Check back soon!</p>
+      </div>`;
+    }
+    if (this.parties.length === 0 && this.isEditMode) {
+      return `<div class="recruiting-empty">
+        <p>No parties yet. Click <strong>+ New Party</strong> to get started.</p>
+      </div>`;
+    }
+    const stats = this.calculateStats();
+    const partyLabel = stats.partyCount === 1 ? 'DDN ready party' : 'DDN ready parties';
+    const slotLabel = stats.openSlots === 1 ? 'slot' : 'slots';
+    if (stats.openSlots === 0) {
+      return `<div class="recruiting-stats recruiting-stats--full">
+        <span class="recruiting-stats__text">All ${stats.partyCount} ${partyLabel} are full — but we'll always make room for a great fit.</span>
+      </div>`;
+    }
+    return `<div class="recruiting-stats">
+      <span class="recruiting-stats__big">${stats.openSlots}</span>
+      <span class="recruiting-stats__text">open ${slotLabel} across ${stats.partyCount} ${partyLabel}</span>
+    </div>`;
+  },
 
-    if (openSlots.length === 0) {
-      legendContainer.innerHTML = `
-        <div class="recruiting-summary recruiting-summary--full">
-          <h3>All Parties Full</h3>
-          <p class="recruiting-summary__note">Guardians and Saints are always welcome — we'll build a new team around you.</p>
-        </div>
-      `;
-      return;
+  renderPartyGrid(playerMap) {
+    if (this.parties.length === 0) return '';
+    const cards = this.parties.map((party, i) => this.renderPartyCard(party, i, playerMap)).join('');
+    return `<div class="party-grid">${cards}</div>`;
+  },
+
+  renderPartyCard(party, partyIndex, playerMap) {
+    const color = PARTY_COLORS[partyIndex % PARTY_COLORS.length];
+    const filled = (party.tank ? 1 : 0) + (party.healer ? 1 : 0) + (party.dps || []).filter(Boolean).length;
+    const deleteBtn = this.isEditMode
+      ? `<button class="party-card__delete" data-party-index="${partyIndex}" title="Delete party">×</button>`
+      : '';
+
+    const tankChip = this.renderSlotChip(party.tank, partyIndex, 'tank', 0, 'Guardian', playerMap);
+    const healerChip = this.renderSlotChip(party.healer, partyIndex, 'healer', 0, 'Saint', playerMap);
+    const dpsChips = [];
+    for (let d = 0; d < 6; d++) {
+      const name = (party.dps || [])[d] || null;
+      dpsChips.push(this.renderSlotChip(name, partyIndex, 'dps', d, 'DPS', playerMap));
     }
 
-    // Build marquee content for DPS slots
-    const dpsClasses = DPS_SLOTS.find(s => s.key === 'dps')?.classes || [];
-    const marqueeItems = dpsClasses.map(cls => {
-      const spriteStyle = getClassSpriteStyle(cls);
-      return `<span class="recruit-marquee__item">
-        <span class="recruit-marquee__icon"><span class="class-sprite" style="${spriteStyle}"></span></span>
-        <span class="recruit-marquee__name">${cls}</span>
-      </span>`;
-    }).join('');
-
-    // Build one row per slot type (deduplicated, with count)
-    const rows = openSlots.map(({ label, classes, key, count }) => {
-      const countBadge = `<span class="recruit-slot__count">${count > 1 ? count + 'x' : ''}</span>`;
-
-      // DPS slot — inline marquee instead of class list
-      if (key === 'dps') {
-        return `<div class="recruit-slot recruit-slot--dps">
-          ${countBadge}
-          <span class="recruit-slot__label">${label}</span>
-          <div class="recruit-marquee">
-            <div class="recruit-marquee__track">
-              ${marqueeItems}${marqueeItems}
-            </div>
-          </div>
-        </div>`;
-      }
-
-      const classChips = classes.map(cls => {
-        const spriteStyle = getClassSpriteStyle(cls);
-        return `<span class="recruit-slot__class">
-          <span class="recruit-slot__icon"><span class="class-sprite" style="${spriteStyle}"></span></span>
-          <span class="recruit-slot__classname">${cls}</span>
-        </span>`;
-      });
-
-      // Join with "or" separators
-      const classesHtml = classChips.reduce((acc, chip, i) => {
-        if (i === 0) return chip;
-        return acc + '<span class="recruit-slot__or">or</span>' + chip;
-      }, '');
-
-      return `<div class="recruit-slot">
-        ${countBadge}
-        <span class="recruit-slot__label">${label}</span>
-        <div class="recruit-slot__classes">${classesHtml}</div>
-      </div>`;
-    });
-
-    legendContainer.innerHTML = `
-      <div class="recruiting-summary">
-        <h3>Recruiting</h3>
-        <div class="recruiting-summary__slots">${rows.join('')}</div>
+    return `<div class="party-card" style="--party-color: ${color.main}; --party-glow: ${color.glow}">
+      <div class="party-card__header">
+        <span class="party-card__name">Party ${partyIndex + 1}</span>
+        <span class="party-card__count ${filled === 8 ? 'party-card__count--full' : ''}">${filled}/8</span>
+        ${deleteBtn}
       </div>
-    `;
+      <div class="party-card__slots">
+        ${tankChip}
+        ${healerChip}
+        ${dpsChips.join('')}
+      </div>
+    </div>`;
+  },
+
+  renderSlotChip(playerName, partyIndex, slotType, slotIdx, slotLabel, playerMap) {
+    const slotKey = `${partyIndex}-${slotType}-${slotIdx}`;
+    const droppable = this.isEditMode ? 'data-droppable="true"' : '';
+    const slotTypeClass = `slot-chip--${slotType}`;
+
+    const player = playerName ? playerMap[playerName] : null;
+
+    if (!player) {
+      const placeholder = this.isEditMode ? '+' : '?';
+      return `<div class="slot-chip slot-chip--empty ${slotTypeClass}" data-party="${partyIndex}" data-slot-key="${slotKey}" ${droppable}>
+        <div class="slot-chip__icon-placeholder">${placeholder}</div>
+        <div class="slot-chip__label">${slotLabel}</div>
+        <div class="slot-chip__sub">Open</div>
+      </div>`;
+    }
+
+    const gs = player._gearscore || 0;
+    const tier = getGearscoreTier(gs);
+    const spriteStyle = getClassSpriteStyle(player.role);
+    const draggable = this.isEditMode ? 'draggable="true"' : '';
+
+    const tipHtml = renderChipTip(player);
+
+    return `<div class="slot-chip slot-chip--filled ${slotTypeClass}" data-party="${partyIndex}" data-slot-key="${slotKey}" data-player-name="${player.name}" ${draggable} ${droppable}
+              style="--tier-color: ${tier.color}">
+      <div class="slot-chip__icon">
+        <span class="class-sprite" style="${spriteStyle}"></span>
+      </div>
+      <div class="slot-chip__class">${player.role}</div>
+      ${this.isEditMode ? `<div class="slot-chip__name">${player.name}</div>` : ''}
+      <div class="slot-chip__gs" style="color: ${tier.color}">${gs}</div>
+      ${tipHtml}
+    </div>`;
   },
 
   renderUnassignedPool(unassigned) {
-    if (unassigned.length === 0) return '<div class="recruit-pool"><p class="recruit-pool__empty">All characters assigned!</p></div>';
+    if (unassigned.length === 0) {
+      return '<div class="recruit-pool"><p class="recruit-pool__empty">All characters assigned!</p></div>';
+    }
 
     const cards = unassigned.map(player => {
       const gs = player._gearscore || 0;
@@ -766,7 +368,7 @@ export const RecruitingPage = {
       const spriteStyle = getClassSpriteStyle(player.role);
       return `<div class="recruit-pool__card" draggable="true" data-player-name="${player.name}" title="${player.name} — ${player.role} (${gs})">
         <div class="recruit-pool__icon">
-          <div class="class-sprite" style="${spriteStyle}"></div>
+          <span class="class-sprite" style="${spriteStyle}"></span>
         </div>
         <div class="recruit-pool__details">
           <span class="recruit-pool__name">${player.name}</span>
@@ -785,37 +387,33 @@ export const RecruitingPage = {
   setupPoolDragHandlers() {
     const cards = this._container.querySelectorAll('.recruit-pool__card');
     cards.forEach(card => {
+      const playerName = card.dataset.playerName;
       card.addEventListener('dragstart', (e) => {
-        const playerName = card.dataset.playerName;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', playerName);
         e.dataTransfer.setData('sourceSlotKey', `pool-${playerName}`);
         card.classList.add('dragging');
       });
-
-      card.addEventListener('dragend', () => {
-        card.classList.remove('dragging');
-      });
-
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      this.attachTouchDrag(card, { playerName, sourceSlotKey: `pool-${playerName}`, ghostClass: 'recruit-pool__card--ghost' });
     });
   },
 
   addParty() {
     this.parties.push({ tank: null, healer: null, dps: [null, null, null, null, null, null] });
     this.isDirty = true;
-    this.renderConstellation();
+    this.renderContent();
   },
 
   deleteParty(partyIndex) {
     if (partyIndex < 0 || partyIndex >= this.parties.length) return;
     this.parties.splice(partyIndex, 1);
     this.isDirty = true;
-    this.renderConstellation();
+    this.renderContent();
   },
 
   async saveLayout() {
     try {
-      // Clean up null-only dps arrays for saving
       const toSave = this.parties.map(p => ({
         tank: p.tank || null,
         healer: p.healer || null,
@@ -830,7 +428,6 @@ export const RecruitingPage = {
     }
   },
 
-  // Assign a player name to a slot, return the displaced player name (if any)
   assignToSlot(slotKey, playerName) {
     const [partyStr, slotType, slotIdxStr] = slotKey.split('-');
     const partyIndex = parseInt(partyStr);
@@ -852,111 +449,416 @@ export const RecruitingPage = {
     return displaced;
   },
 
-  // Remove player from a slot, return the removed name
   removeFromSlot(slotKey) {
     return this.assignToSlot(slotKey, null);
   },
 
-  // Find which slot a player is in, return slotKey or null
-  findPlayerSlot(playerName) {
-    for (let pi = 0; pi < this.parties.length; pi++) {
-      const party = this.parties[pi];
-      if (party.tank === playerName) return `${pi}-tank-0`;
-      if (party.healer === playerName) return `${pi}-healer-0`;
-      for (let d = 0; d < (party.dps || []).length; d++) {
-        if (party.dps[d] === playerName) return `${pi}-dps-${d}`;
-      }
-    }
-    return null;
-  },
-
   setupDragAndDrop() {
-    const allNodes = this._container.querySelectorAll('.web-node');
+    const allChips = this._container.querySelectorAll('.slot-chip');
 
-    allNodes.forEach(node => {
-      // Drag start — filled party slots can be dragged
-      node.addEventListener('dragstart', (e) => {
-        const playerName = node.dataset.playerName;
+    allChips.forEach(chip => {
+      chip.addEventListener('dragstart', (e) => {
+        const playerName = chip.dataset.playerName;
         if (!playerName) { e.preventDefault(); return; }
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', playerName);
-        e.dataTransfer.setData('sourceSlotKey', node.dataset.slotKey || '');
-        node.classList.add('dragging');
+        e.dataTransfer.setData('sourceSlotKey', chip.dataset.slotKey || '');
+        chip.classList.add('dragging');
       });
 
-      node.addEventListener('dragend', () => {
-        node.classList.remove('dragging');
-      });
+      chip.addEventListener('dragend', () => chip.classList.remove('dragging'));
 
-      // Drop target — party slots accept drops from other slots or from the pool
-      if (node.dataset.droppable === 'true') {
-        node.addEventListener('dragover', (e) => {
+      if (chip.dataset.droppable === 'true') {
+        chip.addEventListener('dragover', (e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          node.classList.add('drag-over');
+          chip.classList.add('drag-over');
         });
 
-        node.addEventListener('dragleave', () => {
-          node.classList.remove('drag-over');
-        });
+        chip.addEventListener('dragleave', () => chip.classList.remove('drag-over'));
 
-        node.addEventListener('drop', (e) => {
+        chip.addEventListener('drop', (e) => {
           e.preventDefault();
-          node.classList.remove('drag-over');
+          chip.classList.remove('drag-over');
 
           const playerName = e.dataTransfer.getData('text/plain');
           const sourceSlotKey = e.dataTransfer.getData('sourceSlotKey');
-          const targetSlotKey = node.dataset.slotKey;
+          const targetSlotKey = chip.dataset.slotKey;
 
           if (!playerName || !targetSlotKey) return;
 
           const isFromPool = sourceSlotKey.startsWith('pool-');
           const isFromSlot = sourceSlotKey && !isFromPool;
-          const targetCurrentPlayer = node.dataset.playerName || null;
+          const targetCurrentPlayer = chip.dataset.playerName || null;
 
           if (isFromSlot) {
             if (sourceSlotKey === targetSlotKey) return;
             this.assignToSlot(targetSlotKey, playerName);
             this.assignToSlot(sourceSlotKey, targetCurrentPlayer);
           } else {
-            // From pool — displace existing if any
-            if (targetCurrentPlayer) {
-              this.removeFromSlot(targetSlotKey);
-            }
+            if (targetCurrentPlayer) this.removeFromSlot(targetSlotKey);
             this.assignToSlot(targetSlotKey, playerName);
           }
 
           this.isDirty = true;
-          this.renderConstellation();
+          this.renderContent();
         });
       }
 
-      // Double-click a filled slot to remove back to pool
       if (this.isEditMode) {
-        node.addEventListener('dblclick', () => {
-          const playerName = node.dataset.playerName;
-          const slotKey = node.dataset.slotKey;
+        chip.addEventListener('dblclick', () => {
+          const playerName = chip.dataset.playerName;
+          const slotKey = chip.dataset.slotKey;
           if (!playerName || !slotKey) return;
           this.removeFromSlot(slotKey);
           this.isDirty = true;
-          this.renderConstellation();
+          this.renderContent();
         });
       }
     });
   },
 
+  setupPickerTaps() {
+    const chips = this._container.querySelectorAll('.slot-chip[data-slot-key]');
+    chips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        if (e.target.closest('.party-card__delete')) return;
+        const slotKey = chip.dataset.slotKey;
+        if (!slotKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.openSlotPicker(slotKey);
+      });
+
+      const playerName = chip.dataset.playerName;
+      if (playerName) {
+        this.attachTouchDrag(chip, { playerName, sourceSlotKey: chip.dataset.slotKey, ghostClass: 'slot-chip--ghost' });
+      }
+    });
+  },
+
+  renderPickerCard(player, action) {
+    const gs = player._gearscore || 0;
+    const tier = getGearscoreTier(gs);
+    const spriteStyle = getClassSpriteStyle(player.role);
+    const draggable = action === 'assign' ? 'draggable="true"' : '';
+    return `<button class="slot-picker-card slot-picker-card--${action}" data-action="${action}" data-player-name="${player.name}" ${draggable}>
+      <span class="slot-picker-card__icon"><span class="class-sprite" style="${spriteStyle}"></span></span>
+      <span class="slot-picker-card__details">
+        <span class="slot-picker-card__name">${player.name}</span>
+        <span class="slot-picker-card__class">${player.role}</span>
+      </span>
+      <span class="slot-picker-card__gs" style="color: ${tier.color}">${gs}</span>
+    </button>`;
+  },
+
+  openSlotPicker(slotKey) {
+    this.closeSlotPicker();
+
+    const [partyStr, slotType, slotIdxStr] = slotKey.split('-');
+    const partyIndex = parseInt(partyStr);
+    const slotIdx = parseInt(slotIdxStr);
+    const party = this.parties[partyIndex];
+    if (!party) return;
+
+    let currentName = null;
+    if (slotType === 'tank') currentName = party.tank;
+    else if (slotType === 'healer') currentName = party.healer;
+    else if (slotType === 'dps') currentName = (party.dps || [])[slotIdx];
+
+    const playerMap = {};
+    this.allPlayers.forEach(p => { playerMap[p.name] = p; });
+    const assigned = this.getAssignedNames();
+    const available = this.allPlayers
+      .filter(p => !assigned.has(p.name))
+      .sort((a, b) => (b._gearscore || 0) - (a._gearscore || 0));
+
+    const currentPlayer = currentName ? playerMap[currentName] : null;
+    const slotLabelMap = { tank: 'Guardian', healer: 'Saint', dps: 'DPS' };
+    const slotLabel = slotLabelMap[slotType] || 'Slot';
+
+    const currentSection = currentPlayer ? `
+      <div class="slot-picker__section">
+        <div class="slot-picker__section-title">Currently in slot</div>
+        ${this.renderPickerCard(currentPlayer, 'remove')}
+      </div>
+    ` : '';
+
+    const poolSection = available.length > 0 ? `
+      <div class="slot-picker__section">
+        <div class="slot-picker__section-title">Available characters (${available.length})</div>
+        <div class="slot-picker__grid">
+          ${available.map(p => this.renderPickerCard(p, 'assign')).join('')}
+        </div>
+      </div>
+    ` : `
+      <div class="slot-picker__section">
+        <div class="slot-picker__empty">No unassigned characters available.</div>
+      </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'slot-picker-overlay';
+    const panel = document.createElement('div');
+    panel.className = 'slot-picker';
+    panel.setAttribute('role', 'dialog');
+    panel.innerHTML = `
+      <div class="slot-picker__header">
+        <div class="slot-picker__title">Drag a character into a slot</div>
+        <button class="slot-picker__close" aria-label="Close">×</button>
+      </div>
+      <div class="slot-picker__body">
+        ${currentSection}
+        ${poolSection}
+      </div>
+    `;
+    document.body.appendChild(panel);
+    document.body.classList.add('slot-picker-open');
+    this._activePicker = panel;
+    this._activeSlotKey = slotKey;
+
+    const close = () => this.closeSlotPicker();
+    panel.querySelector('.slot-picker__close').addEventListener('click', close);
+
+    panel.querySelectorAll('.slot-picker-card').forEach(card => {
+      const action = card.dataset.action;
+      const playerName = card.dataset.playerName;
+
+      if (action === 'remove') {
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.removeFromSlot(slotKey);
+          this.isDirty = true;
+          this.renderContent();
+          close();
+        });
+      }
+
+      if (action === 'assign') {
+        card.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', playerName);
+          e.dataTransfer.setData('sourceSlotKey', `pool-${playerName}`);
+          card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        this.attachTouchDrag(card, { playerName, sourceSlotKey: `pool-${playerName}`, closePickerOnDrop: true });
+      }
+    });
+  },
+
+  attachTouchDrag(card, { playerName, sourceSlotKey = null, ghostClass = 'slot-picker-card--ghost', closePickerOnDrop = false }) {
+    let ghost = null;
+    let activeDrop = null;
+    let dragging = false;
+    let pressTimer = null;
+    let startX = 0, startY = 0;
+    const HOLD_MS = 320;
+    const MOVE_CANCEL = 8;
+
+    const cleanup = () => {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      if (ghost) { ghost.remove(); ghost = null; }
+      if (activeDrop) { activeDrop.classList.remove('drag-over'); activeDrop = null; }
+      card.classList.remove('dragging');
+      dragging = false;
+    };
+
+    const startDrag = (clientX, clientY) => {
+      dragging = true;
+      ghost = card.cloneNode(true);
+      ghost.classList.add(ghostClass);
+      ghost.style.width = card.offsetWidth + 'px';
+      ghost.style.left = (clientX - card.offsetWidth / 2) + 'px';
+      ghost.style.top = (clientY - 20) + 'px';
+      document.body.appendChild(ghost);
+      card.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(20);
+    };
+
+    card.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dragging = false;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        startDrag(startX, startY);
+      }, HOLD_MS);
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (!dragging) {
+        if (pressTimer && Math.hypot(t.clientX - startX, t.clientY - startY) > MOVE_CANCEL) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+        return;
+      }
+      e.preventDefault();
+      ghost.style.left = (t.clientX - card.offsetWidth / 2) + 'px';
+      ghost.style.top = (t.clientY - 20) + 'px';
+
+      ghost.style.display = 'none';
+      const under = document.elementFromPoint(t.clientX, t.clientY);
+      ghost.style.display = '';
+      const target = under?.closest('[data-droppable="true"]');
+      if (activeDrop && activeDrop !== target) {
+        activeDrop.classList.remove('drag-over');
+        activeDrop = null;
+      }
+      if (target && target !== activeDrop) {
+        target.classList.add('drag-over');
+        activeDrop = target;
+      }
+    }, { passive: false });
+
+    card.addEventListener('touchend', () => {
+      if (!dragging) { cleanup(); return; }
+      const dropKey = activeDrop?.dataset.slotKey;
+      if (dropKey) {
+        const targetCurrent = activeDrop.dataset.playerName || null;
+        const isFromSlot = sourceSlotKey && !sourceSlotKey.startsWith('pool-');
+        if (isFromSlot && sourceSlotKey !== dropKey) {
+          this.assignToSlot(dropKey, playerName);
+          this.assignToSlot(sourceSlotKey, targetCurrent);
+        } else {
+          if (targetCurrent) this.removeFromSlot(dropKey);
+          this.assignToSlot(dropKey, playerName);
+        }
+        this.isDirty = true;
+        cleanup();
+        if (closePickerOnDrop) this.closeSlotPicker();
+        this.renderContent();
+        return;
+      }
+      cleanup();
+    });
+
+    card.addEventListener('touchcancel', cleanup);
+  },
+
+  closeSlotPicker() {
+    if (this._activePicker) {
+      this._activePicker.remove();
+      this._activePicker = null;
+    }
+    this._activeSlotKey = null;
+    document.body.classList.remove('slot-picker-open');
+  },
+
+  renderActivelyRecruiting() {
+    const hasSelection = this.activeClasses.length > 0;
+    const editBtn = this.isEditMode ? `<button class="actively-recruiting__edit">Edit</button>` : '';
+
+    if (!hasSelection && !this.isEditMode) return '';
+    if (!hasSelection && this.isEditMode) {
+      return `<section class="actively-recruiting actively-recruiting--empty">
+        <div class="actively-recruiting__head">
+          <h3 class="actively-recruiting__title">Actively Recruiting</h3>
+          ${editBtn}
+        </div>
+        <p class="actively-recruiting__empty">No classes selected. Click <strong>Edit</strong> to highlight classes the guild is hunting for.</p>
+      </section>`;
+    }
+
+    const cards = this.activeClasses.map(cls => `
+      <div class="actively-recruiting__card">
+        <span class="actively-recruiting__icon"><span class="class-sprite" style="${getClassSpriteStyle(cls)}"></span></span>
+        <span class="actively-recruiting__name">${cls}</span>
+      </div>
+    `).join('');
+
+    return `<section class="actively-recruiting">
+      <div class="actively-recruiting__head">
+        <h3 class="actively-recruiting__title">Actively Recruiting</h3>
+        ${editBtn}
+      </div>
+      <div class="actively-recruiting__grid">${cards}</div>
+      <p class="actively-recruiting__note">
+        Don't see your class? <strong>Apply anyway!</strong> Active and friendly players of any class are always welcome. Preference for main characters.
+      </p>
+    </section>`;
+  },
+
+  openActiveClassesEditor() {
+    const existing = document.querySelector('.active-classes-overlay');
+    if (existing) existing.remove();
+
+    const selected = new Set(this.activeClasses);
+    const families = Object.entries(CLASS_FAMILIES).map(([key, family]) => {
+      const items = family.classes.map(cls => `
+        <label class="active-classes__item ${selected.has(cls) ? 'is-selected' : ''}">
+          <input type="checkbox" value="${cls}" ${selected.has(cls) ? 'checked' : ''} />
+          <span class="active-classes__icon"><span class="class-sprite" style="${getClassSpriteStyle(cls)}"></span></span>
+          <span class="active-classes__name">${cls}</span>
+        </label>
+      `).join('');
+      return `<div class="active-classes__family">
+        <div class="active-classes__family-name">${family.name}</div>
+        <div class="active-classes__items">${items}</div>
+      </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'active-classes-overlay';
+    overlay.innerHTML = `
+      <div class="active-classes" role="dialog" aria-modal="true">
+        <div class="active-classes__header">
+          <h3>Select Recruiting Classes</h3>
+          <button class="active-classes__close" aria-label="Close">×</button>
+        </div>
+        <div class="active-classes__body">${families}</div>
+        <div class="active-classes__footer">
+          <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+          <button class="btn btn-primary" data-action="save">Save</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('.active-classes__close').addEventListener('click', close);
+    overlay.querySelector('[data-action="cancel"]').addEventListener('click', close);
+
+    overlay.querySelectorAll('.active-classes__item').forEach(label => {
+      const input = label.querySelector('input');
+      input.addEventListener('change', () => {
+        label.classList.toggle('is-selected', input.checked);
+      });
+    });
+
+    overlay.querySelector('[data-action="save"]').addEventListener('click', async () => {
+      const checked = Array.from(overlay.querySelectorAll('input:checked')).map(i => i.value);
+      this.activeClasses = checked;
+      try {
+        await dataService.setAppConfig(ACTIVE_CLASSES_KEY, JSON.stringify(checked));
+        toast.show('Recruiting classes updated', 'success');
+      } catch (err) {
+        console.error('Failed to save active classes:', err);
+        toast.show('Failed to save', 'error');
+      }
+      close();
+      this.renderContent();
+    });
+  },
+
   destroy() {
+    this.closeSlotPicker();
     const nav = document.querySelector('nav.main-nav');
     if (nav) nav.style.display = '';
-    if (this._resizeHandler) {
-      window.removeEventListener('resize', this._resizeHandler);
-      this._resizeHandler = null;
+    if (PlayersPage._chartInstance) {
+      PlayersPage._chartInstance.destroy();
+      PlayersPage._chartInstance = null;
     }
     this.allPlayers = [];
+    this._fullPlayers = [];
+    this._userMap = {};
     this.parties = [];
     this.isDirty = false;
-    this._currentPartyIndex = 0;
-    this._isMobile = false;
     this._container = null;
   }
 };
