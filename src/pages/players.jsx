@@ -43,6 +43,17 @@ export const PlayersPage = {
     return dataService.canEditPlayer(player);
   },
 
+  // Inline exclude toggle (admin only) — used in row/card renders
+  _buildExcludeToggleHtml(player) {
+    if (!dataService.isAdmin()) return '';
+    const isOn = !!player.exclude;
+    const label = isOn ? 'Excluded' : 'Exclude';
+    const tip = isOn ? 'Click to include' : 'Click to exclude from recruiting';
+    return `<button type="button" class="exclude-pill ${isOn ? 'is-on' : ''} tooltip-wrap"
+      data-action="toggle-exclude" data-player-id="${player.id}" data-exclude="${isOn}"
+      data-tooltip="${tip}">${label}</button>`;
+  },
+
   async render(container) {
     const canViewFull = dataService.isPlayer();
 
@@ -388,6 +399,30 @@ export const PlayersPage = {
           const filter = btn.dataset.filter; // 'hc' or 'cl'
           this._raidPriorityFilter[filter] = !this._raidPriorityFilter[filter];
           this.loadPlayers();
+        });
+      });
+
+      // Admin inline exclude toggles
+      document.querySelectorAll('.exclude-pill[data-action="toggle-exclude"]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const playerId = btn.dataset.playerId;
+          const newExclude = btn.dataset.exclude !== 'true';
+          try {
+            btn.disabled = true;
+            await dataService.togglePlayerExclude(playerId, newExclude);
+            const player = players.find(p => p.id === playerId);
+            if (player) player.exclude = newExclude;
+            btn.dataset.exclude = String(newExclude);
+            btn.classList.toggle('is-on', newExclude);
+            btn.textContent = newExclude ? 'Excluded' : 'Exclude';
+            btn.setAttribute('data-tooltip', newExclude ? 'Click to include' : 'Click to exclude from recruiting');
+            toast.success(newExclude ? `${player?.name || 'Character'} excluded` : `${player?.name || 'Character'} included`);
+          } catch (err) {
+            toast.error(`Failed: ${err.message}`);
+          } finally {
+            btn.disabled = false;
+          }
         });
       });
 
@@ -824,6 +859,7 @@ export const PlayersPage = {
               <td class="expand-toggle-cell">${detailHtml ? '<span class="expand-arrow">▶</span>' : ''}</td>
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
+                ${this._buildExcludeToggleHtml(player)}
               </td>
               <td class="player-owner" data-label="Owner">
                 ${owner ? `
@@ -881,6 +917,7 @@ export const PlayersPage = {
                       ${canEdit
                         ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
                         : player.name}
+                      ${this._buildExcludeToggleHtml(player)}
                     </span>
                     <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
                   </div>
@@ -1185,6 +1222,7 @@ export const PlayersPage = {
               <td class="expand-toggle-cell">${detailHtml ? '<span class="expand-arrow">▶</span>' : ''}</td>
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
+                ${this._buildExcludeToggleHtml(player)}
               </td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
@@ -1241,6 +1279,7 @@ export const PlayersPage = {
                       ${canEdit
                         ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
                         : player.name}
+                      ${this._buildExcludeToggleHtml(player)}
                     </span>
                     <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
                   </div>
@@ -1857,6 +1896,18 @@ export const PlayersPage = {
             <label for="player-notes">Notes:</label>
             <textarea id="player-notes" rows="3" maxlength="140"></textarea>
           </div>
+          ${isAdmin ? `
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="player-exclude">
+              Exclude from recruiting
+            </label>
+            <div id="player-exclude-fields" style="display: none; margin-top: 0.4rem;">
+              <input type="text" id="player-exclude-label" placeholder="Badge label (default: Excluded)" maxlength="20" style="width: 100%; margin-bottom: 0.3rem;">
+              <input type="text" id="player-exclude-reason" placeholder="Tooltip reason (e.g., 'Just an alt', 'On break until Apr 30')" maxlength="120" style="width: 100%;">
+            </div>
+          </div>
+          ` : ''}
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Add Character</button>
             <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
@@ -1869,6 +1920,15 @@ export const PlayersPage = {
 
     // Initialize class picker
     this.renderClassPicker('class-picker', 'player-class', '');
+
+    // Toggle exclude-fields visibility
+    const excludeCb = document.getElementById('player-exclude');
+    const excludeFields = document.getElementById('player-exclude-fields');
+    if (excludeCb && excludeFields) {
+      excludeCb.addEventListener('change', () => {
+        excludeFields.style.display = excludeCb.checked ? 'block' : 'none';
+      });
+    }
 
     // Initialize account buttons
     const selectedOwnerId = isAdmin
@@ -1919,10 +1979,13 @@ export const PlayersPage = {
 
         const suffix1 = document.getElementById('player-suffix1').value;
         const suffix2 = document.getElementById('player-suffix2').value;
+        const exclude = document.getElementById('player-exclude')?.checked || false;
+        const excludeLabel = document.getElementById('player-exclude-label')?.value || '';
+        const excludeReason = document.getElementById('player-exclude-reason')?.value || '';
         const result = await dataService.addPlayer({
           name, role, weapon, weaponEnhance, suffix1, suffix2,
           armor, armorEnhance, equipment, characterStats,
-          notes, accountNumber: accountNumber || 1
+          notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason
         });
 
         if (isAdmin && result.data?.id) {
@@ -1994,6 +2057,18 @@ export const PlayersPage = {
             <label for="edit-player-notes">Notes:</label>
             <textarea id="edit-player-notes" rows="3" maxlength="140">${player.notes}</textarea>
           </div>
+          ${isAdmin ? `
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="edit-player-exclude" ${player.exclude ? 'checked' : ''}>
+              Exclude from recruiting
+            </label>
+            <div id="edit-player-exclude-fields" style="display: ${player.exclude ? 'block' : 'none'}; margin-top: 0.4rem;">
+              <input type="text" id="edit-player-exclude-label" placeholder="Badge label (default: Excluded)" maxlength="20" value="${(player.excludeLabel || '').replace(/"/g, '&quot;')}" style="width: 100%; margin-bottom: 0.3rem;">
+              <input type="text" id="edit-player-exclude-reason" placeholder="Tooltip reason (e.g., 'Just an alt', 'On break until Apr 30')" maxlength="120" value="${(player.excludeReason || '').replace(/"/g, '&quot;')}" style="width: 100%;">
+            </div>
+          </div>
+          ` : ''}
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Save Changes</button>
             <button type="button" class="btn btn-secondary" id="cancel-edit-btn">Cancel</button>
@@ -2006,6 +2081,15 @@ export const PlayersPage = {
     document.body.appendChild(modalElement);
 
     this.renderClassPicker('edit-class-picker', 'edit-player-class', player.role || '');
+
+    // Toggle exclude-fields visibility
+    const editExcludeCb = document.getElementById('edit-player-exclude');
+    const editExcludeFields = document.getElementById('edit-player-exclude-fields');
+    if (editExcludeCb && editExcludeFields) {
+      editExcludeCb.addEventListener('change', () => {
+        editExcludeFields.style.display = editExcludeCb.checked ? 'block' : 'none';
+      });
+    }
 
     const editMaxAccount = player.discordId ? Math.max(1, maxAccount, player.accountNumber || 1) : 1;
     this.renderAccountButtons('edit-account-buttons-container', player.accountNumber || 1, editMaxAccount);
@@ -2053,11 +2137,14 @@ export const PlayersPage = {
 
         const suffix1 = document.getElementById('edit-player-suffix1').value;
         const suffix2 = document.getElementById('edit-player-suffix2').value;
+        const exclude = document.getElementById('edit-player-exclude')?.checked ?? player.exclude ?? false;
+        const excludeLabel = document.getElementById('edit-player-exclude-label')?.value ?? player.excludeLabel ?? '';
+        const excludeReason = document.getElementById('edit-player-exclude-reason')?.value ?? player.excludeReason ?? '';
         await dataService.updatePlayer({
           id: player.id, name, role,
           weapon, weaponEnhance, suffix1, suffix2,
           armor, armorEnhance, equipment, characterStats,
-          notes, accountNumber: accountNumber || 1
+          notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason
         }, player.name);
 
         if (isAdmin && newOwnerId !== player.discordId) {

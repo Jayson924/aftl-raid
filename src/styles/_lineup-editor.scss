@@ -1046,6 +1046,38 @@
           box-shadow: 0 0 8px rgba(40, 167, 69, 0.3);
         }
 
+        &.is-alt {
+          .player-info,
+          .class-sprite {
+            opacity: 0.5;
+            transition: opacity 0.15s ease;
+          }
+
+          &:hover .player-info,
+          &:hover .class-sprite {
+            opacity: 0.85;
+          }
+
+          .player-name { color: $text-muted; }
+        }
+
+        .alt-badge {
+          position: absolute;
+          bottom: 0.4rem;
+          left: 0.4rem;
+          background-color: rgba(255, 193, 7, 0.85);
+          color: #1a1a1a;
+          padding: 0.1rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.65rem;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          line-height: 1.2;
+          cursor: help;
+          z-index: 2;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
         &:active {
           cursor: grabbing;
         }
@@ -1615,4 +1647,5 @@
     }
   }
 }
+
 

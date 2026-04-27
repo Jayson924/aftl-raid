@@ -299,6 +299,11 @@ export const AdminPage = {
           </div>
         </div>
         <div class="admin-user-actions">
+          <label class="toggle-switch tooltip-wrap" data-tooltip="Exclude this user's characters from recruiting and dim them in the lineup pool">
+            <input type="checkbox" class="admin-exclude-checkbox" data-discord-id="${user.discordId}" ${user.exclude ? 'checked' : ''} ${isOtherAdmin(user) ? 'disabled' : ''}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Exclude</span>
+          </label>
           <select class="admin-role-select" data-discord-id="${user.discordId}" ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>
             <option value="guest" ${user.role === 'guest' ? 'selected' : ''}>Guest</option>
             <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>
@@ -306,8 +311,71 @@ export const AdminPage = {
           </select>
           ${user.role !== 'admin' ? `<button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${user.discordId}">Delete</button>` : ''}
         </div>
+        <div class="admin-exclude-fields" data-discord-id="${user.discordId}" style="display: ${user.exclude ? 'flex' : 'none'};">
+          <input type="text" class="admin-exclude-label" data-discord-id="${user.discordId}" placeholder="Excluded" maxlength="20" value="${(user.excludeLabel || '').replace(/"/g, '&quot;')}">
+          <input type="text" class="admin-exclude-reason" data-discord-id="${user.discordId}" placeholder="Just an alt in the guild" maxlength="120" value="${(user.excludeReason || '').replace(/"/g, '&quot;')}">
+        </div>
       </div>
     `).join('');
+
+    // Exclude toggle listeners
+    container.querySelectorAll('.admin-exclude-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', async (e) => {
+        const discordId = e.target.dataset.discordId;
+        const exclude = e.target.checked;
+        const user = this._users.find(u => u.discordId === discordId);
+        const fields = container.querySelector(`.admin-exclude-fields[data-discord-id="${discordId}"]`);
+        if (fields) fields.style.display = exclude ? 'flex' : 'none';
+        try {
+          await dataService.updateUserExclude(discordId, exclude);
+          user.exclude = exclude;
+          toast.success(`${user.displayName} ${exclude ? 'excluded' : 'included'}`);
+        } catch (err) {
+          console.error('Failed to update exclude:', err);
+          toast.error('Failed to update');
+          e.target.checked = !exclude;
+          if (fields) fields.style.display = !exclude ? 'flex' : 'none';
+        }
+      });
+    });
+
+    // Exclude label listeners — save on blur if changed
+    container.querySelectorAll('.admin-exclude-label').forEach(input => {
+      input.addEventListener('blur', async (e) => {
+        const discordId = e.target.dataset.discordId;
+        const user = this._users.find(u => u.discordId === discordId);
+        const newLabel = e.target.value.trim();
+        if (newLabel === (user.excludeLabel || '')) return;
+        try {
+          await dataService.updateUserExclude(discordId, user.exclude, { label: newLabel });
+          user.excludeLabel = newLabel;
+          toast.success('Badge label updated');
+        } catch (err) {
+          console.error('Failed to update label:', err);
+          toast.error('Failed to update');
+          e.target.value = user.excludeLabel || '';
+        }
+      });
+    });
+
+    // Exclude reason listeners — save on blur if changed
+    container.querySelectorAll('.admin-exclude-reason').forEach(input => {
+      input.addEventListener('blur', async (e) => {
+        const discordId = e.target.dataset.discordId;
+        const user = this._users.find(u => u.discordId === discordId);
+        const newReason = e.target.value.trim();
+        if (newReason === (user.excludeReason || '')) return;
+        try {
+          await dataService.updateUserExclude(discordId, user.exclude, { reason: newReason });
+          user.excludeReason = newReason;
+          toast.success('Reason updated');
+        } catch (err) {
+          console.error('Failed to update reason:', err);
+          toast.error('Failed to update');
+          e.target.value = user.excludeReason || '';
+        }
+      });
+    });
 
     // Role change listeners
     container.querySelectorAll('.admin-role-select').forEach(select => {

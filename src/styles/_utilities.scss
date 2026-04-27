@@ -146,6 +146,76 @@
   }
 }
 
+// Reusable toggle switch (input[type=checkbox] styled as a slider)
+// Markup: <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span><span class="toggle-label">…</span></label>
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+
+  input { display: none; }
+
+  .toggle-slider {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    transition: background-color 0.15s ease;
+    flex-shrink: 0;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      background-color: white;
+      border-radius: 50%;
+      transition: transform 0.15s ease;
+    }
+  }
+
+  input:checked + .toggle-slider {
+    background-color: $primary-color;
+
+    &::before { transform: translateX(16px); }
+  }
+
+  input:disabled + .toggle-slider {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .toggle-label {
+    font-size: 0.85rem;
+    color: $text-light;
+    white-space: nowrap;
+  }
+}
+
+// JS-driven tooltip for elements inside overflow:auto/hidden containers
+// where the CSS-only [data-tooltip] would be clipped.
+// Opt in with `data-tooltip-fixed="..."`. Positioning is handled by initFixedTooltip().
+.tooltip-fixed {
+  position: fixed;
+  display: none;
+  z-index: 9999;
+  background-color: rgba(20, 20, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  line-height: 1.4;
+}
+
 .settings-info {
   margin: 1rem 0;
 

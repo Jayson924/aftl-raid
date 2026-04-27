@@ -1457,3 +1457,38 @@
     }
   }
 }
+
+// Inline admin "Exclude" toggle next to character name — matches .admin-sort-btn aesthetic.
+.exclude-pill {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: $text-muted;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    color: $text-light;
+  }
+
+  &.is-on {
+    background: rgba($primary-color, 0.15);
+    border-color: rgba($primary-color, 0.3);
+    color: $primary-color;
+
+    &:hover:not(:disabled) {
+      background: rgba($primary-color, 0.22);
+      border-color: rgba($primary-color, 0.45);
+      color: $primary-color;
+    }
+  }
+
+  &:disabled { opacity: 0.5; cursor: wait; }
+}

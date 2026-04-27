@@ -158,7 +158,13 @@ export const RecruitingPage = {
       this._fullPlayers = playersWithGs;
       this._userMap = {};
       (appUsers || []).forEach(u => { this._userMap[u.discordId] = u; });
-      this.allPlayers = playersWithGs.filter(p => p._gearscore >= 65);
+      this.allPlayers = playersWithGs.filter(p => {
+        if (p._gearscore < 65) return false;
+        if (p.exclude) return false;
+        const owner = p.discordId ? this._userMap[p.discordId] : null;
+        if (owner?.exclude) return false;
+        return true;
+      });
 
       let saved = await dataService.getAppConfig(CONFIG_KEY);
       if (typeof saved === 'string') {

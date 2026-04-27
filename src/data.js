@@ -311,7 +311,10 @@ class DataService {
         classicCompleted: p.classic_completed || '',
         classicTicketUsed: p.classic_ticket_used || '',
         discordId: p.discord_id || null,
-        accountNumber: p.account_number || null
+        accountNumber: p.account_number || null,
+        exclude: p.exclude === true,
+        excludeLabel: p.exclude_label || '',
+        excludeReason: p.exclude_reason || ''
       };
     });
   }
@@ -331,7 +334,7 @@ class DataService {
   async getAppUsers() {
     const { data, error } = await supabase
       .from('app_users')
-      .select('discord_id, username, display_name, avatar_url, role, created_at')
+      .select('discord_id, username, display_name, avatar_url, role, exclude, exclude_label, exclude_reason, created_at')
       .order('display_name');
 
     if (error) {
@@ -345,8 +348,30 @@ class DataService {
       displayName: u.display_name || u.username,
       avatarUrl: u.avatar_url,
       role: u.role,
+      exclude: u.exclude === true,
+      excludeLabel: u.exclude_label || '',
+      excludeReason: u.exclude_reason || '',
       createdAt: u.created_at
     }));
+  }
+
+  /**
+   * Toggle exclude flag on a user (admin only)
+   */
+  async updateUserExclude(discordId, exclude, { label, reason } = {}) {
+    if (!this.isAdmin()) throw new Error('Only admins can update user exclude flag');
+
+    const update = { exclude: !!exclude };
+    if (label !== undefined) update.exclude_label = label?.trim() || null;
+    if (reason !== undefined) update.exclude_reason = reason?.trim() || null;
+
+    const { error } = await supabase
+      .from('app_users')
+      .update(update)
+      .eq('discord_id', discordId);
+
+    if (error) throw error;
+    return { success: true };
   }
 
   /**
@@ -430,6 +455,9 @@ class DataService {
       classic_completed: player.classicCompleted || null,
       classic_ticket_used: player.classicTicketUsed || null,
       account_number: player.accountNumber || null,
+      exclude: player.exclude === true,
+      exclude_label: player.excludeLabel?.trim() || null,
+      exclude_reason: player.excludeReason?.trim() || null,
       // Auto-assign to the logged-in user
       discord_id: this._user?.id || null
     };
@@ -460,7 +488,10 @@ class DataService {
       // New jsonb columns
       equipment: player.equipment || {},
       character_stats: player.characterStats || {},
-      account_number: player.accountNumber || null
+      account_number: player.accountNumber || null,
+      exclude: player.exclude === true,
+      exclude_label: player.excludeLabel?.trim() || null,
+      exclude_reason: player.excludeReason?.trim() || null
     });
 
     if (player.id) {
@@ -471,6 +502,16 @@ class DataService {
 
     const { error } = await query;
 
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async togglePlayerExclude(playerId, exclude) {
+    if (!this.isAdmin()) throw new Error('Only admins can toggle exclude');
+    const { error } = await supabase
+      .from('players')
+      .update({ exclude: !!exclude })
+      .eq('id', playerId);
     if (error) throw error;
     return { success: true };
   }

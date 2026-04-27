@@ -4,6 +4,7 @@ import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXE
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
+import { initFixedTooltip } from '../fixed-tooltip.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -461,11 +462,16 @@ export const LineupEditorPage = {
     }
 
     try {
-      // Load both players and lineups
-      [this.players, this.allLineups] = await Promise.all([
+      // Load players, lineups, and app users (for owner exclude flag)
+      const [players, lineups, appUsers] = await Promise.all([
         dataService.getPlayers(),
-        dataService.getLineups()
+        dataService.getLineups(),
+        dataService.getAppUsers().catch(() => [])
       ]);
+      this.players = players;
+      this.allLineups = lineups;
+      this._userMap = {};
+      (appUsers || []).forEach(u => { this._userMap[u.discordId] = u; });
 
       this.renderAvailablePlayers();
       this.loadExistingLineups();
@@ -715,11 +721,17 @@ export const LineupEditorPage = {
 
       // Ticket used badge (only for Classic)
       const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/icons/ticket.svg" alt="T"></span>` : '';
+      const isExcluded = this.isPlayerExcluded(player);
+      const exclusion = isExcluded ? this.getExclusionInfo(player) : null;
+      const escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      const escapeText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      const altBadge = exclusion ? `<span class="alt-badge" data-tooltip-fixed="${escapeAttr(exclusion.reason)}">${escapeText(exclusion.label)}</span>` : '';
 
       return `
-        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''}"
+        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''} ${isExcluded ? 'is-alt' : ''}"
              data-player-name="${player.name}"
              draggable="true">
+          ${altBadge}
           ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
           ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
@@ -740,6 +752,7 @@ export const LineupEditorPage = {
 
     this.setupPlayerDragHandlers();
     this.setupAddPubHandler();
+    initFixedTooltip();
   },
 
   getFilteredPlayers() {
@@ -790,7 +803,32 @@ export const LineupEditorPage = {
 
         return matchesSearch && matchesClassFamily && matchesCompletion && matchesNotInLineup;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        // Excluded (alt) characters sink to the bottom
+        const aEx = this.isPlayerExcluded(a) ? 1 : 0;
+        const bEx = this.isPlayerExcluded(b) ? 1 : 0;
+        if (aEx !== bEx) return aEx - bEx;
+        return a.name.localeCompare(b.name);
+      });
+  },
+
+  isPlayerExcluded(player) {
+    if (player.exclude) return true;
+    const owner = player.discordId && this._userMap ? this._userMap[player.discordId] : null;
+    return !!(owner && owner.exclude);
+  },
+
+  getExclusionInfo(player) {
+    const owner = player.discordId && this._userMap ? this._userMap[player.discordId] : null;
+    const label =
+      (player.exclude && player.excludeLabel) ||
+      (owner?.exclude && owner.excludeLabel) ||
+      'Excluded';
+    const reason =
+      (player.exclude && player.excludeReason) ||
+      (owner?.exclude && owner.excludeReason) ||
+      'Just an alt in the guild';
+    return { label, reason };
   },
 
   filterPlayers() {
