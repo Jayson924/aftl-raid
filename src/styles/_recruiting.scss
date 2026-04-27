@@ -224,6 +224,7 @@
   position: relative;
   transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   min-height: 96px;
+  min-width: 0;
 
   &--empty {
     border-style: dashed;
