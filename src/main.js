@@ -78,7 +78,7 @@ async function initApp() {
   router.register('characters', PlayersPage); // Public - guests see roster only
   router.register('editor', LineupEditorPage, 'guildmate'); // Guildmates and admins only
   router.register('enhancement', EnhancementPage); // No auth required
-  router.register('lavish', SpendingGuidePage); // Public
+  router.register('lavish', SpendingGuidePage, 'guildmate'); // Guildmates and admins only
   router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
   router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
@@ -130,7 +130,9 @@ function renderNavigation() {
         ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
-        <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        ${isPlayer ? `
+          <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        ` : ''}
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
