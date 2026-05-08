@@ -45,6 +45,11 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
   const selectedUsers = new Set();
   let generatedResult = null;
 
+  // Owners flagged as excluded — their characters are skipped during generation
+  const excludedOwnerIds = new Set(
+    appUsers.filter(u => u.exclude).map(u => u.discordId)
+  );
+
   // Count characters per user
   const charCountByUser = {};
   players.forEach(p => {
@@ -53,7 +58,7 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
     }
   });
 
-  const usersWithChars = appUsers.filter(u => charCountByUser[u.discordId] > 0);
+  const usersWithChars = appUsers.filter(u => charCountByUser[u.discordId] > 0 && !u.exclude);
 
   const modalElement = document.createElement('div');
   modalElement.className = 'modal';
@@ -265,11 +270,11 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
 
         const lineupState = { raidType, players: [] };
         const excludeNames = includeInExisting ? null : namesInLineups;
-        generatedResult = generateOptimalLineup(activeIds, players, lineupState, { includeCleared, excludeNames });
+        generatedResult = generateOptimalLineup(activeIds, players, lineupState, { includeCleared, excludeNames, excludedOwnerIds });
 
         // Fill guest slots with real characters from all users (unless restricted)
         if (generatedResult && !selectedUsersOnly) {
-          generatedResult = fillGuestSlotsWithPlayers(generatedResult, players, lineupState, { includeCleared, excludeNames });
+          generatedResult = fillGuestSlotsWithPlayers(generatedResult, players, lineupState, { includeCleared, excludeNames, excludedOwnerIds });
         }
 
         if (generatedResult) {
@@ -315,9 +320,11 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
  * Replace guest slots with real characters from ALL users (not just selected).
  * One character per user. Greedy by amp + gearscore.
  */
-function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeCleared = false, excludeNames = null } = {}) {
+function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeCleared = false, excludeNames = null, excludedOwnerIds = null } = {}) {
   const candidates = players.filter(p =>
     p.discordId && p.role
+    && !p.exclude
+    && (!excludedOwnerIds || !excludedOwnerIds.has(p.discordId))
     && (includeCleared || dataService.playerNeedsRaid(p, currentLineup.raidType))
     && (!excludeNames || !excludeNames.has(p.name))
   );
@@ -385,9 +392,11 @@ function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeClea
  * Always includes a tank and healer when real candidates exist; reserves
  * guest slots for missing essential roles.
  */
-function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { includeCleared = false, excludeNames = null } = {}) {
+function generateOptimalLineup(aroundDiscordIds, players, currentLineup, { includeCleared = false, excludeNames = null, excludedOwnerIds = null } = {}) {
   const candidates = players.filter(p =>
     aroundDiscordIds.includes(p.discordId) && p.role
+    && !p.exclude
+    && (!excludedOwnerIds || !excludedOwnerIds.has(p.discordId))
     && (includeCleared || dataService.playerNeedsRaid(p, currentLineup.raidType))
     && (!excludeNames || !excludeNames.has(p.name))
   );
