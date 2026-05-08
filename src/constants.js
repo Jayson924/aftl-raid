@@ -58,10 +58,24 @@ export const CLASS_SPRITE_MAP = {
   'Spirit Dancer':  [5, 2],
 };
 
+// Returns true if a raid type uses 4 slots instead of 8
+export function isFourManRaid(raidType) {
+  return raidType === '4-man' || raidType === 'DDN Normal';
+}
+
 // Returns the number of lineup slots for a given raid type
 // 4-man raids have 4 slots, all others have 8
 export function getLineupSize(raidType) {
-  return raidType === '4-man' ? 4 : 8;
+  return isFourManRaid(raidType) ? 4 : 8;
+}
+
+// Display label for a raid type — legacy "Hardcore"/"Classic" map to GDN
+export function formatRaidTypeLabel(raidType) {
+  const rt = raidType || 'Hardcore';
+  if (rt === 'Unspecified') return 'Unspecified';
+  if (rt === '4-man') return '4-Man';
+  if (rt === 'Hardcore' || rt === 'Classic') return `GDN ${rt}`;
+  return rt;
 }
 
 // Get inline style for a class sprite icon background

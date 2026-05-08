@@ -16,6 +16,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
+// Map a raid_type string to the players-table completion column it tracks.
+// Returns null for raid types that don't track weekly completion.
+function raidTypeToCompletionColumn(raidType) {
+  if (raidType === 'Hardcore') return 'hardcore_completed';
+  if (raidType === 'Classic') return 'classic_completed';
+  if (raidType === 'DDN Hardcore') return 'ddn_hardcore_completed';
+  if (raidType === 'DDN Classic') return 'ddn_classic_completed';
+  if (raidType === 'DDN Normal') return 'ddn_normal_completed';
+  return null;
+}
+
 // Discord OAuth configuration
 const DISCORD_CLIENT_ID = import.meta.env.VITE_DISCORD_CLIENT_ID;
 const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize';
@@ -309,6 +320,9 @@ class DataService {
         armorLevel: p.armor_level || '',
         hardcoreCompleted: p.hardcore_completed || '',
         classicCompleted: p.classic_completed || '',
+        ddnHardcoreCompleted: p.ddn_hardcore_completed || '',
+        ddnClassicCompleted: p.ddn_classic_completed || '',
+        ddnNormalCompleted: p.ddn_normal_completed || '',
         classicTicketUsed: p.classic_ticket_used || '',
         discordId: p.discord_id || null,
         accountNumber: p.account_number || null,
@@ -453,6 +467,9 @@ class DataService {
       character_stats: player.characterStats || {},
       hardcore_completed: player.hardcoreCompleted || null,
       classic_completed: player.classicCompleted || null,
+      ddn_hardcore_completed: player.ddnHardcoreCompleted || null,
+      ddn_classic_completed: player.ddnClassicCompleted || null,
+      ddn_normal_completed: player.ddnNormalCompleted || null,
       classic_ticket_used: player.classicTicketUsed || null,
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
@@ -779,8 +796,12 @@ class DataService {
   }
 
   playerNeedsRaid(player, raidType) {
-    // 4-man and Unspecified don't track weekly completion — treat as always needing (no one is "completed")
+    // 4-man and Unspecified don't track weekly completion
     if (raidType === 'Unspecified' || raidType === '4-man') return true;
+    // DDN Hardcore is unreleased — treat everyone as always needing
+    if (raidType === 'DDN Hardcore') return true;
+    if (raidType === 'DDN Classic') return !this.isCompletedThisWeek(player.ddnClassicCompleted);
+    if (raidType === 'DDN Normal') return !this.isCompletedThisWeek(player.ddnNormalCompleted);
     const timestamp = raidType === 'Hardcore' ? player.hardcoreCompleted : player.classicCompleted;
     return !this.isCompletedThisWeek(timestamp);
   }
@@ -793,7 +814,9 @@ class DataService {
   async markPlayersCompleted(playerNames, raidType, ticketPlayerNames = []) {
     // 4-man and Unspecified don't track weekly completion
     if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
-    const column = raidType === 'Hardcore' ? 'hardcore_completed' : 'classic_completed';
+    // DDN Hardcore is unreleased — no completion tracking yet
+    if (raidType === 'DDN Hardcore') return { success: true };
+    const column = raidTypeToCompletionColumn(raidType);
     const now = new Date().toISOString();
 
     // Update completion timestamp
@@ -820,7 +843,9 @@ class DataService {
   async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName, ticketPlayerNames = []) {
     // 4-man and Unspecified don't track weekly completion
     if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
-    const column = raidType === 'Hardcore' ? 'hardcore_completed' : 'classic_completed';
+    // DDN Hardcore is unreleased — no completion tracking yet
+    if (raidType === 'DDN Hardcore') return { success: true };
+    const column = raidTypeToCompletionColumn(raidType);
 
     // Clear completion timestamp
     const { error } = await supabase
@@ -850,7 +875,8 @@ class DataService {
    * @param {boolean} completed - Whether to mark as completed or not
    */
   async togglePlayerRaidCompletion(playerId, raidType, completed) {
-    const column = raidType === 'Hardcore' ? 'hardcore_completed' : 'classic_completed';
+    const column = raidTypeToCompletionColumn(raidType);
+    if (!column) return { success: true };
     const value = completed ? new Date().toISOString() : null;
 
     const { error } = await supabase

@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid } from '../constants.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
@@ -78,6 +78,9 @@ export const LineupEditorPage = {
                   <select id="raid-type">
                     <option value="Hardcore">GDN Hardcore</option>
                     <option value="Classic">GDN Classic</option>
+                    <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
+                    <option value="DDN Classic" disabled>DDN Classic (coming soon)</option>
+                    <option value="DDN Normal" disabled>DDN Normal (coming soon)</option>
                     <option value="4-man">4-Man</option>
                     <option value="Unspecified">Unspecified</option>
                   </select>
@@ -145,7 +148,7 @@ export const LineupEditorPage = {
                   </div>
                 </div>
               </div>
-              <div id="lineup-slots-container" class="slots-container ${this.currentLineup.raidType === '4-man' ? 'four-man' : ''}">
+              <div id="lineup-slots-container" class="slots-container ${isFourManRaid(this.currentLineup.raidType) ? 'four-man' : ''}">
                 ${Array(8).fill(0).map((_, idx) => `
                   <div class="slot" data-slot="${idx}">
                     <span class="slot-number">${idx + 1}</span>
@@ -240,8 +243,8 @@ export const LineupEditorPage = {
       const newRaidType = e.target.value;
       this.currentLineup.raidType = newRaidType;
 
-      // If switching to 4-man, clear slots 4-7 so only 1-4 remain
-      if (newRaidType === '4-man') {
+      // If switching to a 4-man raid, clear slots 4-7 so only 1-4 remain
+      if (isFourManRaid(newRaidType)) {
         for (let i = 4; i < 8; i++) {
           if (this.currentLineup.players[i]) {
             this.currentLineup.players[i] = '';
@@ -266,7 +269,7 @@ export const LineupEditorPage = {
       // Toggle the four-man class on the slots container
       const slotsContainer = document.getElementById('lineup-slots-container');
       if (slotsContainer) {
-        slotsContainer.classList.toggle('four-man', newRaidType === '4-man');
+        slotsContainer.classList.toggle('four-man', isFourManRaid(newRaidType));
       }
 
       this.renderAvailablePlayers(); // Re-render to update completion badges
@@ -2478,7 +2481,7 @@ export const LineupEditorPage = {
     // Apply four-man class based on raid type
     const slotsContainer = document.getElementById('lineup-slots-container');
     if (slotsContainer) {
-      slotsContainer.classList.toggle('four-man', (lineup.raidType || 'Hardcore') === '4-man');
+      slotsContainer.classList.toggle('four-man', isFourManRaid(lineup.raidType || 'Hardcore'));
     }
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('next-week-toggle').checked = lineup.isNextWeek || false;

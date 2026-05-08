@@ -124,8 +124,50 @@ export const PlayersPage = {
   // Store expanded state for owner groups (collapsed by default)
   _expandedOwners: new Set(),
 
-  // Filter for prioritizing uncleared raids { hc: boolean, cl: boolean }
-  _raidPriorityFilter: { hc: false, cl: false },
+  // Filter for prioritizing uncleared raids — keyed by raid bucket
+  // (ghc = GDN Hardcore, gcl = GDN Classic, dcl = DDN Classic, dn = DDN Normal).
+  // DDN Hardcore is unreleased so it has no filter key.
+  _raidPriorityFilter: { ghc: false, gcl: false, dcl: false, dn: false },
+
+  // Render the GDN/DDN raid badge group for a player.
+  // DDN Hardcore is rendered greyed out / non-clickable until released.
+  renderRaidBadgesHTML(player, canToggleRaid) {
+    const needsGHC = dataService.playerNeedsRaid(player, 'Hardcore');
+    const needsGCL = dataService.playerNeedsRaid(player, 'Classic');
+    const needsDCL = dataService.playerNeedsRaid(player, 'DDN Classic');
+    const needsDN = dataService.playerNeedsRaid(player, 'DDN Normal');
+    const clickClass = canToggleRaid ? 'clickable' : '';
+    const titleAttr = canToggleRaid ? 'Click to toggle' : '';
+    const toggleAttrs = (raidType, completed) =>
+      canToggleRaid
+        ? `data-player-id="${player.id}" data-raid-type="${raidType}" data-completed="${completed}"`
+        : '';
+    const check = '<span class="raid-badge-check">✓</span>';
+    const lbl = (text) => `<span class="raid-badge-label">${text}</span>`;
+    return `
+      <div class="raid-badge-group">
+        <div class="raid-row gdn-row">
+          <span class="raid-row-label">GDN</span>
+          <span class="raid-badge raid-hardcore ${!needsGHC ? 'completed' : ''} ${clickClass}"
+                ${toggleAttrs('Hardcore', !needsGHC)}
+                title="${titleAttr}">${lbl('HC')}${!needsGHC ? check : ''}</span>
+          <span class="raid-badge raid-classic ${!needsGCL ? 'completed' : ''} ${clickClass}"
+                ${toggleAttrs('Classic', !needsGCL)}
+                title="${titleAttr}">${lbl('CL')}${!needsGCL ? check : ''}</span>
+        </div>
+        <div class="raid-row ddn-row">
+          <span class="raid-row-label">DDN</span>
+          <span class="raid-badge raid-ddn-hardcore disabled" title="Coming soon">${lbl('HC')}</span>
+          <span class="raid-badge raid-ddn-classic ${!needsDCL ? 'completed' : ''} ${clickClass}"
+                ${toggleAttrs('DDN Classic', !needsDCL)}
+                title="${titleAttr}">${lbl('CL')}${!needsDCL ? check : ''}</span>
+          <span class="raid-badge raid-ddn-normal ${!needsDN ? 'completed' : ''} ${clickClass}"
+                ${toggleAttrs('DDN Normal', !needsDN)}
+                title="${titleAttr}">${lbl('N')}${!needsDN ? check : ''}</span>
+        </div>
+      </div>
+    `;
+  },
 
   // Equipment column sort: null, 'weapon', or 'armor'
   _equipmentSort: null,
@@ -285,28 +327,17 @@ export const PlayersPage = {
   },
 
   sortPlayersByRaidPriority(players) {
+    const filter = this._raidPriorityFilter;
+    const activeRaidTypes = [];
+    if (filter.ghc) activeRaidTypes.push('Hardcore');
+    if (filter.gcl) activeRaidTypes.push('Classic');
+    if (filter.dcl) activeRaidTypes.push('DDN Classic');
+    if (filter.dn) activeRaidTypes.push('DDN Normal');
+
     return [...players].sort((a, b) => {
-      const hasFilter = this._raidPriorityFilter.hc || this._raidPriorityFilter.cl;
-
-      if (hasFilter) {
-        const aNeedsHC = dataService.playerNeedsRaid(a, 'Hardcore');
-        const aNeedsCL = dataService.playerNeedsRaid(a, 'Classic');
-        const bNeedsHC = dataService.playerNeedsRaid(b, 'Hardcore');
-        const bNeedsCL = dataService.playerNeedsRaid(b, 'Classic');
-
-        let aNeeds = false, bNeeds = false;
-        if (this._raidPriorityFilter.hc && this._raidPriorityFilter.cl) {
-          // Both selected - needs either
-          aNeeds = aNeedsHC || aNeedsCL;
-          bNeeds = bNeedsHC || bNeedsCL;
-        } else if (this._raidPriorityFilter.hc) {
-          aNeeds = aNeedsHC;
-          bNeeds = bNeedsHC;
-        } else if (this._raidPriorityFilter.cl) {
-          aNeeds = aNeedsCL;
-          bNeeds = bNeedsCL;
-        }
-
+      if (activeRaidTypes.length > 0) {
+        const aNeeds = activeRaidTypes.some(rt => dataService.playerNeedsRaid(a, rt));
+        const bNeeds = activeRaidTypes.some(rt => dataService.playerNeedsRaid(b, rt));
         // Uncleared (needs raid) comes first
         if (aNeeds && !bNeeds) return -1;
         if (!aNeeds && bNeeds) return 1;
@@ -396,7 +427,8 @@ export const PlayersPage = {
       // Add event listeners for raid priority filter (multi-select)
       document.querySelectorAll('.raid-priority-filter .filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const filter = btn.dataset.filter; // 'hc' or 'cl'
+          const filter = btn.dataset.filter; // 'ghc' | 'gcl' | 'dcl'
+          if (!filter) return;
           this._raidPriorityFilter[filter] = !this._raidPriorityFilter[filter];
           this.loadPlayers();
         });
@@ -813,8 +845,11 @@ export const PlayersPage = {
     listElement.innerHTML = `
       ${this.renderClassFamilyFilter()}
       <div class="raid-priority-filter mobile-filter">
-        <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
-        <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
+        <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
+        <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
+        <button class="filter-btn ddn disabled" disabled title="Coming soon">D HC</button>
+        <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
+        <button class="filter-btn ddn ${this._raidPriorityFilter.dn ? 'active' : ''}" data-filter="dn">D N</button>
       </div>
       <table class="players-table expandable-table">
         <thead>
@@ -837,8 +872,11 @@ export const PlayersPage = {
             <td></td>
             <td>
               <div class="raid-priority-filter">
-                <button class="filter-btn ${this._raidPriorityFilter.hc ? 'active' : ''}" data-filter="hc">HC</button>
-                <button class="filter-btn ${this._raidPriorityFilter.cl ? 'active' : ''}" data-filter="cl">CL</button>
+                <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
+                <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
+                <button class="filter-btn ddn disabled" disabled title="Coming soon">D HC</button>
+                <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
+                <button class="filter-btn ddn ${this._raidPriorityFilter.dn ? 'active' : ''}" data-filter="dn">D N</button>
               </div>
             </td>
             <td></td>
@@ -846,8 +884,6 @@ export const PlayersPage = {
         </thead>
         <tbody>
           ${sortedPlayers.map(player => {
-            const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
-            const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
             const detailHtml = this._buildEquipDetailHtml(player);
@@ -877,16 +913,7 @@ export const PlayersPage = {
                 ${this._buildEquipSummaryHtml(player)}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
-                <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
-                      title="${canToggleRaid ? 'Click to toggle' : ''}">
-                  ${!needsHardcore ? '✓ ' : ''}HC
-                </span>
-                <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
-                      title="${canToggleRaid ? 'Click to toggle' : ''}">
-                  ${!needsClassic ? '✓ ' : ''}CL
-                </span>
+                ${this.renderRaidBadgesHTML(player, canToggleRaid)}
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
             </tr>
@@ -899,8 +926,6 @@ export const PlayersPage = {
         ${sortedPlayers.map(player => {
           const gs = calculateGearscore(player);
           const tier = getGearscoreTier(gs);
-          const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
-          const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
           const iconStyle = getClassSpriteStyle(player.role);
@@ -923,16 +948,7 @@ export const PlayersPage = {
                   </div>
                 </div>
                 <div class="char-card-badges">
-                  <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
-                        title="${canToggleRaid ? 'Click to toggle' : ''}">
-                    ${!needsHardcore ? '✓ ' : ''}HC
-                  </span>
-                  <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
-                        title="${canToggleRaid ? 'Click to toggle' : ''}">
-                    ${!needsClassic ? '✓ ' : ''}CL
-                  </span>
+                  ${this.renderRaidBadgesHTML(player, canToggleRaid)}
                 </div>
               </div>
               ${owner ? `<div class="char-card-owner"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="char-card-owner-avatar" onerror="this.src='/icons/avatar.svg'"><span>${owner.displayName}</span></div>` : ''}
@@ -1211,8 +1227,6 @@ export const PlayersPage = {
         </thead>
         <tbody>
           ${sortedPlayers.map(player => {
-            const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
-            const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
             const detailHtml = this._buildEquipDetailHtml(player);
@@ -1232,16 +1246,7 @@ export const PlayersPage = {
                 ${formatPlayerEquipmentHtml(player)}
               </td>
               <td class="raids-needed" data-label="Raids Needed">
-                <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
-                      title="${canToggleRaid ? 'Click to toggle' : ''}">
-                  ${!needsHardcore ? '✓ ' : ''}HC
-                </span>
-                <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                      ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
-                      title="${canToggleRaid ? 'Click to toggle' : ''}">
-                  ${!needsClassic ? '✓ ' : ''}CL
-                </span>
+                ${this.renderRaidBadgesHTML(player, canToggleRaid)}
               </td>
               <td class="notes" data-label="Notes">${player.notes}</td>
             </tr>
@@ -1261,8 +1266,6 @@ export const PlayersPage = {
         ${sortedPlayers.map(player => {
           const gs = calculateGearscore(player);
           const tier = getGearscoreTier(gs);
-          const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
-          const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
           const iconStyle = getClassSpriteStyle(player.role);
@@ -1285,16 +1288,7 @@ export const PlayersPage = {
                   </div>
                 </div>
                 <div class="char-card-badges">
-                  <span class="raid-badge raid-hardcore ${!needsHardcore ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"` : ''}
-                        title="${canToggleRaid ? 'Click to toggle' : ''}">
-                    ${!needsHardcore ? '✓ ' : ''}HC
-                  </span>
-                  <span class="raid-badge raid-classic ${!needsClassic ? 'completed' : ''} ${canToggleRaid ? 'clickable' : ''}"
-                        ${canToggleRaid ? `data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"` : ''}
-                        title="${canToggleRaid ? 'Click to toggle' : ''}">
-                    ${!needsClassic ? '✓ ' : ''}CL
-                  </span>
+                  ${this.renderRaidBadgesHTML(player, canToggleRaid)}
                 </div>
               </div>
               ${detailHtml}

@@ -147,8 +147,6 @@ export const MyRaidsPage = {
         }
         html += '<div class="character-cards">';
         players.forEach(player => {
-          const needsHardcore = dataService.playerNeedsRaid(player, 'Hardcore');
-          const needsClassic = dataService.playerNeedsRaid(player, 'Classic');
           const iconStyle = getClassSpriteStyle(player.role);
           const playerRaids = raidsByPlayer[player.id] || [];
 
@@ -163,16 +161,7 @@ export const MyRaidsPage = {
                   </div>
                 </div>
                 <div class="character-actions">
-                  <span class="raid-badge raid-hardcore clickable ${!needsHardcore ? 'completed' : ''}"
-                        data-player-id="${player.id}" data-raid-type="Hardcore" data-completed="${!needsHardcore}"
-                        title="Click to toggle">
-                    ${!needsHardcore ? '✓ ' : ''}HC
-                  </span>
-                  <span class="raid-badge raid-classic clickable ${!needsClassic ? 'completed' : ''}"
-                        data-player-id="${player.id}" data-raid-type="Classic" data-completed="${!needsClassic}"
-                        title="Click to toggle">
-                    ${!needsClassic ? '✓ ' : ''}CL
-                  </span>
+                  ${PlayersPage.renderRaidBadgesHTML(player, true)}
                 </div>
               </div>
               <div class="character-personal-raids">

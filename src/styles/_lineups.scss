@@ -40,6 +40,15 @@
       border-bottom-color: $primary-color;
       background-color: rgba(244, 196, 48, 0.1);
     }
+
+    &:disabled {
+      color: rgba(255, 255, 255, 0.25);
+      cursor: not-allowed;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
   }
 
   .tab-content-wrapper {

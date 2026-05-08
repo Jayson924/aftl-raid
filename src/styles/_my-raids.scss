@@ -279,32 +279,109 @@
   }
 
   // ============================================
-  // RAID BADGES - HC/CL completion badges
+  // RAID BADGES - GDN/DDN completion badges
+  // GDN = jungle (greens), DDN = desert (sand)
   // ============================================
 
+  .raid-badge-group {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .raid-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .raid-row-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    width: 1.8rem;
+    flex-shrink: 0;
+    text-transform: uppercase;
+
+    .gdn-row & { color: #6fa843; }
+    .ddn-row & { color: #c69257; }
+  }
+
   .raid-badge {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.3rem 0.6rem;
+    padding: 0.25rem 0.55rem;
     border-radius: 4px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     border: 2px solid transparent;
     transition: all 0.2s ease;
     user-select: none;
     min-width: 36px;
 
-    &.raid-hardcore {
-      background: linear-gradient(135deg, #d62d49 0%, #b8243d 100%);
+    .raid-badge-label {
+      transition: opacity 0.15s ease;
+    }
+
+    .raid-badge-check {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      font-weight: 900;
+      line-height: 1;
       color: white;
-      box-shadow: 0 2px 6px rgba(214, 45, 73, 0.3);
+      text-shadow:
+        0 0 3px rgba(0, 0, 0, 0.9),
+        0 1px 2px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+    }
+
+    &.completed .raid-badge-label {
+      opacity: 0.25;
+    }
+
+    // GDN — jungle palette
+    &.raid-hardcore {
+      background: linear-gradient(135deg, #2d6a3a 0%, #245530 100%);
+      color: white;
+      box-shadow: 0 2px 6px rgba(45, 106, 58, 0.3);
     }
 
     &.raid-classic {
-      background: linear-gradient(135deg, #8f5ce0 0%, #7648c7 100%);
+      background: linear-gradient(135deg, #5b9c3e 0%, #4a8133 100%);
       color: white;
-      box-shadow: 0 2px 6px rgba(143, 92, 224, 0.3);
+      box-shadow: 0 2px 6px rgba(91, 156, 62, 0.3);
+    }
+
+    // DDN — desert palette
+    &.raid-ddn-hardcore {
+      background: linear-gradient(135deg, #a06430 0%, #855228 100%);
+      color: white;
+      box-shadow: 0 2px 6px rgba(160, 100, 48, 0.3);
+    }
+
+    &.raid-ddn-classic {
+      background: linear-gradient(135deg, #c69257 0%, #a87a47 100%);
+      color: white;
+      box-shadow: 0 2px 6px rgba(198, 146, 87, 0.3);
+    }
+
+    &.raid-ddn-normal {
+      background: linear-gradient(135deg, #d9b07c 0%, #c19967 100%);
+      color: #3a2614;
+      box-shadow: 0 2px 6px rgba(217, 176, 124, 0.3);
+    }
+
+    &.disabled {
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.3);
+      box-shadow: none;
+      cursor: not-allowed;
     }
 
     &.clickable {
@@ -321,16 +398,27 @@
     }
 
     &.completed {
-      opacity: 0.6;
       border-color: $success-color;
       box-shadow: 0 0 8px rgba(40, 167, 69, 0.3);
 
       &.raid-hardcore {
-        background: linear-gradient(135deg, rgba(214, 45, 73, 0.5) 0%, rgba(184, 36, 61, 0.5) 100%);
+        background: linear-gradient(135deg, rgba(45, 106, 58, 0.5) 0%, rgba(36, 85, 48, 0.5) 100%);
       }
 
       &.raid-classic {
-        background: linear-gradient(135deg, rgba(143, 92, 224, 0.5) 0%, rgba(118, 72, 199, 0.5) 100%);
+        background: linear-gradient(135deg, rgba(91, 156, 62, 0.5) 0%, rgba(74, 129, 51, 0.5) 100%);
+      }
+
+      &.raid-ddn-hardcore {
+        background: linear-gradient(135deg, rgba(160, 100, 48, 0.5) 0%, rgba(133, 82, 40, 0.5) 100%);
+      }
+
+      &.raid-ddn-classic {
+        background: linear-gradient(135deg, rgba(198, 146, 87, 0.5) 0%, rgba(168, 122, 71, 0.5) 100%);
+      }
+
+      &.raid-ddn-normal {
+        background: linear-gradient(135deg, rgba(217, 176, 124, 0.5) 0%, rgba(193, 153, 103, 0.5) 100%);
       }
     }
   }

@@ -688,6 +688,27 @@
         background-color: rgba($primary-color, 0.12);
         color: rgba($primary-color, 0.8);
       }
+
+      &.gdn.active {
+        background-color: rgba(91, 156, 62, 0.18);
+        color: #8fc56b;
+      }
+
+      &.ddn.active {
+        background-color: rgba(198, 146, 87, 0.18);
+        color: #d9b07c;
+      }
+
+      &:disabled,
+      &.disabled {
+        color: rgba(255, 255, 255, 0.18);
+        cursor: not-allowed;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.03);
+          color: rgba(255, 255, 255, 0.18);
+        }
+      }
     }
   }
 
@@ -1004,24 +1025,98 @@
       white-space: nowrap;
     }
 
+    .raid-badge-group {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .raid-row {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .raid-row-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      width: 1.6rem;
+      flex-shrink: 0;
+      text-transform: uppercase;
+
+      .gdn-row & { color: #6fa843; }
+      .ddn-row & { color: #c69257; }
+    }
+
     .raid-badge {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.45rem;
       border-radius: 4px;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 600;
-      margin-right: 0.25rem;
       border: 2px solid transparent;
       transition: all 0.2s ease;
+      min-width: 2rem;
+      justify-content: center;
 
+      .raid-badge-label {
+        transition: opacity 0.15s ease;
+      }
+
+      .raid-badge-check {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        font-weight: 900;
+        line-height: 1;
+        color: white;
+        text-shadow:
+          0 0 3px rgba(0, 0, 0, 0.9),
+          0 1px 2px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+      }
+
+      &.completed .raid-badge-label {
+        opacity: 0.25;
+      }
+
+      // GDN — jungle palette
       &.raid-hardcore {
-        background-color: #d62d49;
+        background-color: #2d6a3a;
         color: white;
       }
 
       &.raid-classic {
-        background-color: #8f5ce0;
+        background-color: #5b9c3e;
         color: white;
+      }
+
+      // DDN — desert palette
+      &.raid-ddn-hardcore {
+        background-color: #a06430;
+        color: white;
+      }
+
+      &.raid-ddn-classic {
+        background-color: #c69257;
+        color: white;
+      }
+
+      &.raid-ddn-normal {
+        background-color: #d9b07c;
+        color: #3a2614;
+      }
+
+      &.disabled {
+        background-color: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.3);
+        cursor: not-allowed;
       }
 
       &.clickable {
@@ -1034,17 +1129,14 @@
       }
 
       &.completed {
-        opacity: 0.5;
         border-color: $success-color;
         position: relative;
 
-        &.raid-hardcore {
-          background-color: rgba(214, 45, 73, 0.4);
-        }
-
-        &.raid-classic {
-          background-color: rgba(143, 92, 224, 0.4);
-        }
+        &.raid-hardcore       { background-color: rgba(45, 106, 58, 0.4); }
+        &.raid-classic        { background-color: rgba(91, 156, 62, 0.4); }
+        &.raid-ddn-hardcore   { background-color: rgba(160, 100, 48, 0.4); }
+        &.raid-ddn-classic    { background-color: rgba(198, 146, 87, 0.4); }
+        &.raid-ddn-normal     { background-color: rgba(217, 176, 124, 0.4); }
       }
     }
 
@@ -1263,21 +1355,96 @@
   gap: 0.25rem;
   flex-shrink: 0;
 
-  .raid-badge {
-    display: inline-block;
-    padding: 0.2rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 700;
+  .raid-badge-group {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
 
+  .raid-row {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .raid-row-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    width: 1.5rem;
+    flex-shrink: 0;
+    text-transform: uppercase;
+
+    .gdn-row & { color: #6fa843; }
+    .ddn-row & { color: #c69257; }
+  }
+
+  .raid-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 1.8rem;
+    justify-content: center;
+
+    .raid-badge-label {
+      transition: opacity 0.15s ease;
+    }
+
+    .raid-badge-check {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
+      font-weight: 900;
+      line-height: 1;
+      color: white;
+      text-shadow:
+        0 0 3px rgba(0, 0, 0, 0.9),
+        0 1px 2px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+    }
+
+    &.completed .raid-badge-label {
+      opacity: 0.25;
+    }
+
+    // GDN — jungle palette
     &.raid-hardcore {
-      background-color: rgba(214, 45, 73, 0.8);
+      background-color: rgba(45, 106, 58, 0.85);
       color: white;
     }
 
     &.raid-classic {
-      background-color: rgba(143, 92, 224, 0.8);
+      background-color: rgba(91, 156, 62, 0.85);
       color: white;
+    }
+
+    // DDN — desert palette
+    &.raid-ddn-hardcore {
+      background-color: rgba(160, 100, 48, 0.85);
+      color: white;
+    }
+
+    &.raid-ddn-classic {
+      background-color: rgba(198, 146, 87, 0.85);
+      color: white;
+    }
+
+    &.raid-ddn-normal {
+      background-color: rgba(217, 176, 124, 0.85);
+      color: #3a2614;
+    }
+
+    &.disabled {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.3);
+      cursor: not-allowed;
     }
 
     &.clickable {
@@ -1288,16 +1455,13 @@
     }
 
     &.completed {
-      opacity: 0.5;
       border: 1px solid $success-color;
 
-      &.raid-hardcore {
-        background-color: rgba(214, 45, 73, 0.4);
-      }
-
-      &.raid-classic {
-        background-color: rgba(143, 92, 224, 0.4);
-      }
+      &.raid-hardcore       { background-color: rgba(45, 106, 58, 0.4); }
+      &.raid-classic        { background-color: rgba(91, 156, 62, 0.4); }
+      &.raid-ddn-hardcore   { background-color: rgba(160, 100, 48, 0.4); }
+      &.raid-ddn-classic    { background-color: rgba(198, 146, 87, 0.4); }
+      &.raid-ddn-normal     { background-color: rgba(217, 176, 124, 0.4); }
     }
   }
 }

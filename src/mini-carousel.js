@@ -1,4 +1,4 @@
-import { EQUIPMENT_RARITIES, getClassSpriteStyle, getLineupSize } from './constants.js';
+import { EQUIPMENT_RARITIES, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel } from './constants.js';
 import { dataService } from './data.js';
 
 /**
@@ -129,11 +129,11 @@ export function renderMiniLineupCard(lineup, playerMap, options = {}) {
           ${lineup.name}
         </span>
         <div class="mini-lineup-header-actions">
-          <span class="mini-lineup-raid-type">${lineup.raidType === 'Unspecified' ? 'Unspecified' : (lineup.raidType === '4-man' ? '4-Man' : `GDN ${lineup.raidType || 'Hardcore'}`)}</span>
+          <span class="mini-lineup-raid-type">${formatRaidTypeLabel(lineup.raidType)}</span>
           ${deleteBtn}
         </div>
       </div>
-      <div class="mini-lineup-grid ${lineup.raidType === '4-man' ? 'four-man' : ''}">
+      <div class="mini-lineup-grid ${isFourManRaid(lineup.raidType) ? 'four-man' : ''}">
         ${playerCards}
       </div>
     </div>

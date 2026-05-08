@@ -2,7 +2,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel } from '../constants.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
 
@@ -34,6 +34,9 @@ export const LineupsPage = {
         <div class="raid-tabs">
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
+          <button class="tab-button" disabled title="Coming soon">DDN Hardcore</button>
+          <button class="tab-button" disabled title="Coming soon">DDN Classic</button>
+          <button class="tab-button" disabled title="Coming soon">DDN Normal</button>
           <button class="tab-button ${this.currentRaidType === '4-man' ? 'active' : ''}" data-raid-type="4-man">4-Man</button>
           <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
         </div>
@@ -341,6 +344,9 @@ export const LineupsPage = {
               <option value="Unspecified" selected>Unspecified</option>
               <option value="Hardcore">GDN Hardcore</option>
               <option value="Classic">GDN Classic</option>
+              <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
+              <option value="DDN Classic" disabled>DDN Classic (coming soon)</option>
+              <option value="DDN Normal" disabled>DDN Normal (coming soon)</option>
               <option value="4-man">4-Man</option>
             </select>
           ` : ''}
@@ -368,7 +374,7 @@ export const LineupsPage = {
             </div>
           </div>
         </div>
-        <div class="lineup-players ${lineup.raidType === '4-man' ? 'four-man' : ''}">
+        <div class="lineup-players ${isFourManRaid(lineup.raidType) ? 'four-man' : ''}">
           ${lineup.players.slice(0, getLineupSize(lineup.raidType)).map((playerName, idx) => {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
@@ -454,7 +460,7 @@ export const LineupsPage = {
           const lineupId = e.target.dataset.lineupId;
           try {
             await dataService.updateLineupRaidType(lineupId, newType);
-            toast.show(newType === '4-man' ? 'Lineup moved to 4-Man' : `Lineup moved to GDN ${newType}`, 'success');
+            toast.show(`Lineup moved to ${formatRaidTypeLabel(newType)}`, 'success');
             this.currentShowcaseLineup = null;
             await this.loadLineups();
           } catch (err) {
