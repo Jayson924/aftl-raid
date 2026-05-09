@@ -58,6 +58,40 @@
     position: relative;
   }
 
+  .preliminary-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(244, 196, 48, 0.35);
+    border-left: 4px solid $primary-color;
+    border-radius: 6px;
+    background: rgba(244, 196, 48, 0.08);
+    color: $text-light;
+    font-size: 0.95rem;
+    margin-bottom: -1rem;
+
+    &--hidden {
+      display: none;
+    }
+
+    &__tag {
+      flex-shrink: 0;
+      padding: 0.15rem 0.55rem;
+      background: $primary-color;
+      color: #1a1a1a;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    &__text {
+      line-height: 1.4;
+    }
+  }
+
   .showcase-area {
     display: flex;
     flex-direction: column;

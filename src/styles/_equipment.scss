@@ -108,10 +108,67 @@
 
 .player-equipment {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.15rem;
   margin-top: 0.25rem;
   font-size: 0.85rem;
+}
+
+.equip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  line-height: 1.2;
+
+  .equip-row-icon {
+    display: inline-flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.55);
+    flex-shrink: 0;
+
+    svg {
+      width: 13px;
+      height: 13px;
+    }
+  }
+
+  .equip-piece {
+    font-weight: 600;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .equip-sep {
+    color: rgba(255, 255, 255, 0.3);
+    font-weight: 400;
+    margin: 0 0.1rem;
+  }
+
+  .equip-avg-tag {
+    font-size: 0.7rem;
+    font-weight: 400;
+    opacity: 0.7;
+    font-style: italic;
+  }
+
+  &--armor .equip-piece {
+    font-weight: 500;
+  }
+}
+
+.player-equipment-compact {
+  .equip-row {
+    gap: 0.3rem;
+
+    .equip-row-icon svg {
+      width: 11px;
+      height: 11px;
+    }
+
+    .equip-piece {
+      font-size: 0.78rem;
+    }
+  }
 }
 
 .sortable-header {

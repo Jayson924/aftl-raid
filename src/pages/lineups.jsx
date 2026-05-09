@@ -3,6 +3,7 @@ import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
 import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel } from '../constants.js';
+import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
 
@@ -35,12 +36,16 @@ export const LineupsPage = {
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
           <button class="tab-button" disabled title="Coming soon">DDN Hardcore</button>
-          <button class="tab-button" disabled title="Coming soon">DDN Classic</button>
+          <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic" title="Preliminary — subject to change">DDN Classic</button>
           <button class="tab-button" disabled title="Coming soon">DDN Normal</button>
           <button class="tab-button ${this.currentRaidType === '4-man' ? 'active' : ''}" data-raid-type="4-man">4-Man</button>
           <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
         </div>
         <div class="tab-content-wrapper">
+          <div id="preliminary-banner" class="preliminary-banner ${this.currentRaidType === 'DDN Classic' ? '' : 'preliminary-banner--hidden'}">
+            <span class="preliminary-banner__tag">Preliminary</span>
+            <span class="preliminary-banner__text">DDN Classic isn't released yet — these lineups are drafts and subject to change.</span>
+          </div>
           <div class="showcase-area">
             <div id="showcase-card-container">
               <div class="loading">Loading lineup...</div>
@@ -71,6 +76,7 @@ export const LineupsPage = {
     this.setupCarouselDragScroll();
     this.setupNextWeekToggle();
     this.loadLineups();
+    initChipTooltip();
 
     // Close damage amp tooltips when clicking elsewhere
     document.addEventListener('click', () => {
@@ -159,6 +165,12 @@ export const LineupsPage = {
         button.classList.remove('active');
       }
     });
+
+    // Toggle preliminary banner for DDN Classic
+    const banner = document.getElementById('preliminary-banner');
+    if (banner) {
+      banner.classList.toggle('preliminary-banner--hidden', raidType !== 'DDN Classic');
+    }
 
     // Reload lineups for new raid type
     this.loadLineups();
@@ -345,7 +357,7 @@ export const LineupsPage = {
               <option value="Hardcore">GDN Hardcore</option>
               <option value="Classic">GDN Classic</option>
               <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
-              <option value="DDN Classic" disabled>DDN Classic (coming soon)</option>
+              <option value="DDN Classic">DDN Classic (not final)</option>
               <option value="DDN Normal" disabled>DDN Normal (coming soon)</option>
               <option value="4-man">4-Man</option>
             </select>
@@ -417,7 +429,7 @@ export const LineupsPage = {
               ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
-                <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : (() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</span>
+                <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : renderGearscoreBadge(player)}</span>
                 ${pilotDisplay}
                 ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
                 ${!isPub ? formatPlayerEquipmentHtml(player, 'player-equipment-compact') : ''}

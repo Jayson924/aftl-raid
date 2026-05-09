@@ -21,6 +21,7 @@ export const CLASS_SPRITE_MAP = {
   // 1st specializations
   'Swordmaster':    [0, 8],
   'Mercenary':      [1, 0],
+  'Avenger':        [6, 3],
   'Bowmaster':      [1, 6],
   'Acrobat':        [1, 7],
   'Elemental Lord': [2, 4],
@@ -36,6 +37,7 @@ export const CLASS_SPRITE_MAP = {
   'Moon Lord':      [1, 3],
   'Barbarian':      [1, 4],
   'Destroyer':      [1, 5],
+  'Dark Avenger':   [6, 4],
   'Sniper':         [2, 0],
   'Artillery':      [2, 1],
   'Wind Walker':    [2, 2],
@@ -94,6 +96,7 @@ export const CLASSES = [
   'Moon Lord',
   'Barbarian',
   'Destroyer',
+  'Dark Avenger',
   'Sniper',
   'Artillery',
   'Tempest',
@@ -121,33 +124,39 @@ export const CLASSES = [
 export const DAMAGE_AMP_SOURCES = {
   paladin: {
     name: 'Armor Break',
-    physical: 16,
-    magic: 16,
+    physical: 20,
+    magic: 20,
     classes: ['Guardian', 'Crusader']
   },
   saint: {
     name: 'Shock Relic',
-    physical: 14,
-    magic: 14,
+    physical: 20,
+    magic: 20,
     classes: ['Saint']
   },
   forceUser: {
     name: 'Force Mirror',
     physical: 0,
-    magic: 26,
+    magic: 30,
     classes: ['Smasher', 'Majesty']
   },
   bowmaster: {
     name: 'Bulls Eye',
-    physical: 16,
-    magic: 16,
+    physical: 20,
+    magic: 20,
     classes: ['Sniper', 'Artillery']
   },
   swordmaster: {
     name: 'Provoking Slam',
-    physical: 35,
-    magic: 35,
+    physical: 40,
+    magic: 40,
     classes: ['Gladiator', 'Moon Lord']
+  },
+  engineer: {
+    name: 'Mecha Duck',
+    physical: 12,
+    magic: 12,
+    classes: ['Gear Master, Shooting Star']
   },
   tempest: {
     name: 'Binding Shot EX',
@@ -167,22 +176,16 @@ export const DAMAGE_AMP_SOURCES = {
     magic: 30,
     classes: ['Moon Lord']
   },
-  physicianMagic: {
-    name: 'Love Virus',
-    physical: 8,
-    magic: 8,
-    classes: ['Physician']
-  },
   physicianBoth: {
     name: 'Disease EX',
-    physical: 10,
-    magic: 10,
+    physical: 20,
+    magic: 20,
     classes: ['Physician']
   },
   screamer: {
     name: 'Summon Puppet',
-    physical: 18,
-    magic: 18,
+    physical: 20,
+    magic: 20,
     classes: ['Dark Summoner', 'Soul Eater']
   },
   destroyer: {
@@ -195,7 +198,7 @@ export const DAMAGE_AMP_SOURCES = {
     name: 'Dark Stinger',
     physical: 20,
     magic: 20,
-    classes: ['Avenger']
+    classes: ['Dark Avenger']
   }
 };
 
@@ -204,7 +207,7 @@ export const CLASS_FAMILIES = {
   warrior: {
     name: 'Warrior',
     icon: 'warrior.png',
-    classes: ['Moon Lord', 'Gladiator', 'Barbarian', 'Destroyer'],
+    classes: ['Moon Lord', 'Gladiator', 'Barbarian', 'Destroyer', 'Dark Avenger'],
     specializations: {
       swordmaster: {
         name: 'Swordmaster',
@@ -215,6 +218,11 @@ export const CLASS_FAMILIES = {
         name: 'Mercenary',
         icon: 'Mercenary.png',
         classes: ['Barbarian', 'Destroyer']
+      },
+      avenger: {
+        name: 'Avenger',
+        icon: 'Avenger.png',
+        classes: ['Dark Avenger']
       }
     }
   },
@@ -505,15 +513,74 @@ export function formatEquipmentText(type, player) {
   };
 }
 
-// Generate compact equipment + suffix + FD summary HTML for a player
-// Used across lineups, lineup editor, and player selector
-export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment') {
-  const parts = [];
+// Armor slots used for the average-enhancement summary
+const ARMOR_SLOTS = ['helmet', 'top', 'bottom', 'gloves', 'boots'];
 
-  const weaponEquip = formatEquipmentText('weapon', player);
-  if (weaponEquip) parts.push(weaponEquip.html);
-  const armorEquip = formatEquipmentText('armor', player);
-  if (armorEquip) parts.push(armorEquip.html);
+function rarityInfo(rarity) {
+  return EQUIPMENT_RARITIES.find(r => r.value === rarity) || null;
+}
+
+function weaponPieceChip(piece, title) {
+  if (!piece || !piece.rarity) return '';
+  const info = rarityInfo(piece.rarity);
+  const enh = piece.enhancement != null && piece.enhancement !== '' ? ` +${piece.enhancement}` : '';
+  return `<span class="equip-piece" style="color: ${info?.color || 'inherit'}" title="${title}">${info?.label || piece.rarity}${enh}</span>`;
+}
+
+// Generate compact equipment + suffix summary HTML for a player.
+// Layout: weapons row (main + sub w/ enhance), armor row (avg enhance).
+export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment') {
+  const equip = player.equipment || {};
+
+  // Weapons: main + sub
+  const main = equip.mainWeapon || (player.weapon ? { rarity: player.weapon, enhancement: player.weaponEnhance } : null);
+  const sub = equip.subWeapon || null;
+  const weaponChips = [
+    weaponPieceChip(main, 'Main weapon'),
+    weaponPieceChip(sub, 'Sub weapon')
+  ].filter(Boolean);
+
+  // Armor: average enhancement across present pieces
+  const armorPieces = ARMOR_SLOTS.map(s => equip[s]).filter(p => p && p.rarity);
+  let armorChip = '';
+  if (armorPieces.length > 0) {
+    const enhVals = armorPieces.map(p => Number(p.enhancement) || 0);
+    const avg = enhVals.reduce((a, b) => a + b, 0) / armorPieces.length;
+    const avgStr = Number.isInteger(avg) ? `+${avg}` : `+${avg.toFixed(1)}`;
+
+    const counts = {};
+    armorPieces.forEach(p => { counts[p.rarity] = (counts[p.rarity] || 0) + 1; });
+    const rarities = Object.keys(counts);
+    let label, color;
+    if (rarities.length === 1) {
+      const info = rarityInfo(rarities[0]);
+      label = info?.label || rarities[0];
+      color = info?.color || 'inherit';
+    } else {
+      const dominant = rarities.sort((a, b) => counts[b] - counts[a])[0];
+      const info = rarityInfo(dominant);
+      label = 'Mixed';
+      color = info?.color || 'inherit';
+    }
+    const title = `Avg of ${armorPieces.length} armor piece${armorPieces.length === 1 ? '' : 's'}`;
+    armorChip = `<span class="equip-piece" style="color: ${color}" title="${title}">${label} ${avgStr}<span class="equip-avg-tag"> (avg)</span></span>`;
+  } else if (player.armor) {
+    const info = rarityInfo(player.armor);
+    const enh = player.armorEnhance ? ` +${player.armorEnhance}` : '';
+    armorChip = `<span class="equip-piece" style="color: ${info?.color || 'inherit'}">${info?.label || player.armor}${enh}</span>`;
+  }
+
+  let html = '';
+  if (weaponChips.length > 0 || armorChip) {
+    html += `<div class="${cssClass}">`;
+    if (weaponChips.length > 0) {
+      html += `<div class="equip-row equip-row--weapons"><span class="equip-row-icon">${EQUIPMENT_ICONS.weapon}</span>${weaponChips.join('<span class="equip-sep">/</span>')}</div>`;
+    }
+    if (armorChip) {
+      html += `<div class="equip-row equip-row--armor"><span class="equip-row-icon">${EQUIPMENT_ICONS.armor}</span>${armorChip}</div>`;
+    }
+    html += `</div>`;
+  }
 
   const suffixes = [];
   if (player.suffix1) {
@@ -523,11 +590,6 @@ export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment')
   if (player.suffix2) {
     const s = WEAPON_SUFFIXES.find(s => s.value === player.suffix2);
     suffixes.push(s?.label || player.suffix2);
-  }
-
-  let html = '';
-  if (parts.length > 0) {
-    html += `<div class="${cssClass}">${parts.join(' ')}</div>`;
   }
   if (suffixes.length > 0) {
     html += `<div class="player-suffixes">${suffixes.join(' + ')}</div>`;

@@ -237,12 +237,25 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--tier-color) 20%, transparent) inset;
   }
 
+  // Guest open slot — class is locked but the player isn't filled yet.
+  // Looks like an open slot (dashed border) but shows the requested class
+  // sprite and an optional preferred-player line.
+  &--guest {
+    border-color: rgba(244, 196, 48, 0.5);
+    background: rgba(244, 196, 48, 0.06);
+  }
+
   &__icon {
     width: 44px;
     height: 46px;
     display: flex;
     align-items: center;
     justify-content: center;
+
+    &--ghost .class-sprite {
+      filter: grayscale(0.55) brightness(0.85);
+      opacity: 0.7;
+    }
   }
 
   &__icon-placeholder {
@@ -284,6 +297,18 @@
   &__name {
     font-size: 0.62rem;
     color: #888;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__preference {
+    margin-top: 2px;
+    font-size: 0.6rem;
+    line-height: 1.15;
+    color: rgba(244, 196, 48, 0.85);
+    font-style: italic;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -907,6 +932,36 @@
   }
 }
 
+// Floating variant — positioned by JS via getBoundingClientRect so it escapes
+// scroll-clipped ancestors (used on lineups page + lineup editor cards).
+.chip-tip.chip-tip-floating {
+  position: fixed;
+  bottom: auto;
+  left: 0;
+  top: 0;
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+  z-index: 10000;
+
+  // Caret pointing up (placed below the trigger)
+  &.chip-tip-floating--below {
+    &::before {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: rgba(244, 196, 48, 0.28);
+    }
+    &::after {
+      top: auto;
+      bottom: calc(100% - 1px);
+      border-top-color: transparent;
+      border-bottom-color: #1e1e1e;
+    }
+  }
+}
+
 // ─── Slot Picker (sticky bottom dock — drag from picker into party slots) ───
 
 body.slot-picker-open {
@@ -1158,6 +1213,7 @@ body.slot-picker-open {
     &__label { font-size: 0.62rem; }
     &__sub { font-size: 0.55rem; }
     &__name { font-size: 0.56rem; }
+    &__preference { font-size: 0.55rem; }
     &__gs { font-size: 0.65rem; }
 
     &__icon, &__icon-placeholder {

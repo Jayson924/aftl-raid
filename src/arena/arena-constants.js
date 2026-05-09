@@ -63,7 +63,7 @@ export const CLASS_ABILITIES = {
     name: 'Highlander',
     description: 'Survive lethal damage at 1 HP once (lasts 2 turns)',
     icon: `<span class="ability-icon"><div class="class-sprite" style="${getClassSpriteStyle('Warrior')}"></div></span>`,
-    classes: ['Gladiator', 'Moon Lord', 'Barbarian', 'Destroyer']
+    classes: ['Gladiator', 'Moon Lord', 'Barbarian', 'Destroyer', 'Dark Avenger']
   },
   archer: {
     id: 'critical_buff',

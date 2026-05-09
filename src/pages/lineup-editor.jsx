@@ -5,6 +5,7 @@ import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.j
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
+import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -30,6 +31,8 @@ export const LineupEditorPage = {
   expandedClassFamily: null,
   selectedSpecialization: null,
   selectedFinalClass: null,
+  gearscoreMin: 0,
+  playerListLayout: 1, // 1 = single column, 2 = two columns
   showCarouselLineups: true,
   showCarouselNextWeek: false,
   lineupSubscription: null, // Supabase realtime subscription
@@ -61,6 +64,9 @@ export const LineupEditorPage = {
     this.expandedClassFamily = null;
     this.selectedSpecialization = null;
     this.selectedFinalClass = null;
+    this.gearscoreMin = 0;
+    const savedCols = parseInt(localStorage.getItem('lineup-editor-player-cols'), 10);
+    this.playerListLayout = savedCols === 2 ? 2 : 1;
     this.viewingUsers = [];
 
     container.innerHTML = `
@@ -79,7 +85,7 @@ export const LineupEditorPage = {
                     <option value="Hardcore">GDN Hardcore</option>
                     <option value="Classic">GDN Classic</option>
                     <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
-                    <option value="DDN Classic" disabled>DDN Classic (coming soon)</option>
+                    <option value="DDN Classic">DDN Classic (not final)</option>
                     <option value="DDN Normal" disabled>DDN Normal (coming soon)</option>
                     <option value="4-man">4-Man</option>
                     <option value="Unspecified">Unspecified</option>
@@ -196,7 +202,12 @@ export const LineupEditorPage = {
             </div>
 
             <div class="available-players">
-              <h3>Available Characters <span style="font-size: 0.85rem; color: #888; font-weight: normal;">(Drag & drop, double click, click slots)</span></h3>
+              <div class="available-players-header">
+                <h3>Available Characters <span style="font-size: 0.85rem; color: #888; font-weight: normal;">(Drag & drop, double click, click slots)</span></h3>
+                <button type="button" id="layout-toggle-btn" class="layout-toggle-btn" title="Toggle column layout" aria-label="Toggle column layout">
+                  <span class="layout-toggle-icon ${this.playerListLayout === 2 ? 'is-cols-2' : 'is-cols-1'}"></span>
+                </button>
+              </div>
               <div class="player-filter">
                 <input type="text" id="player-search" placeholder="Search characters...">
               </div>
@@ -219,7 +230,12 @@ export const LineupEditorPage = {
                   <span>Hide in Lineup</span>
                 </label>
               </div>
-              <div id="available-players-list" class="players-list">
+              <div class="gs-filter">
+                <span class="gs-filter__label">Min GS</span>
+                <input type="range" id="gs-min-slider" class="gs-slider" min="0" max="100" step="1" value="0">
+                <span class="gs-filter__value" id="gs-min-value">0+</span>
+              </div>
+              <div id="available-players-list" class="players-list${this.playerListLayout === 2 ? ' players-list--cols-2' : ''}">
                 <div class="loading">Loading players...</div>
               </div>
             </div>
@@ -232,6 +248,7 @@ export const LineupEditorPage = {
     this.setupCarouselDragScroll();
     this.updateRaidTimeDisplay();
     this.loadPlayers();
+    initChipTooltip();
   },
 
   attachEventListeners() {
@@ -368,6 +385,34 @@ export const LineupEditorPage = {
     document.getElementById('hide-in-lineup-checkbox').addEventListener('change', () => {
       this.filterPlayers();
     });
+
+    const gsSlider = document.getElementById('gs-min-slider');
+    const gsValue = document.getElementById('gs-min-value');
+    gsSlider.addEventListener('input', () => {
+      const v = Number(gsSlider.value);
+      this.gearscoreMin = v;
+      const tier = getGearscoreTier(v);
+      gsValue.textContent = `${v}+`;
+      gsValue.style.color = tier.color;
+      gsSlider.style.setProperty('--gs-fill', `${v}%`);
+      gsSlider.style.setProperty('--gs-color', tier.color);
+      this.filterPlayers();
+    });
+
+    const layoutToggleBtn = document.getElementById('layout-toggle-btn');
+    if (layoutToggleBtn) {
+      layoutToggleBtn.addEventListener('click', () => {
+        this.playerListLayout = this.playerListLayout === 2 ? 1 : 2;
+        localStorage.setItem('lineup-editor-player-cols', String(this.playerListLayout));
+        const listEl = document.getElementById('available-players-list');
+        if (listEl) listEl.classList.toggle('players-list--cols-2', this.playerListLayout === 2);
+        const iconEl = layoutToggleBtn.querySelector('.layout-toggle-icon');
+        if (iconEl) {
+          iconEl.classList.toggle('is-cols-2', this.playerListLayout === 2);
+          iconEl.classList.toggle('is-cols-1', this.playerListLayout === 1);
+        }
+      });
+    }
 
     // Class family filter buttons
     document.querySelectorAll('.class-family-btn').forEach(btn => {
@@ -740,7 +785,7 @@ export const LineupEditorPage = {
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
-            <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
+            <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
             <div class="player-role">${player.role}</div>
             ${formatPlayerEquipmentHtml(player)}
           </div>
@@ -762,11 +807,14 @@ export const LineupEditorPage = {
     const searchTerm = document.getElementById('player-search').value.toLowerCase();
     const hideCleared = document.getElementById('hide-cleared-checkbox').checked;
     const hideInLineup = document.getElementById('hide-in-lineup-checkbox').checked;
+    const minGs = this.gearscoreMin || 0;
 
     return this.players
       .filter(player => {
         const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
                             player.role.toLowerCase().includes(searchTerm);
+
+        const matchesGearscore = minGs === 0 || calculateGearscore(player) >= minGs;
 
         // Class family, specialization, or final class filter
         let matchesClassFamily = true;
@@ -804,7 +852,7 @@ export const LineupEditorPage = {
           matchesNotInLineup = !inOtherLineup;
         }
 
-        return matchesSearch && matchesClassFamily && matchesCompletion && matchesNotInLineup;
+        return matchesSearch && matchesClassFamily && matchesCompletion && matchesNotInLineup && matchesGearscore;
       })
       .sort((a, b) => {
         // Excluded (alt) characters sink to the bottom
@@ -1321,7 +1369,7 @@ export const LineupEditorPage = {
           <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
             ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
             <div class="player-info">
-              <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
+              <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
               <div class="player-role">${player.role}</div>
               ${formatPlayerEquipmentHtml(player)}
             </div>
@@ -1754,7 +1802,7 @@ export const LineupEditorPage = {
             <input type="text" id="pub-name" placeholder="Leave empty for placeholder">
           </div>
           <div class="form-group">
-            <label>Class: *</label>
+            <label>Class:</label>
             <input type="hidden" id="pub-class" value="">
             <div class="class-picker" id="pub-class-picker"></div>
           </div>
@@ -1776,11 +1824,6 @@ export const LineupEditorPage = {
       e.preventDefault();
       const name = document.getElementById('pub-name').value.trim();
       const role = document.getElementById('pub-class').value;
-
-      if (!role) {
-        toast.error('Please select a class');
-        return;
-      }
 
       this.assignPubPlayerToSlot(slotIndex, name, role);
       document.body.removeChild(modalElement);
@@ -1810,7 +1853,7 @@ export const LineupEditorPage = {
             <input type="text" id="edit-guest-name" value="${currentName || ''}" placeholder="Leave empty for placeholder">
           </div>
           <div class="form-group">
-            <label>Class: *</label>
+            <label>Class:</label>
             <input type="hidden" id="edit-guest-class" value="${currentRole || ''}">
             <div class="class-picker" id="edit-guest-class-picker"></div>
           </div>
@@ -1834,10 +1877,6 @@ export const LineupEditorPage = {
       e.preventDefault();
       const name = input.value.trim();
       const role = document.getElementById('edit-guest-class').value;
-      if (!role) {
-        toast.error('Please select a class');
-        return;
-      }
       this.assignPubPlayerToSlot(slotIndex, name, role);
       document.body.removeChild(modalElement);
     });
@@ -2009,7 +2048,7 @@ export const LineupEditorPage = {
     slotContent.innerHTML = `
       ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
       <div class="assigned-player">
-        <div class="player-name">${player.name} ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}</div>
+        <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
         ${pilotDisplay}
         <div class="player-role">${player.role}</div>
         ${formatPlayerEquipmentHtml(player, 'player-equipment-compact')}
@@ -2799,7 +2838,7 @@ export const LineupEditorPage = {
    * @param {string} lineupId
    * @param {number} ttlMs - how long to keep the mark (default 5s)
    */
-  _markPendingUpdate(lineupId, ttlMs = 5000) {
+  _markPendingUpdate(lineupId, ttlMs = 15000) {
     if (!lineupId) return;
     this.pendingUpdateIds.add(lineupId);
     setTimeout(() => {
@@ -2823,9 +2862,11 @@ export const LineupEditorPage = {
         return;
       }
 
-      // Skip notification if this user initiated the update (own save,
-      // or a bot-side update triggered by the user like thread creation)
-      if (eventType === 'UPDATE' && this.pendingUpdateIds.has(changedLineupId)) {
+      // Skip notification if this user initiated the change (own save, completion
+      // sync, or a bot-side update triggered by the user like thread creation).
+      // Covers UPDATE and INSERT — postgres_changes occasionally emits an INSERT
+      // for a freshly-saved row before the UPDATE, depending on payload size.
+      if ((eventType === 'UPDATE' || eventType === 'INSERT') && this.pendingUpdateIds.has(changedLineupId)) {
         return;
       }
 
