@@ -43,8 +43,8 @@ export const LineupsPage = {
         </div>
         <div class="tab-content-wrapper">
           <div id="preliminary-banner" class="preliminary-banner ${this.currentRaidType === 'DDN Classic' ? '' : 'preliminary-banner--hidden'}">
-            <span class="preliminary-banner__tag">Preliminary</span>
-            <span class="preliminary-banner__text">DDN Classic isn't released yet — these lineups are drafts and subject to change.</span>
+            <span class="preliminary-banner__tag">Drafts</span>
+            <span class="preliminary-banner__text">DDN Classic isn't released yet. These lineups are drafts and subject to change.</span>
           </div>
           <div class="showcase-area">
             <div id="showcase-card-container">
