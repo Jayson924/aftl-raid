@@ -1752,7 +1752,7 @@ export const PlayersPage = {
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <span>Upload character screenshot</span>
+            <span>Upload/Paste character screenshot</span>
           </div>
           <img id="${prefix}-screenshot-preview" class="modal-screenshot-preview" style="display:none" />
           <input type="file" id="${prefix}-screenshot-input" accept="image/*" style="display:none" />
