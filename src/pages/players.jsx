@@ -1148,7 +1148,7 @@ export const PlayersPage = {
       const rInfo = EQUIPMENT_RARITIES.find(r => r.value === piece.rarity);
       const color = rInfo?.color || 'inherit';
       const enh = piece.enhancement ? ` +${piece.enhancement}` : '';
-      const lvl = piece.level === '40' ? 'Lv40' : 'Lv50';
+      const lvl = piece.level === '60' ? 'Lv60' : piece.level === '40' ? 'Lv40' : 'Lv50';
       return `<div class="equip-cell"><span class="equip-cell-label">${label}</span><span class="equip-cell-value" style="color: ${color}"><span class="equip-cell-lv">${lvl}</span> ${rInfo?.label || piece.rarity}${enh}</span></div>`;
     };
 
@@ -1526,7 +1526,7 @@ export const PlayersPage = {
     return `
       <div class="equip-slot-row">
         <span class="equip-slot-label">${label}</span>
-        <button type="button" class="equip-level-toggle ${level === '40' ? 'level-40' : ''}" id="${id}-level" data-level="${level}" title="Equipment level">Lv${level === '40' ? '40' : '50'}</button>
+        <button type="button" class="equip-level-toggle level-${level}" id="${id}-level" data-level="${level}" title="Equipment level">Lv${level}</button>
         <select id="${id}-rarity" class="equipment-select equip-compact">${rarityOptions}</select>
         ${showEnhance ? `<select id="${id}-enhance" class="equipment-select equip-compact enhancement-select">${enhanceOptions}</select>` : ''}
       </div>
@@ -1602,6 +1602,15 @@ export const PlayersPage = {
       if (hasEnhance && piece.enhancement) {
         const enhEl = document.getElementById(`${prefix}-${slotId}-enhance`);
         if (enhEl) enhEl.value = String(piece.enhancement);
+      }
+      // Default Lv60 for rare/epic, Lv50 for unique/legend
+      const levelBtn = document.getElementById(`${prefix}-${slotId}-level`);
+      if (levelBtn) {
+        const defaultLevel = (piece.rarity === 'rare' || piece.rarity === 'epic') ? '60' : '50';
+        levelBtn.dataset.level = defaultLevel;
+        levelBtn.textContent = `Lv${defaultLevel}`;
+        levelBtn.classList.remove('level-40', 'level-50', 'level-60');
+        levelBtn.classList.add(`level-${defaultLevel}`);
       }
     };
 
@@ -1732,11 +1741,12 @@ export const PlayersPage = {
     modalElement.querySelectorAll('.equip-level-toggle').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        const current = btn.dataset.level;
-        const next = current === '50' ? '40' : '50';
+        const cycle = { '50': '60', '60': '40', '40': '50' };
+        const next = cycle[btn.dataset.level] || '50';
         btn.dataset.level = next;
         btn.textContent = `Lv${next}`;
-        btn.classList.toggle('level-40', next === '40');
+        btn.classList.remove('level-40', 'level-50', 'level-60');
+        btn.classList.add(`level-${next}`);
       });
     });
   },

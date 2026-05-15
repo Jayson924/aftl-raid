@@ -324,6 +324,7 @@ export const EQUIPMENT_RARITIES = [
 
 // Equipment levels (for epic/unique/legend rarity)
 export const EQUIPMENT_LEVELS = [
+  { value: '60', label: 'Lv60' },
   { value: '50', label: 'Lv50' },
   { value: '40', label: 'Lv40' }
 ];

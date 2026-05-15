@@ -6,7 +6,6 @@ import { LineupEditorPage } from './pages/lineup-editor.jsx'
 import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
-import { ScreenshotTestPage } from './pages/screenshot-test.jsx'
 import { RecruitingPage } from './pages/recruiting.jsx'
 import { EnhanceRacePage } from './pages/enhance-race.jsx'
 import { AdminPage } from './pages/admin.jsx'
@@ -80,7 +79,6 @@ async function initApp() {
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // Public - no auth required
   router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
-  router.register('screenshot-test', ScreenshotTestPage); // No auth required - POC page
   router.register('recruiting', RecruitingPage); // Public standalone page - no nav
   router.register('arena', ArenaHubPage, 'guildmate'); // Guildmates and admins only
   router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
