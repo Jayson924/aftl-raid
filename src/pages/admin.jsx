@@ -1,7 +1,13 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
-import { setFdTable } from '../constants.js';
+import {
+  setFdTable,
+  CARDS_PER_PAGE,
+  DEFAULT_CARD_PAGES,
+  MAX_CARD_PAGES
+} from '../constants.js';
+import { renderPagination, bindPagination } from '../pagination.js';
 
 export const AdminPage = {
   _users: [],
@@ -9,6 +15,10 @@ export const AdminPage = {
   _sortAsc: true,
   _activeTab: 'users',
   _fdTable: [],
+  _cardNames: {},        // slotIndex -> name
+  _cardPageCount: DEFAULT_CARD_PAGES,
+  _cardMapPage: 1,       // currently-viewed page in editor
+  _cardMapLoaded: false,
 
   async render(container) {
     if (!dataService.isAdmin()) {
@@ -22,8 +32,18 @@ export const AdminPage = {
         <div class="admin-tabs">
           <button class="admin-tab active" data-tab="users">Users</button>
           <button class="admin-tab" data-tab="discord-bot">Discord Bot</button>
+          <button class="admin-tab" data-tab="card-map">Card Map</button>
         </div>
         <div class="admin-tab-content" id="admin-tab-users">
+          <div class="section" id="admin-whitelist-section" style="display:none">
+            <div class="admin-section-header">
+              <h2>New Characters <span class="admin-pending-count" id="admin-whitelist-count"></span></h2>
+            </div>
+            <p class="admin-fd-desc">Characters that haven't been confirmed as in-guild. Mark as in-guild to grant access to in-guild features (or if guild friend, kayo na bahala :) pang incentivise lang naman natin na ipasok mga characters sa guild)</p>
+            <div id="admin-whitelist-list" class="admin-whitelist-list">
+              <p class="loading">Loading...</p>
+            </div>
+          </div>
           <div class="section">
             <div class="admin-section-header">
               <h2>Users</h2>
@@ -56,6 +76,21 @@ export const AdminPage = {
             <div id="admin-fd-table" class="admin-fd-table">
               <p class="loading">Loading...</p>
             </div>
+          </div>
+        </div>
+        <div class="admin-tab-content" id="admin-tab-card-map" style="display:none">
+          <div class="section">
+            <div class="admin-section-header">
+              <h2>Card Map</h2>
+              <div class="admin-card-map-actions">
+                <button class="btn btn-sm admin-card-remove-page-btn" title="Remove the last page">− Remove Page</button>
+                <button class="btn btn-sm admin-card-add-page-btn" title="Add a new page (up to ${MAX_CARD_PAGES})">+ Add Page</button>
+                <button class="btn btn-sm btn-primary admin-card-save-btn">Save Names</button>
+              </div>
+            </div>
+            <p class="admin-fd-desc"></p>
+            <div id="admin-card-map" class="admin-card-map">
+              <p class="loading">Loading…</p>
             </div>
           </div>
         </div>
@@ -70,6 +105,7 @@ export const AdminPage = {
         this._activeTab = tab.dataset.tab;
         document.querySelectorAll('.admin-tab-content').forEach(c => c.style.display = 'none');
         document.getElementById(`admin-tab-${tab.dataset.tab}`).style.display = '';
+        if (tab.dataset.tab === 'card-map') this._loadCardMap();
       });
     });
 
@@ -94,9 +130,15 @@ export const AdminPage = {
     document.querySelector('.admin-fd-add-btn').addEventListener('click', () => this._addFdRow());
     document.querySelector('.admin-fd-save-btn').addEventListener('click', () => this._saveFdTable());
 
+    // Card Map actions
+    document.querySelector('.admin-card-add-page-btn').addEventListener('click', () => this._addCardPage());
+    document.querySelector('.admin-card-remove-page-btn').addEventListener('click', () => this._removeCardPage());
+    document.querySelector('.admin-card-save-btn').addEventListener('click', () => this._saveCardMap());
+
     await this._loadUsers();
     this._renderUsers();
     this._loadFdTable();
+    this._loadWhitelistQueue();
   },
 
   // ============================================
@@ -234,6 +276,236 @@ export const AdminPage = {
     } catch (err) {
       console.error('Failed to save FD table:', err);
       toast.error('Failed to save FD table');
+    }
+  },
+
+  // ============================================
+  // WHITELIST REVIEW QUEUE
+  // ============================================
+
+  async _loadWhitelistQueue() {
+    try {
+      const all = await dataService.getPlayers();
+      // Pending = not whitelisted yet AND not excluded (excluded characters are out regardless).
+      this._pendingWhitelist = all.filter(p => !p.whitelisted && !p.exclude);
+    } catch (err) {
+      console.error('Failed to load whitelist queue:', err);
+      this._pendingWhitelist = [];
+    }
+    this._renderWhitelistQueue();
+  },
+
+  _renderWhitelistQueue() {
+    const section = document.getElementById('admin-whitelist-section');
+    const list = document.getElementById('admin-whitelist-list');
+    const countEl = document.getElementById('admin-whitelist-count');
+    if (!section || !list) return;
+
+    const pending = this._pendingWhitelist || [];
+    if (pending.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    if (countEl) countEl.textContent = `(${pending.length})`;
+
+    const usersById = {};
+    (this._users || []).forEach(u => { usersById[u.discordId] = u; });
+
+    // Group by owner for easier review
+    const sorted = [...pending].sort((a, b) => {
+      const ownerA = (usersById[a.discordId]?.displayName || '~').toLowerCase();
+      const ownerB = (usersById[b.discordId]?.displayName || '~').toLowerCase();
+      if (ownerA !== ownerB) return ownerA.localeCompare(ownerB);
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    list.innerHTML = sorted.map(p => {
+      const owner = usersById[p.discordId];
+      const ownerName = owner?.displayName || 'Unknown';
+      const ownerAvatar = owner?.avatarUrl || '/icons/avatar.svg';
+      const acctTag = p.accountNumber > 1 ? ` <span class="acct-tag">Acct ${p.accountNumber}</span>` : '';
+      return `
+        <div class="admin-whitelist-row" data-player-id="${p.id}">
+          <div class="admin-whitelist-info">
+            <img src="${ownerAvatar}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
+            <div class="admin-whitelist-details">
+              <span class="admin-whitelist-char">${p.name}${acctTag}</span>
+              <span class="admin-whitelist-meta">${p.role || ''} · Owner: ${ownerName}</span>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-primary admin-whitelist-approve" data-player-id="${p.id}">In-Guild</button>
+        </div>
+      `;
+    }).join('');
+
+    list.querySelectorAll('.admin-whitelist-approve').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.playerId;
+        btn.disabled = true;
+        try {
+          await dataService.togglePlayerWhitelist(id, true);
+          const player = (this._pendingWhitelist || []).find(p => p.id === id);
+          toast.success(`${player?.name || 'Character'} whitelisted`);
+          this._pendingWhitelist = (this._pendingWhitelist || []).filter(p => p.id !== id);
+          this._renderWhitelistQueue();
+        } catch (err) {
+          btn.disabled = false;
+          toast.error(`Failed: ${err.message}`);
+        }
+      });
+    });
+  },
+
+  // ============================================
+  // CARD MAP
+  // ============================================
+
+  async _loadCardMap() {
+    if (this._cardMapLoaded) {
+      this._renderCardMap();
+      return;
+    }
+    try {
+      const [names, pageCount] = await Promise.all([
+        dataService.getCardSlotNames(),
+        dataService.getCardPageCount()
+      ]);
+      this._cardNames = names || {};
+      this._cardPageCount = pageCount || DEFAULT_CARD_PAGES;
+      this._cardMapLoaded = true;
+    } catch (err) {
+      console.error('Failed to load card map:', err);
+      toast.error('Failed to load card map');
+    }
+    this._renderCardMap();
+  },
+
+  _renderCardMap() {
+    const container = document.getElementById('admin-card-map');
+    if (!container) return;
+
+    const page = this._cardMapPage;
+    const startIdx = (page - 1) * CARDS_PER_PAGE;
+
+    let slotsHtml = '';
+    for (let i = 0; i < CARDS_PER_PAGE; i++) {
+      const slotIndex = startIdx + i;
+      const name = this._cardNames[slotIndex] || '';
+      slotsHtml += `
+        <div class="admin-card-slot" data-slot-index="${slotIndex}">
+          <span class="admin-card-slot-index">#${slotIndex + 1}</span>
+          <input type="text" class="admin-card-slot-input" data-slot-index="${slotIndex}"
+                 value="${name.replace(/"/g, '&quot;')}" placeholder="Slot ${slotIndex + 1}" maxlength="40">
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="admin-card-slot-grid">${slotsHtml}</div>
+      <div class="admin-card-pagination">
+        ${renderPagination(page, this._cardPageCount)}
+      </div>
+    `;
+
+    // Page switching — persist current inputs into _cardNames before switching
+    bindPagination(container.querySelector('.pagination'), page, this._cardPageCount, (newPage) => {
+      this._collectCardMapInputs();
+      this._cardMapPage = newPage;
+      this._renderCardMap();
+    });
+
+    // Live-update _cardNames on input so Save captures everything across pages
+    container.querySelectorAll('.admin-card-slot-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const idx = parseInt(input.dataset.slotIndex, 10);
+        const val = input.value.trim();
+        if (val) this._cardNames[idx] = val;
+        else delete this._cardNames[idx];
+      });
+    });
+
+    // Disable remove button when on minimum
+    const removeBtn = document.querySelector('.admin-card-remove-page-btn');
+    if (removeBtn) removeBtn.disabled = this._cardPageCount <= 1;
+    const addBtn = document.querySelector('.admin-card-add-page-btn');
+    if (addBtn) addBtn.disabled = this._cardPageCount >= MAX_CARD_PAGES;
+  },
+
+  _collectCardMapInputs() {
+    document.querySelectorAll('.admin-card-slot-input').forEach(input => {
+      const idx = parseInt(input.dataset.slotIndex, 10);
+      const val = input.value.trim();
+      if (val) this._cardNames[idx] = val;
+      else delete this._cardNames[idx];
+    });
+  },
+
+  async _addCardPage() {
+    if (this._cardPageCount >= MAX_CARD_PAGES) {
+      toast.error(`Maximum ${MAX_CARD_PAGES} pages`);
+      return;
+    }
+    this._collectCardMapInputs();
+    const newCount = this._cardPageCount + 1;
+    try {
+      await dataService.saveCardPageCount(newCount);
+      this._cardPageCount = newCount;
+      this._cardMapPage = newCount; // jump to the new page
+      toast.success(`Page ${newCount} added`);
+      this._renderCardMap();
+    } catch (err) {
+      toast.error(`Failed to add page: ${err.message}`);
+    }
+  },
+
+  async _removeCardPage() {
+    if (this._cardPageCount <= 1) return;
+
+    const pageToRemove = this._cardPageCount;
+    const startIdx = (pageToRemove - 1) * CARDS_PER_PAGE;
+    const endIdx = pageToRemove * CARDS_PER_PAGE;
+
+    const confirmed = await modal.confirm(
+      `Removing page ${pageToRemove} will delete its 16 slot names and every character's rarity data on those slots. This cannot be undone. Continue?`,
+      {
+        title: `Remove Card Page ${pageToRemove}`,
+        confirmText: 'Remove Page',
+        cancelText: 'Cancel',
+        danger: true
+      }
+    );
+    if (!confirmed) return;
+
+    this._collectCardMapInputs();
+
+    // Drop the names for the removed range
+    const newNames = { ...this._cardNames };
+    for (let i = startIdx; i < endIdx; i++) delete newNames[i];
+
+    try {
+      await Promise.all([
+        dataService.deletePlayerCardsInRange(startIdx, endIdx),
+        dataService.saveCardSlotNames(newNames),
+        dataService.saveCardPageCount(pageToRemove - 1)
+      ]);
+      this._cardNames = newNames;
+      this._cardPageCount = pageToRemove - 1;
+      if (this._cardMapPage > this._cardPageCount) this._cardMapPage = this._cardPageCount;
+      toast.success(`Page ${pageToRemove} removed`);
+      this._renderCardMap();
+    } catch (err) {
+      toast.error(`Failed to remove page: ${err.message}`);
+    }
+  },
+
+  async _saveCardMap() {
+    this._collectCardMapInputs();
+    try {
+      await dataService.saveCardSlotNames(this._cardNames);
+      toast.success('Card names saved');
+    } catch (err) {
+      toast.error(`Failed to save: ${err.message}`);
     }
   },
 

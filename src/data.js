@@ -328,9 +328,19 @@ class DataService {
         accountNumber: p.account_number || null,
         exclude: p.exclude === true,
         excludeLabel: p.exclude_label || '',
-        excludeReason: p.exclude_reason || ''
+        excludeReason: p.exclude_reason || '',
+        whitelisted: p.whitelisted === true
       };
     });
+  }
+
+  /**
+   * Canonical "is this character allowed to use guild-only features?" check.
+   * Currently gates the card collection; designed to gate more later.
+   * A character must be both whitelisted (in our guild) AND not excluded.
+   */
+  isPlayerWhitelisted(player) {
+    return !!player && player.exclude !== true && player.whitelisted === true;
   }
 
   /**
@@ -528,6 +538,16 @@ class DataService {
     const { error } = await supabase
       .from('players')
       .update({ exclude: !!exclude })
+      .eq('id', playerId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async togglePlayerWhitelist(playerId, whitelisted) {
+    if (!this.isAdmin()) throw new Error('Only admins can toggle whitelist');
+    const { error } = await supabase
+      .from('players')
+      .update({ whitelisted: !!whitelisted })
       .eq('id', playerId);
     if (error) throw error;
     return { success: true };
@@ -1070,6 +1090,124 @@ class DataService {
 
     if (error) throw error;
     return { success: true, newClears: data.current_clears - 1 };
+  }
+
+  // ============================================
+  // CARD SLOT NAMES + PAGE COUNT (admin-managed)
+  // ============================================
+
+  async getCardSlotNames() {
+    const raw = await this.getAppConfig('card_slot_names');
+    if (!raw) return {};
+    try {
+      return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      return {};
+    }
+  }
+
+  async saveCardSlotNames(namesByIndex) {
+    return this.setAppConfig('card_slot_names', JSON.stringify(namesByIndex));
+  }
+
+  async getCardPageCount() {
+    const raw = await this.getAppConfig('card_page_count');
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : null; // caller picks default
+  }
+
+  async saveCardPageCount(n) {
+    return this.setAppConfig('card_page_count', String(n));
+  }
+
+  /**
+   * Delete all player_card rows in [startSlotIndex, endSlotIndex).
+   * Used when an admin removes a card page.
+   */
+  async deletePlayerCardsInRange(startSlotIndex, endSlotIndexExclusive) {
+    if (!this._user) throw new Error('Not logged in');
+    const { error } = await supabase
+      .from('player_cards')
+      .delete()
+      .gte('slot_index', startSlotIndex)
+      .lt('slot_index', endSlotIndexExclusive);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // ============================================
+  // PLAYER CARDS (monster card collection)
+  // ============================================
+
+  async getPlayerCards(playerId = null) {
+    let query = supabase.from('player_cards').select('*');
+    if (playerId) query = query.eq('player_id', playerId);
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching player cards:', error);
+      return [];
+    }
+    return data.map(c => ({
+      id: c.id,
+      playerId: c.player_id,
+      slotIndex: c.slot_index,
+      rarity: c.rarity
+    }));
+  }
+
+  async setPlayerCard(playerId, slotIndex, rarity) {
+    if (!this._user) throw new Error('Not logged in');
+    if (!rarity) {
+      return this.removePlayerCard(playerId, slotIndex);
+    }
+    const { error } = await supabase
+      .from('player_cards')
+      .upsert(
+        { player_id: playerId, slot_index: slotIndex, rarity },
+        { onConflict: 'player_id,slot_index' }
+      );
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async removePlayerCard(playerId, slotIndex) {
+    if (!this._user) throw new Error('Not logged in');
+    const { error } = await supabase
+      .from('player_cards')
+      .delete()
+      .eq('player_id', playerId)
+      .eq('slot_index', slotIndex);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async bulkSetPlayerCards(playerId, entries) {
+    if (!this._user) throw new Error('Not logged in');
+    if (!entries?.length) return { success: true };
+
+    const toUpsert = entries.filter(e => e.rarity).map(e => ({
+      player_id: playerId,
+      slot_index: e.slotIndex,
+      rarity: e.rarity
+    }));
+    const toDelete = entries.filter(e => !e.rarity).map(e => e.slotIndex);
+
+    if (toUpsert.length) {
+      const { error } = await supabase
+        .from('player_cards')
+        .upsert(toUpsert, { onConflict: 'player_id,slot_index' });
+      if (error) throw error;
+    }
+    if (toDelete.length) {
+      const { error } = await supabase
+        .from('player_cards')
+        .delete()
+        .eq('player_id', playerId)
+        .in('slot_index', toDelete);
+      if (error) throw error;
+    }
+    return { success: true };
   }
 
   // ============================================

@@ -506,6 +506,10 @@
       padding: 1rem;
     }
 
+    #my-cards-list {
+      grid-template-columns: 1fr;
+    }
+
     .display-name-form {
       flex-direction: column;
 

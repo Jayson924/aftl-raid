@@ -3,7 +3,8 @@
   margin: 0 auto;
   transition: max-width 0.3s ease;
 
-  &:has(#my-characters-list.two-columns) {
+  &:has(#my-characters-list.two-columns),
+  &:has(.mc-tab.active[data-tab="cards"]) {
     max-width: 1200px;
   }
 
@@ -908,5 +909,277 @@
     color: $text-muted;
     margin: 0.5rem 0 1rem;
     font-style: italic;
+  }
+}
+
+// ============================================
+// MY CHARACTERS — TABS (Raids / Cards)
+// Written as top-level rules with parent selectors to avoid nesting drift.
+// ============================================
+.my-raids-page .mc-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.my-raids-page .mc-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0.6rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  &.active {
+    color: $primary-color;
+    border-bottom-color: $primary-color;
+  }
+}
+
+// ============================================
+// CARDS TAB
+// ============================================
+.my-raids-page .my-cards-section .section-header h2 {
+  margin: 0;
+}
+
+.my-raids-page #my-cards-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.my-raids-page .card-character-block {
+  margin-bottom: 0;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $border-radius;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+
+  &:hover {
+    background: rgba(244, 196, 48, 0.04);
+    border-color: rgba(244, 196, 48, 0.35);
+    box-shadow: 0 0 18px rgba(244, 196, 48, 0.12), inset 0 0 24px rgba(244, 196, 48, 0.03);
+  }
+
+  &.analyzing {
+    border-color: rgba(244, 196, 48, 0.7);
+    box-shadow: 0 0 24px rgba(244, 196, 48, 0.35);
+    pointer-events: none;
+
+    &::after {
+      content: 'Analyzing…';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid rgba(244, 196, 48, 0.5);
+      border-radius: 4px;
+      color: $primary-color;
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+      z-index: 2;
+    }
+
+    .card-grid {
+      opacity: 0.35;
+      transition: opacity 0.15s ease;
+    }
+  }
+}
+
+.my-raids-page .card-character-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+
+  .character-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+
+    .character-name {
+      display: block;
+      font-weight: 600;
+      color: $text-light;
+    }
+
+    .character-class {
+      display: block;
+      font-size: 0.8rem;
+      color: $text-muted;
+    }
+  }
+}
+
+.my-raids-page .card-paste-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(244, 196, 48, 0.25);
+  border-radius: 4px;
+  color: rgba(244, 196, 48, 0.85);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  line-height: 1;
+
+  .card-paste-icon {
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  &:hover {
+    background: rgba(244, 196, 48, 0.1);
+    border-color: rgba(244, 196, 48, 0.55);
+    color: $primary-color;
+    box-shadow: 0 0 8px rgba(244, 196, 48, 0.15);
+
+    .card-paste-icon {
+      opacity: 1;
+    }
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+.my-raids-page .card-pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.my-raids-page .card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.my-raids-page .card-slot {
+  --rarity-color: rgba(255, 255, 255, 0.12);
+  aspect-ratio: 1;
+  border: 2px solid var(--rarity-color);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s, box-shadow 0.15s;
+  user-select: none;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 8px var(--rarity-color);
+  }
+
+  &.has-card {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.2));
+    box-shadow: 0 0 6px var(--rarity-color), inset 0 0 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .card-slot-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    padding: 0 4px;
+    line-height: 1.15;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+
+  &.has-card .card-slot-label {
+    color: var(--rarity-color);
+    font-weight: 600;
+  }
+}
+
+// Card screenshot upload modal (appended to body)
+.card-screenshot-modal {
+  max-width: 520px;
+
+  .modal-hint {
+    color: $text-muted;
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+  }
+
+  .modal-upload-zone {
+    position: relative;
+    min-height: 200px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: $border-radius;
+    background: rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    overflow: hidden;
+
+    &:hover,
+    &.drag-over {
+      border-color: rgba(244, 196, 48, 0.5);
+      background: rgba(244, 196, 48, 0.05);
+    }
+
+    .modal-upload-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: $text-muted;
+      font-size: 0.9rem;
+    }
+
+    .modal-screenshot-preview {
+      max-width: 100%;
+      max-height: 320px;
+      display: block;
+    }
+  }
+
+  .card-screenshot-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+
+    .upload-status {
+      font-size: 0.85rem;
+      color: $text-muted;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
   }
 }

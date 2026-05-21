@@ -1622,9 +1622,18 @@
   }
 }
 
-// Inline admin "Exclude" toggle next to character name — matches .admin-sort-btn aesthetic.
+// Row that holds the admin "Exclude" + "Whitelist" pills, placed under the
+// character info (under the class icon in the card layout, under the name in
+// the table layout). See .exclude-pill / .whitelist-pill below.
+.admin-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+// Inline admin "Exclude" toggle — sits inside .admin-pills-row, matches .admin-sort-btn aesthetic.
 .exclude-pill {
-  margin-left: 0.5rem;
   padding: 0.15rem 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
@@ -1651,6 +1660,41 @@
       background: rgba($primary-color, 0.22);
       border-color: rgba($primary-color, 0.45);
       color: $primary-color;
+    }
+  }
+
+  &:disabled { opacity: 0.5; cursor: wait; }
+}
+
+// Inline admin "Whitelist" (in-guild) toggle — sits inside .admin-pills-row.
+// Off state is a soft orange/warn tint so admins notice characters needing review.
+.whitelist-pill {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid rgba(255, 152, 0, 0.35);
+  border-radius: 4px;
+  background: rgba(255, 152, 0, 0.08);
+  color: #ff9800;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 152, 0, 0.16);
+    border-color: rgba(255, 152, 0, 0.55);
+  }
+
+  &.is-on {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #22c55e;
+
+    &:hover:not(:disabled) {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #22c55e;
     }
   }
 

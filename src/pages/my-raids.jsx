@@ -1,25 +1,39 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
-import { getClassSpriteStyle } from '../constants.js';
+import {
+  getClassSpriteStyle,
+  CARDS_PER_PAGE,
+  DEFAULT_CARD_PAGES,
+  EQUIPMENT_RARITIES
+} from '../constants.js';
+import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
+
+const CARD_RARITIES = EQUIPMENT_RARITIES.filter(r => r.value);
 
 export const MyRaidsPage = {
   _myPlayers: [],
   _personalRaids: [],
+  _playerCards: [], // [{ id, playerId, slotIndex, rarity }]
   _editingRaidId: null,
   _editingRaidPlayerId: null,
-  _lastAddedRaid: null, // { name, maxClears } - for pre-filling next add form
+  _lastAddedRaid: null,
+  _activeTab: 'raids', // 'raids' | 'cards'
+  _cardsPageByPlayer: {}, // playerId -> current page
+  _cardNames: {}, // slotIndex -> custom card name (from app_config)
+  _cardPageCount: DEFAULT_CARD_PAGES,
+  _hoveredPlayerId: null, // tracks which character the mouse is over (for Ctrl+V paste-to-character)
 
   async render(container) {
     if (!dataService.isAuthenticated()) {
-      container.innerHTML = '<p>Please log in to view your raids.</p>';
+      container.innerHTML = '<p>Please log in to view your characters.</p>';
       return;
     }
 
     container.innerHTML = `
       <div class="my-raids-page">
-        <h1 class="page-title">My Raids</h1>
+        <h1 class="page-title">My Characters</h1>
 
         <div class="section display-name-section">
           <h2>Display Name</h2>
@@ -29,9 +43,14 @@ export const MyRaidsPage = {
           </div>
         </div>
 
-        <div class="section my-characters-section">
+        <div class="mc-tabs">
+          <button class="mc-tab active" data-tab="raids">Raids</button>
+          <button class="mc-tab" data-tab="cards">Cards</button>
+        </div>
+
+        <div class="section my-characters-section" data-tab-panel="raids">
           <div class="section-header">
-            <h2>My Characters
+            <h2>Raids
               <button class="btn btn-icon-toggle" id="toggle-columns-btn" title="Toggle two-column layout">
                 <img class="col-icon" src="/icons/onecolumn.svg" alt="Toggle columns">
               </button>
@@ -44,10 +63,16 @@ export const MyRaidsPage = {
           </div>
           <div id="my-characters-list"></div>
         </div>
+
+        <div class="section my-cards-section" data-tab-panel="cards" style="display:none">
+          <div class="section-header">
+            <h2>Card Collection</h2>
+          </div>
+          <div id="my-cards-list"></div>
+        </div>
       </div>
     `;
 
-    // Pre-fill display name
     const nameInput = document.getElementById('display-name-input');
     nameInput.value = dataService.getDisplayName() || '';
 
@@ -56,15 +81,49 @@ export const MyRaidsPage = {
     this.setupAddRaidToAllHandler();
     this.setupDeleteAllRaidsHandler();
     this.setupColumnToggle();
+    this.setupTabHandlers();
     await this.loadMyCharacters();
   },
 
   destroy() {
     this._myPlayers = [];
     this._personalRaids = [];
+    this._playerCards = [];
+    this._cardsLoaded = false;
     this._editingRaidId = null;
     this._editingRaidPlayerId = null;
     this._lastAddedRaid = null;
+    this._activeTab = 'raids';
+    this._cardsPageByPlayer = {};
+    this._cardNames = {};
+    this._cardPageCount = DEFAULT_CARD_PAGES;
+    this._hoveredPlayerId = null;
+    if (this._pasteHandler) {
+      document.removeEventListener('paste', this._pasteHandler);
+      this._pasteHandler = null;
+    }
+    this._pasteTargetPlayerId = null;
+  },
+
+  // ============================================
+  // TABS
+  // ============================================
+
+  setupTabHandlers() {
+    document.querySelectorAll('.mc-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        if (tab === this._activeTab) return;
+        this._activeTab = tab;
+        document.querySelectorAll('.mc-tab').forEach(b => {
+          b.classList.toggle('active', b.dataset.tab === tab);
+        });
+        document.querySelectorAll('[data-tab-panel]').forEach(panel => {
+          panel.style.display = panel.dataset.tabPanel === tab ? '' : 'none';
+        });
+        if (tab === 'cards') this.renderCardsTab();
+      });
+    });
   },
 
   // ============================================
@@ -910,5 +969,452 @@ export const MyRaidsPage = {
         toast.error(`Failed to update raid: ${error.message}`);
       }
     }
+  },
+
+  // ============================================
+  // CARDS TAB
+  // ============================================
+
+  async renderCardsTab() {
+    const listEl = document.getElementById('my-cards-list');
+    if (!listEl) return;
+
+    // Characters must be whitelisted (and not excluded) to use the card collection.
+    const cardEligiblePlayers = this._myPlayers.filter(p => dataService.isPlayerWhitelisted(p));
+
+    if (this._myPlayers.length === 0) {
+      listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
+      return;
+    }
+    if (cardEligiblePlayers.length === 0) {
+      listEl.innerHTML = '<p class="empty-state">No card-eligible characters on your account.</p>';
+      return;
+    }
+
+    // Lazy-load cards + custom slot names + page count on first view
+    if (!this._cardsLoaded) {
+      listEl.innerHTML = '<p class="empty-state">Loading cards…</p>';
+      try {
+        const playerIds = cardEligiblePlayers.map(p => p.id);
+        const [allCards, names, pageCount] = await Promise.all([
+          dataService.getPlayerCards(),
+          dataService.getCardSlotNames(),
+          dataService.getCardPageCount()
+        ]);
+        this._playerCards = allCards.filter(c => playerIds.includes(c.playerId));
+        this._cardNames = names || {};
+        this._cardPageCount = pageCount || DEFAULT_CARD_PAGES;
+        this._cardsLoaded = true;
+      } catch (error) {
+        console.error('Error loading cards:', error);
+        listEl.innerHTML = '<p class="empty-state">Failed to load cards.</p>';
+        return;
+      }
+    }
+
+    this.installCardsPasteHandler();
+
+    let html = '';
+    cardEligiblePlayers.forEach(player => {
+      const iconStyle = getClassSpriteStyle(player.role);
+      const currentPage = this._cardsPageByPlayer[player.id] || 1;
+      html += `
+        <div class="card-character-block" data-player-id="${player.id}">
+          <div class="card-character-header">
+            <div class="character-info">
+              ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
+              <div>
+                <span class="character-name">${player.name}</span>
+                <span class="character-class">${player.role}</span>
+              </div>
+            </div>
+            <div class="card-character-actions">
+              <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page">
+                <svg class="card-paste-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>Upload/Paste page ${currentPage}</span>
+              </button>
+            </div>
+          </div>
+          <div class="card-grid" data-player-id="${player.id}">
+            ${this.renderCardGridHTML(player.id, currentPage)}
+          </div>
+          <div class="card-pagination-wrap" data-player-id="${player.id}">
+            ${renderPagination(currentPage, this._cardPageCount)}
+          </div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+
+    this.setupCardGridHandlers();
+  },
+
+  resolveSlotName(slotIndex) {
+    return this._cardNames?.[slotIndex] || '';
+  },
+
+  renderCardGridHTML(playerId, page) {
+    const startIdx = (page - 1) * CARDS_PER_PAGE;
+    const playerCards = this._playerCards.filter(c => c.playerId === playerId);
+    const byIndex = {};
+    playerCards.forEach(c => { byIndex[c.slotIndex] = c.rarity; });
+
+    let html = '';
+    for (let i = 0; i < CARDS_PER_PAGE; i++) {
+      const slotIndex = startIdx + i;
+      const rarity = byIndex[slotIndex] || '';
+      const rarityInfo = CARD_RARITIES.find(r => r.value === rarity);
+      const color = rarityInfo?.color || '';
+      const name = this.resolveSlotName(slotIndex);
+      const label = name || `Slot ${slotIndex + 1}`;
+      html += `
+        <div class="card-slot ${rarity ? 'has-card' : ''}"
+             data-player-id="${playerId}"
+             data-slot-index="${slotIndex}"
+             data-rarity="${rarity}"
+             style="${color ? `--rarity-color: ${color}` : ''}"
+             title="${label}${rarity ? ` — ${rarityInfo.label}` : ''}">
+          <span class="card-slot-label">${label}</span>
+        </div>
+      `;
+    }
+    return html;
+  },
+
+  setupCardGridHandlers() {
+    // Pagination per character
+    this._myPlayers.forEach(player => {
+      this.bindPlayerPagination(player.id);
+    });
+
+    // Paste/upload buttons
+    document.querySelectorAll('.card-paste-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.showCardScreenshotUpload(btn.dataset.playerId);
+      });
+    });
+
+    // Hover tracking: which character is the mouse over?
+    // Used by the paste handler to paste-to-the-character-you're-hovering.
+    document.querySelectorAll('.card-character-block').forEach(block => {
+      const playerId = block.dataset.playerId;
+      block.addEventListener('mouseenter', () => { this._hoveredPlayerId = playerId; });
+      block.addEventListener('mouseleave', () => {
+        if (this._hoveredPlayerId === playerId) this._hoveredPlayerId = null;
+      });
+    });
+
+    // Slot clicks
+    this._myPlayers.forEach(p => this.bindCardSlotHandlers(p.id));
+  },
+
+  bindPlayerPagination(playerId) {
+    const currentPage = this._cardsPageByPlayer[playerId] || 1;
+    const wrap = document.querySelector(`.card-pagination-wrap[data-player-id="${playerId}"] .pagination`);
+    bindPagination(wrap, currentPage, this._cardPageCount, (newPage) => {
+      this._cardsPageByPlayer[playerId] = newPage;
+      // Re-render grid
+      const grid = document.querySelector(`.card-grid[data-player-id="${playerId}"]`);
+      if (grid) grid.innerHTML = this.renderCardGridHTML(playerId, newPage);
+      // Re-render pagination so the active page updates
+      const pgWrap = document.querySelector(`.card-pagination-wrap[data-player-id="${playerId}"]`);
+      if (pgWrap) pgWrap.innerHTML = renderPagination(newPage, this._cardPageCount);
+      // Update paste button label (only the span — keep the icon)
+      const pasteLabel = document.querySelector(`.card-paste-btn[data-player-id="${playerId}"] span`);
+      if (pasteLabel) pasteLabel.textContent = `Upload/Paste page ${newPage}`;
+      this.bindCardSlotHandlers(playerId);
+      this.bindPlayerPagination(playerId);
+    });
+  },
+
+  bindCardSlotHandlers(playerId) {
+    document.querySelectorAll(`.card-slot[data-player-id="${playerId}"]`).forEach(slot => {
+      slot.addEventListener('click', () => this.cycleSlotRarity(slot));
+      slot.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this.clearSlotRarity(slot);
+      });
+    });
+  },
+
+  async cycleSlotRarity(slot) {
+    const playerId = slot.dataset.playerId;
+    const slotIndex = parseInt(slot.dataset.slotIndex, 10);
+    const current = slot.dataset.rarity || '';
+    // Cycle: '' -> magic -> rare -> epic -> unique -> legend -> ''
+    const order = ['', 'magic', 'rare', 'epic', 'unique', 'legend'];
+    const next = order[(order.indexOf(current) + 1) % order.length];
+
+    slot.style.opacity = '0.5';
+    try {
+      await dataService.setPlayerCard(playerId, slotIndex, next);
+      this.updateLocalCard(playerId, slotIndex, next);
+      this.repaintSlot(slot, next);
+    } catch (error) {
+      toast.error(`Failed to update card: ${error.message}`);
+    } finally {
+      slot.style.opacity = '1';
+    }
+  },
+
+  async clearSlotRarity(slot) {
+    const playerId = slot.dataset.playerId;
+    const slotIndex = parseInt(slot.dataset.slotIndex, 10);
+    if (!slot.dataset.rarity) return;
+
+    slot.style.opacity = '0.5';
+    try {
+      await dataService.removePlayerCard(playerId, slotIndex);
+      this.updateLocalCard(playerId, slotIndex, '');
+      this.repaintSlot(slot, '');
+    } catch (error) {
+      toast.error(`Failed to clear card: ${error.message}`);
+    } finally {
+      slot.style.opacity = '1';
+    }
+  },
+
+  updateLocalCard(playerId, slotIndex, rarity) {
+    this._playerCards = this._playerCards.filter(
+      c => !(c.playerId === playerId && c.slotIndex === slotIndex)
+    );
+    if (rarity) {
+      this._playerCards.push({ playerId, slotIndex, rarity });
+    }
+  },
+
+  repaintSlot(slot, rarity) {
+    const rarityInfo = CARD_RARITIES.find(r => r.value === rarity);
+    slot.dataset.rarity = rarity;
+    slot.classList.toggle('has-card', !!rarity);
+    slot.style.setProperty('--rarity-color', rarityInfo?.color || '');
+    const slotIndex = parseInt(slot.dataset.slotIndex, 10);
+    const label = this.resolveSlotName(slotIndex) || `Slot ${slotIndex + 1}`;
+    slot.title = `${label}${rarity ? ` — ${rarityInfo.label}` : ''}`;
+  },
+
+  // ============================================
+  // CARD SCREENSHOT UPLOAD
+  // ============================================
+
+  installCardsPasteHandler() {
+    if (this._pasteHandler) return;
+    this._pasteHandler = (e) => {
+      if (this._activeTab !== 'cards') return;
+
+      // Modal target wins; otherwise paste against whichever character the mouse is over.
+      const modalTarget = this._pasteTargetPlayerId;
+      const hoverTarget = this._hoveredPlayerId;
+      if (!modalTarget && !hoverTarget) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (modalTarget) {
+            this.handleCardImageFile(file, modalTarget);
+          } else {
+            this.hoverPasteAndApply(hoverTarget, file);
+          }
+          return;
+        }
+      }
+    };
+    document.addEventListener('paste', this._pasteHandler);
+  },
+
+  async hoverPasteAndApply(playerId, file) {
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (!player) return;
+
+    const page = this._cardsPageByPlayer[playerId] || 1;
+    const block = document.querySelector(`.card-character-block[data-player-id="${playerId}"]`);
+    block?.classList.add('analyzing');
+    toast.info(`Analyzing ${player.name} page ${page}…`);
+
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch('/.netlify/functions/analyze-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: file.type, page })
+      });
+      const data = await response.json();
+
+      if (data.error && !data.slots) {
+        toast.error(`Analysis failed: ${data.error}`);
+        return;
+      }
+      if (!Array.isArray(data.slots)) {
+        toast.error('Bad response from analyzer');
+        return;
+      }
+
+      await this.applyAnalyzedSlots(playerId, page, data.slots);
+      toast.success(`${player.name} page ${page} updated (${data.confidence || 'unknown'} confidence)`);
+    } catch (err) {
+      console.error('hoverPasteAndApply error:', err);
+      toast.error('Failed to analyze screenshot');
+    } finally {
+      block?.classList.remove('analyzing');
+    }
+  },
+
+  showCardScreenshotUpload(playerId) {
+    this._pasteTargetPlayerId = playerId;
+    const page = this._cardsPageByPlayer[playerId] || 1;
+    const player = this._myPlayers.find(p => p.id === playerId);
+    const playerName = player?.name || 'character';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.innerHTML = `
+      <div class="modal-content card-screenshot-modal">
+        <h2>Import Card Page ${page}</h2>
+        <p class="modal-hint">Paste (Ctrl+V) or drop a screenshot of <strong>${playerName}</strong>'s card page ${page}. The analyzer detects rarities for the 16 slots on this page.</p>
+        <div class="modal-upload-zone" id="card-upload-zone">
+          <div class="modal-upload-placeholder">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span>Click, drop, or paste an image</span>
+          </div>
+          <img id="card-screenshot-preview" class="modal-screenshot-preview" style="display:none" />
+          <input type="file" id="card-screenshot-input" accept="image/*" style="display:none" />
+        </div>
+        <div class="card-screenshot-actions">
+          <span id="card-upload-status" class="upload-status"></span>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="card-upload-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="card-analyze-btn" disabled>Analyze & Apply</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const zone = overlay.querySelector('#card-upload-zone');
+    const fileInput = overlay.querySelector('#card-screenshot-input');
+    const preview = overlay.querySelector('#card-screenshot-preview');
+    const placeholder = overlay.querySelector('.modal-upload-placeholder');
+    const status = overlay.querySelector('#card-upload-status');
+    const analyzeBtn = overlay.querySelector('#card-analyze-btn');
+    const cancelBtn = overlay.querySelector('#card-upload-cancel');
+
+    let imageData = null;
+    let mimeType = null;
+
+    const handleFile = (file) => {
+      if (!file || !file.type.startsWith('image/')) return;
+      mimeType = file.type;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+        analyzeBtn.disabled = false;
+        imageData = e.target.result.split(',')[1];
+      };
+      reader.readAsDataURL(file);
+    };
+
+    this.handleCardImageFile = handleFile;
+
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    const close = () => {
+      this._pasteTargetPlayerId = null;
+      this.handleCardImageFile = null;
+      document.removeEventListener('keydown', onKey);
+      if (overlay.parentNode) overlay.remove();
+    };
+
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    cancelBtn.addEventListener('click', close);
+
+    analyzeBtn.addEventListener('click', async () => {
+      if (!imageData) return;
+      analyzeBtn.disabled = true;
+      status.textContent = 'Analyzing…';
+      status.style.color = '';
+      try {
+        const response = await fetch('/.netlify/functions/analyze-cards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageData, mimeType, page })
+        });
+        const data = await response.json();
+        if (data.error && !data.slots) {
+          status.textContent = 'Failed: ' + data.error;
+          status.style.color = '#e57373';
+          toast.error('Analysis failed');
+          analyzeBtn.disabled = false;
+          return;
+        }
+        if (!Array.isArray(data.slots)) {
+          status.textContent = 'Bad response from analyzer';
+          status.style.color = '#e57373';
+          analyzeBtn.disabled = false;
+          return;
+        }
+
+        await this.applyAnalyzedSlots(playerId, page, data.slots);
+        toast.success(`Page ${page} updated (${data.confidence || 'unknown'} confidence)`);
+        close();
+      } catch (err) {
+        status.textContent = 'Error analyzing screenshot';
+        status.style.color = '#e57373';
+        toast.error('Failed to analyze screenshot');
+        analyzeBtn.disabled = false;
+      }
+    });
+  },
+
+  async applyAnalyzedSlots(playerId, page, slots) {
+    const startIdx = (page - 1) * CARDS_PER_PAGE;
+    const validRarities = new Set(CARD_RARITIES.map(r => r.value));
+    const entries = slots
+      .filter(s => typeof s.position === 'number' && s.position >= 0 && s.position < CARDS_PER_PAGE)
+      .map(s => ({
+        slotIndex: startIdx + s.position,
+        rarity: validRarities.has(s.rarity) ? s.rarity : ''
+      }));
+
+    await dataService.bulkSetPlayerCards(playerId, entries);
+    entries.forEach(e => this.updateLocalCard(playerId, e.slotIndex, e.rarity));
+
+    // Re-render this player's grid
+    this._cardsPageByPlayer[playerId] = page;
+    const grid = document.querySelector(`.card-grid[data-player-id="${playerId}"]`);
+    if (grid) grid.innerHTML = this.renderCardGridHTML(playerId, page);
+    this.bindCardSlotHandlers(playerId);
   }
 };

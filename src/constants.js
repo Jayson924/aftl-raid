@@ -316,11 +316,22 @@ export const CLASS_FAMILIES = {
 // Equipment rarities with color codes
 export const EQUIPMENT_RARITIES = [
   { value: '', label: 'None', color: '' },
+  { value: 'magic', label: 'Magic', color: '#22c55e' },
   { value: 'rare', label: 'Rare', color: '#3b82f6' },
   { value: 'epic', label: 'Epic', color: '#ff9800' },
   { value: 'unique', label: 'Unique', color: '#8f5ce0' },
   { value: 'legend', label: 'Legend', color: '#d62d49' }
 ];
+
+// ============================================
+// MONSTER CARDS
+// ============================================
+// In-game card UI: pages of 16 slots (4x4 grid) each. Page count is admin-configurable
+// (stored in app_config key 'card_page_count') and slot names live in 'card_slot_names'.
+// Slot positions are stable across pages, so screenshots map 1:1 to slot indexes.
+export const CARDS_PER_PAGE = 16;
+export const DEFAULT_CARD_PAGES = 4;
+export const MAX_CARD_PAGES = 16; // matches DB CHECK constraint (slot_index < 256)
 
 // Equipment levels (for epic/unique/legend rarity)
 export const EQUIPMENT_LEVELS = [

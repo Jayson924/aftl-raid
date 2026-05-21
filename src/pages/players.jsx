@@ -54,6 +54,26 @@ export const PlayersPage = {
       data-tooltip="${tip}">${label}</button>`;
   },
 
+  // Inline whitelist toggle (admin only). Whitelist = "in our guild — gets guild features".
+  _buildWhitelistToggleHtml(player) {
+    if (!dataService.isAdmin()) return '';
+    const isOn = !!player.whitelisted;
+    const label = isOn ? 'In Guild' : 'Not in Guild';
+    const tip = isOn ? 'Click to remove guild access' : 'Click to whitelist (grant guild access)';
+    return `<button type="button" class="whitelist-pill ${isOn ? 'is-on' : ''} tooltip-wrap"
+      data-action="toggle-whitelist" data-player-id="${player.id}" data-whitelisted="${isOn}"
+      data-tooltip="${tip}">${label}</button>`;
+  },
+
+  // Both admin pills together — used in its own row under the character info.
+  _buildAdminPillsRowHtml(player) {
+    if (!dataService.isAdmin()) return '';
+    const exclude = this._buildExcludeToggleHtml(player);
+    const whitelist = this._buildWhitelistToggleHtml(player);
+    if (!exclude && !whitelist) return '';
+    return `<div class="admin-pills-row">${exclude}${whitelist}</div>`;
+  },
+
   async render(container) {
     const canViewFull = dataService.isPlayer();
 
@@ -450,6 +470,30 @@ export const PlayersPage = {
             btn.textContent = newExclude ? 'Excluded' : 'Exclude';
             btn.setAttribute('data-tooltip', newExclude ? 'Click to include' : 'Click to exclude from recruiting');
             toast.success(newExclude ? `${player?.name || 'Character'} excluded` : `${player?.name || 'Character'} included`);
+          } catch (err) {
+            toast.error(`Failed: ${err.message}`);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // Admin inline whitelist toggles
+      document.querySelectorAll('.whitelist-pill[data-action="toggle-whitelist"]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const playerId = btn.dataset.playerId;
+          const newWhitelisted = btn.dataset.whitelisted !== 'true';
+          try {
+            btn.disabled = true;
+            await dataService.togglePlayerWhitelist(playerId, newWhitelisted);
+            const player = players.find(p => p.id === playerId);
+            if (player) player.whitelisted = newWhitelisted;
+            btn.dataset.whitelisted = String(newWhitelisted);
+            btn.classList.toggle('is-on', newWhitelisted);
+            btn.textContent = newWhitelisted ? 'In Guild' : 'Not Whitelisted';
+            btn.setAttribute('data-tooltip', newWhitelisted ? 'Click to remove guild access' : 'Click to whitelist (grant guild access)');
+            toast.success(newWhitelisted ? `${player?.name || 'Character'} whitelisted` : `${player?.name || 'Character'} removed from whitelist`);
           } catch (err) {
             toast.error(`Failed: ${err.message}`);
           } finally {
@@ -895,7 +939,7 @@ export const PlayersPage = {
               <td class="expand-toggle-cell">${detailHtml ? '<span class="expand-arrow">▶</span>' : ''}</td>
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
-                ${this._buildExcludeToggleHtml(player)}
+                ${this._buildAdminPillsRowHtml(player)}
               </td>
               <td class="player-owner" data-label="Owner">
                 ${owner ? `
@@ -942,9 +986,9 @@ export const PlayersPage = {
                       ${canEdit
                         ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
                         : player.name}
-                      ${this._buildExcludeToggleHtml(player)}
                     </span>
                     <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
+                    ${this._buildAdminPillsRowHtml(player)}
                   </div>
                 </div>
                 <div class="char-card-badges">
@@ -1236,7 +1280,7 @@ export const PlayersPage = {
               <td class="expand-toggle-cell">${detailHtml ? '<span class="expand-arrow">▶</span>' : ''}</td>
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>` : player.name}
-                ${this._buildExcludeToggleHtml(player)}
+                ${this._buildAdminPillsRowHtml(player)}
               </td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
@@ -1282,9 +1326,9 @@ export const PlayersPage = {
                       ${canEdit
                         ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
                         : player.name}
-                      ${this._buildExcludeToggleHtml(player)}
                     </span>
                     <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
+                    ${this._buildAdminPillsRowHtml(player)}
                   </div>
                 </div>
                 <div class="char-card-badges">

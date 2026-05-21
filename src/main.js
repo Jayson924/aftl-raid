@@ -135,7 +135,7 @@ function renderNavigation() {
         ` : ''}
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
-            ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Raids</a>` : ''}
+            ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Characters</a>` : ''}
             <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
             ${isAdmin ? `<a href="#" class="nav-link" id="admin-btn-mobile">Admin</a>` : ''}
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
@@ -156,7 +156,7 @@ function renderNavigation() {
               <div class="dropdown-header">
                 <span class="dropdown-role">${dataService.getUserRole()}</span>
               </div>
-              ${isPlayer ? `<button class="dropdown-item" id="my-raids-btn">My Raids</button>` : ''}
+              ${isPlayer ? `<button class="dropdown-item" id="my-raids-btn">My Characters</button>` : ''}
               <button class="dropdown-item" id="change-name-btn">Change Name</button>
               ${isAdmin ? `<button class="dropdown-item" id="admin-btn">Admin</button>` : ''}
               <button class="dropdown-item" id="logout-btn">Logout</button>

@@ -1,0 +1,56 @@
+// ============================================
+// PAGINATION — shared component
+// ============================================
+.pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.pagination-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 0.4rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+
+  &:hover:not(:disabled) {
+    color: $primary-color;
+    background: rgba(244, 196, 48, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  &.active {
+    color: $primary-color;
+    text-shadow: 0 0 8px rgba(244, 196, 48, 0.4);
+    font-weight: 700;
+  }
+}
+
+.pagination-arrow,
+.pagination-jump {
+  color: rgba(244, 196, 48, 0.7);
+  font-size: 1.1rem;
+
+  &:hover:not(:disabled) {
+    color: $primary-color;
+  }
+}
