@@ -1120,6 +1120,207 @@
   }
 }
 
+// Grid-stack the two sections (Equipped / Extras) so the character block's
+// height stays stable when toggling — height locks to whichever section is taller.
+.my-raids-page .card-section-stack {
+  display: grid;
+}
+
+.my-raids-page .card-section-stack > .card-section {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.my-raids-page .card-section[data-section-active="false"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+// Section tabs (Slots / Extras) inside each character block
+.my-raids-page .card-section-tabs {
+  display: inline-flex;
+  margin-bottom: 0.6rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.my-raids-page .card-section-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.3rem 0.85rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(.active) {
+    color: $text-light;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &.active {
+    background: rgba(244, 196, 48, 0.18);
+    color: $primary-color;
+  }
+}
+
+// Extras list (My Characters → Cards tab → Extras section)
+.my-raids-page .card-extras-empty {
+  font-size: 0.85rem;
+  color: $text-muted;
+  font-style: italic;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.my-raids-page .card-extras-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.my-raids-page .card-extra-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  font-size: 0.85rem;
+
+  .extra-rarity-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  .extra-card-name {
+    flex: 1;
+    min-width: 0;
+    color: $text-light;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .extra-amount-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .extra-amount-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: $text-light;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background: rgba(244, 196, 48, 0.15);
+      border-color: rgba(244, 196, 48, 0.4);
+      color: $primary-color;
+    }
+  }
+
+  .extra-amount {
+    min-width: 32px;
+    text-align: center;
+    color: $text-light;
+    font-weight: 600;
+  }
+
+  .extra-delete-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: $text-muted;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0;
+
+    &:hover {
+      color: $danger-color;
+      background: rgba($danger-color, 0.12);
+    }
+  }
+}
+
+.my-raids-page .card-extras-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+
+  select,
+  input {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    color: $text-light;
+    font-size: 0.85rem;
+    font-family: inherit;
+    padding: 0.35rem 0.45rem;
+    min-width: 0;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+    }
+  }
+
+  .extras-amount-input {
+    width: 62px;
+    text-align: center;
+  }
+
+  .extras-add-btn {
+    padding: 0.4rem 0.85rem;
+    background: rgba(244, 196, 48, 0.15);
+    border: 1px solid rgba(244, 196, 48, 0.4);
+    color: $primary-color;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+
+    &:hover:not(:disabled) {
+      background: rgba(244, 196, 48, 0.25);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
 // Card screenshot upload modal (appended to body)
 .card-screenshot-modal {
   max-width: 520px;

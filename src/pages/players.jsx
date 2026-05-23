@@ -1,9 +1,12 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
+import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
+
+const CARD_RARITIES_PLAYERS = EQUIPMENT_RARITIES.filter(r => r.value);
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
@@ -27,6 +30,21 @@ export const PlayersPage = {
   // Cached data for roster re-renders
   _rosterPlayers: null,
   _rosterUserMap: null,
+
+  // Per-character card view state: { [playerId]: 'stats' | 'cards' } — default 'stats'
+  _charCardView: {},
+
+  // Per-character mini-grid page state: { [playerId]: pageNumber } — default 1
+  _charCardPageByPlayer: {},
+
+  // Card-collection data (loaded with the page)
+  _cardCollection: {
+    loaded: false,
+    loading: null, // promise while a load is in-flight
+    byPlayerId: {}, // playerId -> { [slotIndex]: rarity }
+    names: {},     // slotIndex -> custom name
+    pageCount: DEFAULT_CARD_PAGES,
+  },
 
   // Class family colors for chart
   _classFamilyColors: {
@@ -63,6 +81,154 @@ export const PlayersPage = {
     return `<button type="button" class="whitelist-pill ${isOn ? 'is-on' : ''} tooltip-wrap"
       data-action="toggle-whitelist" data-player-id="${player.id}" data-whitelisted="${isOn}"
       data-tooltip="${tip}">${label}</button>`;
+  },
+
+  // ============================================
+  // CHARACTER CARD: STATS / CARDS VIEW TOGGLE
+  // ============================================
+
+  _charViewFor(player) {
+    return this._charCardView[player.id] || 'stats';
+  },
+
+  _playerHasCards(playerId) {
+    const rarities = this._cardCollection.byPlayerId?.[playerId];
+    if (!rarities) return false;
+    return Object.values(rarities).some(r => !!r);
+  },
+
+  _buildCharCardToggleHtml(player) {
+    // Only whitelisted, non-excluded characters can show a card collection,
+    // and only if they actually have at least one card recorded.
+    if (!dataService.isPlayerWhitelisted(player)) return '';
+    if (!this._playerHasCards(player.id)) return '';
+    const view = this._charViewFor(player);
+    const tab = (v, label) =>
+      `<button type="button" class="char-card-view-tab ${view === v ? 'active' : ''}"
+        data-action="char-view" data-player-id="${player.id}" data-view="${v}">${label}</button>`;
+    return `<div class="char-card-view-toggle">${tab('stats', 'Stats')}${tab('cards', 'Cards')}</div>`;
+  },
+
+  _buildMiniCardGridHtml(playerId, page) {
+    const startIdx = (page - 1) * CARDS_PER_PAGE;
+    const rarities = this._cardCollection.byPlayerId[playerId] || {};
+    let html = '';
+    for (let i = 0; i < CARDS_PER_PAGE; i++) {
+      const slotIndex = startIdx + i;
+      const rarity = rarities[slotIndex] || '';
+      const info = CARD_RARITIES_PLAYERS.find(r => r.value === rarity);
+      const color = info?.color || '';
+      const name = this._cardCollection.names?.[slotIndex] || '';
+      const label = name || `Slot ${slotIndex + 1}`;
+      html += `
+        <div class="char-card-mini-slot ${rarity ? 'has-card' : ''}"
+             style="${color ? `--rarity-color: ${color}` : ''}"
+             title="${label}${rarity ? ` — ${info.label}` : ''}">
+          <span class="char-card-mini-slot-label">${label}</span>
+        </div>
+      `;
+    }
+    return html;
+  },
+
+  _buildCharCardCollectionHtml(player) {
+    const page = this._charCardPageByPlayer[player.id] || 1;
+    const pageCount = this._cardCollection.pageCount || DEFAULT_CARD_PAGES;
+    if (!this._cardCollection.loaded) {
+      return `<div class="char-card-collection"><p class="char-card-collection-loading">Loading cards…</p></div>`;
+    }
+    return `
+      <div class="char-card-collection" data-player-id="${player.id}">
+        <div class="char-card-mini-grid">${this._buildMiniCardGridHtml(player.id, page)}</div>
+        <div class="char-card-mini-pagination">${renderPagination(page, pageCount)}</div>
+      </div>
+    `;
+  },
+
+  _buildCharCardBodyHtml(player, detailHtml) {
+    if (this._charViewFor(player) === 'cards' && dataService.isPlayerWhitelisted(player)) {
+      return this._buildCharCardCollectionHtml(player);
+    }
+    return `${detailHtml}${player.notes ? `<div class="char-card-notes">${player.notes}</div>` : ''}`;
+  },
+
+  async _ensureCardCollectionLoaded() {
+    if (this._cardCollection.loaded) return;
+    if (this._cardCollection.loading) {
+      await this._cardCollection.loading;
+      return;
+    }
+    this._cardCollection.loading = (async () => {
+      try {
+        const [allCards, names, pageCount] = await Promise.all([
+          dataService.getPlayerCards(),
+          dataService.getCardSlotNames(),
+          dataService.getCardPageCount()
+        ]);
+        const byPlayerId = {};
+        (allCards || []).forEach(c => {
+          if (!byPlayerId[c.playerId]) byPlayerId[c.playerId] = {};
+          byPlayerId[c.playerId][c.slotIndex] = c.rarity;
+        });
+        this._cardCollection.byPlayerId = byPlayerId;
+        this._cardCollection.names = names || {};
+        this._cardCollection.pageCount = pageCount || DEFAULT_CARD_PAGES;
+        this._cardCollection.loaded = true;
+      } catch (err) {
+        console.error('Failed to load card collection:', err);
+      } finally {
+        this._cardCollection.loading = null;
+      }
+    })();
+    await this._cardCollection.loading;
+  },
+
+  _bindCharCardToggles(rootEl = document) {
+    rootEl.querySelectorAll('[data-action="char-view"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const playerId = btn.dataset.playerId;
+        const view = btn.dataset.view;
+        if (this._charCardView[playerId] === view) return;
+        this._charCardView[playerId] = view;
+
+        if (view === 'cards' && !this._cardCollection.loaded) {
+          await this._ensureCardCollectionLoaded();
+        }
+        this._refreshCharCardBody(playerId);
+      });
+    });
+  },
+
+  // Replace just the body of every .char-card for this player (there can be
+  // duplicates if both grouped + flat-mobile views are rendered).
+  _refreshCharCardBody(playerId) {
+    const player = (this._allPlayers || []).find(p => p.id === playerId);
+    if (!player) return;
+
+    document.querySelectorAll(`.char-card[data-player-id="${playerId}"]`).forEach(card => {
+      // Update tab active states
+      card.querySelectorAll('[data-action="char-view"]').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === this._charViewFor(player));
+      });
+      const body = card.querySelector('.char-card-body');
+      if (body) {
+        const detailHtml = this._buildEquipDetailHtml(player);
+        body.innerHTML = this._buildCharCardBodyHtml(player, detailHtml);
+        this._bindCharCardCollectionPagination(card, playerId);
+      }
+    });
+  },
+
+  _bindCharCardCollectionPagination(rootEl, playerId) {
+    const wrap = rootEl.querySelector('.char-card-mini-pagination .pagination');
+    if (!wrap) return;
+    const currentPage = this._charCardPageByPlayer[playerId] || 1;
+    const pageCount = this._cardCollection.pageCount || DEFAULT_CARD_PAGES;
+    bindPagination(wrap, currentPage, pageCount, (newPage) => {
+      this._charCardPageByPlayer[playerId] = newPage;
+      this._refreshCharCardBody(playerId);
+    });
   },
 
   // Both admin pills together — used in its own row under the character info.
@@ -699,7 +865,7 @@ export const PlayersPage = {
                 <span class="roster-chart-center-label">total</span>
               </div>
             </div>
-            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and would need 2718 FD, +15 weapon, and +15 armor.</div>
+            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and would need 3762 FD, +15 weapon, and +15 armor.</div>
           </div>
           <div class="roster-breakdown">
             <h3>Class Breakdown</h3>
@@ -977,7 +1143,7 @@ export const PlayersPage = {
           const detailHtml = this._buildEquipDetailHtml(player);
 
           return `
-            <div class="char-card">
+            <div class="char-card" data-player-id="${player.id}">
               <div class="char-card-header">
                 <div class="char-card-identity">
                   ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
@@ -1317,7 +1483,7 @@ export const PlayersPage = {
           const detailHtml = this._buildEquipDetailHtml(player);
 
           return `
-            <div class="char-card">
+            <div class="char-card" data-player-id="${player.id}">
               <div class="char-card-header">
                 <div class="char-card-identity">
                   ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}

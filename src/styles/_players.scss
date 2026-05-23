@@ -1700,3 +1700,113 @@
 
   &:disabled { opacity: 0.5; cursor: wait; }
 }
+
+// ============================================
+// CHARACTER CARD — Stats / Cards view toggle + mini collection grid
+// ============================================
+.char-card-view-toggle {
+  display: inline-flex;
+  margin: 0.5rem 0 0.4rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.char-card-view-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(.active) {
+    color: $text-light;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &.active {
+    background: rgba(244, 196, 48, 0.18);
+    color: $primary-color;
+  }
+}
+
+.char-card-collection {
+  padding: 0.5rem 0;
+}
+
+.char-card-collection-loading {
+  font-size: 0.75rem;
+  color: $text-muted;
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+.char-card-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.25rem;
+  max-width: 100%;
+}
+
+.char-card-mini-slot {
+  --rarity-color: rgba(255, 255, 255, 0.1);
+  aspect-ratio: 1;
+  border: 1.5px solid var(--rarity-color);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  overflow: hidden;
+
+  &.has-card {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.2));
+    box-shadow: 0 0 4px var(--rarity-color), inset 0 0 6px rgba(0, 0, 0, 0.3);
+
+    .char-card-mini-slot-label {
+      color: var(--rarity-color);
+      font-weight: 600;
+    }
+  }
+
+  .char-card-mini-slot-label {
+    font-size: 0.6rem;
+    line-height: 1.1;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+}
+
+.char-card-mini-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+
+  .pagination {
+    padding: 0.25rem 0.4rem;
+    gap: 0.15rem;
+  }
+
+  .pagination-btn {
+    min-width: 22px;
+    height: 22px;
+    font-size: 0.8rem;
+    padding: 0 0.3rem;
+  }
+}
+

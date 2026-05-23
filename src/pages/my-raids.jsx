@@ -24,6 +24,8 @@ export const MyRaidsPage = {
   _cardNames: {}, // slotIndex -> custom card name (from app_config)
   _cardPageCount: DEFAULT_CARD_PAGES,
   _hoveredPlayerId: null, // tracks which character the mouse is over (for Ctrl+V paste-to-character)
+  _extrasByPlayer: {}, // playerId -> [{ id, cardName, rarity, amount }]
+  _sectionByPlayer: {}, // playerId -> 'slots' | 'extras' (default 'slots')
 
   async render(container) {
     if (!dataService.isAuthenticated()) {
@@ -98,6 +100,8 @@ export const MyRaidsPage = {
     this._cardNames = {};
     this._cardPageCount = DEFAULT_CARD_PAGES;
     this._hoveredPlayerId = null;
+    this._extrasByPlayer = {};
+    this._sectionByPlayer = {};
     if (this._pasteHandler) {
       document.removeEventListener('paste', this._pasteHandler);
       this._pasteHandler = null;
@@ -991,17 +995,30 @@ export const MyRaidsPage = {
       return;
     }
 
-    // Lazy-load cards + custom slot names + page count on first view
+    // Lazy-load cards + extras + custom slot names + page count on first view
     if (!this._cardsLoaded) {
       listEl.innerHTML = '<p class="empty-state">Loading cards…</p>';
       try {
         const playerIds = cardEligiblePlayers.map(p => p.id);
-        const [allCards, names, pageCount] = await Promise.all([
+        const [allCards, allExtras, names, pageCount] = await Promise.all([
           dataService.getPlayerCards(),
+          dataService.getExtraCards(),
           dataService.getCardSlotNames(),
           dataService.getCardPageCount()
         ]);
         this._playerCards = allCards.filter(c => playerIds.includes(c.playerId));
+        // Group extras by player and sort
+        const extrasByPlayer = {};
+        (allExtras || []).filter(e => playerIds.includes(e.playerId)).forEach(e => {
+          if (!extrasByPlayer[e.playerId]) extrasByPlayer[e.playerId] = [];
+          extrasByPlayer[e.playerId].push(e);
+        });
+        const rarityOrder = ['legend', 'unique', 'epic', 'rare', 'magic'];
+        Object.values(extrasByPlayer).forEach(list => list.sort((a, b) => {
+          if (a.cardName !== b.cardName) return a.cardName.localeCompare(b.cardName);
+          return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+        }));
+        this._extrasByPlayer = extrasByPlayer;
         this._cardNames = names || {};
         this._cardPageCount = pageCount || DEFAULT_CARD_PAGES;
         this._cardsLoaded = true;
@@ -1018,6 +1035,8 @@ export const MyRaidsPage = {
     cardEligiblePlayers.forEach(player => {
       const iconStyle = getClassSpriteStyle(player.role);
       const currentPage = this._cardsPageByPlayer[player.id] || 1;
+      const section = this._sectionByPlayer[player.id] || 'slots';
+      const showSlots = section === 'slots';
       html += `
         <div class="card-character-block" data-player-id="${player.id}">
           <div class="card-character-header">
@@ -1029,7 +1048,7 @@ export const MyRaidsPage = {
               </div>
             </div>
             <div class="card-character-actions">
-              <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page">
+              <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page" ${showSlots ? '' : 'style="display:none"'}>
                 <svg class="card-paste-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="17 8 12 3 7 8"/>
@@ -1039,11 +1058,22 @@ export const MyRaidsPage = {
               </button>
             </div>
           </div>
-          <div class="card-grid" data-player-id="${player.id}">
-            ${this.renderCardGridHTML(player.id, currentPage)}
+          <div class="card-section-tabs" data-player-id="${player.id}">
+            <button class="card-section-tab ${showSlots ? 'active' : ''}" data-section="slots" data-player-id="${player.id}">Equipped</button>
+            <button class="card-section-tab ${!showSlots ? 'active' : ''}" data-section="extras" data-player-id="${player.id}">Extras</button>
           </div>
-          <div class="card-pagination-wrap" data-player-id="${player.id}">
-            ${renderPagination(currentPage, this._cardPageCount)}
+          <div class="card-section-stack" data-player-id="${player.id}">
+            <div class="card-section card-section-slots" data-player-id="${player.id}" data-section-active="${showSlots}">
+              <div class="card-grid" data-player-id="${player.id}">
+                ${this.renderCardGridHTML(player.id, currentPage)}
+              </div>
+              <div class="card-pagination-wrap" data-player-id="${player.id}">
+                ${renderPagination(currentPage, this._cardPageCount)}
+              </div>
+            </div>
+            <div class="card-section card-section-extras" data-player-id="${player.id}" data-section-active="${!showSlots}">
+              ${this.renderExtrasSectionHTML(player.id)}
+            </div>
           </div>
         </div>
       `;
@@ -1085,6 +1115,182 @@ export const MyRaidsPage = {
     return html;
   },
 
+  renderExtrasSectionHTML(playerId) {
+    const extras = this._extrasByPlayer[playerId] || [];
+    let rowsHtml = '';
+    if (extras.length === 0) {
+      rowsHtml = `<p class="card-extras-empty">No extras yet. Add one below.</p>`;
+    } else {
+      rowsHtml = `<div class="card-extras-list">${extras.map(e => {
+        const info = CARD_RARITIES.find(r => r.value === e.rarity);
+        const color = info?.color || '';
+        return `
+          <div class="card-extra-row" data-extra-id="${e.id}">
+            <span class="extra-rarity-dot" style="color:${color};background:${color}" title="${info?.label || e.rarity}"></span>
+            <span class="extra-card-name">${e.cardName}</span>
+            <span class="extra-amount-controls">
+              <button class="extra-amount-btn" data-action="extra-dec" data-extra-id="${e.id}">−</button>
+              <span class="extra-amount">×${e.amount}</span>
+              <button class="extra-amount-btn" data-action="extra-inc" data-extra-id="${e.id}">+</button>
+            </span>
+            <button class="extra-delete-btn" data-action="extra-delete" data-extra-id="${e.id}" title="Remove">×</button>
+          </div>
+        `;
+      }).join('')}</div>`;
+    }
+
+    // Add form: name select from Card Map, rarity, amount
+    const uniqueNames = [...new Set(Object.values(this._cardNames || {}).map(n => (n || '').trim()).filter(Boolean))].sort();
+    const nameOptions = uniqueNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+    const rarityOptions = CARD_RARITIES.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+
+    const formHtml = `
+      <form class="card-extras-form" data-action="extra-add" data-player-id="${playerId}">
+        <select class="extras-name-select" required ${uniqueNames.length === 0 ? 'disabled' : ''}>
+          <option value="">${uniqueNames.length === 0 ? 'No cards in Card Map yet' : 'Pick a card…'}</option>
+          ${nameOptions}
+        </select>
+        <select class="extras-rarity-select" required>${rarityOptions}</select>
+        <input class="extras-amount-input" type="number" min="1" max="999" value="1" required>
+        <button type="submit" class="extras-add-btn">Add</button>
+      </form>
+    `;
+
+    return `${rowsHtml}${formHtml}`;
+  },
+
+  refreshExtrasSection(playerId) {
+    document.querySelectorAll(`.card-section-extras[data-player-id="${playerId}"]`).forEach(section => {
+      section.innerHTML = this.renderExtrasSectionHTML(playerId);
+      this.bindExtrasHandlers(playerId);
+    });
+  },
+
+  bindExtrasHandlers(playerId) {
+    document.querySelectorAll(`.card-section-extras[data-player-id="${playerId}"]`).forEach(section => {
+      section.querySelectorAll('[data-action="extra-add"]').forEach(form => {
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.handleAddExtra(form, playerId);
+        });
+      });
+      section.querySelectorAll('[data-action="extra-inc"]').forEach(btn => {
+        btn.addEventListener('click', () => this.handleExtraAmountDelta(btn.dataset.extraId, +1));
+      });
+      section.querySelectorAll('[data-action="extra-dec"]').forEach(btn => {
+        btn.addEventListener('click', () => this.handleExtraAmountDelta(btn.dataset.extraId, -1));
+      });
+      section.querySelectorAll('[data-action="extra-delete"]').forEach(btn => {
+        btn.addEventListener('click', () => this.handleExtraDelete(btn.dataset.extraId));
+      });
+    });
+  },
+
+  async handleAddExtra(form, playerId) {
+    const nameSelect = form.querySelector('.extras-name-select');
+    const raritySelect = form.querySelector('.extras-rarity-select');
+    const amountInput = form.querySelector('.extras-amount-input');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    const cardName = nameSelect.value.trim();
+    const rarity = raritySelect.value;
+    const amount = parseInt(amountInput.value, 10);
+
+    if (!cardName) { toast.error('Pick a card from the list'); return; }
+    if (!rarity) { toast.error('Pick a rarity'); return; }
+    if (!Number.isFinite(amount) || amount < 1) { toast.error('Amount must be at least 1'); return; }
+
+    submitBtn.disabled = true;
+    try {
+      await dataService.addExtraCard(playerId, cardName, rarity, amount);
+      await this.reloadExtrasFor(playerId);
+      nameSelect.value = '';
+      amountInput.value = '1';
+      toast.success(`Added ${amount} × ${cardName}`);
+    } catch (err) {
+      toast.error(`Failed to add: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  },
+
+  async handleExtraAmountDelta(extraId, delta) {
+    const list = Object.values(this._extrasByPlayer).flat();
+    const extra = list.find(e => e.id === extraId);
+    if (!extra) return;
+    const newAmount = extra.amount + delta;
+    try {
+      if (newAmount <= 0) {
+        await dataService.removeExtraCard(extraId);
+      } else {
+        await dataService.setExtraCardAmount(extraId, newAmount);
+      }
+      await this.reloadExtrasFor(extra.playerId);
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`);
+    }
+  },
+
+  async handleExtraDelete(extraId) {
+    const list = Object.values(this._extrasByPlayer).flat();
+    const extra = list.find(e => e.id === extraId);
+    if (!extra) return;
+    const confirmed = await modal.confirm(
+      `Remove "${extra.cardName}" (${extra.rarity}, ×${extra.amount}) from extras?`,
+      { title: 'Remove Extra', confirmText: 'Remove', cancelText: 'Cancel', danger: true }
+    );
+    if (!confirmed) return;
+    try {
+      await dataService.removeExtraCard(extraId);
+      await this.reloadExtrasFor(extra.playerId);
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`);
+    }
+  },
+
+  async reloadExtrasFor(playerId) {
+    try {
+      const list = await dataService.getExtraCards(playerId);
+      const rarityOrder = ['legend', 'unique', 'epic', 'rare', 'magic'];
+      list.sort((a, b) => {
+        if (a.cardName !== b.cardName) return a.cardName.localeCompare(b.cardName);
+        return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+      });
+      this._extrasByPlayer[playerId] = list;
+      this.refreshExtrasSection(playerId);
+    } catch (err) {
+      console.error('Failed to reload extras:', err);
+    }
+  },
+
+  bindSectionTabs() {
+    document.querySelectorAll('.card-section-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const playerId = btn.dataset.playerId;
+        const section = btn.dataset.section;
+        if (this._sectionByPlayer[playerId] === section) return;
+        this._sectionByPlayer[playerId] = section;
+        // Update tabs
+        document.querySelectorAll(`.card-section-tab[data-player-id="${playerId}"]`).forEach(b => {
+          b.classList.toggle('active', b.dataset.section === section);
+        });
+        // Toggle section visibility via data-attr; both stay in the DOM so the
+        // grid-stacked container locks to the taller section's height.
+        const showSlots = section === 'slots';
+        document.querySelectorAll(`.card-section-slots[data-player-id="${playerId}"]`).forEach(s => {
+          s.dataset.sectionActive = String(showSlots);
+        });
+        document.querySelectorAll(`.card-section-extras[data-player-id="${playerId}"]`).forEach(s => {
+          s.dataset.sectionActive = String(!showSlots);
+        });
+        // Hide paste button on extras section
+        document.querySelectorAll(`.card-paste-btn[data-player-id="${playerId}"]`).forEach(b => {
+          b.style.display = showSlots ? '' : 'none';
+        });
+      });
+    });
+  },
+
   setupCardGridHandlers() {
     // Pagination per character
     this._myPlayers.forEach(player => {
@@ -1107,6 +1313,10 @@ export const MyRaidsPage = {
         if (this._hoveredPlayerId === playerId) this._hoveredPlayerId = null;
       });
     });
+
+    // Slots/Extras section tabs and extras handlers
+    this.bindSectionTabs();
+    this._myPlayers.forEach(p => this.bindExtrasHandlers(p.id));
 
     // Slot clicks
     this._myPlayers.forEach(p => this.bindCardSlotHandlers(p.id));

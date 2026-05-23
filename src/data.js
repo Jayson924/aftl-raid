@@ -353,6 +353,16 @@ class DataService {
   }
 
   /**
+   * Strict ownership check — does NOT grant admins permission.
+   * Use this for character-personal data the owner alone should curate
+   * (e.g., the extras list on the Characters page).
+   */
+  isPlayerOwner(player) {
+    if (!this._user || !player) return false;
+    return player.discordId === this._user.id;
+  }
+
+  /**
    * Get all Discord users (for admin assignment dropdown)
    */
   async getAppUsers() {
@@ -1207,6 +1217,85 @@ class DataService {
         .in('slot_index', toDelete);
       if (error) throw error;
     }
+    return { success: true };
+  }
+
+  // ============================================
+  // PLAYER EXTRA CARDS (duplicates / stash, by name+rarity+amount)
+  // ============================================
+
+  async getExtraCards(playerId = null) {
+    let query = supabase.from('player_extra_cards').select('*');
+    if (playerId) query = query.eq('player_id', playerId);
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching extra cards:', error);
+      return [];
+    }
+    return (data || []).map(e => ({
+      id: e.id,
+      playerId: e.player_id,
+      cardName: e.card_name,
+      rarity: e.rarity,
+      amount: e.amount,
+    }));
+  }
+
+  /**
+   * Adds (or increments) an extra-card entry. If (player, name, rarity) already
+   * exists, the amount is added on top of the existing row's amount.
+   */
+  async addExtraCard(playerId, cardName, rarity, amount = 1) {
+    if (!this._user) throw new Error('Not logged in');
+    if (!playerId || !cardName || !rarity) throw new Error('Missing fields');
+    if (!Number.isFinite(amount) || amount < 1) throw new Error('Amount must be at least 1');
+
+    const { data: existing } = await supabase
+      .from('player_extra_cards')
+      .select('id, amount')
+      .eq('player_id', playerId)
+      .eq('card_name', cardName)
+      .eq('rarity', rarity)
+      .maybeSingle();
+
+    if (existing) {
+      const newAmount = existing.amount + amount;
+      const { error } = await supabase
+        .from('player_extra_cards')
+        .update({ amount: newAmount })
+        .eq('id', existing.id);
+      if (error) throw error;
+      return { success: true, id: existing.id, amount: newAmount };
+    }
+
+    const { data, error } = await supabase
+      .from('player_extra_cards')
+      .insert({ player_id: playerId, card_name: cardName, rarity, amount })
+      .select()
+      .single();
+    if (error) throw error;
+    return { success: true, id: data.id, amount: data.amount };
+  }
+
+  async setExtraCardAmount(extraId, amount) {
+    if (!this._user) throw new Error('Not logged in');
+    if (amount <= 0) return this.removeExtraCard(extraId);
+    const { error } = await supabase
+      .from('player_extra_cards')
+      .update({ amount })
+      .eq('id', extraId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async removeExtraCard(extraId) {
+    if (!this._user) throw new Error('Not logged in');
+    const { error } = await supabase
+      .from('player_extra_cards')
+      .delete()
+      .eq('id', extraId);
+    if (error) throw error;
     return { success: true };
   }
 
