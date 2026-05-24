@@ -50,21 +50,21 @@ export const MyRaidsPage = {
 
         <div class="section availability-section">
           <h2>Availability</h2>
-          <p class="availability-hint">When you're typically online. Used for raids that need scheduling lead time (currently DDN Classic).</p>
+          <p class="availability-hint">When you're typically online. Used for raids that need scheduling lead time (currently DDN Classic). Enter times in <strong>your local timezone</strong> — others see them converted to theirs.</p>
+          <div class="availability-tz-banner" id="availability-tz-label">Detecting your timezone…</div>
           <div class="availability-form">
             <label class="availability-anytime">
               <input type="checkbox" id="availability-anytime-input">
               <span>Available anytime</span>
             </label>
             <label class="availability-field">
-              <span class="availability-label">Available from</span>
+              <span class="availability-label">Available from <span class="availability-label-tz" id="availability-from-tz"></span></span>
               <input type="text" id="availability-from-input" placeholder="Pick a time" readonly>
             </label>
             <label class="availability-field">
-              <span class="availability-label">Log off time</span>
+              <span class="availability-label">Log off time <span class="availability-label-tz" id="availability-off-tz"></span></span>
               <input type="text" id="availability-off-input" placeholder="Pick a time" readonly>
             </label>
-            <span class="availability-tz" id="availability-tz-label"></span>
             <div class="availability-actions">
               <button class="btn btn-secondary" id="clear-availability-btn">Clear</button>
               <button class="btn btn-primary" id="save-availability-btn">Save</button>
@@ -235,7 +235,14 @@ export const MyRaidsPage = {
 
     const browserTz = getBrowserTimezone();
     const tz = current.timezone || browserTz;
-    tzLabel.textContent = tz ? `Times in ${getTimezoneShortLabel(tz)} (${tz})` : '';
+    const tzShort = tz ? getTimezoneShortLabel(tz) : '';
+    tzLabel.innerHTML = tz
+      ? `You're entering times in your local timezone: <strong>${tzShort}</strong> <span class="tz-name">(${tz})</span>`
+      : '';
+    const fromTzEl = document.getElementById('availability-from-tz');
+    const offTzEl = document.getElementById('availability-off-tz');
+    if (fromTzEl) fromTzEl.textContent = tzShort ? `(${tzShort})` : '';
+    if (offTzEl) offTzEl.textContent = tzShort ? `(${tzShort})` : '';
 
     const syncDisabled = () => {
       const disabled = anytimeInput.checked;
