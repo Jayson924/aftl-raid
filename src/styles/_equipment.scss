@@ -203,3 +203,12 @@
     opacity: 1;
   }
 }
+
+// Hint that a player's log-off time crosses into the next day.
+// Wraps the off-time portion inside availability chips on the lineup editor
+// and lineups page when offMin < fromMin in the viewer's timezone.
+.availability-next-day {
+  color: #ffb86c;
+  font-style: italic;
+  font-weight: 600;
+}

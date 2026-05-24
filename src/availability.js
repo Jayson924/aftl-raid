@@ -98,7 +98,9 @@ function formatHM({ hours, minutes }) {
 /**
  * Format an availability window for display in the viewer's timezone.
  * Returns "Anytime" if the anytime flag is set, "8:00 PM – 2:00 AM" for a range,
- * or "" if no availability set.
+ * or "" if no availability set. The off-time is wrapped in
+ * `<span class="availability-next-day">…</span>` when the window crosses midnight
+ * (i.e. off-time is the next day), so callers can render it as HTML.
  */
 export function formatAvailabilityRange(availability, viewerTz) {
   if (!availability) return '';
@@ -111,7 +113,16 @@ export function formatAvailabilityRange(availability, viewerTz) {
   const from = availableFrom ? convertTimeOfDay(availableFrom, timezone, vtz) : null;
   const off = logOffTime ? convertTimeOfDay(logOffTime, timezone, vtz) : null;
 
-  if (from && off) return `${formatHM(from)} – ${formatHM(off)}`;
+  if (from && off) {
+    const fromMin = from.hours * 60 + from.minutes;
+    const offMin = off.hours * 60 + off.minutes;
+    const crossesMidnight = offMin < fromMin;
+    const offText = formatHM(off);
+    const offHtml = crossesMidnight
+      ? `<span class="availability-next-day">${offText}</span>`
+      : offText;
+    return `${formatHM(from)} – ${offHtml}`;
+  }
   if (from) return `from ${formatHM(from)}`;
   if (off) return `until ${formatHM(off)}`;
   return '';
