@@ -37,6 +37,7 @@ class DataService {
     this._user = null;
     this._userRole = null;
     this._authCallbacks = [];
+    this._myAvailability = null;
   }
 
   // ============================================
@@ -140,12 +141,13 @@ class DataService {
     if (!this._user) {
       this._userRole = null;
       this._customDisplayName = null;
+      this._myAvailability = null;
       return;
     }
 
     const { data, error } = await supabase
       .from('app_users')
-      .select('role, display_name, avatar_url')
+      .select('role, display_name, avatar_url, available_from, log_off_time, availability_timezone, available_anytime')
       .eq('discord_id', this._user.id)
       .single();
 
@@ -169,12 +171,19 @@ class DataService {
 
       this._userRole = newUser?.role || 'guest';
       this._customDisplayName = null; // New user, no custom name yet
+      this._myAvailability = { availableFrom: null, logOffTime: null, timezone: null, anytime: false };
       return;
     }
 
     this._userRole = data?.role || 'guest';
     // Store custom display name if it differs from Discord name
     this._customDisplayName = data?.display_name !== this._user.displayName ? data?.display_name : null;
+    this._myAvailability = {
+      availableFrom: data?.available_from || null,
+      logOffTime: data?.log_off_time || null,
+      timezone: data?.availability_timezone || null,
+      anytime: data?.available_anytime === true
+    };
 
     // Sync avatar: if session has no avatar but DB does, use DB value
     // (covers case where user set avatar on Discord and logged in from another device)
@@ -248,6 +257,41 @@ class DataService {
     if (error) throw error;
 
     this._customDisplayName = trimmedName !== this._user.displayName ? trimmedName : null;
+    return { success: true };
+  }
+
+  getMyAvailability() {
+    return this._myAvailability || { availableFrom: null, logOffTime: null, timezone: null, anytime: false };
+  }
+
+  /**
+   * Update the user's daily availability window.
+   * Pass null values to clear. `timezone` should be an IANA name (e.g. America/Los_Angeles).
+   * `anytime: true` flags the user as having an open schedule.
+   */
+  async updateAvailability({ availableFrom, logOffTime, timezone, anytime }) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const update = {
+      available_from: availableFrom || null,
+      log_off_time: logOffTime || null,
+      availability_timezone: timezone || null,
+      available_anytime: anytime === true
+    };
+
+    const { error } = await supabase
+      .from('app_users')
+      .update(update)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+
+    this._myAvailability = {
+      availableFrom: update.available_from,
+      logOffTime: update.log_off_time,
+      timezone: update.availability_timezone,
+      anytime: update.available_anytime
+    };
     return { success: true };
   }
 
@@ -368,7 +412,7 @@ class DataService {
   async getAppUsers() {
     const { data, error } = await supabase
       .from('app_users')
-      .select('discord_id, username, display_name, avatar_url, role, exclude, exclude_label, exclude_reason, created_at')
+      .select('discord_id, username, display_name, avatar_url, role, exclude, exclude_label, exclude_reason, created_at, available_from, log_off_time, availability_timezone, available_anytime')
       .order('display_name');
 
     if (error) {
@@ -385,7 +429,11 @@ class DataService {
       exclude: u.exclude === true,
       excludeLabel: u.exclude_label || '',
       excludeReason: u.exclude_reason || '',
-      createdAt: u.created_at
+      createdAt: u.created_at,
+      availableFrom: u.available_from || null,
+      logOffTime: u.log_off_time || null,
+      availabilityTimezone: u.availability_timezone || null,
+      availableAnytime: u.available_anytime === true
     }));
   }
 

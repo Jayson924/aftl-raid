@@ -9,6 +9,9 @@ import {
 } from '../constants.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
+import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/themes/dark.css';
 
 const CARD_RARITIES = EQUIPMENT_RARITIES.filter(r => r.value);
 
@@ -42,6 +45,30 @@ export const MyRaidsPage = {
           <div class="display-name-form">
             <input type="text" id="display-name-input" value="" maxlength="32" placeholder="Enter your display name">
             <button class="btn btn-primary" id="save-name-btn">Save</button>
+          </div>
+        </div>
+
+        <div class="section availability-section">
+          <h2>Availability</h2>
+          <p class="availability-hint">When you're typically online. Used for raids that need scheduling lead time (currently DDN Classic).</p>
+          <div class="availability-form">
+            <label class="availability-anytime">
+              <input type="checkbox" id="availability-anytime-input">
+              <span>Available anytime</span>
+            </label>
+            <label class="availability-field">
+              <span class="availability-label">Available from</span>
+              <input type="text" id="availability-from-input" placeholder="Pick a time" readonly>
+            </label>
+            <label class="availability-field">
+              <span class="availability-label">Log off time</span>
+              <input type="text" id="availability-off-input" placeholder="Pick a time" readonly>
+            </label>
+            <span class="availability-tz" id="availability-tz-label"></span>
+            <div class="availability-actions">
+              <button class="btn btn-secondary" id="clear-availability-btn">Clear</button>
+              <button class="btn btn-primary" id="save-availability-btn">Save</button>
+            </div>
           </div>
         </div>
 
@@ -79,6 +106,7 @@ export const MyRaidsPage = {
     nameInput.value = dataService.getDisplayName() || '';
 
     this.setupDisplayNameHandlers();
+    this.setupAvailabilityHandlers();
     this.setupAddCharacterHandler();
     this.setupAddRaidToAllHandler();
     this.setupDeleteAllRaidsHandler();
@@ -107,6 +135,10 @@ export const MyRaidsPage = {
       this._pasteHandler = null;
     }
     this._pasteTargetPlayerId = null;
+    this._availabilityFromPicker?.destroy();
+    this._availabilityOffPicker?.destroy();
+    this._availabilityFromPicker = null;
+    this._availabilityOffPicker = null;
   },
 
   // ============================================
@@ -159,6 +191,106 @@ export const MyRaidsPage = {
       window.dispatchEvent(new CustomEvent('display-name-changed'));
     } catch (error) {
       toast.error(`Failed to update name: ${error.message}`);
+    }
+  },
+
+  // ============================================
+  // AVAILABILITY
+  // ============================================
+
+  setupAvailabilityHandlers() {
+    const fromInput = document.getElementById('availability-from-input');
+    const offInput = document.getElementById('availability-off-input');
+    const anytimeInput = document.getElementById('availability-anytime-input');
+    const tzLabel = document.getElementById('availability-tz-label');
+    const saveBtn = document.getElementById('save-availability-btn');
+    const clearBtn = document.getElementById('clear-availability-btn');
+
+    const current = dataService.getMyAvailability();
+    // Time columns come back as HH:MM:SS — flatpickr accepts HH:MM.
+    const trim = (t) => t ? t.slice(0, 5) : '';
+
+    const pickerOpts = {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: 'H:i',          // stored format, 24h — what we send to the DB
+      altInput: true,             // show a friendlier value in the visible input
+      altFormat: 'h:i K',         // 12-hour with AM/PM
+      time_24hr: false,
+      minuteIncrement: 15,
+      defaultHour: 20,
+      allowInput: false
+    };
+
+    this._availabilityFromPicker = flatpickr(fromInput, {
+      ...pickerOpts,
+      defaultDate: trim(current.availableFrom) || null
+    });
+    this._availabilityOffPicker = flatpickr(offInput, {
+      ...pickerOpts,
+      defaultDate: trim(current.logOffTime) || null
+    });
+
+    anytimeInput.checked = !!current.anytime;
+
+    const browserTz = getBrowserTimezone();
+    const tz = current.timezone || browserTz;
+    tzLabel.textContent = tz ? `Times in ${getTimezoneShortLabel(tz)} (${tz})` : '';
+
+    const syncDisabled = () => {
+      const disabled = anytimeInput.checked;
+      // flatpickr's altInput swaps the visible field — disable both.
+      [this._availabilityFromPicker, this._availabilityOffPicker].forEach(p => {
+        if (!p) return;
+        p.input.disabled = disabled;
+        if (p.altInput) p.altInput.disabled = disabled;
+      });
+    };
+    syncDisabled();
+    anytimeInput.addEventListener('change', syncDisabled);
+
+    saveBtn.addEventListener('click', () => this.saveAvailability());
+    clearBtn.addEventListener('click', () => this.clearAvailability());
+  },
+
+  async saveAvailability() {
+    const anytimeInput = document.getElementById('availability-anytime-input');
+    const anytime = anytimeInput.checked;
+    // Pickers store the canonical HH:MM in their hidden input (with altInput).
+    const fromVal = this._availabilityFromPicker?.input?.value || null;
+    const offVal = this._availabilityOffPicker?.input?.value || null;
+    const availableFrom = anytime ? null : (fromVal || null);
+    const logOffTime = anytime ? null : (offVal || null);
+
+    if (!anytime && !availableFrom && !logOffTime) {
+      toast.error('Set at least one time, check "anytime", or use Clear');
+      return;
+    }
+
+    try {
+      await dataService.updateAvailability({
+        availableFrom,
+        logOffTime,
+        timezone: anytime ? null : getBrowserTimezone(),
+        anytime
+      });
+      toast.success('Availability updated!');
+    } catch (error) {
+      toast.error(`Failed to update availability: ${error.message}`);
+    }
+  },
+
+  async clearAvailability() {
+    try {
+      await dataService.updateAvailability({ availableFrom: null, logOffTime: null, timezone: null, anytime: false });
+      this._availabilityFromPicker?.clear();
+      this._availabilityOffPicker?.clear();
+      const anytimeInput = document.getElementById('availability-anytime-input');
+      anytimeInput.checked = false;
+      anytimeInput.dispatchEvent(new Event('change'));
+      toast.success('Availability cleared');
+    } catch (error) {
+      toast.error(`Failed to clear: ${error.message}`);
     }
   },
 

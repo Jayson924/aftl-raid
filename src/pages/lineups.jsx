@@ -6,6 +6,8 @@ import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCE
 import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
+import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForRaid } from '../availability.js';
+import { initFixedTooltip } from '../fixed-tooltip.js';
 
 export const LineupsPage = {
   currentRaidType: 'Hardcore',
@@ -262,13 +264,17 @@ export const LineupsPage = {
     }
 
     try {
-      const [lineups, players] = await Promise.all([
+      const [lineups, players, appUsers] = await Promise.all([
         dataService.getLineups(),
-        dataService.getPlayers()
+        dataService.getPlayers(),
+        dataService.getAppUsers().catch(() => [])
       ]);
 
       // Clear pending ticket changes when fresh data is loaded
       this.pendingTicketChanges = {};
+
+      this._userMap = {};
+      (appUsers || []).forEach(u => { this._userMap[u.discordId] = u; });
 
       this.allLineups = lineups.filter(l => l.raidType === this.currentRaidType);
 
@@ -387,7 +393,23 @@ export const LineupsPage = {
           </div>
         </div>
         <div class="lineup-players ${isFourManRaid(lineup.raidType) ? 'four-man' : ''}">
-          ${lineup.players.slice(0, getLineupSize(lineup.raidType)).map((playerName, idx) => {
+          ${(() => {
+            const showAvail = shouldShowAvailabilityForRaid(lineup.raidType);
+            const viewerTz = getBrowserTimezone();
+            const userMap = this._userMap || {};
+            const ownerAvailHtml = (player) => {
+              if (!showAvail || !player?.discordId) return '';
+              const owner = userMap[player.discordId];
+              if (!owner) return '';
+              const text = formatAvailabilityRange({
+                availableFrom: owner.availableFrom,
+                logOffTime: owner.logOffTime,
+                timezone: owner.availabilityTimezone,
+                anytime: owner.availableAnytime
+              }, viewerTz);
+              return text ? `<span class="player-slot-availability" data-tooltip-fixed="When this player is typically online (your timezone)">🕒 ${text}</span>` : '';
+            };
+            return lineup.players.slice(0, getLineupSize(lineup.raidType)).map((playerName, idx) => {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
 
@@ -429,14 +451,18 @@ export const LineupsPage = {
               ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
-                <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : renderGearscoreBadge(player)}</span>
+                <div class="player-name-row">
+                  <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : renderGearscoreBadge(player)}</span>
+                  ${!isPub ? ownerAvailHtml(player) : ''}
+                </div>
                 ${pilotDisplay}
                 ${player.role ? `<span class="player-role">${player.role}</span>` : ''}
                 ${!isPub ? formatPlayerEquipmentHtml(player, 'player-equipment-compact') : ''}
               </div>
             </div>
           `;
-          }).join('')}
+          }).join('');
+          })()}
           ${(() => {
             const size = getLineupSize(lineup.raidType);
             const filled = Math.min(lineup.players.length, size);
@@ -451,6 +477,8 @@ export const LineupsPage = {
         ${lineup.notes ? `<div class="lineup-notes-display"><span class="notes-label">Notes:</span> ${lineup.notes}</div>` : ''}
       </div>
     `;
+
+    initFixedTooltip();
 
     // Add click handler for cleared button if admin
     if (isAdmin) {

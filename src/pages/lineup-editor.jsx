@@ -9,6 +9,7 @@ import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
+import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForRaid } from '../availability.js';
 
 export const LineupEditorPage = {
   players: [],
@@ -740,11 +741,24 @@ export const LineupEditorPage = {
       </div>
     `;
 
+    const showAvailability = shouldShowAvailabilityForRaid(this.currentLineup.raidType);
+    const viewerTz = getBrowserTimezone();
+
     const playerCards = filteredPlayers.map(player => {
       const isInLineup = this.currentLineup.players.includes(player.name);
       // Check completion status based on CURRENT lineup's raid type
       // In Next Week mode, treat all players as needing the raid (ignore current completion status)
       const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+
+      // Owner's availability — only when the raid type calls for it.
+      const owner = showAvailability && player.discordId ? this._userMap?.[player.discordId] : null;
+      const availText = owner ? formatAvailabilityRange({
+        availableFrom: owner.availableFrom,
+        logOffTime: owner.logOffTime,
+        timezone: owner.availabilityTimezone,
+        anytime: owner.availableAnytime
+      }, viewerTz) : '';
+      const availBadge = availText ? `<span class="player-card-availability" data-tooltip-fixed="When this player is typically online (your timezone)">🕒 ${availText}</span>` : '';
 
       // Check if player has already used their ticket this week (Classic only)
       const ticketUsed = this.currentLineup.isNextWeek ? false : dataService.playerTicketUsed(player, this.currentLineup.raidType);
@@ -780,12 +794,15 @@ export const LineupEditorPage = {
              data-player-name="${player.name}"
              draggable="true">
           ${altBadge}
-          ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
           ${ticketBadge}
           ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
-            <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+            <div class="player-name-row">
+              <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+              ${availBadge}
+              ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
+            </div>
             <div class="player-role">${player.role}</div>
             ${formatPlayerEquipmentHtml(player)}
           </div>
@@ -2045,10 +2062,25 @@ export const LineupEditorPage = {
     const pilotName = this.currentLineup.pilotSlots[slotIndex] || '';
     const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
 
+    // Owner's availability (converted to viewer's timezone). Only shown for raid types
+    // where scheduling lead time matters (see shouldShowAvailabilityForRaid).
+    const showAvail = shouldShowAvailabilityForRaid(this.currentLineup.raidType);
+    const owner = showAvail && player.discordId ? this._userMap?.[player.discordId] : null;
+    const availText = owner ? formatAvailabilityRange({
+      availableFrom: owner.availableFrom,
+      logOffTime: owner.logOffTime,
+      timezone: owner.availabilityTimezone,
+      anytime: owner.availableAnytime
+    }, getBrowserTimezone()) : '';
+    const availDisplay = availText ? `<span class="slot-availability" data-tooltip-fixed="When this player is typically online (your timezone)">🕒 ${availText}</span>` : '';
+
     slotContent.innerHTML = `
       ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
       <div class="assigned-player">
-        <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+        <div class="player-name-row">
+          <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+          ${availDisplay}
+        </div>
         ${pilotDisplay}
         <div class="player-role">${player.role}</div>
         ${formatPlayerEquipmentHtml(player, 'player-equipment-compact')}
