@@ -9,7 +9,7 @@ import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
-import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForRaid } from '../availability.js';
+import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForRaid, availabilityMatchesRange, formatMinutesAsTime } from '../availability.js';
 
 export const LineupEditorPage = {
   players: [],
@@ -33,6 +33,9 @@ export const LineupEditorPage = {
   selectedSpecialization: null,
   selectedFinalClass: null,
   gearscoreMin: 0,
+  // Time-of-day filter (minutes from midnight, viewer's local TZ). null = inactive.
+  timeFilterFrom: null,
+  timeFilterTo: null,
   playerListLayout: 1, // 1 = single column, 2 = two columns
   showCarouselLineups: true,
   showCarouselNextWeek: false,
@@ -66,6 +69,8 @@ export const LineupEditorPage = {
     this.selectedSpecialization = null;
     this.selectedFinalClass = null;
     this.gearscoreMin = 0;
+    this.timeFilterFrom = null;
+    this.timeFilterTo = null;
     const savedCols = parseInt(localStorage.getItem('lineup-editor-player-cols'), 10);
     this.playerListLayout = savedCols === 2 ? 2 : 1;
     this.viewingUsers = [];
@@ -236,6 +241,20 @@ export const LineupEditorPage = {
                 <input type="range" id="gs-min-slider" class="gs-slider" min="0" max="100" step="1" value="0">
                 <span class="gs-filter__value" id="gs-min-value">0+</span>
               </div>
+              <div class="time-filter" id="time-filter" hidden>
+                <div class="time-filter__top">
+                  <span class="time-filter__label">Available</span>
+                  <span class="time-filter__readout" id="time-filter-readout">Any time</span>
+                  <button type="button" class="time-filter__clear" id="time-filter-clear" title="Clear time filter" aria-label="Clear time filter">×</button>
+                </div>
+                <div class="time-filter__slider">
+                  <div class="time-filter__track"></div>
+                  <div class="time-filter__range" id="time-filter-range"></div>
+                  <div class="time-filter__range time-filter__range--wrap" id="time-filter-range-wrap" hidden></div>
+                  <input type="range" id="time-filter-from" class="time-filter__input time-filter__input--from" min="0" max="1440" step="30" value="0">
+                  <input type="range" id="time-filter-to" class="time-filter__input time-filter__input--to" min="0" max="1440" step="30" value="1440">
+                </div>
+              </div>
               <div id="available-players-list" class="players-list${this.playerListLayout === 2 ? ' players-list--cols-2' : ''}">
                 <div class="loading">Loading players...</div>
               </div>
@@ -290,6 +309,7 @@ export const LineupEditorPage = {
         slotsContainer.classList.toggle('four-man', isFourManRaid(newRaidType));
       }
 
+      this.updateTimeFilterVisibility(); // Show/hide time filter based on raid type
       this.renderAvailablePlayers(); // Re-render to update completion badges
       this.loadExistingLineups(); // Re-filter existing lineups by raid type
       this.reRenderLineupSlots(); // Re-render slots to show/hide ticket toggle
@@ -399,6 +419,8 @@ export const LineupEditorPage = {
       gsSlider.style.setProperty('--gs-color', tier.color);
       this.filterPlayers();
     });
+
+    this.setupTimeFilter();
 
     const layoutToggleBtn = document.getElementById('layout-toggle-btn');
     if (layoutToggleBtn) {
@@ -721,6 +743,100 @@ export const LineupEditorPage = {
     container.style.cursor = 'grab';
   },
 
+  setupTimeFilter() {
+    const fromInput = document.getElementById('time-filter-from');
+    const toInput = document.getElementById('time-filter-to');
+    const clearBtn = document.getElementById('time-filter-clear');
+    if (!fromInput || !toInput) return;
+
+    const onInput = () => {
+      const from = Number(fromInput.value);
+      const to = Number(toInput.value);
+
+      // Inactive when fully open or when handles collapse onto each other.
+      const isFullRange = (from === 0 && to === 1440) || from === to;
+      this.timeFilterFrom = isFullRange ? null : from;
+      this.timeFilterTo = isFullRange ? null : to;
+
+      this.updateTimeFilterUI();
+      this.filterPlayers();
+    };
+
+    fromInput.addEventListener('input', onInput);
+    toInput.addEventListener('input', onInput);
+
+    clearBtn?.addEventListener('click', () => {
+      fromInput.value = '0';
+      toInput.value = '1440';
+      this.timeFilterFrom = null;
+      this.timeFilterTo = null;
+      this.updateTimeFilterUI();
+      this.filterPlayers();
+    });
+
+    this.updateTimeFilterVisibility();
+    this.updateTimeFilterUI();
+  },
+
+  updateTimeFilterVisibility() {
+    const wrap = document.getElementById('time-filter');
+    if (!wrap) return;
+    const show = shouldShowAvailabilityForRaid(this.currentLineup.raidType);
+    wrap.hidden = !show;
+    if (!show) {
+      // Reset so it doesn't apply invisibly to other raid types.
+      this.timeFilterFrom = null;
+      this.timeFilterTo = null;
+      const fromInput = document.getElementById('time-filter-from');
+      const toInput = document.getElementById('time-filter-to');
+      if (fromInput) fromInput.value = '0';
+      if (toInput) toInput.value = '1440';
+      this.updateTimeFilterUI();
+    }
+  },
+
+  updateTimeFilterUI() {
+    const fromInput = document.getElementById('time-filter-from');
+    const toInput = document.getElementById('time-filter-to');
+    const readout = document.getElementById('time-filter-readout');
+    const rangeFill = document.getElementById('time-filter-range');
+    const rangeWrap = document.getElementById('time-filter-range-wrap');
+    if (!fromInput || !toInput || !readout || !rangeFill || !rangeWrap) return;
+
+    const from = Number(fromInput.value);
+    const to = Number(toInput.value);
+    const fromPct = (from / 1440) * 100;
+    const toPct = (to / 1440) * 100;
+    const crossesMidnight = to < from && !(from === 0 && to === 1440);
+
+    if (crossesMidnight) {
+      // Fill from "from" handle to the right edge ...
+      rangeFill.style.left = `${fromPct}%`;
+      rangeFill.style.right = '0%';
+      // ... and from the left edge to the "to" handle.
+      rangeWrap.hidden = false;
+      rangeWrap.style.left = '0%';
+      rangeWrap.style.right = `${100 - toPct}%`;
+    } else {
+      rangeFill.style.left = `${fromPct}%`;
+      rangeFill.style.right = `${100 - toPct}%`;
+      rangeWrap.hidden = true;
+    }
+
+    const active = this.timeFilterFrom != null && this.timeFilterTo != null;
+    if (active) {
+      const fromText = formatMinutesAsTime(from);
+      const toText = to === 1440 ? '12:00 AM' : formatMinutesAsTime(to);
+      readout.innerHTML = crossesMidnight
+        ? `${fromText} – <span class="availability-next-day">${toText}</span>`
+        : `${fromText} – ${toText}`;
+      readout.classList.add('is-active');
+    } else {
+      readout.textContent = 'Any time';
+      readout.classList.remove('is-active');
+    }
+  },
+
   renderAvailablePlayers() {
     const listElement = document.getElementById('available-players-list');
 
@@ -788,9 +904,14 @@ export const LineupEditorPage = {
       const escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
       const escapeText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
       const altBadge = exclusion ? `<span class="alt-badge" data-tooltip-fixed="${escapeAttr(exclusion.reason)}">${escapeText(exclusion.label)}</span>` : '';
+      const tf = this.getTimeFilterStatus(player);
+      const showNoTimePrefBadge = tf.active && !tf.hasPref && !isExcluded;
+      const noTimePrefBadge = showNoTimePrefBadge
+        ? `<span class="player-card-availability player-card-availability--warning" data-tooltip-fixed="No time preference saved">!</span>`
+        : '';
 
       return `
-        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''} ${isExcluded ? 'is-alt' : ''}"
+        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''} ${isExcluded ? 'is-alt' : ''} ${showNoTimePrefBadge ? 'no-time-pref' : ''}"
              data-player-name="${player.name}"
              draggable="true">
           ${altBadge}
@@ -800,7 +921,7 @@ export const LineupEditorPage = {
           <div class="player-info">
             <div class="player-name-row">
               <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
-              ${availBadge}
+              ${availBadge || noTimePrefBadge}
               ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
             </div>
             <div class="player-role">${player.role}</div>
@@ -818,6 +939,23 @@ export const LineupEditorPage = {
     this.setupPlayerDragHandlers();
     this.setupAddPubHandler();
     initFixedTooltip();
+  },
+
+  getTimeFilterStatus(player) {
+    const active = this.timeFilterFrom != null && this.timeFilterTo != null
+      && shouldShowAvailabilityForRaid(this.currentLineup.raidType);
+    if (!active) return { active: false, hasPref: false, match: true };
+
+    const owner = player.discordId && this._userMap ? this._userMap[player.discordId] : null;
+    if (!owner) return { active: true, hasPref: false, match: false };
+
+    const result = availabilityMatchesRange({
+      availableFrom: owner.availableFrom,
+      logOffTime: owner.logOffTime,
+      timezone: owner.availabilityTimezone,
+      anytime: owner.availableAnytime
+    }, getBrowserTimezone(), this.timeFilterFrom, this.timeFilterTo);
+    return { active: true, hasPref: result.hasPref, match: result.match };
   },
 
   getFilteredPlayers() {
@@ -869,13 +1007,31 @@ export const LineupEditorPage = {
           matchesNotInLineup = !inOtherLineup;
         }
 
-        return matchesSearch && matchesClassFamily && matchesCompletion && matchesNotInLineup && matchesGearscore;
+        // Time-of-day filter: hide players whose saved preference is out of range.
+        // Players with NO preference are kept (and pushed to the bottom in sort).
+        let matchesTime = true;
+        const tf = this.getTimeFilterStatus(player);
+        if (tf.active && tf.hasPref && !tf.match) {
+          matchesTime = false;
+        }
+
+        return matchesSearch && matchesClassFamily && matchesCompletion && matchesNotInLineup && matchesGearscore && matchesTime;
       })
       .sort((a, b) => {
         // Excluded (alt) characters sink to the bottom
         const aEx = this.isPlayerExcluded(a) ? 1 : 0;
         const bEx = this.isPlayerExcluded(b) ? 1 : 0;
         if (aEx !== bEx) return aEx - bEx;
+
+        // When the time filter is active, no-preference players sit just above excluded.
+        const aTf = this.getTimeFilterStatus(a);
+        const bTf = this.getTimeFilterStatus(b);
+        if (aTf.active) {
+          const aNoPref = aTf.hasPref ? 0 : 1;
+          const bNoPref = bTf.hasPref ? 0 : 1;
+          if (aNoPref !== bNoPref) return aNoPref - bNoPref;
+        }
+
         return a.name.localeCompare(b.name);
       });
   },

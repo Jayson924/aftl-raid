@@ -67,7 +67,7 @@ function tzOffsetMinutes(tz, date) {
  * Convert "HH:MM(:SS)" interpreted in ownerTz to HH:MM in viewerTz, returning
  * { hours, minutes }. Uses today's date as the reference so DST is correct.
  */
-function convertTimeOfDay(timeStr, ownerTz, viewerTz) {
+export function convertTimeOfDay(timeStr, ownerTz, viewerTz) {
   if (!timeStr) return null;
   const [h, m] = timeStr.split(':').map(Number);
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
@@ -126,4 +126,72 @@ export function formatAvailabilityRange(availability, viewerTz) {
   if (from) return `from ${formatHM(from)}`;
   if (off) return `until ${formatHM(off)}`;
   return '';
+}
+
+/**
+ * Format a number of minutes from midnight (0-1439) as "h:mm AM/PM".
+ */
+export function formatMinutesAsTime(totalMin) {
+  const m = ((totalMin % 1440) + 1440) % 1440;
+  return formatHM({ hours: Math.floor(m / 60), minutes: m % 60 });
+}
+
+/**
+ * Check whether a player's availability window overlaps the viewer-supplied
+ * [fromMin, toMin] range. Both endpoints are minutes-from-midnight in the
+ * viewer's timezone. Player's availability times are stored in their own
+ * timezone and converted before comparison.
+ *
+ * Returns { hasPref, match }:
+ *   - hasPref: true if the owner has any availability info saved (anytime, from, or off)
+ *   - match:   true if the windows overlap (always true for "anytime")
+ */
+export function availabilityMatchesRange(availability, viewerTz, fromMin, toMin) {
+  if (!availability) return { hasPref: false, match: false };
+  if (availability.anytime) return { hasPref: true, match: true };
+
+  const { availableFrom, logOffTime, timezone } = availability;
+  if (!availableFrom && !logOffTime) return { hasPref: false, match: false };
+
+  const vtz = viewerTz || getBrowserTimezone();
+  const from = availableFrom ? convertTimeOfDay(availableFrom, timezone, vtz) : null;
+  const off = logOffTime ? convertTimeOfDay(logOffTime, timezone, vtz) : null;
+
+  // Normalize endpoints into [0, 1440). Both the filter range and the player's
+  // window may cross midnight, in which case we split into two spans before
+  // running the overlap check.
+  const f = ((fromMin % 1440) + 1440) % 1440;
+  const t = ((toMin % 1440) + 1440) % 1440;
+  if (f === t) {
+    // Zero-length / full-wrap range — treat as no constraint.
+    return { hasPref: true, match: true };
+  }
+
+  // Build player spans (may be 1 or 2 if crossing midnight).
+  let playerStart, playerEnd;
+  if (from && off) {
+    playerStart = from.hours * 60 + from.minutes;
+    playerEnd = off.hours * 60 + off.minutes;
+  } else if (from) {
+    // "Available from X onward" — treat as X to midnight.
+    playerStart = from.hours * 60 + from.minutes;
+    playerEnd = 1440;
+  } else {
+    // "Available until X" — treat as midnight to X.
+    playerStart = 0;
+    playerEnd = off.hours * 60 + off.minutes;
+  }
+
+  const playerSpans = playerEnd > playerStart
+    ? [[playerStart, playerEnd]]
+    : [[playerStart, 1440], [0, playerEnd]];
+
+  const filterSpans = t > f
+    ? [[f, t]]
+    : [[f, 1440], [0, t]];
+
+  const overlaps = playerSpans.some(([ps, pe]) =>
+    filterSpans.some(([fs, fe]) => ps < fe && pe > fs)
+  );
+  return { hasPref: true, match: overlaps };
 }

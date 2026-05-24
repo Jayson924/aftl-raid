@@ -1027,6 +1027,138 @@
       }
     }
 
+    .time-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding: 0.5rem 0.7rem 0.7rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: $border-radius;
+
+      &[hidden] { display: none; }
+
+      &__top {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      &__label {
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.65);
+        font-weight: 600;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+
+      &__readout {
+        flex: 1;
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.55);
+
+        &.is-active { color: #de435f; }
+      }
+
+      &__clear {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+
+        &:hover { color: #de435f; background: rgba(255, 255, 255, 0.06); }
+      }
+
+      &__slider {
+        position: relative;
+        height: 22px;
+      }
+
+      &__track {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 6px;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 3px;
+        pointer-events: none;
+      }
+
+      &__range {
+        position: absolute;
+        top: 50%;
+        height: 6px;
+        transform: translateY(-50%);
+        background: #de435f;
+        border-radius: 3px;
+        pointer-events: none;
+      }
+
+      &__input {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 22px;
+        margin: 0;
+        background: none;
+        -webkit-appearance: none;
+        appearance: none;
+        pointer-events: none;
+        outline: none;
+
+        &::-webkit-slider-runnable-track {
+          background: transparent;
+          height: 22px;
+        }
+        &::-moz-range-track {
+          background: transparent;
+          height: 22px;
+        }
+
+        &::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #fff;
+          border: 2px solid #de435f;
+          cursor: grab;
+          box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+          pointer-events: auto;
+          margin-top: 0;
+          position: relative;
+          z-index: 2;
+        }
+
+        &::-moz-range-thumb {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #fff;
+          border: 2px solid #de435f;
+          cursor: grab;
+          box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+          pointer-events: auto;
+        }
+
+        &::-webkit-slider-thumb:active,
+        &::-moz-range-thumb:active { cursor: grabbing; }
+      }
+    }
+
     .class-family-filter {
       display: flex;
       gap: 0.5rem;
@@ -1242,6 +1374,16 @@
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
         }
 
+        &.no-time-pref {
+          .player-info,
+          .class-sprite {
+            opacity: 0.55;
+            transition: opacity 0.15s ease;
+          }
+          &:hover .player-info,
+          &:hover .class-sprite { opacity: 0.9; }
+        }
+
         &:active {
           cursor: grabbing;
         }
@@ -1290,6 +1432,18 @@
             line-height: 1.2;
             white-space: nowrap;
             cursor: help;
+
+            &--warning {
+              width: 18px;
+              height: 18px;
+              justify-content: center;
+              background-color: rgba(222, 67, 95, 0.9);
+              color: #fff;
+              border-radius: 50%;
+              font-size: 0.75rem;
+              font-weight: 800;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+            }
           }
         }
 
