@@ -69,18 +69,18 @@ The character sheet layout:
 CRITICAL: Equipment rarity is determined by the border/glow color of each item icon. Pay very close attention to the color distinctions — getting these right is the most important part of the analysis:
 
 Rarity colors from highest to lowest:
-- Legend = BRIGHT RED or CRIMSON border. A strong, deep, saturated RED. Very rare — most characters do NOT have Legend gear.
-- Unique = PURPLE or VIOLET border. A cool-toned purple/magenta. Distinctly different from both red and blue.
-- Epic = ORANGE or AMBER border. A warm orange/golden/yellowish tone. This is the most common mid-tier rarity.
-- Rare = BLUE border (sky blue or royal blue)
-- Magic = GREEN border
-- Normal = WHITE or GRAY border
+- Legend = RED or PINK-RED border. A warm-toned color sitting between pure red and coral/pink. Hue is in the red-to-magenta-red range (roughly 340°–10° on the color wheel). Looks like crimson, rose, or hot pink — NOT purple. If the border looks reddish or pinkish (even a bright pink-red), it is Legend.
+- Unique = PURPLE or VIOLET border. A true cool-toned purple/violet sitting clearly in the blue-violet range (roughly 260°–290° on the color wheel). Has a noticeable BLUE component. If the color has no blue in it and reads as red/pink/rose, it is NOT Unique.
+- Epic = ORANGE or AMBER border. A warm orange/golden/yellowish tone.
+- Rare = BLUE border (sky blue or royal blue).
+- Magic = GREEN border.
+- Normal = WHITE or GRAY border.
 
 COLOR COMPARISON TIPS:
-- Orange (Epic) vs Red (Legend): Orange has a warm, yellowish tint. Red is a pure, cool-toned red with no orange.
-- Purple (Unique) vs Orange (Epic): Purple has a COOL blue-ish/violet tone. Orange has a WARM yellow-ish tone. If you see a cooler-toned border compared to warm orange equipment, it is purple/Unique.
-- IMPORTANT: Every single equipment piece can have a DIFFERENT rarity — armor, weapons, AND accessories. Do NOT assume any pieces match each other. A character might have a Legend helmet, Epic top, Unique gloves, Epic main weapon, Rare necklace, Unique ring, etc. Evaluate each of the 11 slots independently by its own border color.
-- When in doubt between two adjacent rarities, lean toward the LOWER one (e.g., Epic over Legend, Unique over Epic).
+- Legend (red/pink-red) vs Unique (purple): Legend is WARM with no blue in it — even a bright pink-red is still Legend. Unique is COOL with a clear blue/violet component. Do NOT call something Unique just because it looks bright or saturated; check whether the hue is in the red family or the violet family.
+- Orange (Epic) vs Red (Legend): Orange has a yellow tint. Red/pink-red has no yellow.
+- Every single equipment piece can have a DIFFERENT rarity — armor, weapons, AND accessories. Do NOT assume any pieces match each other. Evaluate each of the 11 slots independently by its own border color.
+- Do not bias toward any particular rarity. Many characters have full Legend gear; many have mixed gear. Report what you actually see in each border.
 
 Enhancement levels appear as small "+X" numbers overlaid on each equipment icon, typically in the bottom-right or center of the icon. They are small white or yellow text. Look carefully at each icon — most equipped items WILL have an enhancement number. Common values range from +9 to +15. If you can make out any number on the icon, report it. If the number is hard to read, give your best guess rather than leaving it as 0. Only use 0 for accessories (which have no enhancement).
 
