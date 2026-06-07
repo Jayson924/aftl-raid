@@ -15,6 +15,16 @@ import 'flatpickr/dist/themes/dark.css';
 
 const CARD_RARITIES = EQUIPMENT_RARITIES.filter(r => r.value);
 
+// Per-character "include bought in totals" prefs, persisted as a playerId->bool map.
+const SHOPPING_TOTAL_PREFS_KEY = 'myShoppingTotalAllByPlayer';
+function loadShoppingTotalPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem(SHOPPING_TOTAL_PREFS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
 // Shopping list items are free text — escape before injecting into innerHTML.
 function escapeHtml(str) {
   return String(str)
@@ -35,8 +45,9 @@ export const MyRaidsPage = {
   _editingRaidPlayerId: null,
   _lastAddedRaid: null,
   _activeTab: 'raids', // 'raids' | 'shopping' | 'cards'
-  _shoppingItems: [], // [{ id, playerId, item, bought, sortOrder }]
+  _shoppingItems: [], // [{ id, playerId, item, bought, price, sortOrder }]
   _shoppingLoaded: false,
+  _shoppingTotalAllByPlayer: loadShoppingTotalPrefs(), // { [playerId]: true } — true = include bought; default un-bought only
   _cardsPageByPlayer: {}, // playerId -> current page
   _cardNames: {}, // slotIndex -> custom card name (from app_config)
   _cardPageCount: DEFAULT_CARD_PAGES,
@@ -616,7 +627,7 @@ export const MyRaidsPage = {
     const group = this._characterGroups.find(g => g.id === groupId);
     if (!group) return;
     const confirmed = await modal.confirm(
-      `Delete group "${group.name}"? Its characters move to Ungrouped (they are not deleted).`,
+      `Delete group "${group.name}"? The characters will be moved to Ungrouped.`,
       { title: 'Delete Group', confirmText: 'Delete', cancelText: 'Cancel', danger: true }
     );
     if (!confirmed) return;
@@ -1584,6 +1595,13 @@ export const MyRaidsPage = {
     this.bindShoppingHandlers();
   },
 
+  shoppingTotalFor(playerId) {
+    const includeBought = !!this._shoppingTotalAllByPlayer[playerId];
+    return this._shoppingItems
+      .filter(i => i.playerId === playerId && (includeBought || !i.bought))
+      .reduce((sum, i) => sum + (Number(i.price) || 0), 0);
+  },
+
   renderShoppingItemsHTML(playerId) {
     const items = this._shoppingItems.filter(i => i.playerId === playerId);
     let html = '';
@@ -1594,6 +1612,7 @@ export const MyRaidsPage = {
           <div class="shopping-item ${item.bought ? 'bought' : ''}" data-item-id="${item.id}">
             <button class="shopping-check" data-item-id="${item.id}" title="${item.bought ? 'Mark as not bought' : 'Mark as bought'}">${item.bought ? '✓' : ''}</button>
             <span class="shopping-item-text">${escapeHtml(item.item)}</span>
+            <input type="number" class="shopping-price-input" data-item-id="${item.id}" value="${item.price || ''}" min="0" step="any" placeholder="0" title="Price">
             <button class="shopping-delete-btn" data-item-id="${item.id}" title="Delete">&times;</button>
           </div>
         `;
@@ -1603,9 +1622,24 @@ export const MyRaidsPage = {
     html += `
       <form class="shopping-add-form" data-player-id="${playerId}">
         <input type="text" class="shopping-add-input" placeholder="Add an item…" maxlength="100" autocomplete="off">
+        <input type="number" class="shopping-add-price" placeholder="Price" min="0" step="any" autocomplete="off">
         <button type="submit" class="btn btn-add-shopping">+ Add</button>
       </form>
     `;
+    if (items.length > 0) {
+      const includeBought = !!this._shoppingTotalAllByPlayer[playerId];
+      const total = this.shoppingTotalFor(playerId);
+      html += `
+        <div class="shopping-total-row">
+          <label class="shopping-total-toggle" title="Include items already marked as bought in this total">
+            <input type="checkbox" class="shopping-total-all" data-player-id="${playerId}" ${includeBought ? 'checked' : ''}>
+            <span>Include bought</span>
+          </label>
+          <span class="shopping-total-label">Total</span>
+          <span class="shopping-total-value">${total.toLocaleString()}</span>
+        </div>
+      `;
+    }
     return html;
   },
 
@@ -1641,6 +1675,22 @@ export const MyRaidsPage = {
     container.querySelectorAll('.shopping-delete-btn').forEach(btn => {
       btn.addEventListener('click', () => this.deleteShoppingItem(btn.dataset.itemId, playerId));
     });
+
+    // Edit price (commit on change/blur)
+    container.querySelectorAll('.shopping-price-input').forEach(input => {
+      input.addEventListener('change', () => this.updateShoppingPrice(input.dataset.itemId, input.value, playerId));
+    });
+
+    // Per-card "include bought in total" toggle
+    const totalToggle = container.querySelector('.shopping-total-all');
+    if (totalToggle) {
+      totalToggle.addEventListener('change', () => {
+        this._shoppingTotalAllByPlayer[playerId] = totalToggle.checked;
+        localStorage.setItem(SHOPPING_TOTAL_PREFS_KEY, JSON.stringify(this._shoppingTotalAllByPlayer));
+        const valueEl = container.querySelector('.shopping-total-value');
+        if (valueEl) valueEl.textContent = this.shoppingTotalFor(playerId).toLocaleString();
+      });
+    }
   },
 
   async addShoppingItem(playerId, form) {
@@ -1648,15 +1698,19 @@ export const MyRaidsPage = {
     const text = input.value.trim();
     if (!text) return;
 
+    const priceInput = form.querySelector('.shopping-add-price');
+    const price = Number(priceInput.value) || 0;
+
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     try {
-      const { data } = await dataService.addShoppingItem(playerId, text);
+      const { data } = await dataService.addShoppingItem(playerId, text, price);
       this._shoppingItems.push({
         id: data.id,
         playerId,
         item: data.item,
         bought: data.bought,
+        price: Number(data.price) || 0,
         sortOrder: data.sort_order
       });
       this.refreshShoppingItems(playerId);
@@ -1679,6 +1733,20 @@ export const MyRaidsPage = {
       this.refreshShoppingItems(playerId);
     } catch (error) {
       toast.error(`Failed to update: ${error.message}`);
+    }
+  },
+
+  async updateShoppingPrice(itemId, value, playerId) {
+    const item = this._shoppingItems.find(i => i.id === itemId);
+    if (!item) return;
+    const newPrice = Number(value) || 0;
+    if (newPrice === item.price) return;
+    try {
+      await dataService.updateShoppingItem(itemId, { price: newPrice });
+      item.price = newPrice;
+      this.refreshShoppingItems(playerId);
+    } catch (error) {
+      toast.error(`Failed to update price: ${error.message}`);
     }
   },
 

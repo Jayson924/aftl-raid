@@ -1654,8 +1654,20 @@
   }
 }
 
+// Fixed height so every card matches; the items list scrolls internally
+// while the add-item row and total stay pinned in view.
+.my-raids-page .shopping-character-block {
+  display: flex;
+  flex-direction: column;
+  height: 33rem;
+}
+
 .my-raids-page .character-shopping {
   padding: 0.5rem 0.75rem 0.75rem;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .my-raids-page .shopping-character-block .character-card .character-info {
@@ -1678,6 +1690,10 @@
   flex-direction: column;
   gap: 0.4rem;
   margin-bottom: 0.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem; // breathing room for the scrollbar
 }
 
 .my-raids-page .shopping-item {
@@ -1770,6 +1786,8 @@
   display: flex;
   gap: 0.4rem;
   align-items: center;
+  margin-bottom: 0.6rem;
+  flex-shrink: 0;
 }
 
 .my-raids-page .shopping-add-input {
@@ -1815,6 +1833,82 @@
     color: $primary-color;
     box-shadow: 0 0 8px rgba(244, 196, 48, 0.2);
   }
+}
+
+// Per-card "include bought" toggle, sits at the left of the total row
+.my-raids-page .shopping-total-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: auto;
+  cursor: pointer;
+  color: $text-muted;
+  font-size: 0.75rem;
+  user-select: none;
+
+  input {
+    cursor: pointer;
+    accent-color: $primary-color;
+  }
+
+  &:hover {
+    color: $text-light;
+  }
+}
+
+// Per-item price input (inline on each row, and in the add form)
+.my-raids-page .shopping-price-input,
+.my-raids-page .shopping-add-price {
+  flex-shrink: 0;
+  width: 5.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: $text-light;
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-align: right;
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    box-shadow: 0 0 8px rgba(244, 196, 48, 0.2);
+  }
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+  }
+}
+
+.my-raids-page .shopping-item.bought .shopping-price-input {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+// Per-character total (sum of item prices) — pinned to the bottom of the card,
+// separated from the add-item row above it.
+.my-raids-page .shopping-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.my-raids-page .shopping-total-label {
+  color: $text-muted;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.my-raids-page .shopping-total-value {
+  color: $primary-color;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 // Card screenshot upload modal (appended to body)

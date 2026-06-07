@@ -1312,11 +1312,12 @@ class DataService {
       playerId: i.player_id,
       item: i.item,
       bought: i.bought,
+      price: Number(i.price) || 0,
       sortOrder: i.sort_order
     }));
   }
 
-  async addShoppingItem(playerId, item) {
+  async addShoppingItem(playerId, item, price = 0) {
     if (!this._user) throw new Error('Not logged in');
 
     const { data: existing } = await supabase
@@ -1335,6 +1336,7 @@ class DataService {
         player_id: playerId,
         item,
         bought: false,
+        price: Number(price) || 0,
         sort_order: nextOrder
       })
       .select()
@@ -1350,6 +1352,7 @@ class DataService {
     const updateData = {};
     if (updates.item !== undefined) updateData.item = updates.item;
     if (updates.bought !== undefined) updateData.bought = updates.bought;
+    if (updates.price !== undefined) updateData.price = Number(updates.price) || 0;
     if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
 
     const { error } = await supabase
