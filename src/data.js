@@ -370,6 +370,8 @@ class DataService {
         classicTicketUsed: p.classic_ticket_used || '',
         discordId: p.discord_id || null,
         accountNumber: p.account_number || null,
+        groupId: p.group_id || null,
+        sortOrder: p.sort_order ?? 0,
         exclude: p.exclude === true,
         excludeLabel: p.exclude_label || '',
         excludeReason: p.exclude_reason || '',
@@ -1148,6 +1150,229 @@ class DataService {
 
     if (error) throw error;
     return { success: true, newClears: data.current_clears - 1 };
+  }
+
+  // ============================================
+  // CHARACTER GROUPS (per-user, per-account folders)
+  // ============================================
+
+  async getCharacterGroups() {
+    if (!this._user) return [];
+
+    const { data, error } = await supabase
+      .from('character_groups')
+      .select('*')
+      .eq('discord_id', this._user.id)
+      .order('account_number')
+      .order('sort_order')
+      .order('created_at');
+
+    if (error) {
+      console.error('Error fetching character groups:', error);
+      return [];
+    }
+
+    return data.map(g => ({
+      id: g.id,
+      discordId: g.discord_id,
+      accountNumber: g.account_number || 1,
+      name: g.name,
+      sortOrder: g.sort_order
+    }));
+  }
+
+  async addCharacterGroup(accountNumber, name) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { data: existing } = await supabase
+      .from('character_groups')
+      .select('sort_order')
+      .eq('discord_id', this._user.id)
+      .eq('account_number', accountNumber)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
+
+    const { data, error } = await supabase
+      .from('character_groups')
+      .insert({
+        discord_id: this._user.id,
+        account_number: accountNumber,
+        name,
+        sort_order: nextOrder
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return {
+      id: data.id,
+      discordId: data.discord_id,
+      accountNumber: data.account_number || 1,
+      name: data.name,
+      sortOrder: data.sort_order
+    };
+  }
+
+  async renameCharacterGroup(groupId, name) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { error } = await supabase
+      .from('character_groups')
+      .update({ name })
+      .eq('id', groupId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async deleteCharacterGroup(groupId) {
+    if (!this._user) throw new Error('Not logged in');
+
+    // Members' group_id is cleared automatically (ON DELETE SET NULL).
+    const { error } = await supabase
+      .from('character_groups')
+      .delete()
+      .eq('id', groupId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async reorderCharacterGroups(orderedGroupIds) {
+    if (!this._user) throw new Error('Not logged in');
+
+    for (let i = 0; i < orderedGroupIds.length; i++) {
+      const { error } = await supabase
+        .from('character_groups')
+        .update({ sort_order: i })
+        .eq('id', orderedGroupIds[i])
+        .eq('discord_id', this._user.id);
+      if (error) throw error;
+    }
+    return { success: true };
+  }
+
+  async setCharacterGroup(playerId, groupId) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { error } = await supabase
+      .from('players')
+      .update({ group_id: groupId })
+      .eq('id', playerId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
+   * Persist a whole bucket's order after a drag/move.
+   * entries: [{ id, groupId, sortOrder }] — groupId may be null (ungrouped).
+   */
+  async saveCharacterOrder(entries) {
+    if (!this._user) throw new Error('Not logged in');
+
+    for (const e of entries) {
+      const { error } = await supabase
+        .from('players')
+        .update({ group_id: e.groupId ?? null, sort_order: e.sortOrder })
+        .eq('id', e.id)
+        .eq('discord_id', this._user.id);
+      if (error) throw error;
+    }
+    return { success: true };
+  }
+
+  // ============================================
+  // SHOPPING LIST (per-character want list)
+  // ============================================
+
+  async getShoppingList() {
+    if (!this._user) return [];
+
+    const { data, error } = await supabase
+      .from('shopping_list')
+      .select('*')
+      .eq('discord_id', this._user.id)
+      .order('sort_order')
+      .order('created_at');
+
+    if (error) {
+      console.error('Error fetching shopping list:', error);
+      return [];
+    }
+
+    return data.map(i => ({
+      id: i.id,
+      discordId: i.discord_id,
+      playerId: i.player_id,
+      item: i.item,
+      bought: i.bought,
+      sortOrder: i.sort_order
+    }));
+  }
+
+  async addShoppingItem(playerId, item) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { data: existing } = await supabase
+      .from('shopping_list')
+      .select('sort_order')
+      .eq('player_id', playerId)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
+
+    const { data, error } = await supabase
+      .from('shopping_list')
+      .insert({
+        discord_id: this._user.id,
+        player_id: playerId,
+        item,
+        bought: false,
+        sort_order: nextOrder
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  }
+
+  async updateShoppingItem(itemId, updates) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const updateData = {};
+    if (updates.item !== undefined) updateData.item = updates.item;
+    if (updates.bought !== undefined) updateData.bought = updates.bought;
+    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
+
+    const { error } = await supabase
+      .from('shopping_list')
+      .update(updateData)
+      .eq('id', itemId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async deleteShoppingItem(itemId) {
+    if (!this._user) throw new Error('Not logged in');
+
+    const { error } = await supabase
+      .from('shopping_list')
+      .delete()
+      .eq('id', itemId)
+      .eq('discord_id', this._user.id);
+
+    if (error) throw error;
+    return { success: true };
   }
 
   // ============================================

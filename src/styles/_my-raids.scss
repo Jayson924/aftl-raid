@@ -4,7 +4,8 @@
   transition: max-width 0.3s ease;
 
   &:has(#my-characters-list.two-columns),
-  &:has(.mc-tab.active[data-tab="cards"]) {
+  &:has(.mc-tab.active[data-tab="cards"]),
+  &:has(.mc-tab.active[data-tab="shopping"]) {
     max-width: 1200px;
   }
 
@@ -312,12 +313,9 @@
     }
   }
 
-  #my-characters-list.two-columns {
-    > .character-cards,
-    > .account-group > .character-cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
+  #my-characters-list.two-columns .character-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   // ============================================
@@ -399,6 +397,7 @@
     align-items: center;
     gap: 0.4rem;
     flex-shrink: 0;
+    margin-left: auto; // keep badges right-aligned next to the drag handle
   }
 
   // ============================================
@@ -923,11 +922,8 @@
   // ============================================
 
   @media (max-width: 768px) {
-    #my-characters-list.two-columns {
-      > .character-cards,
-      > .account-group > .character-cards {
-        grid-template-columns: 1fr;
-      }
+    #my-characters-list.two-columns .character-cards {
+      grid-template-columns: 1fr;
     }
   }
 
@@ -1068,13 +1064,213 @@
 }
 
 // ============================================
+// CHARACTER GROUPS + REORDER (My Characters)
+// ============================================
+.my-raids-page .character-group-toolbar {
+  margin-bottom: 0.6rem;
+}
+
+.my-raids-page .btn-new-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px dashed rgba(244, 196, 48, 0.3);
+  border-radius: 4px;
+  background: rgba(244, 196, 48, 0.05);
+  color: rgba(244, 196, 48, 0.75);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: $primary-color;
+    background: rgba(244, 196, 48, 0.1);
+    color: $primary-color;
+  }
+}
+
+.my-raids-page .character-group {
+  margin-bottom: 1rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.my-raids-page .character-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  .character-group-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: $primary-color;
+
+    &[data-group-id] {
+      cursor: pointer;
+
+      &:hover {
+        text-shadow: 0 0 8px rgba(244, 196, 48, 0.4);
+      }
+    }
+  }
+
+  .character-group-count {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: $text-muted;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 0.05rem 0.45rem;
+  }
+
+  .character-group-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: auto;
+
+    button {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: transparent;
+      color: $text-muted;
+      font-size: 0.9rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: $text-light;
+      }
+
+      &.group-delete:hover {
+        background: rgba(220, 53, 69, 0.15);
+        color: $danger-color;
+      }
+    }
+  }
+}
+
+.my-raids-page .character-group-empty {
+  grid-column: 1 / -1;
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: $text-muted;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+// Drop-target highlight while dragging a character
+.my-raids-page .character-cards.drag-over {
+  outline: 2px dashed rgba(244, 196, 48, 0.5);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.my-raids-page .character-block.dragging {
+  opacity: 0.5;
+}
+
+.my-raids-page .char-drag-handle {
+  flex-shrink: 0;
+  cursor: grab;
+  color: $text-muted;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.35rem 0 0;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:hover {
+    color: $text-light;
+  }
+}
+
+// Mobile move controls — hidden on desktop (drag is primary there)
+.my-raids-page .char-move-controls {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+  button {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: $text-light;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(244, 196, 48, 0.12);
+      border-color: rgba(244, 196, 48, 0.4);
+      color: $primary-color;
+    }
+  }
+
+  .char-group-select-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: $text-muted;
+  }
+
+  .char-group-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: $text-light;
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.4rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .my-raids-page .char-drag-handle {
+    display: none; // dragging is unreliable on touch — use the buttons
+  }
+
+  .my-raids-page .char-move-controls {
+    display: flex;
+  }
+}
+
+// ============================================
 // CARDS TAB
 // ============================================
 .my-raids-page .my-cards-section .section-header h2 {
   margin: 0;
 }
 
-.my-raids-page #my-cards-list {
+.my-raids-page #my-cards-list .cards-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
@@ -1440,6 +1636,184 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+  }
+}
+
+// ============================================
+// SHOPPING LIST TAB
+// ============================================
+.my-raids-page #my-shopping-list .character-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .my-raids-page #my-shopping-list .character-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.my-raids-page .character-shopping {
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.my-raids-page .shopping-character-block .character-card .character-info {
+  .character-name {
+    display: block;
+    font-weight: 600;
+    font-size: 1rem;
+    color: $text-light;
+  }
+
+  .character-class {
+    display: block;
+    font-size: 0.85rem;
+    color: $text-muted;
+  }
+}
+
+.my-raids-page .shopping-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.my-raids-page .shopping-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+
+    .shopping-delete-btn {
+      opacity: 1;
+    }
+  }
+
+  &.bought {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.12) 0%, rgba(40, 167, 69, 0.04) 100%);
+    border-color: rgba(40, 167, 69, 0.35);
+
+    .shopping-item-text {
+      color: rgba(255, 255, 255, 0.5);
+      text-decoration: line-through;
+    }
+
+    .shopping-check {
+      border-color: $success-color;
+      background: $success-color;
+      color: #fff;
+    }
+  }
+}
+
+.my-raids-page .shopping-check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  color: transparent;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: $success-color;
+    box-shadow: 0 0 6px rgba(40, 167, 69, 0.3);
+  }
+}
+
+.my-raids-page .shopping-item-text {
+  flex: 1;
+  min-width: 0;
+  color: $text-light;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.my-raids-page .shopping-delete-btn {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  padding: 0.1rem 0.4rem;
+  border: none;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: rgba(220, 53, 69, 0.15);
+    color: $danger-color;
+    opacity: 1;
+  }
+}
+
+.my-raids-page .shopping-add-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.my-raids-page .shopping-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: $text-light;
+  font-size: 0.9rem;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    box-shadow: 0 0 8px rgba(244, 196, 48, 0.2);
+  }
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+  }
+}
+
+.my-raids-page .btn-add-shopping {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px dashed rgba(244, 196, 48, 0.3);
+  border-radius: 4px;
+  background: rgba(244, 196, 48, 0.05);
+  color: rgba(244, 196, 48, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: $primary-color;
+    background: rgba(244, 196, 48, 0.1);
+    color: $primary-color;
+    box-shadow: 0 0 8px rgba(244, 196, 48, 0.2);
   }
 }
 

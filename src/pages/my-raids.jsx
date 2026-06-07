@@ -15,14 +15,28 @@ import 'flatpickr/dist/themes/dark.css';
 
 const CARD_RARITIES = EQUIPMENT_RARITIES.filter(r => r.value);
 
+// Shopping list items are free text — escape before injecting into innerHTML.
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export const MyRaidsPage = {
   _myPlayers: [],
   _personalRaids: [],
+  _characterGroups: [], // [{ id, accountNumber, name, sortOrder }]
+  _draggingPlayerId: null, // character drag-and-drop (Raids tab)
   _playerCards: [], // [{ id, playerId, slotIndex, rarity }]
   _editingRaidId: null,
   _editingRaidPlayerId: null,
   _lastAddedRaid: null,
-  _activeTab: 'raids', // 'raids' | 'cards'
+  _activeTab: 'raids', // 'raids' | 'shopping' | 'cards'
+  _shoppingItems: [], // [{ id, playerId, item, bought, sortOrder }]
+  _shoppingLoaded: false,
   _cardsPageByPlayer: {}, // playerId -> current page
   _cardNames: {}, // slotIndex -> custom card name (from app_config)
   _cardPageCount: DEFAULT_CARD_PAGES,
@@ -75,6 +89,7 @@ export const MyRaidsPage = {
         <div class="mc-tabs">
           <button class="mc-tab active" data-tab="raids">Raids</button>
           <button class="mc-tab" data-tab="cards">Cards</button>
+          <button class="mc-tab" data-tab="shopping">Shopping List</button>
         </div>
 
         <div class="section my-characters-section" data-tab-panel="raids">
@@ -99,6 +114,13 @@ export const MyRaidsPage = {
           </div>
           <div id="my-cards-list"></div>
         </div>
+
+        <div class="section my-shopping-section" data-tab-panel="shopping" style="display:none">
+          <div class="section-header">
+            <h2>Shopping List</h2>
+          </div>
+          <div id="my-shopping-list"></div>
+        </div>
       </div>
     `;
 
@@ -118,12 +140,16 @@ export const MyRaidsPage = {
   destroy() {
     this._myPlayers = [];
     this._personalRaids = [];
+    this._characterGroups = [];
+    this._draggingPlayerId = null;
     this._playerCards = [];
     this._cardsLoaded = false;
     this._editingRaidId = null;
     this._editingRaidPlayerId = null;
     this._lastAddedRaid = null;
     this._activeTab = 'raids';
+    this._shoppingItems = [];
+    this._shoppingLoaded = false;
     this._cardsPageByPlayer = {};
     this._cardNames = {};
     this._cardPageCount = DEFAULT_CARD_PAGES;
@@ -158,6 +184,7 @@ export const MyRaidsPage = {
           panel.style.display = panel.dataset.tabPanel === tab ? '' : 'none';
         });
         if (tab === 'cards') this.renderCardsTab();
+        if (tab === 'shopping') this.renderShoppingTab();
       });
     });
   },
@@ -310,83 +337,472 @@ export const MyRaidsPage = {
     if (!listEl) return;
 
     try {
-      const [allPlayers] = await Promise.all([
+      const [allPlayers, groups] = await Promise.all([
         dataService.getPlayers(),
+        dataService.getCharacterGroups(),
         this.loadPersonalRaids()
       ]);
       const userId = dataService.getUser()?.id;
       this._myPlayers = allPlayers.filter(p => p.discordId === userId);
+      this._characterGroups = groups;
 
-      if (this._myPlayers.length === 0) {
-        listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
-        return;
-      }
-
-      // Group personal raids by player ID
-      const raidsByPlayer = {};
-      this._personalRaids.forEach(raid => {
-        if (!raidsByPlayer[raid.playerId]) raidsByPlayer[raid.playerId] = [];
-        raidsByPlayer[raid.playerId].push(raid);
-      });
-
-      // Group by account number
-      const byAccount = {};
-      this._myPlayers.forEach(p => {
-        const acct = p.accountNumber || 1;
-        if (!byAccount[acct]) byAccount[acct] = [];
-        byAccount[acct].push(p);
-      });
-
-      const accountNumbers = Object.keys(byAccount).sort((a, b) => a - b);
-      const multiAccount = accountNumbers.length > 1;
-
-      let html = '';
-      accountNumbers.forEach(acctNum => {
-        const players = byAccount[acctNum];
-        if (multiAccount) {
-          html += `<div class="account-group">
-            <div class="account-header">Account ${acctNum}</div>`;
-        }
-        html += '<div class="character-cards">';
-        players.forEach(player => {
-          const iconStyle = getClassSpriteStyle(player.role);
-          const playerRaids = raidsByPlayer[player.id] || [];
-
-          html += `
-            <div class="character-block" data-player-id="${player.id}">
-              <div class="character-card">
-                <div class="character-info">
-                  ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
-                  <div>
-                    <span class="character-name-link" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>
-                    <span class="character-class">${player.role}</span>
-                  </div>
-                </div>
-                <div class="character-actions">
-                  ${PlayersPage.renderRaidBadgesHTML(player, true)}
-                </div>
-              </div>
-              <div class="character-personal-raids">
-                ${this.renderPlayerRaidsHTML(player.id, playerRaids)}
-                <div class="add-raid-form-container" data-player-id="${player.id}"></div>
-              </div>
-            </div>
-          `;
-        });
-        html += '</div>';
-        if (multiAccount) {
-          html += '</div>';
-        }
-      });
-
-      listEl.innerHTML = html;
-      this.setupRaidBadgeHandlers();
-      this.setupEditCharacterHandlers();
-      this.setupPersonalRaidHandlers();
-      this.setupAddRaidHandlers();
+      this.renderRaidsList();
     } catch (error) {
       console.error('Error loading characters:', error);
       listEl.innerHTML = '<p class="empty-state">Failed to load characters.</p>';
+    }
+  },
+
+  // Render the Raids tab from current local state (no refetch). The Raids tab
+  // is the editable surface: drag handles, move buttons, and group management.
+  renderRaidsList() {
+    const listEl = document.getElementById('my-characters-list');
+    if (!listEl) return;
+
+    if (this._myPlayers.length === 0) {
+      listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
+      return;
+    }
+
+    // Group personal raids by player ID
+    const raidsByPlayer = {};
+    this._personalRaids.forEach(raid => {
+      if (!raidsByPlayer[raid.playerId]) raidsByPlayer[raid.playerId] = [];
+      raidsByPlayer[raid.playerId].push(raid);
+    });
+
+    const structure = this.buildAccountStructure(this._myPlayers);
+    listEl.innerHTML = this.renderAccountStructure(structure, {
+      editable: true,
+      containerClass: 'character-cards',
+      renderCharacter: (player) => {
+        const iconStyle = getClassSpriteStyle(player.role);
+        const playerRaids = raidsByPlayer[player.id] || [];
+        return `
+          <div class="character-block" data-player-id="${player.id}" data-group-id="${player.groupId || ''}" data-account="${player.accountNumber || 1}">
+            <div class="character-card">
+              <span class="char-drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>
+              <div class="character-info">
+                ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
+                <div>
+                  <span class="character-name-link" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>
+                  <span class="character-class">${player.role}</span>
+                </div>
+              </div>
+              <div class="character-actions">
+                ${PlayersPage.renderRaidBadgesHTML(player, true)}
+              </div>
+            </div>
+            ${this.renderCharMoveControls(player)}
+            <div class="character-personal-raids">
+              ${this.renderPlayerRaidsHTML(player.id, playerRaids)}
+              <div class="add-raid-form-container" data-player-id="${player.id}"></div>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    this.setupRaidBadgeHandlers();
+    this.setupEditCharacterHandlers();
+    this.setupPersonalRaidHandlers();
+    this.setupAddRaidHandlers();
+    this.setupGroupHandlers(listEl);
+    this.setupCharacterDnD(listEl);
+    this.setupCharacterMoveHandlers(listEl);
+  },
+
+  // ============================================
+  // SHARED GROUPING STRUCTURE (all tabs)
+  // ============================================
+
+  // Build account -> groups -> ordered players. Groups are per-account and
+  // come from this._characterGroups; characters with no (or a stale) group
+  // fall into an Ungrouped bucket. Within a bucket, sort by sortOrder, name.
+  buildAccountStructure(players) {
+    const byAccount = {};
+    players.forEach(p => {
+      const acct = p.accountNumber || 1;
+      if (!byAccount[acct]) byAccount[acct] = [];
+      byAccount[acct].push(p);
+    });
+
+    const sortPlayers = (arr) => arr.slice().sort((a, b) => {
+      const ao = a.sortOrder ?? 0;
+      const bo = b.sortOrder ?? 0;
+      if (ao !== bo) return ao - bo;
+      return a.name.localeCompare(b.name);
+    });
+
+    const accountNumbers = Object.keys(byAccount).sort((a, b) => a - b);
+    return accountNumbers.map(acctNum => {
+      const acctPlayers = byAccount[acctNum];
+      const acctGroups = this._characterGroups
+        .filter(g => String(g.accountNumber) === String(acctNum))
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      const validGroupIds = new Set(acctGroups.map(g => g.id));
+
+      const groups = acctGroups.map(g => ({
+        id: g.id,
+        name: g.name,
+        players: sortPlayers(acctPlayers.filter(p => p.groupId === g.id))
+      }));
+      const ungrouped = sortPlayers(
+        acctPlayers.filter(p => !p.groupId || !validGroupIds.has(p.groupId))
+      );
+
+      return {
+        accountNumber: Number(acctNum),
+        groups,
+        ungrouped,
+        hasGroups: acctGroups.length > 0
+      };
+    });
+  },
+
+  renderAccountStructure(structure, opts) {
+    const { editable, renderCharacter, containerClass = 'character-cards', hideEmptyGroups = false } = opts;
+    const multiAccount = structure.length > 1;
+    let html = '';
+
+    structure.forEach(acct => {
+      const sections = [];
+
+      if (acct.hasGroups || editable) {
+        acct.groups.forEach(group => {
+          if (hideEmptyGroups && group.players.length === 0) return;
+          sections.push(this.renderGroupSection({
+            groupId: group.id, name: group.name, players: group.players,
+            accountNumber: acct.accountNumber, editable, renderCharacter, containerClass,
+            showHeader: true
+          }));
+        });
+        // Ungrouped bucket — header only shown when real groups exist
+        if (!(hideEmptyGroups && acct.ungrouped.length === 0)) {
+          sections.push(this.renderGroupSection({
+            groupId: '', name: 'Ungrouped', players: acct.ungrouped,
+            accountNumber: acct.accountNumber, editable, renderCharacter, containerClass,
+            showHeader: acct.hasGroups, isUngrouped: true
+          }));
+        }
+      } else {
+        // No groups and not editable: flat list (preserves the original look)
+        sections.push(this.renderGroupSection({
+          groupId: '', name: '', players: acct.ungrouped,
+          accountNumber: acct.accountNumber, editable, renderCharacter, containerClass,
+          showHeader: false, isUngrouped: true
+        }));
+      }
+
+      if (sections.every(s => !s)) return;
+
+      html += `<div class="account-group" data-account="${acct.accountNumber}">`;
+      if (multiAccount) {
+        html += `<div class="account-header">Account ${acct.accountNumber}</div>`;
+      }
+      if (editable) {
+        html += `<div class="character-group-toolbar">
+          <button class="btn btn-new-group" data-account="${acct.accountNumber}">+ New Group</button>
+        </div>`;
+      }
+      html += sections.join('');
+      html += `</div>`;
+    });
+
+    return html;
+  },
+
+  renderGroupSection({ groupId, name, players, accountNumber, editable, renderCharacter, containerClass, showHeader, isUngrouped = false }) {
+    let html = `<div class="character-group" data-group-id="${groupId}" data-account="${accountNumber}">`;
+
+    if (showHeader) {
+      html += `<div class="character-group-header">`;
+      html += `<span class="character-group-name"${editable && !isUngrouped ? ` data-group-id="${groupId}" title="Rename group"` : ''}>${escapeHtml(name || 'Ungrouped')}</span>`;
+      html += `<span class="character-group-count">${players.length}</span>`;
+      if (editable && !isUngrouped) {
+        html += `<span class="character-group-controls">
+          <button class="group-move-up" data-group-id="${groupId}" title="Move group up">↑</button>
+          <button class="group-move-down" data-group-id="${groupId}" title="Move group down">↓</button>
+          <button class="group-rename" data-group-id="${groupId}" title="Rename group">✎</button>
+          <button class="group-delete" data-group-id="${groupId}" title="Delete group">×</button>
+        </span>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `<div class="${containerClass}" data-group-id="${groupId}" data-account="${accountNumber}">`;
+    players.forEach(p => { html += renderCharacter(p); });
+    if (editable && players.length === 0) {
+      html += `<div class="character-group-empty">Drop a character here</div>`;
+    }
+    html += `</div></div>`;
+    return html;
+  },
+
+  renderCharMoveControls(player) {
+    const acct = player.accountNumber || 1;
+    const groups = this._characterGroups
+      .filter(g => String(g.accountNumber) === String(acct))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const options = [`<option value="" ${!player.groupId ? 'selected' : ''}>Ungrouped</option>`]
+      .concat(groups.map(g => `<option value="${g.id}" ${g.id === player.groupId ? 'selected' : ''}>${escapeHtml(g.name)}</option>`))
+      .join('');
+    return `
+      <div class="char-move-controls">
+        <button class="char-move-up" data-player-id="${player.id}" title="Move up">↑</button>
+        <button class="char-move-down" data-player-id="${player.id}" title="Move down">↓</button>
+        <label class="char-group-select-label">
+          <span>Group</span>
+          <select class="char-group-select" data-player-id="${player.id}">${options}</select>
+        </label>
+      </div>
+    `;
+  },
+
+  // ============================================
+  // GROUP MANAGEMENT (Raids tab)
+  // ============================================
+
+  setupGroupHandlers(root) {
+    root.querySelectorAll('.btn-new-group').forEach(btn => {
+      btn.addEventListener('click', () => this.createGroup(Number(btn.dataset.account)));
+    });
+    root.querySelectorAll('.group-rename, .character-group-name[data-group-id]').forEach(el => {
+      el.addEventListener('click', () => this.renameGroup(el.dataset.groupId));
+    });
+    root.querySelectorAll('.group-delete').forEach(btn => {
+      btn.addEventListener('click', () => this.deleteGroup(btn.dataset.groupId));
+    });
+    root.querySelectorAll('.group-move-up').forEach(btn => {
+      btn.addEventListener('click', () => this.moveGroup(btn.dataset.groupId, -1));
+    });
+    root.querySelectorAll('.group-move-down').forEach(btn => {
+      btn.addEventListener('click', () => this.moveGroup(btn.dataset.groupId, 1));
+    });
+  },
+
+  async createGroup(accountNumber) {
+    const name = await modal.prompt('Name your new group', {
+      title: 'New Group', okText: 'Create', placeholder: 'e.g. Favorites'
+    });
+    if (!name) return;
+    try {
+      const group = await dataService.addCharacterGroup(accountNumber, name);
+      this._characterGroups.push(group);
+      this.renderRaidsList();
+      toast.success(`Group "${group.name}" created`);
+    } catch (e) {
+      toast.error(`Failed to create group: ${e.message}`);
+    }
+  },
+
+  async renameGroup(groupId) {
+    const group = this._characterGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const name = await modal.prompt('Group name', {
+      title: 'Rename Group', okText: 'Save', defaultValue: group.name
+    });
+    if (!name || name === group.name) return;
+    try {
+      await dataService.renameCharacterGroup(groupId, name);
+      group.name = name;
+      this.renderRaidsList();
+    } catch (e) {
+      toast.error(`Failed to rename: ${e.message}`);
+    }
+  },
+
+  async deleteGroup(groupId) {
+    const group = this._characterGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const confirmed = await modal.confirm(
+      `Delete group "${group.name}"? Its characters move to Ungrouped (they are not deleted).`,
+      { title: 'Delete Group', confirmText: 'Delete', cancelText: 'Cancel', danger: true }
+    );
+    if (!confirmed) return;
+    try {
+      await dataService.deleteCharacterGroup(groupId);
+      this._characterGroups = this._characterGroups.filter(g => g.id !== groupId);
+      // DB cleared members via ON DELETE SET NULL — mirror locally
+      this._myPlayers.forEach(p => { if (p.groupId === groupId) p.groupId = null; });
+      this.renderRaidsList();
+      toast.success('Group deleted');
+    } catch (e) {
+      toast.error(`Failed to delete: ${e.message}`);
+    }
+  },
+
+  async moveGroup(groupId, delta) {
+    const group = this._characterGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const siblings = this._characterGroups
+      .filter(g => String(g.accountNumber) === String(group.accountNumber))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = siblings.findIndex(g => g.id === groupId);
+    const newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= siblings.length) return;
+    siblings.splice(idx, 1);
+    siblings.splice(newIdx, 0, group);
+    siblings.forEach((g, i) => { g.sortOrder = i; });
+    try {
+      await dataService.reorderCharacterGroups(siblings.map(g => g.id));
+      this.renderRaidsList();
+    } catch (e) {
+      toast.error(`Failed to reorder groups: ${e.message}`);
+    }
+  },
+
+  // ============================================
+  // CHARACTER REORDER / MOVE (Raids tab)
+  // ============================================
+
+  // this._myPlayers in (account, group) in current display order.
+  bucketPlayers(accountNumber, groupId) {
+    const gid = groupId || null;
+    const acctGroupIds = new Set(
+      this._characterGroups
+        .filter(g => String(g.accountNumber) === String(accountNumber))
+        .map(g => g.id)
+    );
+    return this._myPlayers
+      .filter(p => String(p.accountNumber || 1) === String(accountNumber))
+      .filter(p => gid ? p.groupId === gid : (!p.groupId || !acctGroupIds.has(p.groupId)))
+      .sort((a, b) => {
+        const ao = a.sortOrder ?? 0, bo = b.sortOrder ?? 0;
+        if (ao !== bo) return ao - bo;
+        return a.name.localeCompare(b.name);
+      });
+  },
+
+  // Reassign sequential sortOrder + groupId to a bucket, locally and in the DB.
+  async persistBucketOrder(orderedPlayers, groupId) {
+    const gid = groupId || null;
+    const entries = orderedPlayers.map((p, i) => {
+      p.sortOrder = i;
+      p.groupId = gid;
+      return { id: p.id, groupId: gid, sortOrder: i };
+    });
+    await dataService.saveCharacterOrder(entries);
+  },
+
+  setupCharacterMoveHandlers(root) {
+    root.querySelectorAll('.char-move-up').forEach(btn => {
+      btn.addEventListener('click', () => this.moveCharacter(btn.dataset.playerId, -1));
+    });
+    root.querySelectorAll('.char-move-down').forEach(btn => {
+      btn.addEventListener('click', () => this.moveCharacter(btn.dataset.playerId, 1));
+    });
+    root.querySelectorAll('.char-group-select').forEach(sel => {
+      sel.addEventListener('change', () => this.changeCharacterGroup(sel.dataset.playerId, sel.value || null));
+    });
+  },
+
+  async moveCharacter(playerId, delta) {
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (!player) return;
+    const bucket = this.bucketPlayers(player.accountNumber || 1, player.groupId);
+    const idx = bucket.findIndex(p => p.id === playerId);
+    const newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= bucket.length) return;
+    bucket.splice(idx, 1);
+    bucket.splice(newIdx, 0, player);
+    try {
+      await this.persistBucketOrder(bucket, player.groupId);
+      this.renderRaidsList();
+    } catch (e) {
+      toast.error(`Failed to reorder: ${e.message}`);
+    }
+  },
+
+  async changeCharacterGroup(playerId, newGroupId) {
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (!player) return;
+    if ((player.groupId || null) === (newGroupId || null)) return;
+    const dest = this.bucketPlayers(player.accountNumber || 1, newGroupId).filter(p => p.id !== playerId);
+    dest.push(player); // append to end of destination
+    try {
+      await this.persistBucketOrder(dest, newGroupId);
+      this.renderRaidsList();
+    } catch (e) {
+      toast.error(`Failed to move: ${e.message}`);
+    }
+  },
+
+  setupCharacterDnD(root) {
+    root.querySelectorAll('.character-block').forEach(block => {
+      const handle = block.querySelector('.char-drag-handle');
+      if (!handle) return;
+      // Only make the block draggable while the handle is held — otherwise
+      // draggable=true on the parent breaks text selection in the inline
+      // "add raid" inputs (a Chrome quirk).
+      handle.addEventListener('mousedown', () => block.setAttribute('draggable', 'true'));
+      handle.addEventListener('mouseup', () => block.setAttribute('draggable', 'false'));
+
+      block.addEventListener('dragstart', (e) => {
+        this._draggingPlayerId = block.dataset.playerId;
+        block.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', block.dataset.playerId); } catch (_) {}
+      });
+      block.addEventListener('dragend', () => {
+        block.classList.remove('dragging');
+        block.setAttribute('draggable', 'false');
+        this._draggingPlayerId = null;
+        root.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      });
+    });
+
+    root.querySelectorAll('.character-cards').forEach(container => {
+      container.addEventListener('dragover', (e) => {
+        if (!this._draggingPlayerId) return;
+        const dragging = this._myPlayers.find(p => p.id === this._draggingPlayerId);
+        // Restrict drops to the same account (groups are per-account)
+        if (!dragging || String(dragging.accountNumber || 1) !== String(container.dataset.account)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        container.classList.add('drag-over');
+      });
+      container.addEventListener('dragleave', (e) => {
+        if (!container.contains(e.relatedTarget)) container.classList.remove('drag-over');
+      });
+      container.addEventListener('drop', (e) => {
+        if (!this._draggingPlayerId) return;
+        const dragging = this._myPlayers.find(p => p.id === this._draggingPlayerId);
+        if (!dragging || String(dragging.accountNumber || 1) !== String(container.dataset.account)) return;
+        e.preventDefault();
+        container.classList.remove('drag-over');
+        const afterEl = this.getDragAfterElement(container, e.clientY);
+        const afterId = afterEl?.dataset.playerId || null;
+        this.handleCharacterDrop(this._draggingPlayerId, container.dataset.groupId || null, afterId);
+      });
+    });
+  },
+
+  getDragAfterElement(container, y) {
+    const els = [...container.querySelectorAll('.character-block:not(.dragging)')];
+    return els.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) return { offset, element: child };
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+  },
+
+  async handleCharacterDrop(playerId, targetGroupId, afterId) {
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (!player) return;
+    const dest = this.bucketPlayers(player.accountNumber || 1, targetGroupId).filter(p => p.id !== playerId);
+    let insertIdx = dest.length;
+    if (afterId) {
+      const i = dest.findIndex(p => p.id === afterId);
+      if (i !== -1) insertIdx = i;
+    }
+    dest.splice(insertIdx, 0, player);
+    try {
+      await this.persistBucketOrder(dest, targetGroupId);
+      this.renderRaidsList();
+    } catch (e) {
+      toast.error(`Failed to move: ${e.message}`);
     }
   },
 
@@ -1115,6 +1531,170 @@ export const MyRaidsPage = {
   },
 
   // ============================================
+  // SHOPPING LIST TAB
+  // ============================================
+
+  async renderShoppingTab() {
+    const listEl = document.getElementById('my-shopping-list');
+    if (!listEl) return;
+
+    if (this._myPlayers.length === 0) {
+      listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
+      return;
+    }
+
+    // Lazy-load shopping items on first view
+    if (!this._shoppingLoaded) {
+      listEl.innerHTML = '<p class="empty-state">Loading…</p>';
+      try {
+        this._shoppingItems = await dataService.getShoppingList();
+        this._shoppingLoaded = true;
+      } catch (error) {
+        console.error('Error loading shopping list:', error);
+        listEl.innerHTML = '<p class="empty-state">Failed to load shopping list.</p>';
+        return;
+      }
+    }
+
+    // Shared account → group → ordered-character structure (read-only here)
+    const structure = this.buildAccountStructure(this._myPlayers);
+    listEl.innerHTML = this.renderAccountStructure(structure, {
+      editable: false,
+      containerClass: 'character-cards',
+      renderCharacter: (player) => {
+        const iconStyle = getClassSpriteStyle(player.role);
+        return `
+          <div class="character-block shopping-character-block" data-player-id="${player.id}">
+            <div class="character-card">
+              <div class="character-info">
+                ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
+                <div>
+                  <span class="character-name">${player.name}</span>
+                  <span class="character-class">${player.role}</span>
+                </div>
+              </div>
+            </div>
+            <div class="character-shopping" data-player-id="${player.id}">
+              ${this.renderShoppingItemsHTML(player.id)}
+            </div>
+          </div>
+        `;
+      }
+    });
+    this.bindShoppingHandlers();
+  },
+
+  renderShoppingItemsHTML(playerId) {
+    const items = this._shoppingItems.filter(i => i.playerId === playerId);
+    let html = '';
+    if (items.length > 0) {
+      html += '<div class="shopping-items-list">';
+      items.forEach(item => {
+        html += `
+          <div class="shopping-item ${item.bought ? 'bought' : ''}" data-item-id="${item.id}">
+            <button class="shopping-check" data-item-id="${item.id}" title="${item.bought ? 'Mark as not bought' : 'Mark as bought'}">${item.bought ? '✓' : ''}</button>
+            <span class="shopping-item-text">${escapeHtml(item.item)}</span>
+            <button class="shopping-delete-btn" data-item-id="${item.id}" title="Delete">&times;</button>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+    html += `
+      <form class="shopping-add-form" data-player-id="${playerId}">
+        <input type="text" class="shopping-add-input" placeholder="Add an item…" maxlength="100" autocomplete="off">
+        <button type="submit" class="btn btn-add-shopping">+ Add</button>
+      </form>
+    `;
+    return html;
+  },
+
+  refreshShoppingItems(playerId) {
+    const container = document.querySelector(`.character-shopping[data-player-id="${playerId}"]`);
+    if (!container) return;
+    container.innerHTML = this.renderShoppingItemsHTML(playerId);
+    this.bindShoppingHandlersFor(container, playerId);
+  },
+
+  bindShoppingHandlers() {
+    document.querySelectorAll('.character-shopping').forEach(container => {
+      this.bindShoppingHandlersFor(container, container.dataset.playerId);
+    });
+  },
+
+  bindShoppingHandlersFor(container, playerId) {
+    // Add item
+    const form = container.querySelector('.shopping-add-form');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.addShoppingItem(playerId, form);
+      });
+    }
+
+    // Toggle bought
+    container.querySelectorAll('.shopping-check').forEach(btn => {
+      btn.addEventListener('click', () => this.toggleShoppingItem(btn.dataset.itemId, playerId));
+    });
+
+    // Delete
+    container.querySelectorAll('.shopping-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.deleteShoppingItem(btn.dataset.itemId, playerId));
+    });
+  },
+
+  async addShoppingItem(playerId, form) {
+    const input = form.querySelector('.shopping-add-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      const { data } = await dataService.addShoppingItem(playerId, text);
+      this._shoppingItems.push({
+        id: data.id,
+        playerId,
+        item: data.item,
+        bought: data.bought,
+        sortOrder: data.sort_order
+      });
+      this.refreshShoppingItems(playerId);
+      // Keep focus on the (new) input for fast successive entry
+      const newInput = document.querySelector(`.character-shopping[data-player-id="${playerId}"] .shopping-add-input`);
+      if (newInput) newInput.focus();
+    } catch (error) {
+      toast.error(`Failed to add item: ${error.message}`);
+      submitBtn.disabled = false;
+    }
+  },
+
+  async toggleShoppingItem(itemId, playerId) {
+    const item = this._shoppingItems.find(i => i.id === itemId);
+    if (!item) return;
+    const newBought = !item.bought;
+    try {
+      await dataService.updateShoppingItem(itemId, { bought: newBought });
+      item.bought = newBought;
+      this.refreshShoppingItems(playerId);
+    } catch (error) {
+      toast.error(`Failed to update: ${error.message}`);
+    }
+  },
+
+  async deleteShoppingItem(itemId, playerId) {
+    const item = this._shoppingItems.find(i => i.id === itemId);
+    if (!item) return;
+    try {
+      await dataService.deleteShoppingItem(itemId);
+      this._shoppingItems = this._shoppingItems.filter(i => i.id !== itemId);
+      this.refreshShoppingItems(playerId);
+    } catch (error) {
+      toast.error(`Failed to delete: ${error.message}`);
+    }
+  },
+
+  // ============================================
   // CARDS TAB
   // ============================================
 
@@ -1170,56 +1750,64 @@ export const MyRaidsPage = {
 
     this.installCardsPasteHandler();
 
-    let html = '';
-    cardEligiblePlayers.forEach(player => {
-      const iconStyle = getClassSpriteStyle(player.role);
-      const currentPage = this._cardsPageByPlayer[player.id] || 1;
-      const section = this._sectionByPlayer[player.id] || 'slots';
-      const showSlots = section === 'slots';
-      html += `
-        <div class="card-character-block" data-player-id="${player.id}">
-          <div class="card-character-header">
-            <div class="character-info">
-              ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
-              <div>
-                <span class="character-name">${player.name}</span>
-                <span class="character-class">${player.role}</span>
-              </div>
-            </div>
-            <div class="card-character-actions">
-              <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page" ${showSlots ? '' : 'style="display:none"'}>
-                <svg class="card-paste-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <span>Upload/Paste page ${currentPage}</span>
-              </button>
-            </div>
-          </div>
-          <div class="card-section-tabs" data-player-id="${player.id}">
-            <button class="card-section-tab ${showSlots ? 'active' : ''}" data-section="slots" data-player-id="${player.id}">Equipped</button>
-            <button class="card-section-tab ${!showSlots ? 'active' : ''}" data-section="extras" data-player-id="${player.id}">Extras</button>
-          </div>
-          <div class="card-section-stack" data-player-id="${player.id}">
-            <div class="card-section card-section-slots" data-player-id="${player.id}" data-section-active="${showSlots}">
-              <div class="card-grid" data-player-id="${player.id}">
-                ${this.renderCardGridHTML(player.id, currentPage)}
-              </div>
-              <div class="card-pagination-wrap" data-player-id="${player.id}">
-                ${renderPagination(currentPage, this._cardPageCount)}
-              </div>
-            </div>
-            <div class="card-section card-section-extras" data-player-id="${player.id}" data-section-active="${!showSlots}">
-              ${this.renderExtrasSectionHTML(player.id)}
-            </div>
-          </div>
-        </div>
-      `;
+    // Shared account → group → ordered structure (read-only). Only
+    // card-eligible characters appear, so empty group sections are hidden.
+    const structure = this.buildAccountStructure(cardEligiblePlayers);
+    listEl.innerHTML = this.renderAccountStructure(structure, {
+      editable: false,
+      containerClass: 'character-cards cards-grid',
+      hideEmptyGroups: true,
+      renderCharacter: (player) => this.renderCardCharacterBlockHTML(player)
     });
-    listEl.innerHTML = html;
 
     this.setupCardGridHandlers();
+  },
+
+  renderCardCharacterBlockHTML(player) {
+    const iconStyle = getClassSpriteStyle(player.role);
+    const currentPage = this._cardsPageByPlayer[player.id] || 1;
+    const section = this._sectionByPlayer[player.id] || 'slots';
+    const showSlots = section === 'slots';
+    return `
+      <div class="card-character-block" data-player-id="${player.id}">
+        <div class="card-character-header">
+          <div class="character-info">
+            ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
+            <div>
+              <span class="character-name">${player.name}</span>
+              <span class="character-class">${player.role}</span>
+            </div>
+          </div>
+          <div class="card-character-actions">
+            <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page" ${showSlots ? '' : 'style="display:none"'}>
+              <svg class="card-paste-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Upload/Paste page ${currentPage}</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-section-tabs" data-player-id="${player.id}">
+          <button class="card-section-tab ${showSlots ? 'active' : ''}" data-section="slots" data-player-id="${player.id}">Equipped</button>
+          <button class="card-section-tab ${!showSlots ? 'active' : ''}" data-section="extras" data-player-id="${player.id}">Extras</button>
+        </div>
+        <div class="card-section-stack" data-player-id="${player.id}">
+          <div class="card-section card-section-slots" data-player-id="${player.id}" data-section-active="${showSlots}">
+            <div class="card-grid" data-player-id="${player.id}">
+              ${this.renderCardGridHTML(player.id, currentPage)}
+            </div>
+            <div class="card-pagination-wrap" data-player-id="${player.id}">
+              ${renderPagination(currentPage, this._cardPageCount)}
+            </div>
+          </div>
+          <div class="card-section card-section-extras" data-player-id="${player.id}" data-section-active="${!showSlots}">
+            ${this.renderExtrasSectionHTML(player.id)}
+          </div>
+        </div>
+      </div>
+    `;
   },
 
   resolveSlotName(slotIndex) {
