@@ -9,10 +9,20 @@ import {
 } from '../constants.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 
+// Escape user-controlled values before interpolating into innerHTML.
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export const AdminPage = {
   _users: [],
-  _sortBy: 'name', // 'name' or 'date'
-  _sortAsc: true,
+  _sortBy: 'date', // 'name' or 'date' — default to date so newly joined users surface at the top
+  _sortAsc: false, // date desc = newest first
   _activeTab: 'users',
   _fdTable: [],
   _cardNames: {},        // slotIndex -> name
@@ -35,31 +45,36 @@ export const AdminPage = {
           <button class="admin-tab" data-tab="card-map">Card Map</button>
         </div>
         <div class="admin-tab-content" id="admin-tab-users">
-          <div class="section" id="admin-whitelist-section" style="display:none">
-            <div class="admin-section-header">
-              <h2>New Characters <span class="admin-pending-count" id="admin-whitelist-count"></span></h2>
-            </div>
-            <p class="admin-fd-desc">Characters that haven't been confirmed as in-guild. Mark as in-guild to grant access to in-guild features (or if guild friend, kayo na bahala :) pang incentivise lang naman natin na ipasok mga characters sa guild)</p>
-            <div id="admin-whitelist-list" class="admin-whitelist-list">
-              <p class="loading">Loading...</p>
-            </div>
+          <div class="admin-subtabs">
+            <button class="admin-subtab active" data-subtab="users-list">Users</button>
+            <button class="admin-subtab" data-subtab="new-characters">New Characters <span class="admin-pending-count" id="admin-whitelist-count"></span></button>
           </div>
-          <div class="section">
-            <div class="admin-section-header">
-              <h2>Users</h2>
-              <div class="admin-sort-buttons">
-                <button class="admin-sort-btn active" data-sort="name">Name</button>
-                <button class="admin-sort-btn" data-sort="date">Date Joined</button>
+          <div class="admin-subtab-content" id="admin-subtab-new-characters" style="display:none">
+            <div class="section" id="admin-whitelist-section">
+              <p class="admin-fd-desc">Characters that haven't been confirmed as in-guild. Mark as in-guild to grant access to in-guild features (or if guild friend, kayo na bahala :) pang incentivise lang naman natin na ipasok mga characters sa guild)</p>
+              <div id="admin-whitelist-list" class="admin-whitelist-list">
+                <p class="loading">Loading...</p>
               </div>
             </div>
-            <div id="admin-users-list" class="admin-users-list">
-              <p class="loading">Loading users...</p>
-            </div>
           </div>
-          <div class="section">
-            <h2>Admins</h2>
-            <div id="admin-admins-list" class="admin-users-list">
-              <p class="loading">Loading admins...</p>
+          <div class="admin-subtab-content" id="admin-subtab-users-list">
+            <div class="section">
+              <div class="admin-section-header">
+                <h2>Users</h2>
+                <div class="admin-sort-buttons">
+                  <button class="admin-sort-btn" data-sort="name">Name</button>
+                  <button class="admin-sort-btn active" data-sort="date">Date Joined</button>
+                </div>
+              </div>
+              <div id="admin-users-list" class="admin-users-list">
+                <p class="loading">Loading users...</p>
+              </div>
+            </div>
+            <div class="section">
+              <h2>Admins</h2>
+              <div id="admin-admins-list" class="admin-users-list">
+                <p class="loading">Loading admins...</p>
+              </div>
             </div>
           </div>
         </div>
@@ -106,6 +121,16 @@ export const AdminPage = {
         document.querySelectorAll('.admin-tab-content').forEach(c => c.style.display = 'none');
         document.getElementById(`admin-tab-${tab.dataset.tab}`).style.display = '';
         if (tab.dataset.tab === 'card-map') this._loadCardMap();
+      });
+    });
+
+    // Sub-tab listeners (within Users tab)
+    document.querySelectorAll('.admin-subtab').forEach(subtab => {
+      subtab.addEventListener('click', () => {
+        document.querySelectorAll('.admin-subtab').forEach(t => t.classList.remove('active'));
+        subtab.classList.add('active');
+        document.querySelectorAll('.admin-subtab-content').forEach(c => c.style.display = 'none');
+        document.getElementById(`admin-subtab-${subtab.dataset.subtab}`).style.display = '';
       });
     });
 
@@ -286,8 +311,9 @@ export const AdminPage = {
   async _loadWhitelistQueue() {
     try {
       const all = await dataService.getPlayers();
-      // Pending = not whitelisted yet AND not excluded (excluded characters are out regardless).
-      this._pendingWhitelist = all.filter(p => !p.whitelisted && !p.exclude);
+      // Pending = not whitelisted yet AND not excluded AND not dismissed.
+      // (excluded/ignored characters are out of the review queue regardless.)
+      this._pendingWhitelist = all.filter(p => !p.whitelisted && !p.exclude && !p.whitelistIgnored);
     } catch (err) {
       console.error('Failed to load whitelist queue:', err);
       this._pendingWhitelist = [];
@@ -296,18 +322,17 @@ export const AdminPage = {
   },
 
   _renderWhitelistQueue() {
-    const section = document.getElementById('admin-whitelist-section');
     const list = document.getElementById('admin-whitelist-list');
     const countEl = document.getElementById('admin-whitelist-count');
-    if (!section || !list) return;
+    if (!list) return;
 
     const pending = this._pendingWhitelist || [];
+    if (countEl) countEl.textContent = pending.length ? `(${pending.length})` : '';
+
     if (pending.length === 0) {
-      section.style.display = 'none';
+      list.innerHTML = '<p class="empty-state">No new characters to review 🎉</p>';
       return;
     }
-    section.style.display = '';
-    if (countEl) countEl.textContent = `(${pending.length})`;
 
     const usersById = {};
     (this._users || []).forEach(u => { usersById[u.discordId] = u; });
@@ -322,19 +347,22 @@ export const AdminPage = {
 
     list.innerHTML = sorted.map(p => {
       const owner = usersById[p.discordId];
-      const ownerName = owner?.displayName || 'Unknown';
-      const ownerAvatar = owner?.avatarUrl || '/icons/avatar.svg';
+      const ownerName = escapeHtml(owner?.displayName || 'Unknown');
+      const ownerAvatar = escapeHtml(owner?.avatarUrl || '/icons/avatar.svg');
       const acctTag = p.accountNumber > 1 ? ` <span class="acct-tag">Acct ${p.accountNumber}</span>` : '';
       return `
-        <div class="admin-whitelist-row" data-player-id="${p.id}">
+        <div class="admin-whitelist-row" data-player-id="${escapeHtml(p.id)}">
           <div class="admin-whitelist-info">
             <img src="${ownerAvatar}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
             <div class="admin-whitelist-details">
-              <span class="admin-whitelist-char">${p.name}${acctTag}</span>
-              <span class="admin-whitelist-meta">${p.role || ''} · Owner: ${ownerName}</span>
+              <span class="admin-whitelist-char">${escapeHtml(p.name)}${acctTag}</span>
+              <span class="admin-whitelist-meta">${escapeHtml(p.role || '')} · Owner: ${ownerName}</span>
             </div>
           </div>
-          <button class="btn btn-sm btn-primary admin-whitelist-approve" data-player-id="${p.id}">In-Guild</button>
+          <div class="admin-whitelist-actions">
+            <button class="btn btn-sm btn-primary admin-whitelist-approve" data-player-id="${escapeHtml(p.id)}">In-Guild</button>
+            <button class="btn btn-sm btn-secondary admin-whitelist-ignore" data-player-id="${escapeHtml(p.id)}">Dismiss</button>
+          </div>
         </div>
       `;
     }).join('');
@@ -347,6 +375,23 @@ export const AdminPage = {
           await dataService.togglePlayerWhitelist(id, true);
           const player = (this._pendingWhitelist || []).find(p => p.id === id);
           toast.success(`${player?.name || 'Character'} whitelisted`);
+          this._pendingWhitelist = (this._pendingWhitelist || []).filter(p => p.id !== id);
+          this._renderWhitelistQueue();
+        } catch (err) {
+          btn.disabled = false;
+          toast.error(`Failed: ${err.message}`);
+        }
+      });
+    });
+
+    list.querySelectorAll('.admin-whitelist-ignore').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.playerId;
+        btn.disabled = true;
+        try {
+          await dataService.dismissPlayerReview(id);
+          const player = (this._pendingWhitelist || []).find(p => p.id === id);
+          toast.success(`${player?.name || 'Character'} dismissed`);
           this._pendingWhitelist = (this._pendingWhitelist || []).filter(p => p.id !== id);
           this._renderWhitelistQueue();
         } catch (err) {
@@ -396,7 +441,7 @@ export const AdminPage = {
         <div class="admin-card-slot" data-slot-index="${slotIndex}">
           <span class="admin-card-slot-index">#${slotIndex + 1}</span>
           <input type="text" class="admin-card-slot-input" data-slot-index="${slotIndex}"
-                 value="${name.replace(/"/g, '&quot;')}" placeholder="Slot ${slotIndex + 1}" maxlength="40">
+                 value="${escapeHtml(name)}" placeholder="Slot ${slotIndex + 1}" maxlength="40">
         </div>
       `;
     }
@@ -531,6 +576,13 @@ export const AdminPage = {
     });
   },
 
+  // A user counts as "new" if they joined within the last 7 days.
+  _isNewUser(user) {
+    if (!user.createdAt) return false;
+    const days = (Date.now() - new Date(user.createdAt).getTime()) / 86400000;
+    return days >= 0 && days <= 7;
+  },
+
   _formatDate(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -548,6 +600,28 @@ export const AdminPage = {
     this._renderUserList(adminsList, admins, 'No admins found.');
   },
 
+  // Save an exclude sub-field (label / reason) on blur when its value changed.
+  // optionKey is what updateUserExclude expects; userProp is the local cache field.
+  _bindExcludeFieldSave(container, selector, optionKey, userProp, successMsg) {
+    container.querySelectorAll(selector).forEach(input => {
+      input.addEventListener('blur', async (e) => {
+        const discordId = e.target.dataset.discordId;
+        const user = this._users.find(u => u.discordId === discordId);
+        const newValue = e.target.value.trim();
+        if (newValue === (user[userProp] || '')) return;
+        try {
+          await dataService.updateUserExclude(discordId, user.exclude, { [optionKey]: newValue });
+          user[userProp] = newValue;
+          toast.success(successMsg);
+        } catch (err) {
+          console.error(`Failed to update ${optionKey}:`, err);
+          toast.error('Failed to update');
+          e.target.value = user[userProp] || '';
+        }
+      });
+    });
+  },
+
   _renderUserList(container, users, emptyText) {
     if (!container) return;
 
@@ -560,35 +634,41 @@ export const AdminPage = {
 
     const isOtherAdmin = (user) => user.role === 'admin' && user.discordId !== currentUserId;
 
-    container.innerHTML = users.map(user => `
-      <div class="admin-user-row" data-discord-id="${user.discordId}">
+    container.innerHTML = users.map(user => {
+      const discordId = escapeHtml(user.discordId);
+      return `
+      <div class="admin-user-row" data-discord-id="${discordId}">
         <div class="admin-user-info">
-          <img src="${user.avatarUrl || '/icons/avatar.svg'}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
+          <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
           <div class="admin-user-details">
-            <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${user.discordId}" ${isOtherAdmin(user) ? '' : 'title="Click to edit name"'}>${user.displayName}</span>
-            <span class="admin-user-username">${user.username}</span>
+            <div class="admin-user-name-row">
+              <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${discordId}" ${isOtherAdmin(user) ? '' : 'title="Click to edit name"'}>${escapeHtml(user.displayName)}</span>
+              ${this._isNewUser(user) ? '<span class="admin-user-new-badge">NEW</span>' : ''}
+            </div>
+            <span class="admin-user-username">${escapeHtml(user.username)}</span>
             ${user.createdAt ? `<span class="admin-user-joined">Joined ${this._formatDate(user.createdAt)}</span>` : ''}
           </div>
         </div>
         <div class="admin-user-actions">
           <label class="toggle-switch tooltip-wrap" data-tooltip="Exclude this user's characters from recruiting and dim them in the lineup pool">
-            <input type="checkbox" class="admin-exclude-checkbox" data-discord-id="${user.discordId}" ${user.exclude ? 'checked' : ''} ${isOtherAdmin(user) ? 'disabled' : ''}>
+            <input type="checkbox" class="admin-exclude-checkbox" data-discord-id="${discordId}" ${user.exclude ? 'checked' : ''} ${isOtherAdmin(user) ? 'disabled' : ''}>
             <span class="toggle-slider"></span>
             <span class="toggle-label">Exclude</span>
           </label>
-          <select class="admin-role-select" data-discord-id="${user.discordId}" ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>
+          <select class="admin-role-select" data-discord-id="${discordId}" ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>
             <option value="guest" ${user.role === 'guest' ? 'selected' : ''}>Guest</option>
             <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
-          ${user.role !== 'admin' ? `<button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${user.discordId}">Delete</button>` : ''}
+          ${user.role !== 'admin' ? `<button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${discordId}">Delete</button>` : ''}
         </div>
-        <div class="admin-exclude-fields" data-discord-id="${user.discordId}" style="display: ${user.exclude ? 'flex' : 'none'};">
-          <input type="text" class="admin-exclude-label" data-discord-id="${user.discordId}" placeholder="Excluded" maxlength="20" value="${(user.excludeLabel || '').replace(/"/g, '&quot;')}">
-          <input type="text" class="admin-exclude-reason" data-discord-id="${user.discordId}" placeholder="Just an alt in the guild" maxlength="120" value="${(user.excludeReason || '').replace(/"/g, '&quot;')}">
+        <div class="admin-exclude-fields" data-discord-id="${discordId}" style="display: ${user.exclude ? 'flex' : 'none'};">
+          <input type="text" class="admin-exclude-label" data-discord-id="${discordId}" placeholder="Excluded" maxlength="20" value="${escapeHtml(user.excludeLabel || '')}">
+          <input type="text" class="admin-exclude-reason" data-discord-id="${discordId}" placeholder="Just an alt in the guild" maxlength="120" value="${escapeHtml(user.excludeReason || '')}">
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // Exclude toggle listeners
     container.querySelectorAll('.admin-exclude-checkbox').forEach(checkbox => {
@@ -611,43 +691,9 @@ export const AdminPage = {
       });
     });
 
-    // Exclude label listeners — save on blur if changed
-    container.querySelectorAll('.admin-exclude-label').forEach(input => {
-      input.addEventListener('blur', async (e) => {
-        const discordId = e.target.dataset.discordId;
-        const user = this._users.find(u => u.discordId === discordId);
-        const newLabel = e.target.value.trim();
-        if (newLabel === (user.excludeLabel || '')) return;
-        try {
-          await dataService.updateUserExclude(discordId, user.exclude, { label: newLabel });
-          user.excludeLabel = newLabel;
-          toast.success('Badge label updated');
-        } catch (err) {
-          console.error('Failed to update label:', err);
-          toast.error('Failed to update');
-          e.target.value = user.excludeLabel || '';
-        }
-      });
-    });
-
-    // Exclude reason listeners — save on blur if changed
-    container.querySelectorAll('.admin-exclude-reason').forEach(input => {
-      input.addEventListener('blur', async (e) => {
-        const discordId = e.target.dataset.discordId;
-        const user = this._users.find(u => u.discordId === discordId);
-        const newReason = e.target.value.trim();
-        if (newReason === (user.excludeReason || '')) return;
-        try {
-          await dataService.updateUserExclude(discordId, user.exclude, { reason: newReason });
-          user.excludeReason = newReason;
-          toast.success('Reason updated');
-        } catch (err) {
-          console.error('Failed to update reason:', err);
-          toast.error('Failed to update');
-          e.target.value = user.excludeReason || '';
-        }
-      });
-    });
+    // Exclude label / reason listeners — save on blur if changed
+    this._bindExcludeFieldSave(container, '.admin-exclude-label', 'label', 'excludeLabel', 'Badge label updated');
+    this._bindExcludeFieldSave(container, '.admin-exclude-reason', 'reason', 'excludeReason', 'Reason updated');
 
     // Role change listeners
     container.querySelectorAll('.admin-role-select').forEach(select => {

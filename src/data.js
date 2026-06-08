@@ -375,7 +375,8 @@ class DataService {
         exclude: p.exclude === true,
         excludeLabel: p.exclude_label || '',
         excludeReason: p.exclude_reason || '',
-        whitelisted: p.whitelisted === true
+        whitelisted: p.whitelisted === true,
+        whitelistIgnored: p.whitelist_ignored === true
       };
     });
   }
@@ -608,6 +609,18 @@ class DataService {
     const { error } = await supabase
       .from('players')
       .update({ whitelisted: !!whitelisted })
+      .eq('id', playerId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // Dismiss a character from the admin "New Characters" review queue without
+  // whitelisting or excluding it — just clears it from the list.
+  async dismissPlayerReview(playerId) {
+    if (!this.isAdmin()) throw new Error('Only admins can dismiss reviews');
+    const { error } = await supabase
+      .from('players')
+      .update({ whitelist_ignored: true })
       .eq('id', playerId);
     if (error) throw error;
     return { success: true };

@@ -106,7 +106,15 @@
   flex-direction: column;
   min-width: 0;
 
+  .admin-user-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
   .admin-user-name {
+    min-width: 0;
     font-weight: 600;
     color: $text-light;
     white-space: nowrap;
@@ -152,6 +160,20 @@
     color: $text-muted;
     opacity: 0.7;
   }
+}
+
+.admin-user-new-badge {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  line-height: 1.4;
 }
 
 .admin-user-actions {
@@ -255,6 +277,46 @@
     color: $primary-color;
     border-bottom-color: $primary-color;
     background-color: rgba(244, 196, 48, 0.1);
+  }
+}
+
+// Sub-tabs (within the Users tab — pill style, lighter than top tabs)
+.admin-subtabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-subtab {
+  padding: 0.4rem 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: $text-muted;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.85rem;
+  font-weight: 500;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $text-light;
+  }
+
+  &.active {
+    background: rgba($primary-color, 0.15);
+    border-color: rgba($primary-color, 0.4);
+    color: $primary-color;
+  }
+
+  .admin-pending-count {
+    color: #ff9800;
+    margin-left: 0.25rem;
+    font-weight: 600;
+  }
+
+  &.active .admin-pending-count {
+    color: inherit;
   }
 }
 
@@ -387,20 +449,36 @@
 }
 
 .admin-page .admin-whitelist-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.4rem;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+
+  .empty-state {
+    grid-column: 1 / -1;
+  }
 }
 
 .admin-page .admin-whitelist-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
   background: rgba(255, 152, 0, 0.04);
   border: 1px solid rgba(255, 152, 0, 0.18);
   border-radius: 4px;
+}
+
+.admin-page .admin-whitelist-actions {
+  display: flex;
+  gap: 0.4rem;
+
+  .btn {
+    flex: 1;
+    white-space: nowrap;
+  }
 }
 
 .admin-page .admin-whitelist-info {
@@ -420,6 +498,9 @@
   color: $text-light;
   font-weight: 600;
   font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   .acct-tag {
     font-size: 0.7rem;
@@ -432,6 +513,9 @@
 .admin-page .admin-whitelist-meta {
   font-size: 0.75rem;
   color: $text-muted;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 // ============================================
@@ -520,5 +604,9 @@
 
   .admin-page .admin-card-slot-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-page .admin-whitelist-list {
+    grid-template-columns: 1fr;
   }
 }
