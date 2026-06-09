@@ -434,6 +434,8 @@ export const LineupEditorPage = {
           iconEl.classList.toggle('is-cols-2', this.playerListLayout === 2);
           iconEl.classList.toggle('is-cols-1', this.playerListLayout === 1);
         }
+        // Re-render so the rarity labels switch between full / abbreviated.
+        this.renderAvailablePlayers();
       });
     }
 
@@ -911,7 +913,7 @@ export const LineupEditorPage = {
         : '';
 
       return `
-        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''} ${isExcluded ? 'is-alt' : ''} ${showNoTimePrefBadge ? 'no-time-pref' : ''}"
+        <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''} ${isExcluded ? 'is-alt' : ''} ${showNoTimePrefBadge ? 'no-time-pref' : ''} ${presentInLineup ? 'present-in' : ''}"
              data-player-name="${player.name}"
              draggable="true">
           ${altBadge}
@@ -925,7 +927,7 @@ export const LineupEditorPage = {
               ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
             </div>
             <div class="player-role">${player.role}</div>
-            ${formatPlayerEquipmentHtml(player)}
+            ${formatPlayerEquipmentHtml(player, 'player-equipment', { abbreviateRarity: this.playerListLayout === 2 })}
           </div>
           <div class="player-card-badges">
             ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}

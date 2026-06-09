@@ -1302,6 +1302,36 @@
         .add-pub-card {
           grid-column: 1 / -1;
         }
+
+        // At half width the cards get tight, so trim the padding and equipment
+        // sizing a touch to claw back room.
+        .player-card {
+          padding: 0.55rem 0.6rem;
+          // Card content varies in height (suffix line, 1–2 equipment rows) and
+          // the grid stretches each card in a row to the tallest. Top-align so
+          // names and equipment line up across a row instead of being centered
+          // at different heights. The corner status badges (✓ / ticket / alt)
+          // sit over the left-aligned text's empty side, so they don't need a
+          // reserved strip — keeping every card the same height regardless of
+          // completion state, which is what keeps neighbours aligned.
+          align-items: flex-start;
+
+          .player-equipment {
+            font-size: 0.8rem;
+
+            .equip-row {
+              flex-wrap: wrap;
+              row-gap: 0.1rem;
+            }
+          }
+
+          // Keep a long "present in <lineup>" name from blowing out the card.
+          .present-in-badge {
+            max-width: calc(100% - 1rem);
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        }
       }
 
       .player-card {
@@ -1323,7 +1353,10 @@
 
         &.completed {
           opacity: 0.6;
-          border: 2px solid $success-color;
+          // Keep the border at 1px (like every other state) and fake the
+          // heavier look with an inset ring so the text doesn't shift right.
+          border-color: $success-color;
+          box-shadow: inset 0 0 0 1px $success-color;
 
           .player-name {
             color: $success-color;
@@ -1556,8 +1589,9 @@
         }
 
         &.ticket-used {
-          // Subtle visual indicator that ticket was used
-          border-left: 3px solid rgba(244, 196, 48, 0.6);
+          // Subtle accent that ticket was used — drawn inside the card so it
+          // doesn't push the text over like a left border would.
+          box-shadow: inset 3px 0 0 rgba(244, 196, 48, 0.6);
         }
       }
 

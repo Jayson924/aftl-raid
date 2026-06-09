@@ -532,24 +532,30 @@ function rarityInfo(rarity) {
   return EQUIPMENT_RARITIES.find(r => r.value === rarity) || null;
 }
 
-function weaponPieceChip(piece, title) {
+function weaponPieceChip(piece, title, abbreviate = false) {
   if (!piece || !piece.rarity) return '';
   const info = rarityInfo(piece.rarity);
   const enh = piece.enhancement != null && piece.enhancement !== '' ? ` +${piece.enhancement}` : '';
-  return `<span class="equip-piece" style="color: ${info?.color || 'inherit'}" title="${title}">${info?.label || piece.rarity}${enh}</span>`;
+  const label = info?.label || piece.rarity;
+  const shown = abbreviate ? label.charAt(0).toUpperCase() : label;
+  const tip = abbreviate ? `${title} — ${label}` : title;
+  return `<span class="equip-piece" style="color: ${info?.color || 'inherit'}" title="${tip}">${shown}${enh}</span>`;
 }
 
 // Generate compact equipment + suffix summary HTML for a player.
 // Layout: weapons row (main + sub w/ enhance), armor row (avg enhance).
-export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment') {
+// options.abbreviateRarity collapses rarity names to a single letter (E/U/L…)
+// for tight layouts; the full name stays in the chip's tooltip.
+export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment', options = {}) {
+  const { abbreviateRarity = false } = options;
   const equip = player.equipment || {};
 
   // Weapons: main + sub
   const main = equip.mainWeapon || (player.weapon ? { rarity: player.weapon, enhancement: player.weaponEnhance } : null);
   const sub = equip.subWeapon || null;
   const weaponChips = [
-    weaponPieceChip(main, 'Main weapon'),
-    weaponPieceChip(sub, 'Sub weapon')
+    weaponPieceChip(main, 'Main weapon', abbreviateRarity),
+    weaponPieceChip(sub, 'Sub weapon', abbreviateRarity)
   ].filter(Boolean);
 
   // Armor: average enhancement across present pieces
@@ -566,20 +572,23 @@ export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment')
     let label, color;
     if (rarities.length === 1) {
       const info = rarityInfo(rarities[0]);
-      label = info?.label || rarities[0];
+      const full = info?.label || rarities[0];
+      label = abbreviateRarity ? full.charAt(0).toUpperCase() : full;
       color = info?.color || 'inherit';
     } else {
       const dominant = rarities.sort((a, b) => counts[b] - counts[a])[0];
       const info = rarityInfo(dominant);
-      label = 'Mixed';
+      label = abbreviateRarity ? 'Mix' : 'Mixed';
       color = info?.color || 'inherit';
     }
     const title = `Avg of ${armorPieces.length} armor piece${armorPieces.length === 1 ? '' : 's'}`;
     armorChip = `<span class="equip-piece" style="color: ${color}" title="${title}">${label} ${avgStr}<span class="equip-avg-tag"> (avg)</span></span>`;
   } else if (player.armor) {
     const info = rarityInfo(player.armor);
+    const full = info?.label || player.armor;
+    const label = abbreviateRarity ? full.charAt(0).toUpperCase() : full;
     const enh = player.armorEnhance ? ` +${player.armorEnhance}` : '';
-    armorChip = `<span class="equip-piece" style="color: ${info?.color || 'inherit'}">${info?.label || player.armor}${enh}</span>`;
+    armorChip = `<span class="equip-piece" style="color: ${info?.color || 'inherit'}">${label}${enh}</span>`;
   }
 
   let html = '';
