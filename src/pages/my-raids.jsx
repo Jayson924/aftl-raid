@@ -760,6 +760,7 @@ export const MyRaidsPage = {
         block.setAttribute('draggable', 'false');
         this._draggingPlayerId = null;
         root.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        root.querySelectorAll('.swap-target').forEach(el => el.classList.remove('swap-target'));
       });
     });
 
@@ -772,9 +773,18 @@ export const MyRaidsPage = {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         container.classList.add('drag-over');
+        // Highlight the character the dragged card will swap places with.
+        const target = this.getSwapTarget(container, e.clientX, e.clientY);
+        root.querySelectorAll('.swap-target').forEach(el => el.classList.remove('swap-target'));
+        if (target && target.dataset.playerId !== this._draggingPlayerId) {
+          target.classList.add('swap-target');
+        }
       });
       container.addEventListener('dragleave', (e) => {
-        if (!container.contains(e.relatedTarget)) container.classList.remove('drag-over');
+        if (!container.contains(e.relatedTarget)) {
+          container.classList.remove('drag-over');
+          container.querySelectorAll('.swap-target').forEach(el => el.classList.remove('swap-target'));
+        }
       });
       container.addEventListener('drop', (e) => {
         if (!this._draggingPlayerId) return;
@@ -782,38 +792,68 @@ export const MyRaidsPage = {
         if (!dragging || String(dragging.accountNumber || 1) !== String(container.dataset.account)) return;
         e.preventDefault();
         container.classList.remove('drag-over');
-        const afterEl = this.getDragAfterElement(container, e.clientY);
-        const afterId = afterEl?.dataset.playerId || null;
-        this.handleCharacterDrop(this._draggingPlayerId, container.dataset.groupId || null, afterId);
+        container.querySelectorAll('.swap-target').forEach(el => el.classList.remove('swap-target'));
+        const target = this.getSwapTarget(container, e.clientX, e.clientY);
+        if (target && target.dataset.playerId !== this._draggingPlayerId) {
+          this.handleCharacterSwap(this._draggingPlayerId, target.dataset.playerId);
+        }
       });
     });
   },
 
-  getDragAfterElement(container, y) {
+  // The character card the pointer is over — the one to swap with. Prefers the
+  // card directly under the pointer, falling back to the nearest by center so a
+  // drop in the gap between cards still resolves to the closest character.
+  getSwapTarget(container, x, y) {
     const els = [...container.querySelectorAll('.character-block:not(.dragging)')];
-    return els.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) return { offset, element: child };
-      return closest;
-    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+    if (!els.length) return null;
+    const over = els.find(el => {
+      const b = el.getBoundingClientRect();
+      return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
+    });
+    if (over) return over;
+    let closest = null;
+    let closestDist = Infinity;
+    for (const el of els) {
+      const b = el.getBoundingClientRect();
+      const dist = Math.hypot(x - (b.left + b.width / 2), y - (b.top + b.height / 2));
+      if (dist < closestDist) { closestDist = dist; closest = el; }
+    }
+    return closest;
   },
 
-  async handleCharacterDrop(playerId, targetGroupId, afterId) {
-    const player = this._myPlayers.find(p => p.id === playerId);
-    if (!player) return;
-    const dest = this.bucketPlayers(player.accountNumber || 1, targetGroupId).filter(p => p.id !== playerId);
-    let insertIdx = dest.length;
-    if (afterId) {
-      const i = dest.findIndex(p => p.id === afterId);
-      if (i !== -1) insertIdx = i;
-    }
-    dest.splice(insertIdx, 0, player);
+  // Swap two characters' positions. Within one bucket they trade order slots;
+  // across groups (same account) each takes the other's group + slot.
+  async handleCharacterSwap(draggedId, targetId) {
+    if (draggedId === targetId) return;
+    const dragged = this._myPlayers.find(p => p.id === draggedId);
+    const target = this._myPlayers.find(p => p.id === targetId);
+    if (!dragged || !target) return;
+    const acct = dragged.accountNumber || 1;
+    const gD = dragged.groupId || null;
+    const gT = target.groupId || null;
     try {
-      await this.persistBucketOrder(dest, targetGroupId);
+      if (gD === gT) {
+        const bucket = this.bucketPlayers(acct, gD);
+        const i = bucket.findIndex(p => p.id === draggedId);
+        const j = bucket.findIndex(p => p.id === targetId);
+        if (i === -1 || j === -1) return;
+        [bucket[i], bucket[j]] = [bucket[j], bucket[i]];
+        await this.persistBucketOrder(bucket, gD);
+      } else {
+        const bucketD = this.bucketPlayers(acct, gD);
+        const bucketT = this.bucketPlayers(acct, gT);
+        const i = bucketD.findIndex(p => p.id === draggedId);
+        const j = bucketT.findIndex(p => p.id === targetId);
+        if (i === -1 || j === -1) return;
+        bucketD[i] = target;
+        bucketT[j] = dragged;
+        await this.persistBucketOrder(bucketD, gD);
+        await this.persistBucketOrder(bucketT, gT);
+      }
       this.renderRaidsList();
     } catch (e) {
-      toast.error(`Failed to move: ${e.message}`);
+      toast.error(`Failed to swap: ${e.message}`);
     }
   },
 

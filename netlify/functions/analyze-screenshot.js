@@ -82,28 +82,33 @@ COLOR COMPARISON TIPS:
 - Every single equipment piece can have a DIFFERENT rarity — armor, weapons, AND accessories. Do NOT assume any pieces match each other. Evaluate each of the 11 slots independently by its own border color.
 - Do not bias toward any particular rarity. Many characters have full Legend gear; many have mixed gear. Report what you actually see in each border.
 
+PER-SLOT PROCESS (follow this for every one of the 11 slots, do not skip it):
+1. Look ONLY at that slot's border and write the literal color you observe into its "borderColor" field. Be specific about hue: e.g. "pink-red", "crimson", "rose", "orange", "amber", "purple", "violet", "blue", "green", "white". Describe the color before you think about rarity.
+2. Map that borderColor to a rarity using the table above.
+Decision rule to resist the most common mistake: a warm RED / PINK-RED / ROSE / CRIMSON border is Legend, NOT Epic. Epic must look ORANGE or AMBER with an unmistakable YELLOW tint. If you do not clearly see yellow in the border, it is NOT Epic — it is almost certainly Legend (reddish) or Unique (purplish). When torn between Epic and Legend on a reddish border, choose Legend.
+
 Enhancement levels appear as small "+X" numbers overlaid on each equipment icon, typically in the bottom-right or center of the icon. They are small white or yellow text. Look carefully at each icon — most equipped items WILL have an enhancement number. Common values range from +9 to +15. If you can make out any number on the icon, report it. If the number is hard to read, give your best guess rather than leaving it as 0. Only use 0 for accessories (which have no enhancement).
 
 Valid class names (use EXACTLY one of these):
-Gladiator, Moon Lord, Barbarian, Destroyer, Sniper, Artillery, Tempest, Wind Walker, Saleana, Elestra, Smasher, Majesty, Guardian, Crusader, Saint, Inquisitor, Shooting Star, Gear Master, Adept, Physician, Dark Summoner, Soul Eater, Blade Dancer, Spirit Dancer
+Gladiator, Moon Lord, Barbarian, Destroyer, Dark Avenger, Sniper, Artillery, Tempest, Wind Walker, Saleana, Elestra, Smasher, Majesty, Guardian, Crusader, Saint, Inquisitor, Shooting Star, Gear Master, Adept, Physician, Dark Summoner, Soul Eater, Blade Dancer, Spirit Dancer
 
-Return this JSON structure:
+Return this JSON structure. IMPORTANT: the rarity and enhancement values shown below are FORMAT PLACEHOLDERS ONLY — they are deliberately mixed so you do not copy them. Read each border color yourself and report what you actually see; do NOT default any slot to the value shown here.
 {
   "name": "character name",
   "class": "exact class name from list above",
   "level": 50,
   "equipment": {
-    "helmet": { "rarity": "legend", "enhancement": 12 },
-    "top": { "rarity": "legend", "enhancement": 12 },
-    "bottom": { "rarity": "legend", "enhancement": 12 },
-    "gloves": { "rarity": "legend", "enhancement": 12 },
-    "boots": { "rarity": "legend", "enhancement": 12 },
-    "mainWeapon": { "rarity": "legend", "enhancement": 12 },
-    "subWeapon": { "rarity": "legend", "enhancement": 12 },
-    "necklace": { "rarity": "epic", "enhancement": 0 },
-    "earring": { "rarity": "epic", "enhancement": 0 },
-    "ring1": { "rarity": "epic", "enhancement": 0 },
-    "ring2": { "rarity": "epic", "enhancement": 0 }
+    "helmet": { "borderColor": "violet", "rarity": "unique", "enhancement": 12 },
+    "top": { "borderColor": "pink-red", "rarity": "legend", "enhancement": 13 },
+    "bottom": { "borderColor": "orange", "rarity": "epic", "enhancement": 11 },
+    "gloves": { "borderColor": "crimson", "rarity": "legend", "enhancement": 12 },
+    "boots": { "borderColor": "purple", "rarity": "unique", "enhancement": 12 },
+    "mainWeapon": { "borderColor": "rose", "rarity": "legend", "enhancement": 13 },
+    "subWeapon": { "borderColor": "pink-red", "rarity": "legend", "enhancement": 12 },
+    "necklace": { "borderColor": "crimson", "rarity": "legend", "enhancement": 0 },
+    "earring": { "borderColor": "violet", "rarity": "unique", "enhancement": 0 },
+    "ring1": { "borderColor": "pink-red", "rarity": "legend", "enhancement": 0 },
+    "ring2": { "borderColor": "orange", "rarity": "epic", "enhancement": 0 }
   },
   "stats": {
     "attackPower": 25000,
@@ -131,8 +136,10 @@ IMPORTANT: Atk Power and Magic Atk are displayed as ranges (e.g., "17103-19194")
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        model: 'claude-opus-4-8',
+        max_tokens: 6000,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'low' },
         messages: [
           {
             role: 'user',
@@ -167,7 +174,11 @@ IMPORTANT: Atk Power and Magic Atk are displayed as ranges (e.g., "17103-19194")
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || '';
+    // With adaptive thinking enabled, content[0] is a thinking block — grab the text block(s).
+    const text = (data.content || [])
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('') || '';
 
     // Try to parse the JSON from the response
     let parsed;

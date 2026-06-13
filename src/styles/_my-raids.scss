@@ -1177,15 +1177,25 @@
   border-radius: 6px;
 }
 
-// Drop-target highlight while dragging a character
+// Drop-zone highlight while dragging a character — kept subtle so the
+// swap-target highlight on the specific card is the primary cue.
 .my-raids-page .character-cards.drag-over {
-  outline: 2px dashed rgba(244, 196, 48, 0.5);
+  outline: 1px dashed rgba(244, 196, 48, 0.3);
   outline-offset: 4px;
   border-radius: 6px;
 }
 
 .my-raids-page .character-block.dragging {
   opacity: 0.5;
+}
+
+// Swap target: the character the dragged card will trade places with. A bright
+// ring + glow + slight lift makes it obvious which slot you'll swap into.
+// box-shadow (not a pseudo-element) since .character-block has overflow: hidden.
+.my-raids-page .character-block.swap-target {
+  border-color: #f4c430;
+  box-shadow: 0 0 0 2px #f4c430, 0 0 14px 3px rgba(244, 196, 48, 0.45);
+  transform: scale(1.02);
 }
 
 .my-raids-page .char-drag-handle {
