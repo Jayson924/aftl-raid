@@ -1316,6 +1316,18 @@
           // completion state, which is what keeps neighbours aligned.
           align-items: flex-start;
 
+          // At half width the availability badge sitting beside the name (it's
+          // nowrap + flex:0 0 auto, so it won't shrink) squeezes the name down
+          // to an ellipsis — it looked like it was covering the name. Give the
+          // name its own full-width line and let availability/notes wrap below.
+          .player-name-row {
+            flex-wrap: wrap;
+
+            .player-name {
+              flex: 1 1 100%;
+            }
+          }
+
           .player-equipment {
             font-size: 0.8rem;
 
