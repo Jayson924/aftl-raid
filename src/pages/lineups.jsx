@@ -10,7 +10,7 @@ import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForR
 import { initFixedTooltip } from '../fixed-tooltip.js';
 
 export const LineupsPage = {
-  currentRaidType: 'Hardcore',
+  currentRaidType: 'DDN Classic',
   currentShowcaseLineup: null,
   allLineups: [],
   cachedPlayerMap: null,
@@ -35,19 +35,13 @@ export const LineupsPage = {
       <div class="lineups-page">
         <h1>Raid Lineups</h1>
         <div class="raid-tabs">
+          <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
+          <button class="tab-button" disabled title="Coming soon">DDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
-          <button class="tab-button" disabled title="Coming soon">DDN Hardcore</button>
-          <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic" title="Preliminary — subject to change">DDN Classic</button>
-          <button class="tab-button" disabled title="Coming soon">DDN Normal</button>
-          <button class="tab-button ${this.currentRaidType === '4-man' ? 'active' : ''}" data-raid-type="4-man">4-Man</button>
           <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
         </div>
         <div class="tab-content-wrapper">
-          <div id="preliminary-banner" class="preliminary-banner ${this.currentRaidType === 'DDN Classic' ? '' : 'preliminary-banner--hidden'}">
-            <span class="preliminary-banner__tag">Drafts</span>
-            <span class="preliminary-banner__text">DDN Classic isn't released yet. These lineups are drafts and subject to change.</span>
-          </div>
           <div class="showcase-area">
             <div id="showcase-card-container">
               <div class="loading">Loading lineup...</div>
@@ -167,12 +161,6 @@ export const LineupsPage = {
         button.classList.remove('active');
       }
     });
-
-    // Toggle preliminary banner for DDN Classic
-    const banner = document.getElementById('preliminary-banner');
-    if (banner) {
-      banner.classList.toggle('preliminary-banner--hidden', raidType !== 'DDN Classic');
-    }
 
     // Reload lineups for new raid type
     this.loadLineups();
@@ -360,12 +348,10 @@ export const LineupsPage = {
           ${isAdmin && this.currentRaidType === 'Unspecified' ? `
             <select class="raid-type-reassign" data-lineup-id="${lineup.id}">
               <option value="Unspecified" selected>Unspecified</option>
+              <option value="DDN Classic">DDN Classic</option>
+              <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
               <option value="Hardcore">GDN Hardcore</option>
               <option value="Classic">GDN Classic</option>
-              <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
-              <option value="DDN Classic">DDN Classic (not final)</option>
-              <option value="DDN Normal" disabled>DDN Normal (coming soon)</option>
-              <option value="4-man">4-Man</option>
             </select>
           ` : ''}
           ${isAdmin && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
@@ -762,13 +748,21 @@ export const LineupsPage = {
 
       // Mark as pending to skip self-notification from realtime
       this.pendingToggleId = lineup.id;
-      await dataService.toggleLineupCompleted(lineup.id);
+      const toggleResult = await dataService.toggleLineupCompleted(lineup.id);
       // Delay clearing pendingToggleId to give realtime event time to arrive
       setTimeout(() => {
         if (this.pendingToggleId === lineup.id) {
           this.pendingToggleId = null;
         }
       }, 2000);
+
+      // When newly cleared, ask the bot to mark the Discord thread cleared
+      // (Cleared tag + loot thread). Only if a thread exists. Fire-and-forget.
+      if (toggleResult?.completed && lineup.threadId) {
+        dataService.requestDiscordThreadClear(lineup.id)
+          .catch(err => console.error('[DiscordThread] Clear request failed:', err));
+      }
+
       toast.success(`Updated cleared status for ${lineup.name}!`);
       // Reload the lineups to show updated cleared status
       await this.loadLineups();

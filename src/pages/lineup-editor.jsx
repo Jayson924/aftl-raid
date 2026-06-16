@@ -17,7 +17,7 @@ export const LineupEditorPage = {
   currentLineup: {
     id: null, // UUID from database (null for new unsaved lineups)
     name: '',
-    raidType: 'Hardcore',
+    raidType: 'DDN Classic',
     status: 'ready',
     players: [],
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
@@ -53,7 +53,7 @@ export const LineupEditorPage = {
     this.currentLineup = {
       id: null,
       name: '',
-      raidType: 'Hardcore',
+      raidType: 'DDN Classic',
       status: 'ready',
       players: [],
       ticketSlots: Array(8).fill(false),
@@ -88,12 +88,10 @@ export const LineupEditorPage = {
                 <div class="form-group raid-type-group">
                   <label for="raid-type">Raid Type:</label>
                   <select id="raid-type">
+                    <option value="DDN Classic">DDN Classic</option>
+                    <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
                     <option value="Hardcore">GDN Hardcore</option>
                     <option value="Classic">GDN Classic</option>
-                    <option value="DDN Hardcore" disabled>DDN Hardcore (coming soon)</option>
-                    <option value="DDN Classic">DDN Classic (not final)</option>
-                    <option value="DDN Normal" disabled>DDN Normal (coming soon)</option>
-                    <option value="4-man">4-Man</option>
                     <option value="Unspecified">Unspecified</option>
                   </select>
                 </div>
@@ -2604,6 +2602,14 @@ export const LineupEditorPage = {
       } else if (isNowCleared) {
         // Newly cleared or still cleared with possible player changes — mark all
         await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
+
+        // On the not-cleared -> cleared transition, ask the bot to mark the
+        // Discord thread cleared (Cleared tag + loot thread). Only if a thread
+        // exists. Fire-and-forget — bot processes via thread_requests.
+        if (!wasCleared && this.currentLineup.threadId) {
+          dataService.requestDiscordThreadClear(this.currentLineup.id)
+            .catch(err => console.error('[DiscordThread] Clear request failed:', err));
+        }
       }
     } catch (error) {
       console.error('Error updating completion status:', error);

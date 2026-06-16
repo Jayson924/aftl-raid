@@ -1669,6 +1669,34 @@ class DataService {
   }
 
   /**
+   * Request the Discord bot to mark a lineup's thread as cleared: apply the
+   * Cleared forum tag and create the loot thread. The web app has already set
+   * lineups.completed + player completions, so the bot only does the Discord side.
+   * Fire-and-forget; no-op on the bot if the lineup has no thread.
+   * @param {string} lineupId
+   * @returns {Promise<{ id: string }>} the inserted request row
+   */
+  async requestDiscordThreadClear(lineupId) {
+    if (!this.isAdmin()) throw new Error('Only admins can clear Discord threads');
+    if (!lineupId) throw new Error('lineupId is required');
+
+    const { data, error } = await supabase
+      .from('thread_requests')
+      .insert({
+        lineup_id: lineupId,
+        channel_id: '',
+        requested_by: this._user?.id || null,
+        status: 'pending',
+        action: 'clear'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
    * Subscribe to status updates for a specific thread request.
    * @param {string} requestId
    * @param {(row: Object) => void} callback - Called with the updated row on each change
