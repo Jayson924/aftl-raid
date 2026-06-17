@@ -480,12 +480,34 @@ class DataService {
   async deleteAppUser(discordId) {
     if (!this.isAdmin()) throw new Error('Only admins can delete users');
 
-    const { error } = await supabase
+    // Delete the user. We .select() the deleted row and verify it: an RLS block
+    // (e.g. a missing DELETE policy) returns success with ZERO rows instead of an
+    // error, which previously made this a silent no-op. Throwing here surfaces it
+    // as a real failure. Requires the app_users DELETE policy from
+    // cascade-delete-characters.sql.
+    const { data, error } = await supabase
       .from('app_users')
+      .delete()
+      .eq('discord_id', discordId)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('User was not deleted — check the app_users DELETE RLS policy.');
+    }
+
+    // Remove their characters too. The DB also does this via ON DELETE CASCADE
+    // once the FK in cascade-delete-characters.sql is applied; doing it explicitly
+    // keeps it working before that migration runs. Deleting the player rows
+    // cascades to their cards / personal raids / shopping list. (players has a
+    // permissive "Allow all" RLS policy, so this delete is not silently blocked.)
+    const { error: playersError } = await supabase
+      .from('players')
       .delete()
       .eq('discord_id', discordId);
 
-    if (error) throw error;
+    if (playersError) throw playersError;
+
     return { success: true };
   }
 

@@ -5,7 +5,8 @@ import {
   setFdTable,
   CARDS_PER_PAGE,
   DEFAULT_CARD_PAGES,
-  MAX_CARD_PAGES
+  MAX_CARD_PAGES,
+  getClassSpriteStyle
 } from '../constants.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 
@@ -161,6 +162,7 @@ export const AdminPage = {
     document.querySelector('.admin-card-save-btn').addEventListener('click', () => this._saveCardMap());
 
     await this._loadUsers();
+    await this._loadPlayers();
     this._renderUsers();
     this._loadFdTable();
     this._loadWhitelistQueue();
@@ -310,7 +312,9 @@ export const AdminPage = {
 
   async _loadWhitelistQueue() {
     try {
-      const all = await dataService.getPlayers();
+      const all = (this._players && this._players.length)
+        ? this._players
+        : await dataService.getPlayers();
       // Pending = not whitelisted yet AND not excluded AND not dismissed.
       // (excluded/ignored characters are out of the review queue regardless.)
       this._pendingWhitelist = all.filter(p => !p.whitelisted && !p.exclude && !p.whitelistIgnored);
@@ -562,6 +566,64 @@ export const AdminPage = {
     this._users = await dataService.getAppUsers();
   },
 
+  async _loadPlayers() {
+    try {
+      this._players = await dataService.getPlayers();
+    } catch (err) {
+      console.error('Failed to load players:', err);
+      this._players = [];
+    }
+  },
+
+  // Characters owned by a user, ordered by account then name (for the avatar tooltip).
+  _charactersForUser(discordId) {
+    return (this._players || [])
+      .filter(p => p.discordId === discordId)
+      .sort((a, b) =>
+        (a.accountNumber || 1) - (b.accountNumber || 1) ||
+        (a.name || '').localeCompare(b.name || ''));
+  },
+
+  // Hover tooltip markup listing a user's characters (class icon + name).
+  // Returns '' when the user has no characters so no empty box shows.
+  _renderCharTooltip(discordId) {
+    const chars = this._charactersForUser(discordId);
+    if (chars.length === 0) return '';
+
+    const renderRow = (c) => {
+      const icon = c.role
+        ? `<span class="admin-char-icon"><div class="class-sprite" style="${getClassSpriteStyle(c.role)}"></div></span>`
+        : '<span class="admin-char-icon"></span>';
+      return `<li class="admin-char-row">${icon}<span class="admin-char-name">${escapeHtml(c.name)}</span></li>`;
+    };
+
+    // Distinct accounts (already sorted by account in _charactersForUser).
+    const accounts = [...new Set(chars.map(c => c.accountNumber || 1))];
+
+    // Group under "Acct N" headers only when the user actually has more than one
+    // account; otherwise keep a clean flat list with no labels.
+    let body;
+    if (accounts.length > 1) {
+      body = accounts.map(acct => {
+        const group = chars.filter(c => (c.accountNumber || 1) === acct);
+        return `
+          <div class="admin-char-acct-group">
+            <div class="admin-char-acct-header">Acct ${acct}</div>
+            <ul class="admin-char-tooltip-list">${group.map(renderRow).join('')}</ul>
+          </div>`;
+      }).join('');
+    } else {
+      body = `<ul class="admin-char-tooltip-list">${chars.map(renderRow).join('')}</ul>`;
+    }
+
+    return `
+      <div class="admin-char-tooltip">
+        <div class="admin-char-tooltip-title">${chars.length} character${chars.length === 1 ? '' : 's'}</div>
+        ${body}
+      </div>
+    `;
+  },
+
   _sortUsers(users) {
     return [...users].sort((a, b) => {
       let cmp;
@@ -639,7 +701,10 @@ export const AdminPage = {
       return `
       <div class="admin-user-row" data-discord-id="${discordId}">
         <div class="admin-user-info">
-          <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
+          <div class="admin-user-avatar-wrap">
+            <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
+            ${this._renderCharTooltip(user.discordId)}
+          </div>
           <div class="admin-user-details">
             <div class="admin-user-name-row">
               <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${discordId}" ${isOtherAdmin(user) ? '' : 'title="Click to edit name"'}>${escapeHtml(user.displayName)}</span>
@@ -719,7 +784,7 @@ export const AdminPage = {
       btn.addEventListener('click', async () => {
         const discordId = btn.dataset.discordId;
         const user = this._users.find(u => u.discordId === discordId);
-        const confirmed = await modal.confirm(`Delete user "${user.displayName}"? This cannot be undone.`, {
+        const confirmed = await modal.confirm(`Delete user "${user.displayName}"? This also deletes all of their characters and cannot be undone.`, {
           title: 'Delete User',
           confirmText: 'Delete',
           danger: true
