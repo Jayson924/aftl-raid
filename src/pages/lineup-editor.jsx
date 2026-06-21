@@ -24,6 +24,7 @@ export const LineupEditorPage = {
     pilotSlots: Array(8).fill(''), // Track pilot names per slot (empty string if no pilot)
     completed: false,
     isNextWeek: false,
+    isStatic: false,
     notes: '',
     raidTime: null, // Scheduled raid time (ISO string)
     threadId: null // Discord thread ID (null if none created)
@@ -48,6 +49,7 @@ export const LineupEditorPage = {
 
   async render(container) {
     const isAdmin = dataService.isAdmin();
+    const canEdit = dataService.canEditLineups();
 
     // Reset state when re-entering the page (singleton object persists across navigations)
     this.currentLineup = {
@@ -60,6 +62,7 @@ export const LineupEditorPage = {
       pilotSlots: Array(8).fill(''),
       completed: false,
       isNextWeek: false,
+      isStatic: false,
       notes: '',
       raidTime: null,
       threadId: null
@@ -101,6 +104,11 @@ export const LineupEditorPage = {
                 </div>
               </div>
               <div class="lineup-toggles">
+                <label class="static-toggle-label" title="A permanent lineup keeps the same members every week (not deleted by the weekly cleanup). Raid clear status still resets weekly.">
+                  <input type="checkbox" id="static-toggle">
+                  <img src="/icons/group.svg" class="static-toggle-icon" alt="">
+                  <span>Permanent</span>
+                </label>
                 <label class="next-week-toggle-label">
                   <input type="checkbox" id="next-week-toggle">
                   <span>Next Week</span>
@@ -133,7 +141,7 @@ export const LineupEditorPage = {
                 </div>
                 <div class="lineup-slots-header-right">
                   <div id="presence-indicator" class="presence-indicator"></div>
-                  ${isAdmin ? `<button id="discord-thread-btn" class="btn btn-ghost whos-around-btn" title="Save the lineup and create a Discord thread">Create Discord Thread</button>` : ''}
+                  ${canEdit ? `<button id="discord-thread-btn" class="btn btn-ghost whos-around-btn" title="Save the lineup and create a Discord thread">Create Discord Thread</button>` : ''}
                 </div>
               </div>
               <div class="damage-amp-display">
@@ -170,7 +178,7 @@ export const LineupEditorPage = {
               </div>
               <div class="lineup-actions">
                 <div class="lineup-actions-primary">
-                  ${isAdmin ? `<span class="action-side">
+                  ${canEdit ? `<span class="action-side">
                     <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
                   </span>
                   <span class="action-side">
@@ -347,7 +355,24 @@ export const LineupEditorPage = {
 
     document.getElementById('next-week-toggle').addEventListener('change', (e) => {
       this.currentLineup.isNextWeek = e.target.checked;
+      // Next Week and Static are mutually exclusive
+      if (e.target.checked) {
+        this.currentLineup.isStatic = false;
+        const staticToggle = document.getElementById('static-toggle');
+        if (staticToggle) staticToggle.checked = false;
+      }
       this.renderAvailablePlayers(); // Re-render to show/hide cleared players
+    });
+
+    document.getElementById('static-toggle')?.addEventListener('change', (e) => {
+      this.currentLineup.isStatic = e.target.checked;
+      // Next Week and Static are mutually exclusive
+      if (e.target.checked) {
+        this.currentLineup.isNextWeek = false;
+        const nextWeekToggle = document.getElementById('next-week-toggle');
+        if (nextWeekToggle) nextWeekToggle.checked = false;
+        this.renderAvailablePlayers(); // isNextWeek changed, refresh player filters
+      }
     });
 
     // Carousel tab handlers (toggleable - both can be active)
@@ -2395,6 +2420,7 @@ export const LineupEditorPage = {
       pilotSlots: Array(8).fill(''),
       completed: false,
       isNextWeek: false,
+      isStatic: false,
       notes: '',
       raidTime: null,
       threadId: null
@@ -2407,6 +2433,8 @@ export const LineupEditorPage = {
     document.getElementById('raid-type').value = currentRaidType;
     document.getElementById('cleared-toggle').checked = false;
     document.getElementById('next-week-toggle').checked = false;
+    const staticToggleReset = document.getElementById('static-toggle');
+    if (staticToggleReset) staticToggleReset.checked = false;
     document.getElementById('lineup-notes').value = '';
     if (this.flatpickrInstance) {
       this.flatpickrInstance.clear();
@@ -2436,8 +2464,8 @@ export const LineupEditorPage = {
   },
 
   async saveLineup() {
-    if (!dataService.isAdmin()) {
-      toast.error('Only admins can save lineups.');
+    if (!dataService.canEditLineups()) {
+      toast.error('You do not have permission to save lineups.');
       return false;
     }
 
@@ -2494,6 +2522,7 @@ export const LineupEditorPage = {
         pilotPlayers,
         completed: this.currentLineup.completed,
         isNextWeek: this.currentLineup.isNextWeek,
+        isStatic: this.currentLineup.isStatic,
         notes: this.currentLineup.notes,
         raidTime: this.currentLineup.raidTime
       };
@@ -2643,8 +2672,8 @@ export const LineupEditorPage = {
   },
 
   async deleteLineup(lineupId) {
-    if (!dataService.isAdmin()) {
-      toast.error('Only admins can delete lineups.');
+    if (!dataService.canEditLineups()) {
+      toast.error('You do not have permission to delete lineups.');
       return;
     }
     // Find the lineup to get its name for the confirmation message
@@ -2706,6 +2735,7 @@ export const LineupEditorPage = {
       pilotSlots,
       completed: lineup.completed || false,
       isNextWeek: lineup.isNextWeek || false,
+      isStatic: lineup.isStatic || false,
       notes: lineup.notes || '',
       raidTime: lineup.raidTime || null,
       threadId: lineup.threadId || null
@@ -2720,6 +2750,8 @@ export const LineupEditorPage = {
     }
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('next-week-toggle').checked = lineup.isNextWeek || false;
+    const staticToggleEl = document.getElementById('static-toggle');
+    if (staticToggleEl) staticToggleEl.checked = lineup.isStatic || false;
     document.getElementById('lineup-notes').value = lineup.notes || '';
     if (this.flatpickrInstance) {
       this.flatpickrInstance.setDate(lineup.raidTime ? new Date(lineup.raidTime) : null, false);
@@ -2807,8 +2839,8 @@ export const LineupEditorPage = {
       return;
     }
 
-    if (!dataService.isAdmin()) {
-      toast.error('Only admins can create Discord threads.');
+    if (!dataService.canEditLineups()) {
+      toast.error('You do not have permission to create Discord threads.');
       return;
     }
 

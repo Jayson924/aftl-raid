@@ -310,7 +310,7 @@ export const LineupsPage = {
 
   renderShowcase(lineup, playerMap) {
     const showcaseContainer = document.getElementById('showcase-card-container');
-    const isAdmin = authService.isAdmin();
+    const canManage = authService.canEditLineups();
 
     // Check if lineup is cleared
     const isCleared = lineup.completed;
@@ -336,16 +336,17 @@ export const LineupsPage = {
     const raidTimeDisplay = this.formatRaidTime(lineup.raidTime);
 
     showcaseContainer.innerHTML = `
-      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isNextWeek ? 'next-week' : ''}">
+      <div class="lineup-card showcase-lineup-card ${isCleared ? 'cleared' : ''} ${lineup.isNextWeek ? 'next-week' : ''} ${lineup.isStatic ? 'static' : ''}">
         <div class="lineup-card-header">
           <div class="lineup-card-title">
             <h3>
               ${lineup.isNextWeek ? '<span class="next-week-badge">Next Week</span>' : ''}
+              ${lineup.isStatic ? '<img src="/icons/group.svg" class="static-icon" title="Permanent lineup — same members every week" alt="Permanent">' : ''}
               ${lineup.name}
             </h3>
             ${raidTimeDisplay ? `<span class="raid-time-display"><img src="/icons/calendarclock.svg" alt="" class="raid-time-icon">${raidTimeDisplay}</span>` : ''}
           </div>
-          ${isAdmin && this.currentRaidType === 'Unspecified' ? `
+          ${canManage && this.currentRaidType === 'Unspecified' ? `
             <select class="raid-type-reassign" data-lineup-id="${lineup.id}">
               <option value="Unspecified" selected>Unspecified</option>
               <option value="DDN Classic">DDN Classic</option>
@@ -354,7 +355,7 @@ export const LineupsPage = {
               <option value="Classic">GDN Classic</option>
             </select>
           ` : ''}
-          ${isAdmin && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
+          ${canManage && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">
           <div class="damage-amp-bar physical">
@@ -433,7 +434,7 @@ export const LineupsPage = {
             const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
 
             return `
-            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${isAdmin ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${isAdmin ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
+            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${canManage ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${canManage ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
               ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
@@ -467,7 +468,7 @@ export const LineupsPage = {
     initFixedTooltip();
 
     // Add click handler for cleared button if admin
-    if (isAdmin) {
+    if (canManage) {
       const clearedBtn = showcaseContainer.querySelector('.btn-cleared');
       if (clearedBtn) {
         clearedBtn.addEventListener('click', async (e) => {
@@ -739,7 +740,8 @@ export const LineupsPage = {
           ticketPlayers: ticketPlayers,
           pilotPlayers: lineup.pilotPlayers,
           completed: lineup.completed,
-          isNextWeek: lineup.isNextWeek
+          isNextWeek: lineup.isNextWeek,
+          isStatic: lineup.isStatic
         });
 
         // Clear pending changes after saving

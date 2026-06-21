@@ -304,11 +304,17 @@ class DataService {
   }
 
   isPlayer() {
-    return this._userRole === 'guildmate' || this._userRole === 'admin';
+    return this._userRole === 'guildmate' || this._userRole === 'admin' || this._userRole === 'editor';
   }
 
   isGuest() {
     return this._userRole === 'guest';
+  }
+
+  // Can the current user create/edit/delete lineups in the lineup editor?
+  // Admins plus the dedicated "editor" role.
+  canEditLineups() {
+    return this._userRole === 'admin' || this._userRole === 'editor';
   }
 
   hasAccess(requiredRole) {
@@ -317,7 +323,7 @@ class DataService {
     if (requiredRole === 'admin') {
       return this._userRole === 'admin';
     } else if (requiredRole === 'guildmate') {
-      return this._userRole === 'admin' || this._userRole === 'guildmate';
+      return this._userRole === 'admin' || this._userRole === 'guildmate' || this._userRole === 'editor';
     }
 
     return false;
@@ -706,6 +712,7 @@ class DataService {
         status: lineup.status,
         completed: lineup.completed,
         isNextWeek: lineup.is_template,
+        isStatic: lineup.is_static || false,
         notes: lineup.notes || '',
         raidTime: lineup.raid_time || null,
         threadId: lineup.thread_id || null,
@@ -733,6 +740,7 @@ class DataService {
       status: lineup.status || 'draft',
       completed: lineup.completed || false,
       is_template: lineup.isNextWeek || false,
+      is_static: lineup.isStatic || false,
       notes: lineup.notes || '',
       raid_time: lineup.raidTime || null
     };
@@ -1644,7 +1652,7 @@ class DataService {
    * @returns {Promise<{ id: string }>} the inserted request row
    */
   async requestDiscordThread(lineupId, channelId = '1496954808324587680') {
-    if (!this.isAdmin()) throw new Error('Only admins can create Discord threads');
+    if (!this.canEditLineups()) throw new Error('You do not have permission to create Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
 
     const { data, error } = await supabase
@@ -1671,7 +1679,7 @@ class DataService {
    * @returns {Promise<{ id: string }>} the inserted request row
    */
   async requestDiscordThreadUpdate(lineupId) {
-    if (!this.isAdmin()) throw new Error('Only admins can update Discord threads');
+    if (!this.canEditLineups()) throw new Error('You do not have permission to update Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
 
     const { data, error } = await supabase
@@ -1699,7 +1707,7 @@ class DataService {
    * @returns {Promise<{ id: string }>} the inserted request row
    */
   async requestDiscordThreadClear(lineupId) {
-    if (!this.isAdmin()) throw new Error('Only admins can clear Discord threads');
+    if (!this.canEditLineups()) throw new Error('You do not have permission to clear Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
 
     const { data, error } = await supabase

@@ -215,6 +215,16 @@
         }
       }
 
+      &.static {
+        background: linear-gradient(180deg, rgba(190, 150, 255, 0.15) 0%, rgba(190, 150, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+        border-color: rgba(190, 150, 255, 0.3);
+
+        &:hover {
+          background: linear-gradient(180deg, rgba(190, 150, 255, 0.2) 0%, rgba(190, 150, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 100%);
+          border-color: rgba(190, 150, 255, 0.5);
+        }
+      }
+
       &.cleared {
         filter: saturate(0.4) brightness(0.8);
         border-color: rgba(255, 255, 255, 0.08);
@@ -279,6 +289,13 @@
             padding: 0 3px;
             line-height: 1.4;
             flex-shrink: 0;
+          }
+
+          .static-icon-mini {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            vertical-align: middle;
           }
 
           span {
@@ -414,6 +431,14 @@
       vertical-align: middle;
       margin-right: 0.5rem;
       letter-spacing: 0.03em;
+    }
+
+    .static-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      vertical-align: middle;
+      margin-right: 0.5rem;
     }
 
     .lineup-card-header {
@@ -697,6 +722,11 @@
     &.next-week {
       background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
       border-color: rgba(150, 184, 255, 0.3);
+    }
+
+    &.static {
+      background: linear-gradient(180deg, rgba(190, 150, 255, 0.15) 0%, rgba(190, 150, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+      border-color: rgba(190, 150, 255, 0.3);
     }
 
     &.cleared {

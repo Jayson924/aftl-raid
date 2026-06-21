@@ -723,6 +723,7 @@ export const AdminPage = {
           <select class="admin-role-select" data-discord-id="${discordId}" ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>
             <option value="guest" ${user.role === 'guest' ? 'selected' : ''}>Guest</option>
             <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>
+            <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
           ${user.role !== 'admin' ? `<button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${discordId}">Delete</button>` : ''}

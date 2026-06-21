@@ -122,10 +122,11 @@ export function renderMiniLineupCard(lineup, playerMap, options = {}) {
     : '';
 
   return `
-    <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${selected ? 'selected' : ''} ${lineup.isNextWeek ? 'next-week' : ''}" data-lineup-id="${lineup.id}">
+    <div class="mini-lineup-card ${isCleared ? 'cleared' : ''} ${selected ? 'selected' : ''} ${lineup.isNextWeek ? 'next-week' : ''} ${lineup.isStatic ? 'static' : ''}" data-lineup-id="${lineup.id}">
       <div class="mini-lineup-header">
         <span class="mini-lineup-name">
           ${lineup.isNextWeek ? '<span class="next-week-badge-mini">NW</span>' : ''}
+          ${lineup.isStatic ? '<img src="/icons/group.svg" class="static-icon-mini" title="Permanent lineup" alt="Permanent">' : ''}
           ${lineup.name}
         </span>
         <div class="mini-lineup-header-actions">

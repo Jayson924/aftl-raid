@@ -26,6 +26,10 @@ class AuthService {
     return dataService.isPlayer();
   }
 
+  canEditLineups() {
+    return dataService.canEditLineups();
+  }
+
   hasAccess(requiredRole) {
     return dataService.hasAccess(requiredRole);
   }
