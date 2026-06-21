@@ -2094,16 +2094,49 @@ export const LineupEditorPage = {
     const playerName = this.currentLineup.players[slotIndex];
     const currentPilot = this.currentLineup.pilotSlots[slotIndex] || '';
 
+    const escapeHtml = (str) => String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    // Known users sorted by display name (deduped by display name)
+    const knownUsers = Object.values(this._userMap || {})
+      .filter(u => u && (u.displayName || u.username))
+      .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username));
+
+    const renderUserRows = (filter = '') => {
+      const term = filter.trim().toLowerCase();
+      const matches = knownUsers.filter(u => {
+        const name = (u.displayName || u.username || '').toLowerCase();
+        const uname = (u.username || '').toLowerCase();
+        return !term || name.includes(term) || uname.includes(term);
+      });
+      if (matches.length === 0) {
+        return '<div class="pilot-user-empty">No matching users</div>';
+      }
+      return matches.map(u => {
+        const name = u.displayName || u.username;
+        const selected = name === currentPilot ? ' selected' : '';
+        return `
+          <button type="button" class="pilot-user-row${selected}" data-pilot-name="${escapeHtml(name)}">
+            <img src="${escapeHtml(u.avatarUrl || '/icons/avatar.svg')}" alt="" class="pilot-user-avatar" onerror="this.src='/icons/avatar.svg'">
+            <span class="pilot-user-name">${escapeHtml(name)}</span>
+          </button>`;
+      }).join('');
+    };
+
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
 
     modalElement.innerHTML = `
       <div class="modal-content pilot-modal">
-        <h2>Set Pilot for ${playerName}</h2>
-        <p class="pilot-modal-desc">Who will use this character?:</p>
+        <h2>Set Pilot for ${escapeHtml(playerName)}</h2>
+        <p class="pilot-modal-desc">Who will use this character?</p>
         <form id="pilot-form">
           <div class="form-group">
-            <input type="text" id="pilot-name-input" placeholder="Pilot's name..." value="${currentPilot}">
+            <input type="text" id="pilot-name-input" placeholder="Search or type a name..." value="${escapeHtml(currentPilot)}" autocomplete="off">
+          </div>
+          <div class="pilot-user-list" id="pilot-user-list">
+            ${renderUserRows(currentPilot)}
           </div>
           <div class="modal-actions">
             <button type="submit" class="btn btn-primary">Save</button>
@@ -2121,21 +2154,35 @@ export const LineupEditorPage = {
     input.focus();
     input.select();
 
+    const listEl = document.getElementById('pilot-user-list');
+
+    const applyPilot = (name) => {
+      this.currentLineup.pilotSlots[slotIndex] = name;
+      // Re-render the slot to update display
+      this.assignPlayerToSlot(slotIndex, playerName);
+      document.body.removeChild(modalElement);
+    };
+
+    // Filter the user list as the user types (does not auto-select)
+    input.addEventListener('input', () => {
+      listEl.innerHTML = renderUserRows(input.value);
+    });
+
+    // Click a known user to apply immediately
+    listEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.pilot-user-row');
+      if (!row) return;
+      applyPilot(row.dataset.pilotName);
+    });
+
     const form = document.getElementById('pilot-form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const pilotName = input.value.trim();
-      this.currentLineup.pilotSlots[slotIndex] = pilotName;
-      // Re-render the slot to update display
-      this.assignPlayerToSlot(slotIndex, playerName);
-      document.body.removeChild(modalElement);
+      applyPilot(input.value.trim());
     });
 
     document.getElementById('clear-pilot-btn').addEventListener('click', () => {
-      this.currentLineup.pilotSlots[slotIndex] = '';
-      // Re-render the slot to update display
-      this.assignPlayerToSlot(slotIndex, playerName);
-      document.body.removeChild(modalElement);
+      applyPilot('');
     });
 
     document.getElementById('cancel-pilot-btn').addEventListener('click', () => {

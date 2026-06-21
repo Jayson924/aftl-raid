@@ -113,6 +113,65 @@
         box-shadow: 0 0 8px rgba(100, 149, 237, 0.3);
       }
     }
+
+    .pilot-user-list {
+      margin-top: 0.75rem;
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: $border-radius;
+      background-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .pilot-user-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: none;
+      border: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: $text-light;
+      font-family: inherit;
+      font-size: 0.95rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background-color: rgba(100, 149, 237, 0.15);
+      }
+
+      &.selected {
+        background-color: rgba(100, 149, 237, 0.25);
+      }
+    }
+
+    .pilot-user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .pilot-user-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pilot-user-empty {
+      padding: 0.75rem;
+      color: $text-muted;
+      font-size: 0.85rem;
+      text-align: center;
+    }
   }
 
   .modal-filters {
