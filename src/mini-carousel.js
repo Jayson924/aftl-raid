@@ -117,7 +117,7 @@ export function renderMiniLineupCard(lineup, playerMap, options = {}) {
 
   const playerCards = renderMiniPlayerCards(lineup, playerMap);
 
-  const deleteBtn = showDeleteButton && dataService.isAdmin()
+  const deleteBtn = showDeleteButton && dataService.canEditLineups()
     ? `<button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>`
     : '';
 
