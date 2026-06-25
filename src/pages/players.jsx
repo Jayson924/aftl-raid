@@ -18,8 +18,15 @@ export const PlayersPage = {
   // Flat view disabled for now - grouped view is the only option
   _groupByOwner: true,
 
-  // View mode: 'characters' or 'roster'
+  // View mode: 'characters' (grouped), 'browse' (flat searchable), or 'roster'
   _viewMode: 'characters',
+
+  // Browse view state (flat searchable/sortable list of all characters)
+  _browseSearch: '',
+  _browseSort: localStorage.getItem('playersBrowseSort') || 'owner', // owner | gs | name | class
+  _browseDisplay: localStorage.getItem('playersBrowseDisplay') || 'grid', // grid | table
+  _browseUserMap: null,
+  _browseAccountSizes: {}, // discordId -> count of distinct account numbers
 
   // Chart instance reference
   _chartInstance: null,
@@ -72,11 +79,17 @@ export const PlayersPage = {
       data-tooltip="${tip}">${label}</button>`;
   },
 
-  // Inline whitelist toggle (admin only). Whitelist = "in our guild — gets guild features".
+  // Inline whitelist tag. Whitelist = "in our guild — gets guild features".
+  // Everyone sees the In Guild / Not in Guild tag; only admins can click to toggle.
   _buildWhitelistToggleHtml(player) {
-    if (!dataService.isAdmin()) return '';
     const isOn = !!player.whitelisted;
     const label = isOn ? 'In Guild' : 'Not in Guild';
+    if (!dataService.isAdmin()) {
+      // Normal users: only flag the exceptions ("Not in Guild") to cut noise;
+      // in-guild characters show no tag.
+      if (isOn) return '';
+      return `<span class="whitelist-pill is-readonly">${label}</span>`;
+    }
     const tip = isOn ? 'Click to remove guild access' : 'Click to whitelist (grant guild access)';
     return `<button type="button" class="whitelist-pill ${isOn ? 'is-on' : ''} tooltip-wrap"
       data-action="toggle-whitelist" data-player-id="${player.id}" data-whitelisted="${isOn}"
@@ -231,11 +244,11 @@ export const PlayersPage = {
     });
   },
 
-  // Both admin pills together — used in its own row under the character info.
+  // Status pills row under the character info. Admins get the clickable
+  // exclude + whitelist toggles; normal users get the read-only In Guild tag.
   _buildAdminPillsRowHtml(player) {
-    if (!dataService.isAdmin()) return '';
-    const exclude = this._buildExcludeToggleHtml(player);
-    const whitelist = this._buildWhitelistToggleHtml(player);
+    const exclude = this._buildExcludeToggleHtml(player);   // admin-only ('' otherwise)
+    const whitelist = this._buildWhitelistToggleHtml(player); // tag for everyone
     if (!exclude && !whitelist) return '';
     return `<div class="admin-pills-row">${exclude}${whitelist}</div>`;
   },
@@ -254,6 +267,8 @@ export const PlayersPage = {
           <div class="page-title-tabs">
             ${canViewFull ? `
               <h1 class="view-tab ${this._viewMode === 'characters' ? 'active' : ''}" data-view="characters">Characters</h1>
+              <span class="title-divider">/</span>
+              <h1 class="view-tab ${this._viewMode === 'browse' ? 'active' : ''}" data-view="browse">Browse</h1>
               <span class="title-divider">/</span>
               <h1 class="view-tab ${this._viewMode === 'roster' ? 'active' : ''}" data-view="roster">Roster</h1>
             ` : `
@@ -594,6 +609,13 @@ export const PlayersPage = {
         return;
       }
 
+      // Browse view: flat searchable/sortable list of every character.
+      // Wires its own listeners, so it returns early like the roster view.
+      if (this._viewMode === 'browse') {
+        this.renderBrowseView(listElement, players, userMap);
+        return;
+      }
+
       // Flat view disabled for now - always use grouped view
       this.renderGroupedView(listElement, players, userMap, hasAnyEditableCharacters);
       // if (this._groupByOwner) {
@@ -724,6 +746,341 @@ export const PlayersPage = {
     } catch (error) {
       listElement.innerHTML = `<div class="error">Error loading characters: ${error.message}</div>`;
     }
+  },
+
+  // ============================================
+  // BROWSE VIEW — flat searchable / sortable list of every character
+  // (lives alongside the grouped "Characters" view; fully separate so the
+  //  grouped view can be reverted to just by switching tabs)
+  // ============================================
+  renderBrowseView(listElement, players, userMap) {
+    this._browseUserMap = userMap;
+
+    // Count distinct account numbers per owner so we can flag multi-account
+    const acctSets = {};
+    players.forEach(p => {
+      if (!p.discordId) return;
+      (acctSets[p.discordId] = acctSets[p.discordId] || new Set()).add(p.accountNumber || 1);
+    });
+    this._browseAccountSizes = {};
+    Object.entries(acctSets).forEach(([id, set]) => { this._browseAccountSizes[id] = set.size; });
+
+    listElement.innerHTML = `
+      ${this.renderClassFamilyFilter()}
+      <div class="browse-controls">
+        <div class="browse-search-wrap">
+          <input type="text" id="browse-search" class="browse-search" placeholder="Search name, owner, or class…" autocomplete="off">
+        </div>
+        <div class="browse-controls-right">
+          <label class="browse-sort-label">Sort
+            <select id="browse-sort" class="browse-sort-select">
+              <option value="owner" ${this._browseSort === 'owner' ? 'selected' : ''}>Owner</option>
+              <option value="gs" ${this._browseSort === 'gs' ? 'selected' : ''}>Gearscore</option>
+              <option value="name" ${this._browseSort === 'name' ? 'selected' : ''}>Name</option>
+              <option value="class" ${this._browseSort === 'class' ? 'selected' : ''}>Class</option>
+            </select>
+          </label>
+          <div class="browse-display-toggle">
+            <button type="button" data-display="grid" class="${this._browseDisplay === 'grid' ? 'active' : ''}" title="Grid view">▦</button>
+            <button type="button" data-display="table" class="${this._browseDisplay === 'table' ? 'active' : ''}" title="Table view">▤</button>
+          </div>
+        </div>
+      </div>
+      <div id="browse-results" class="browse-results"></div>
+    `;
+
+    // Restore the search text via property assignment (avoids attribute escaping)
+    const searchInput = document.getElementById('browse-search');
+    if (searchInput) {
+      searchInput.value = this._browseSearch;
+      // Re-render only the results node so the input keeps focus while typing
+      searchInput.addEventListener('input', () => {
+        this._browseSearch = searchInput.value;
+        this._renderBrowseResults();
+      });
+    }
+
+    const sortSelect = document.getElementById('browse-sort');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => {
+        this._browseSort = sortSelect.value;
+        localStorage.setItem('playersBrowseSort', this._browseSort);
+        this._renderBrowseResults();
+      });
+    }
+
+    document.querySelectorAll('.browse-display-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._browseDisplay = btn.dataset.display;
+        localStorage.setItem('playersBrowseDisplay', this._browseDisplay);
+        document.querySelectorAll('.browse-display-toggle button').forEach(b =>
+          b.classList.toggle('active', b.dataset.display === this._browseDisplay));
+        this._renderBrowseResults();
+      });
+    });
+
+    // Class family filter shares the grouped view's controls; it triggers a
+    // full loadPlayers() (the search text survives via this._browseSearch).
+    this.attachClassFilterListeners();
+
+    this._renderBrowseResults();
+  },
+
+  _browseFilterSort(players) {
+    let list = this.filterPlayersByClass(players);
+
+    const q = this._browseSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(p => {
+        const owner = p.discordId ? this._browseUserMap[p.discordId] : null;
+        const ownerName = owner?.displayName || '';
+        return (p.name || '').toLowerCase().includes(q)
+          || ownerName.toLowerCase().includes(q)
+          || (p.role || '').toLowerCase().includes(q);
+      });
+    }
+
+    return this._sortBrowsePlayers(list);
+  },
+
+  _sortBrowsePlayers(players) {
+    const sort = this._browseSort;
+    // Unassigned characters sort to the bottom for owner sort
+    const ownerKey = (p) => (p.discordId ? (this._browseUserMap[p.discordId]?.displayName || '~') : '~~').toLowerCase();
+
+    return [...players].sort((a, b) => {
+      if (sort === 'gs') {
+        const d = calculateGearscore(b) - calculateGearscore(a);
+        if (d !== 0) return d;
+      } else if (sort === 'class') {
+        const d = (a.role || '').localeCompare(b.role || '');
+        if (d !== 0) return d;
+      } else if (sort === 'owner') {
+        const d = ownerKey(a).localeCompare(ownerKey(b));
+        if (d !== 0) return d;
+        const acc = (a.accountNumber || 1) - (b.accountNumber || 1);
+        if (acc !== 0) return acc;
+      }
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  },
+
+  _renderBrowseResults() {
+    const resultsEl = document.getElementById('browse-results');
+    if (!resultsEl) return;
+
+    const list = this._browseFilterSort(this._allPlayers || []);
+    const count = list.length;
+    const countHtml = `<div class="browse-count">${count} character${count !== 1 ? 's' : ''}</div>`;
+
+    if (count === 0) {
+      resultsEl.innerHTML = `${countHtml}<div class="empty-state">No characters match your search.</div>`;
+      return;
+    }
+
+    const body = this._browseDisplay === 'table'
+      ? this._renderBrowseTable(list)
+      : this._renderBrowseGrid(list);
+    resultsEl.innerHTML = `${countHtml}${body}`;
+    this._attachBrowseResultListeners(resultsEl);
+  },
+
+  // Flag class for de-emphasizing characters by guild status (darker border):
+  //  - excluded characters get the strongest flag
+  //  - non-whitelisted ("not in guild") get a subtler darker border
+  _browseFlagClass(player) {
+    if (player.exclude) return 'is-excluded';
+    if (!dataService.isPlayerWhitelisted(player)) return 'not-in-guild';
+    return '';
+  },
+
+  _browseAcctBadgeHtml(player) {
+    const size = player.discordId ? (this._browseAccountSizes[player.discordId] || 1) : 1;
+    if (size <= 1) return '';
+    const n = player.accountNumber || 1;
+    return `<span class="acct-badge" data-account="${n}" title="Account ${n}">A${n}</span>`;
+  },
+
+  _renderBrowseGrid(list) {
+    return `
+      <div class="character-card-grid browse-grid">
+        ${list.map(player => {
+          const gs = calculateGearscore(player);
+          const tier = getGearscoreTier(gs);
+          const canEdit = this.canEditCharacter(player);
+          const canToggleRaid = canEdit || dataService.isAdmin();
+          const iconStyle = getClassSpriteStyle(player.role);
+          const owner = player.discordId ? this._browseUserMap[player.discordId] : null;
+
+          return `
+            <div class="char-card browse-card ${this._browseFlagClass(player)}" data-player-id="${player.id}">
+              <div class="char-card-header">
+                <div class="char-card-identity">
+                  ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
+                  <div class="char-card-name-block">
+                    <span class="char-card-name ${canEdit ? 'editable' : ''}">
+                      ${canEdit
+                        ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
+                        : player.name}
+                    </span>
+                    <span class="char-card-class">${player.role || ''} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
+                  </div>
+                </div>
+                <div class="char-card-badges">
+                  ${this.renderRaidBadgesHTML(player, canToggleRaid)}
+                </div>
+              </div>
+              <div class="browse-card-footer">
+                ${owner
+                  ? `<div class="char-card-owner"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="char-card-owner-avatar" onerror="this.src='/icons/avatar.svg'"><span>${owner.displayName}</span></div>`
+                  : `<div class="char-card-owner no-owner">Unassigned</div>`}
+                ${this._browseAcctBadgeHtml(player)}
+              </div>
+              ${this._buildAdminPillsRowHtml(player)}
+            </div>`;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  _renderBrowseTable(list) {
+    const arrow = (key) => this._browseSort === key ? ' ▼' : '';
+    const th = (key, label) =>
+      `<th class="browse-sort-header ${this._browseSort === key ? 'sort-active' : ''}" data-sort="${key}">${label}${arrow(key)}</th>`;
+
+    return `
+      <table class="players-table browse-table">
+        <thead>
+          <tr>
+            ${th('name', 'Name')}
+            ${th('owner', 'Owner')}
+            <th>Acc</th>
+            ${th('class', 'Class')}
+            ${th('gs', 'GS')}
+            <th>Raids Needed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(player => {
+            const canEdit = this.canEditCharacter(player);
+            const canToggleRaid = canEdit || dataService.isAdmin();
+            const owner = player.discordId ? this._browseUserMap[player.discordId] : null;
+            const gs = calculateGearscore(player);
+            const tier = getGearscoreTier(gs);
+            const n = player.accountNumber || 1;
+            const size = player.discordId ? (this._browseAccountSizes[player.discordId] || 1) : 1;
+
+            return `
+            <tr class="${this._browseFlagClass(player)}" data-player-id="${player.id}">
+              <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
+                ${canEdit
+                  ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
+                  : player.name}
+                ${this._buildAdminPillsRowHtml(player)}
+              </td>
+              <td class="player-owner" data-label="Owner">
+                ${owner
+                  ? `<div class="owner-badge" title="${owner.displayName}"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="owner-avatar" onerror="this.src='/icons/avatar.svg'"><span class="owner-name">${owner.displayName}</span></div>`
+                  : '<span class="no-owner">—</span>'}
+              </td>
+              <td class="browse-acc-cell" data-label="Acc">${size > 1 ? `<span class="acct-badge" data-account="${n}">A${n}</span>` : '<span class="acct-dash">—</span>'}</td>
+              <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role || ''}</td>
+              <td class="gs-cell" data-label="GS"><span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span></td>
+              <td class="raids-needed" data-label="Raids Needed">${this.renderRaidBadgesHTML(player, canToggleRaid)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  },
+
+  _attachBrowseResultListeners(rootEl) {
+    // Edit on name click
+    rootEl.querySelectorAll('.player-name-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const playerId = link.dataset.playerId;
+        const player = (this._allPlayers || []).find(p => p.id === playerId);
+        if (player) this.showEditPlayerModal(player);
+      });
+    });
+
+    // Raid badge toggles — refresh via full reload (re-fetches completion state)
+    rootEl.querySelectorAll('.raid-badge.clickable').forEach(badge => {
+      badge.addEventListener('click', async () => {
+        const playerId = badge.dataset.playerId;
+        const raidType = badge.dataset.raidType;
+        const newCompleted = badge.dataset.completed !== 'true';
+        try {
+          badge.style.opacity = '0.5';
+          await dataService.togglePlayerRaidCompletion(playerId, raidType, newCompleted);
+          toast.success(`${raidType} ${newCompleted ? 'marked as done' : 'marked as not done'}`);
+          this.loadPlayers();
+        } catch (error) {
+          toast.error(`Failed to update: ${error.message}`);
+          badge.style.opacity = '';
+        }
+      });
+    });
+
+    // Sortable table headers (keep the Sort dropdown in sync)
+    rootEl.querySelectorAll('.browse-sort-header').forEach(header => {
+      header.addEventListener('click', () => {
+        this._browseSort = header.dataset.sort;
+        localStorage.setItem('playersBrowseSort', this._browseSort);
+        const sel = document.getElementById('browse-sort');
+        if (sel) sel.value = this._browseSort;
+        this._renderBrowseResults();
+      });
+    });
+
+    // Admin exclude toggles
+    rootEl.querySelectorAll('.exclude-pill[data-action="toggle-exclude"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const playerId = btn.dataset.playerId;
+        const newExclude = btn.dataset.exclude !== 'true';
+        try {
+          btn.disabled = true;
+          await dataService.togglePlayerExclude(playerId, newExclude);
+          const player = (this._allPlayers || []).find(p => p.id === playerId);
+          if (player) player.exclude = newExclude;
+          btn.dataset.exclude = String(newExclude);
+          btn.classList.toggle('is-on', newExclude);
+          btn.textContent = newExclude ? 'Excluded' : 'Exclude';
+          btn.setAttribute('data-tooltip', newExclude ? 'Click to include' : 'Click to exclude from recruiting');
+          toast.success(newExclude ? `${player?.name || 'Character'} excluded` : `${player?.name || 'Character'} included`);
+        } catch (err) {
+          toast.error(`Failed: ${err.message}`);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Admin whitelist toggles
+    rootEl.querySelectorAll('.whitelist-pill[data-action="toggle-whitelist"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const playerId = btn.dataset.playerId;
+        const newWhitelisted = btn.dataset.whitelisted !== 'true';
+        try {
+          btn.disabled = true;
+          await dataService.togglePlayerWhitelist(playerId, newWhitelisted);
+          const player = (this._allPlayers || []).find(p => p.id === playerId);
+          if (player) player.whitelisted = newWhitelisted;
+          btn.dataset.whitelisted = String(newWhitelisted);
+          btn.classList.toggle('is-on', newWhitelisted);
+          btn.textContent = newWhitelisted ? 'In Guild' : 'Not in Guild';
+          btn.setAttribute('data-tooltip', newWhitelisted ? 'Click to remove guild access' : 'Click to whitelist (grant guild access)');
+          toast.success(newWhitelisted ? `${player?.name || 'Character'} whitelisted` : `${player?.name || 'Character'} removed from whitelist`);
+        } catch (err) {
+          toast.error(`Failed: ${err.message}`);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
   },
 
   renderRosterView(listElement, players, userMap) {
