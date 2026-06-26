@@ -76,15 +76,16 @@ function renderMiniPlayerCard(playerName, playerMap, lineup, idx) {
     : '';
 
   const pilotName = !isPub && lineup.pilotPlayers && lineup.pilotPlayers[idx] ? lineup.pilotPlayers[idx] : '';
-  const pilotDisplay = pilotName ? `<span class="pilot-info-mini"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon-mini">${pilotName}</span>` : '';
+  // Pilot shown inline on the name line ([Name] [icon] [pilot]) so it doesn't add
+  // a row / change the card height.
+  const pilotInline = pilotName ? ` <span class="mini-pilot"><img class="mini-pilot-icon" src="/icons/headphones.svg" alt="Pilot">${pilotName}</span>` : '';
 
   return `
     <div class="mini-player-card ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">
       ${ticketHtml}
       ${player.role ? `<div class="class-sprite mini-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
       <div class="mini-player-info">
-        <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}</div>
-        ${pilotDisplay}
+        <div class="mini-player-name">${player.name}${isPub ? ' <span class="pub-badge-mini">G</span>' : ''}${pilotInline}</div>
         ${player.role ? `<div class="mini-player-role">${player.role}</div>` : ''}
       </div>
     </div>

@@ -679,6 +679,15 @@ class DataService {
           slot_position,
           uses_ticket,
           pilot_name
+        ),
+        lineup_loot (
+          id,
+          item,
+          sold,
+          price,
+          sort_order,
+          held_by,
+          source
         )
       `)
       .order('name');
@@ -705,6 +714,18 @@ class DataService {
           }
         });
 
+      const loot = (lineup.lineup_loot || [])
+        .map(l => ({
+          id: l.id,
+          item: l.item,
+          sold: l.sold === true,
+          price: Number(l.price) || 0,
+          sortOrder: l.sort_order ?? 0,
+          heldBy: l.held_by || '',
+          source: l.source || 'web'
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
       return {
         id: lineup.id,
         name: lineup.name,
@@ -718,7 +739,8 @@ class DataService {
         threadId: lineup.thread_id || null,
         players,
         ticketPlayers,
-        pilotPlayers
+        pilotPlayers,
+        loot
       };
     });
   }
@@ -874,6 +896,130 @@ class DataService {
     }
 
     return { success: true, completed: newCompleted };
+  }
+
+  // ============================================
+  // LINEUP LOOT (per-lineup item + gold log)
+  // ============================================
+
+  /**
+   * Fetch the loot entries for a single lineup, sorted by sort_order.
+   * Returns [] on error. (getLineups already embeds loot for the page;
+   * this is for targeted refreshes.)
+   */
+  async getLineupLoot(lineupId) {
+    if (!lineupId) return [];
+
+    const { data, error } = await supabase
+      .from('lineup_loot')
+      .select('id, item, sold, price, sort_order, held_by, source')
+      .eq('lineup_id', lineupId)
+      .order('sort_order');
+
+    if (error) {
+      console.error('Error fetching lineup loot:', error);
+      return [];
+    }
+
+    return data.map(l => ({
+      id: l.id,
+      item: l.item,
+      sold: l.sold === true,
+      price: Number(l.price) || 0,
+      sortOrder: l.sort_order ?? 0,
+      heldBy: l.held_by || '',
+      source: l.source || 'web'
+    }));
+  }
+
+  // New loot starts unsold (no gold yet); price is set later when it sells.
+  async addLineupLoot(lineupId, item, heldBy = '') {
+    if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
+    if (!lineupId) throw new Error('lineupId is required');
+
+    const trimmed = (item || '').trim();
+    if (!trimmed) throw new Error('Item name cannot be empty');
+
+    // Append after the current last entry for this lineup
+    const { data: existing } = await supabase
+      .from('lineup_loot')
+      .select('sort_order')
+      .eq('lineup_id', lineupId)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
+
+    const { data, error } = await supabase
+      .from('lineup_loot')
+      .insert({
+        lineup_id: lineupId,
+        item: trimmed,
+        sold: false,
+        price: 0,
+        sort_order: nextOrder,
+        held_by: (heldBy || '').trim() || null,
+        source: 'web',
+        created_by: this._user?.id || null
+      })
+      .select('id, item, sold, price, sort_order, held_by, source')
+      .single();
+
+    if (error) throw error;
+    return {
+      id: data.id,
+      item: data.item,
+      sold: data.sold === true,
+      price: Number(data.price) || 0,
+      sortOrder: data.sort_order ?? 0,
+      heldBy: data.held_by || '',
+      source: data.source || 'web'
+    };
+  }
+
+  async updateLineupLoot(lootId, updates) {
+    if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
+    if (!lootId) throw new Error('lootId is required');
+
+    const updateData = {};
+    if (updates.item !== undefined) {
+      const trimmed = (updates.item || '').trim();
+      if (!trimmed) throw new Error('Item name cannot be empty');
+      updateData.item = trimmed;
+    }
+    if (updates.sold !== undefined) {
+      updateData.sold = !!updates.sold;
+      // Reverting to unsold clears the price unless one is explicitly provided
+      if (!updates.sold && updates.price === undefined) updateData.price = 0;
+    }
+    if (updates.price !== undefined) {
+      updateData.price = Math.max(0, Math.round(Number(updates.price) || 0));
+    }
+    if (updates.heldBy !== undefined) {
+      updateData.held_by = (updates.heldBy || '').trim() || null;
+    }
+    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
+
+    const { error } = await supabase
+      .from('lineup_loot')
+      .update(updateData)
+      .eq('id', lootId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async deleteLineupLoot(lootId) {
+    if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
+    if (!lootId) throw new Error('lootId is required');
+
+    const { error } = await supabase
+      .from('lineup_loot')
+      .delete()
+      .eq('id', lootId);
+
+    if (error) throw error;
+    return { success: true };
   }
 
   // ============================================
@@ -1633,6 +1779,18 @@ class DataService {
     return supabase
       .channel('lineups-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lineups' }, callback)
+      .subscribe();
+  }
+
+  /**
+   * Subscribe to lineup_loot changes (loot logged from the site or the Discord
+   * bot). Payload's new/old row carries `lineup_id`. Requires the lineup_loot
+   * table to be in the supabase_realtime publication (it is, via lineup-loot.sql).
+   */
+  subscribeToLineupLoot(callback) {
+    return supabase
+      .channel('lineup-loot-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lineup_loot' }, callback)
       .subscribe();
   }
 

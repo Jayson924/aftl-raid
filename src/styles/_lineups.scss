@@ -363,24 +363,6 @@
               text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
             }
 
-            .pilot-info-mini {
-              display: inline-flex;
-              align-items: center;
-              gap: 0.15rem;
-              font-size: 0.6rem;
-              color: rgba(100, 149, 237, 0.9);
-              background-color: rgba(100, 149, 237, 0.15);
-              padding: 0.1rem 0.35rem;
-              border-radius: 8px;
-              margin-bottom: 0.1rem;
-
-              .pilot-info-icon-mini {
-                width: 9px;
-                height: 9px;
-                filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
-              }
-            }
-
             .mini-player-role {
               font-size: 0.65rem;
               color: $text-muted;
@@ -710,6 +692,30 @@
       }
     }
 
+    .btn-loot-toggle {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem;
+      font-size: 0.9rem;
+
+      .btn-loot-icon {
+        width: 15px;
+        height: 15px;
+        filter: brightness(0) invert(1);
+      }
+
+      &.active {
+        background-color: rgba(76, 209, 106, 0.2);
+        color: #6fe08a;
+
+        .btn-loot-icon {
+          filter: brightness(0) saturate(100%) invert(72%) sepia(40%) saturate(500%) hue-rotate(80deg) brightness(95%) contrast(90%);
+        }
+      }
+    }
+
     @keyframes pulse-pending {
       0%, 100% {
         box-shadow: 0 0 10px rgba(244, 196, 48, 0.5);
@@ -729,6 +735,12 @@
       border-color: rgba(190, 150, 255, 0.3);
     }
 
+    // Cleared showcase card: the raid is done, so the loot becomes the big
+    // background panel and the roster shrinks into a small foreground box pinned
+    // to the bottom-left, overlapping the loot (per the sketch).
+    //
+    // Default cleared look (no loot view active): original whole-card dim + giant
+    // CLEARED stamp + normal roster — so cleared lineups without loot look as before.
     &.cleared {
       filter: saturate(0.4) brightness(0.85);
       border-color: rgba(255, 255, 255, 0.1);
@@ -752,7 +764,197 @@
         z-index: 5;
         white-space: nowrap;
       }
+    }
 
+    // Loot view (toggled on via the Loot button): card goes transparent, the loot
+    // box + overhanging roster take over.
+    &.cleared.loot-view {
+      filter: none;
+      background: transparent;
+      border-color: transparent;
+      &::before { content: none; }
+
+      // Drop the pre-raid planning bars
+      .damage-amp-display { display: none; }
+
+      // Move the clear/uncleared button to the bottom, just to the right of the
+      // roster box. Header goes static so the button's absolute positioning
+      // resolves against the card, not the header.
+      .lineup-card-header { position: static; }
+      .btn-cleared {
+        position: absolute;
+        left: calc(360px + 0.75rem);
+        bottom: 0.25rem;
+        z-index: 5;
+      }
+
+      // Loot = big background box. Reserve a band at the bottom so its rows clear
+      // the overlapping roster box.
+      // Loot = the main box. Bottom margin leaves room for the roster to overhang
+      // below it. Neutral card surface (no green).
+      .lineup-loot {
+        margin: 1rem 0 2.5rem;
+        // Fixed height so the box never changes size — items scroll instead.
+        height: 440px;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.25rem 0.9rem 0.5rem;
+        position: relative;
+        z-index: 1;
+
+        // Header (total + payout) stays pinned on top; not a toggle anymore.
+        .lineup-loot-header {
+          flex-shrink: 0;
+          color: #6fe08a;
+          font-size: 1rem;
+          cursor: default;
+
+          &:hover { color: #6fe08a; }
+        }
+
+        // Body fills the rest; the items area scrolls, the add form stays put.
+        .lineup-loot-body {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+        }
+
+        // Add form pinned at the top (under the header); items scroll below it
+        .loot-add-form {
+          flex-shrink: 0;
+          margin-bottom: 0.6rem;
+        }
+
+        .loot-groups,
+        .loot-empty {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+        }
+      }
+
+      // Roster = small foreground box, bottom-left, overlapping the loot.
+      // Renders the mini-carousel card style (renderMiniPlayerCards).
+      .lineup-players {
+        // Reset the base grid so the mini grid (the only visible child) fills the box
+        display: block;
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        // Fixed width (not a % of the card) so the roster doesn't resize when the
+        // card width shifts — e.g. when adding loot makes the page tall enough to
+        // show a scrollbar and reflow everything slightly narrower.
+        width: 360px;
+        max-width: calc(100% - 1rem);
+        z-index: 4;
+        padding: 0.5rem;
+        // Opaque panel matching the app's card surface (page #242424 + ~5% white),
+        // so it reads as a raised card rather than a black box
+        background: #2f2f2f;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+        // The original cleared look: dim the roster (stamp + cards together)
+        filter: saturate(0.4) brightness(0.85);
+        // Click-through so the loot (and its edit buttons) behind it stay usable,
+        // and hovering the loot is detected even under the roster.
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+
+        // Diagonal CLEARED stamp across the roster box
+        &::after {
+          content: 'CLEARED';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-18deg);
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: rgba(76, 209, 106, 0.9);
+          letter-spacing: 0.1em;
+          padding: 0.15rem 0.8rem;
+          border: 2px solid rgba(76, 209, 106, 0.8);
+          border-radius: 6px;
+          background: rgba(0, 0, 0, 0.5);
+          text-shadow: 0 0 8px rgba(76, 209, 106, 0.4);
+          pointer-events: none;
+          z-index: 6;
+          white-space: nowrap;
+        }
+
+        // The full-size slots stay in the DOM but are replaced by the mini grid
+        .player-slot { display: none; }
+
+        // Mirror of .existing-lineups-container .mini-lineup-grid (carousel roster)
+        .mini-lineup-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          grid-template-rows: repeat(4, auto);
+          grid-auto-flow: column;
+          gap: 0.4rem;
+
+          .mini-player-card {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            padding: 0.4rem;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+
+            &.empty {
+              opacity: 0.5;
+              .mini-player-empty { font-size: 0.7rem; color: $text-muted; }
+            }
+
+            .mini-player-info {
+              width: 100%;
+              z-index: 1;
+
+              .mini-player-name {
+                font-size: 0.75rem;
+                font-weight: 600;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+              }
+
+              .mini-player-role {
+                font-size: 0.65rem;
+                color: $text-muted;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+              }
+            }
+          }
+        }
+      }
+
+      // Hovering anywhere on the loot box fades the roster so loot behind it is
+      // readable (kept partly visible, not fully transparent).
+      &:has(.lineup-loot:hover) .lineup-players {
+        opacity: 0.3;
+      }
+
+      @media (max-width: 600px) {
+        // Narrow screens: roster returns to normal flow (no overlap to reveal)
+        .lineup-players {
+          position: static;
+          width: auto;
+          max-width: none;
+          box-shadow: none;
+          opacity: 1 !important;
+        }
+        .lineup-loot { margin: 1rem 0 0; }
+      }
     }
 
     .lineup-players {
@@ -775,6 +977,349 @@
       .notes-label {
         color: rgba(255, 255, 255, 0.4);
         font-weight: 500;
+      }
+    }
+
+    .lineup-loot {
+      margin-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+      z-index: 2;
+
+      .lineup-loot-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.6rem 0.25rem 0.6rem 0;
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 0.9rem;
+        font-weight: 600;
+
+        .loot-title {
+          letter-spacing: 0.02em;
+        }
+
+        .loot-count {
+          font-size: 0.7rem;
+          font-weight: 700;
+          min-width: 18px;
+          text-align: center;
+          padding: 0.05rem 0.35rem;
+          border-radius: 9px;
+          background-color: rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .loot-total {
+          margin-left: auto;
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #f4c430;
+        }
+
+        .loot-payout {
+          font-size: 0.78rem;
+          font-weight: 600;
+          color: #6fe08a;
+          padding: 0.1rem 0.45rem;
+          border-radius: 9px;
+          background-color: rgba(76, 209, 106, 0.12);
+          white-space: nowrap;
+        }
+
+        .loot-total + .loot-payout {
+          margin-left: 0;
+        }
+      }
+
+      .lineup-loot-body {
+        padding: 0.25rem 0 0.5rem;
+      }
+
+      .loot-empty {
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.4);
+        font-style: italic;
+        padding: 0.4rem 0.25rem;
+      }
+
+      .loot-holder-icon {
+        width: 12px;
+        height: 12px;
+        flex-shrink: 0;
+        filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+      }
+
+      .loot-groups {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin-bottom: 0.6rem;
+      }
+
+      .loot-group {
+        background-color: rgba(255, 255, 255, 0.025);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding: 0.5rem;
+
+        .loot-group-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.4rem;
+          padding-bottom: 0.35rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+          .loot-group-holder {
+            flex: 1;
+            min-width: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: rgba(150, 184, 255, 0.95);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            &.loot-group-holder--none {
+              color: rgba(255, 255, 255, 0.4);
+              font-style: italic;
+              font-weight: 500;
+            }
+
+            .loot-group-note {
+              font-size: 0.7rem;
+              font-weight: 400;
+              color: rgba(255, 255, 255, 0.35);
+            }
+          }
+
+          .loot-group-meta {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+
+            .loot-group-count {
+              font-size: 0.65rem;
+              font-weight: 700;
+              min-width: 16px;
+              text-align: center;
+              padding: 0.05rem 0.3rem;
+              border-radius: 8px;
+              background-color: rgba(255, 255, 255, 0.1);
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .loot-group-total {
+              font-size: 0.78rem;
+              font-weight: 700;
+              color: #f4c430;
+            }
+          }
+        }
+      }
+
+      .loot-items {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .loot-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.6rem;
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 5px;
+
+        .loot-item-name {
+          flex: 1;
+          min-width: 0;
+          font-size: 0.85rem;
+          color: rgba(255, 255, 255, 0.9);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+        }
+
+        .loot-source {
+          flex-shrink: 0;
+          font-size: 0.6rem;
+          font-weight: 700;
+          width: 16px;
+          height: 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 3px;
+          background-color: rgba(88, 101, 242, 0.25);
+          color: #aeb8ff;
+        }
+
+        .loot-item-price {
+          flex-shrink: 0;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #f4c430;
+        }
+
+        .loot-item-status--unsold {
+          flex-shrink: 0;
+          font-size: 0.68rem;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.45);
+          background-color: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          padding: 0.05rem 0.4rem;
+          border-radius: 9px;
+          white-space: nowrap;
+        }
+
+        &.loot-item--unsold {
+          opacity: 0.82;
+        }
+      }
+
+      .loot-item--editing {
+        flex-wrap: wrap;
+        background-color: rgba(244, 196, 48, 0.06);
+        border-color: rgba(244, 196, 48, 0.3);
+
+        .loot-edit-item {
+          flex: 1;
+          min-width: 120px;
+        }
+
+        .loot-sold-toggle {
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          font-size: 0.78rem;
+          color: rgba(255, 255, 255, 0.7);
+          cursor: pointer;
+          white-space: nowrap;
+
+          input {
+            cursor: pointer;
+            margin: 0;
+          }
+        }
+
+        .loot-edit-price {
+          width: 80px;
+          flex-shrink: 0;
+
+          &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+          }
+        }
+
+        .loot-edit-holder {
+          flex-shrink: 0;
+        }
+      }
+
+      .loot-icon-btn {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 4px;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        font-size: 0.85rem;
+        line-height: 1;
+        transition: all 0.15s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.12);
+          color: #fff;
+        }
+
+        &.loot-delete-btn:hover {
+          background: rgba(222, 67, 95, 0.25);
+          border-color: rgba(222, 67, 95, 0.5);
+          color: #ff8095;
+        }
+
+        &.loot-save-btn:hover {
+          background: rgba(76, 209, 106, 0.25);
+          border-color: rgba(76, 209, 106, 0.5);
+          color: #6fe08a;
+        }
+      }
+
+      .loot-add-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+
+        .loot-add-item {
+          flex: 1;
+          min-width: 120px;
+        }
+
+        .loot-add-holder {
+          flex-shrink: 0;
+        }
+      }
+
+      .loot-add-item,
+      .loot-edit-item,
+      .loot-edit-price,
+      .loot-add-holder,
+      .loot-edit-holder {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.85rem;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+        color: #e0e0e0;
+
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.35);
+        }
+      }
+
+      .loot-add-holder,
+      .loot-edit-holder {
+        max-width: 140px;
+        cursor: pointer;
+
+        option {
+          background: #1f1f1f;
+          color: #e0e0e0;
+        }
+      }
+
+      .loot-add-btn {
+        flex-shrink: 0;
+        padding: 0.4rem 1rem;
+        font-size: 0.85rem;
       }
     }
 

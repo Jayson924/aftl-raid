@@ -57,6 +57,22 @@ body {
   z-index: 0;
 }
 
+// Inline pilot label on a mini player card's name line ([Name] [icon] [pilot]).
+// Stays on one line so it never adds height to the card.
+.mini-pilot {
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: rgba(120, 165, 245, 0.95);
+
+  .mini-pilot-icon {
+    width: 9px;
+    height: 9px;
+    vertical-align: -1px;
+    margin-right: 1px;
+    filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+  }
+}
+
 // Class icon background for player slots (lineups & editor)
 .slot-class-bg {
   position: absolute;

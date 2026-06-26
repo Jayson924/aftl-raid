@@ -1902,24 +1902,6 @@
             white-space: nowrap;
           }
 
-          .pilot-info-mini {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.15rem;
-            font-size: 0.6rem;
-            color: rgba(100, 149, 237, 0.9);
-            background-color: rgba(100, 149, 237, 0.15);
-            padding: 0.1rem 0.35rem;
-            border-radius: 8px;
-            margin-bottom: 0.1rem;
-
-            .pilot-info-icon-mini {
-              width: 9px;
-              height: 9px;
-              filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
-            }
-          }
-
           .mini-player-role {
             font-size: 0.65rem;
             color: #888;
