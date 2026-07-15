@@ -10,7 +10,7 @@ import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForR
 import { initFixedTooltip } from '../fixed-tooltip.js';
 
 export const LineupsPage = {
-  currentRaidType: 'DDN Classic',
+  currentRaidType: 'DDN Hardcore',
   currentShowcaseLineup: null,
   allLineups: [],
   cachedPlayerMap: null,
@@ -58,15 +58,11 @@ export const LineupsPage = {
       <div class="lineups-page">
         <h1>Raid Lineups</h1>
         <div class="raid-tabs">
-          <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
           <button class="tab-button ${this.currentRaidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
+          <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
           <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
           <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
           <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
-        </div>
-        <div class="planning-banner" id="planning-banner" ${this.currentRaidType === 'DDN Hardcore' ? '' : 'hidden'}>
-          <span class="planning-banner-icon">🚧</span>
-          <span>Planning phase — DDN Hardcore lineups are not yet finalized and won't reset weekly.</span>
         </div>
         <div class="tab-content-wrapper">
           <div class="showcase-area">
@@ -188,10 +184,6 @@ export const LineupsPage = {
         button.classList.remove('active');
       }
     });
-
-    // Show the planning-phase banner only for DDN Hardcore
-    const banner = document.getElementById('planning-banner');
-    if (banner) banner.hidden = raidType !== 'DDN Hardcore';
 
     // Reload lineups for new raid type
     this.loadLineups();
@@ -388,8 +380,8 @@ export const LineupsPage = {
           ${canManage && this.currentRaidType === 'Unspecified' ? `
             <select class="raid-type-reassign" data-lineup-id="${lineup.id}">
               <option value="Unspecified" selected>Unspecified</option>
-              <option value="DDN Classic">DDN Classic</option>
               <option value="DDN Hardcore">DDN Hardcore</option>
+              <option value="DDN Classic">DDN Classic</option>
               <option value="Hardcore">GDN Hardcore</option>
               <option value="Classic">GDN Classic</option>
             </select>

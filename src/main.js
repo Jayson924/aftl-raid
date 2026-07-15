@@ -6,7 +6,8 @@ import { LineupEditorPage } from './pages/lineup-editor.jsx'
 import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
-import { RecruitingPage } from './pages/recruiting.jsx'
+// Parked with its route below — see the note in the route registrations.
+// import { RecruitingPage } from './pages/recruiting.jsx'
 import { EnhanceRacePage } from './pages/enhance-race.jsx'
 import { AdminPage } from './pages/admin.jsx'
 import { ArenaHubPage } from './arena/arena-hub.jsx'
@@ -79,7 +80,11 @@ async function initApp() {
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // Public - no auth required
   router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
-  router.register('recruiting', RecruitingPage); // Public standalone page - no nav
+  // Recruiting is parked — page kept for possible future use, but not routable
+  // here. Re-activate by uncommenting this line (and its import above). The
+  // standalone recruiting site (recruit.html / vite.config.recruit.js) is a
+  // separate Netlify deploy and is unaffected by this.
+  // router.register('recruiting', RecruitingPage); // Public standalone page - no nav
   router.register('arena', ArenaHubPage, 'guildmate'); // Guildmates and admins only
   router.register('arena-setup', ArenaSetupPage, 'admin'); // Arena setup - admin only
   router.register('arena-draft', ArenaDraftPage, 'guildmate'); // Draft phase - guildmates only
@@ -114,7 +119,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.5.00</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.5.01</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>

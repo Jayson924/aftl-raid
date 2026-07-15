@@ -75,7 +75,7 @@ export const MyRaidsPage = {
 
         <div class="section availability-section">
           <h2>Availability</h2>
-          <p class="availability-hint">When you're typically online. Used for raids that need scheduling lead time (currently DDN Classic). Enter times in <strong>your local timezone</strong> — others see them converted to theirs.</p>
+          <p class="availability-hint">When you're typically online. Used for raids that need scheduling lead time (the DDN raids). Enter times in <strong>your local timezone</strong> — others see them converted to theirs.</p>
           <div class="availability-tz-banner" id="availability-tz-label">Detecting your timezone…</div>
           <div class="availability-form">
             <label class="availability-anytime">

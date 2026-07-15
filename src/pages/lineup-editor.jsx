@@ -17,7 +17,7 @@ export const LineupEditorPage = {
   currentLineup: {
     id: null, // UUID from database (null for new unsaved lineups)
     name: '',
-    raidType: 'DDN Classic',
+    raidType: 'DDN Hardcore',
     status: 'ready',
     players: [],
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
@@ -55,7 +55,7 @@ export const LineupEditorPage = {
     this.currentLineup = {
       id: null,
       name: '',
-      raidType: 'DDN Classic',
+      raidType: 'DDN Hardcore',
       status: 'ready',
       players: [],
       ticketSlots: Array(8).fill(false),
@@ -91,8 +91,8 @@ export const LineupEditorPage = {
                 <div class="form-group raid-type-group">
                   <label for="raid-type">Raid Type:</label>
                   <select id="raid-type">
-                    <option value="DDN Classic">DDN Classic</option>
                     <option value="DDN Hardcore">DDN Hardcore</option>
+                    <option value="DDN Classic">DDN Classic</option>
                     <option value="Hardcore">GDN Hardcore</option>
                     <option value="Classic">GDN Classic</option>
                     <option value="Unspecified">Unspecified</option>

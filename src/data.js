@@ -1067,8 +1067,7 @@ class DataService {
   playerNeedsRaid(player, raidType) {
     // 4-man and Unspecified don't track weekly completion
     if (raidType === 'Unspecified' || raidType === '4-man') return true;
-    // DDN Hardcore is unreleased — treat everyone as always needing
-    if (raidType === 'DDN Hardcore') return true;
+    if (raidType === 'DDN Hardcore') return !this.isCompletedThisWeek(player.ddnHardcoreCompleted);
     if (raidType === 'DDN Classic') return !this.isCompletedThisWeek(player.ddnClassicCompleted);
     if (raidType === 'DDN Normal') return !this.isCompletedThisWeek(player.ddnNormalCompleted);
     const timestamp = raidType === 'Hardcore' ? player.hardcoreCompleted : player.classicCompleted;
@@ -1083,8 +1082,6 @@ class DataService {
   async markPlayersCompleted(playerNames, raidType, ticketPlayerNames = []) {
     // 4-man and Unspecified don't track weekly completion
     if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
-    // DDN Hardcore is unreleased — no completion tracking yet
-    if (raidType === 'DDN Hardcore') return { success: true };
     const column = raidTypeToCompletionColumn(raidType);
     const now = new Date().toISOString();
 
@@ -1112,8 +1109,6 @@ class DataService {
   async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName, ticketPlayerNames = []) {
     // 4-man and Unspecified don't track weekly completion
     if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
-    // DDN Hardcore is unreleased — no completion tracking yet
-    if (raidType === 'DDN Hardcore') return { success: true };
     const column = raidTypeToCompletionColumn(raidType);
 
     // Clear completion timestamp

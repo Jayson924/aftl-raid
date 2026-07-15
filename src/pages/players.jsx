@@ -326,15 +326,15 @@ export const PlayersPage = {
   _expandedOwners: new Set(),
 
   // Filter for prioritizing uncleared raids — keyed by raid bucket
-  // (ghc = GDN Hardcore, gcl = GDN Classic, dcl = DDN Classic, dn = DDN Normal).
-  // DDN Hardcore is unreleased so it has no filter key.
-  _raidPriorityFilter: { ghc: false, gcl: false, dcl: false, dn: false },
+  // (ghc = GDN Hardcore, gcl = GDN Classic, dhc = DDN Hardcore,
+  //  dcl = DDN Classic, dn = DDN Normal).
+  _raidPriorityFilter: { ghc: false, gcl: false, dhc: false, dcl: false, dn: false },
 
   // Render the GDN/DDN raid badge group for a player.
-  // DDN Hardcore is rendered greyed out / non-clickable until released.
   renderRaidBadgesHTML(player, canToggleRaid) {
     const needsGHC = dataService.playerNeedsRaid(player, 'Hardcore');
     const needsGCL = dataService.playerNeedsRaid(player, 'Classic');
+    const needsDHC = dataService.playerNeedsRaid(player, 'DDN Hardcore');
     const needsDCL = dataService.playerNeedsRaid(player, 'DDN Classic');
     const needsDN = dataService.playerNeedsRaid(player, 'DDN Normal');
     const clickClass = canToggleRaid ? 'clickable' : '';
@@ -358,7 +358,9 @@ export const PlayersPage = {
         </div>
         <div class="raid-row ddn-row">
           <span class="raid-row-label">DDN</span>
-          <span class="raid-badge raid-ddn-hardcore disabled" title="Coming soon">${lbl('HC')}</span>
+          <span class="raid-badge raid-ddn-hardcore ${!needsDHC ? 'completed' : ''} ${clickClass}"
+                ${toggleAttrs('DDN Hardcore', !needsDHC)}
+                title="${titleAttr}">${lbl('HC')}${!needsDHC ? check : ''}</span>
           <span class="raid-badge raid-ddn-classic ${!needsDCL ? 'completed' : ''} ${clickClass}"
                 ${toggleAttrs('DDN Classic', !needsDCL)}
                 title="${titleAttr}">${lbl('CL')}${!needsDCL ? check : ''}</span>
@@ -532,6 +534,7 @@ export const PlayersPage = {
     const activeRaidTypes = [];
     if (filter.ghc) activeRaidTypes.push('Hardcore');
     if (filter.gcl) activeRaidTypes.push('Classic');
+    if (filter.dhc) activeRaidTypes.push('DDN Hardcore');
     if (filter.dcl) activeRaidTypes.push('DDN Classic');
     if (filter.dn) activeRaidTypes.push('DDN Normal');
 
@@ -1414,7 +1417,7 @@ export const PlayersPage = {
       <div class="raid-priority-filter mobile-filter">
         <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
         <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
-        <button class="filter-btn ddn disabled" disabled title="Coming soon">D HC</button>
+        <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dn ? 'active' : ''}" data-filter="dn">D N</button>
       </div>
@@ -1441,7 +1444,7 @@ export const PlayersPage = {
               <div class="raid-priority-filter">
                 <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
                 <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
-                <button class="filter-btn ddn disabled" disabled title="Coming soon">D HC</button>
+                <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dn ? 'active' : ''}" data-filter="dn">D N</button>
               </div>
