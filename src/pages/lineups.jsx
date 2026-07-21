@@ -9,14 +9,19 @@ import moment from 'moment';
 import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForRaid } from '../availability.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { lootUiMixin } from '../loot-ui.js';
-import { router } from '../router.js';
 
 export const LineupsPage = {
   ...lootUiMixin,
-  // Re-render the whole showcase card (loot mixin calls this after loot changes)
-  _lootRerender(lineup) {
-    this.renderShowcase(lineup, this.cachedPlayerMap);
+  // Re-render after a loot mixin change — the showcase card for a live lineup, or
+  // the record's card in the Loot Log section for an archived record.
+  _lootRerender(ctx) {
+    if (ctx.isRecord) {
+      this.rerenderLootRecordCard(ctx);
+    } else {
+      this.renderShowcase(ctx, this.cachedPlayerMap);
+    }
   },
+  activeSection: 'lineups', // 'lineups' | 'loot-log'
   currentRaidType: 'DDN Hardcore',
   currentShowcaseLineup: null,
   allLineups: [],
@@ -26,11 +31,15 @@ export const LineupsPage = {
   lineupSubscription: null, // Supabase realtime subscription
   lootSubscription: null, // Supabase realtime subscription for lineup_loot (web ⇄ discord)
   payoutSubscription: null, // Supabase realtime subscription for lineup_payouts (web ⇄ discord)
+  lootRecordSubscription: null, // Supabase realtime subscription for loot_records
   pendingToggleId: null, // Track lineup being toggled by current user to skip self-notification
   pendingDeleteId: null, // Track lineup being archived/deleted by current user to skip self-notification
   lootViewActive: null, // Cleared-card loot view: null = auto (on when loot exists), else explicit
   editingLootId: null, // Loot entry currently being inline-edited (null = none)
   editingForceSold: false, // When opening edit via "Mark sold", pre-check the Sold toggle
+  lootRecords: [], // Loot Log section: archived loot records
+  showSettledLoot: false, // Loot Log filter: hide fully-resolved records by default
+  _lootLogRefreshTimer: null,
 
   /**
    * Escape user-entered text before injecting into innerHTML
@@ -65,45 +74,66 @@ export const LineupsPage = {
   async render(container) {
     container.innerHTML = `
       <div class="lineups-page">
-        <h1>Raid Lineups</h1>
-        <div class="raid-tabs">
-          <button class="tab-button ${this.currentRaidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
-          <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
-          <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
-          <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
-          <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
+        <div class="page-title-tabs">
+          <h1 class="view-tab ${this.activeSection === 'lineups' ? 'active' : ''}" data-section="lineups">Raid Lineups</h1>
+          <span class="title-divider">/</span>
+          <h1 class="view-tab ${this.activeSection === 'loot-log' ? 'active' : ''}" data-section="loot-log">Loot Log</h1>
         </div>
-        <div class="tab-content-wrapper">
-          <div class="showcase-area">
-            <div id="showcase-card-container">
-              <div class="loading">Loading lineup...</div>
-            </div>
+
+        <div id="lineups-section" class="page-section" ${this.activeSection === 'lineups' ? '' : 'hidden'}>
+          <div class="raid-tabs">
+            <button class="tab-button ${this.currentRaidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
+            <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
+            <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
+            <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
+            <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
           </div>
-          <div class="carousel-area">
-            <div class="carousel-header">
-              <h3>Lineups</h3>
-              <label class="show-next-week-toggle">
-                <input type="checkbox" id="show-next-week-checkbox">
-                <span>Show Next Week</span>
-              </label>
-            </div>
-            <div class="carousel-wrapper">
-              <button id="carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
-              <div id="existing-lineups-container" class="existing-lineups-container">
-                <div class="loading">Loading lineups...</div>
+          <div class="tab-content-wrapper">
+            <div class="showcase-area">
+              <div id="showcase-card-container">
+                <div class="loading">Loading lineup...</div>
               </div>
-              <button id="carousel-next" class="carousel-nav-btn carousel-next" aria-label="Scroll right">▶</button>
+            </div>
+            <div class="carousel-area">
+              <div class="carousel-header">
+                <h3>Lineups</h3>
+                <label class="show-next-week-toggle">
+                  <input type="checkbox" id="show-next-week-checkbox">
+                  <span>Show Next Week</span>
+                </label>
+              </div>
+              <div class="carousel-wrapper">
+                <button id="carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
+                <div id="existing-lineups-container" class="existing-lineups-container">
+                  <div class="loading">Loading lineups...</div>
+                </div>
+                <button id="carousel-next" class="carousel-nav-btn carousel-next" aria-label="Scroll right">▶</button>
+              </div>
             </div>
           </div>
+        </div>
+
+        <div id="loot-log-section" class="page-section loot-log-section" ${this.activeSection === 'loot-log' ? '' : 'hidden'}>
+          <div class="loot-log-header">
+            <div class="loot-log-title-row">
+              <button class="btn btn-secondary loot-log-filter" type="button"></button>
+            </div>
+            <p class="loot-log-sub">Loot from cleared raids — finish selling and splitting here. Settled records clear on the next weekly reset.</p>
+          </div>
+          <div id="loot-log-list"><div class="loot-log-loading">Loading loot records…</div></div>
         </div>
       </div>
     `;
 
+    this.setupSectionTabs();
     this.setupTabHandlers();
     this.setupShowcaseSwipeHandlers();
     this.setupCarouselDragScroll();
     this.setupNextWeekToggle();
+    this.setupLootLogFilter();
     this.loadLineups();
+    this.setupSubscriptions();
+    if (this.activeSection === 'loot-log') this.loadLootRecords();
     initChipTooltip();
 
     // Close damage amp tooltips when clicking elsewhere
@@ -120,6 +150,27 @@ export const LineupsPage = {
         this.switchRaidType(raidType);
       });
     });
+  },
+
+  setupSectionTabs() {
+    document.querySelectorAll('.lineups-page .page-title-tabs .view-tab').forEach(btn => {
+      btn.addEventListener('click', () => this.switchSection(btn.dataset.section));
+    });
+  },
+
+  // Toggle between the "Raid Lineups" and "Loot Log" sections of this page.
+  switchSection(section) {
+    if (this.activeSection === section) return;
+    this.activeSection = section;
+
+    document.querySelectorAll('.lineups-page .page-title-tabs .view-tab').forEach(btn =>
+      btn.classList.toggle('active', btn.dataset.section === section));
+    const lineupsEl = document.getElementById('lineups-section');
+    const lootEl = document.getElementById('loot-log-section');
+    if (lineupsEl) lineupsEl.hidden = section !== 'lineups';
+    if (lootEl) lootEl.hidden = section !== 'loot-log';
+
+    if (section === 'loot-log') this.loadLootRecords();
   },
 
   setupNextWeekToggle() {
@@ -331,11 +382,6 @@ export const LineupsPage = {
       this.renderShowcase(this.currentShowcaseLineup, this.cachedPlayerMap);
       this.renderCarousel(this.cachedPlayerMap);
       this.setupCarouselHandlers();
-
-      // Setup realtime subscriptions (only once)
-      this.setupRealtimeSubscription();
-      this.setupLootSubscription();
-      this.setupPayoutSubscription();
     } catch (error) {
       showcaseContainer.innerHTML = `<div class="error">Error loading lineups: ${error.message}</div>`;
       carouselContainer.innerHTML = '';
@@ -511,8 +557,11 @@ export const LineupsPage = {
     `;
 
     initFixedTooltip();
-    this.setupLootHandlers(lineup);
-    this.setupPayoutHandlers(lineup);
+    // Scope to the showcase card so we don't grab a Loot Log card's .lineup-loot
+    // (both sections live in the DOM at once).
+    const showcaseRoot = document.getElementById('showcase-card-container') || document;
+    this.setupLootHandlers(lineup, showcaseRoot);
+    this.setupPayoutHandlers(lineup, showcaseRoot);
 
     // Loot view toggle (available to anyone who can see the Loot button)
     const lootToggleBtn = showcaseContainer.querySelector('.btn-loot-toggle');
@@ -927,7 +976,7 @@ export const LineupsPage = {
       toast.showWithAction(
         `Archived ${lineup.name} to the Loot Log.`,
         'Open Loot Log',
-        () => router.navigate('loot-log'),
+        () => this.switchSection('loot-log'),
         'success'
       );
       await this.loadLineups();
@@ -1033,6 +1082,15 @@ export const LineupsPage = {
     });
   },
 
+  // Set up all realtime subscriptions once (each guards against re-subscribing).
+  // Not gated on lineups existing, so the Loot Log section stays live too.
+  setupSubscriptions() {
+    this.setupRealtimeSubscription();
+    this.setupLootSubscription();
+    this.setupPayoutSubscription();
+    this.setupLootRecordSubscription();
+  },
+
   /**
    * Setup realtime subscription for lineup changes
    */
@@ -1076,8 +1134,18 @@ export const LineupsPage = {
 
     this.lootSubscription = dataService.subscribeToLineupLoot((payload) => {
       const changedLineupId = payload.new?.lineup_id || payload.old?.lineup_id;
+      const changedRecordId = payload.new?.record_id || payload.old?.record_id;
       if (changedLineupId) this.refreshLineupLoot(changedLineupId);
+      // Loot on an archived record (or moved off a lineup) → refresh the Loot Log.
+      if (changedRecordId || !changedLineupId) this.scheduleLootLogRefresh();
     });
+  },
+
+  // Subscribe to loot_records changes (e.g. the bot marking a thread closed, or a
+  // record created/deleted by the weekly cleanup or another user).
+  setupLootRecordSubscription() {
+    if (this.lootRecordSubscription) return;
+    this.lootRecordSubscription = dataService.subscribeToLootRecords(() => this.scheduleLootLogRefresh());
   },
 
   /**
@@ -1112,7 +1180,9 @@ export const LineupsPage = {
 
     this.payoutSubscription = dataService.subscribeToLineupPayouts((payload) => {
       const changedLineupId = payload.new?.lineup_id || payload.old?.lineup_id;
+      const changedRecordId = payload.new?.record_id || payload.old?.record_id;
       if (changedLineupId) this.refreshLineupPayouts(changedLineupId);
+      if (changedRecordId || !changedLineupId) this.scheduleLootLogRefresh();
     });
   },
 
@@ -1151,5 +1221,157 @@ export const LineupsPage = {
       dataService.unsubscribe(this.payoutSubscription);
       this.payoutSubscription = null;
     }
+    if (this.lootRecordSubscription) {
+      dataService.unsubscribe(this.lootRecordSubscription);
+      this.lootRecordSubscription = null;
+    }
+    clearTimeout(this._lootLogRefreshTimer);
+  },
+
+  // ============================================
+  // LOOT LOG SECTION (archived loot records)
+  // ============================================
+
+  async loadLootRecords() {
+    try {
+      const [records, players] = await Promise.all([
+        dataService.getLootRecords(),
+        this.cachedPlayerMap ? Promise.resolve(null) : dataService.getPlayers(),
+      ]);
+      this.lootRecords = records;
+      if (players) this.cachedPlayerMap = new Map(players.map(p => [p.name, p]));
+      this.renderLootLogList();
+    } catch (err) {
+      console.error('[loot-log] load failed:', err);
+      const list = document.getElementById('loot-log-list');
+      if (list) list.innerHTML = `<div class="empty-state">Failed to load loot records.</div>`;
+    }
+  },
+
+  // Reload + re-render the Loot Log (debounced; skipped mid-edit).
+  scheduleLootLogRefresh() {
+    if (this.editingLootId) return;
+    clearTimeout(this._lootLogRefreshTimer);
+    this._lootLogRefreshTimer = setTimeout(() => {
+      if (this.activeSection === 'loot-log') this.loadLootRecords();
+    }, 300);
+  },
+
+  // A record is fully resolved when it has loot, every item is sold, and every
+  // roster member has received their share. (Mirrors loot_record_is_resolved SQL.)
+  isLootRecordResolved(record) {
+    const loot = record.loot || [];
+    if (loot.length === 0) return false;
+    if (loot.some(l => !l.sold)) return false;
+    const received = new Set((record.payouts || []).map(p => p.memberName));
+    const members = this.getPartyMemberNames(record);
+    return members.length > 0 && members.every(n => received.has(n));
+  },
+
+  setupLootLogFilter() {
+    const btn = this.getPageEl()?.querySelector('.loot-log-filter');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        this.showSettledLoot = !this.showSettledLoot;
+        this.renderLootLogList();
+      });
+    }
+  },
+
+  renderLootLogList() {
+    const list = document.getElementById('loot-log-list');
+    if (!list) return;
+    const canManage = authService.canEditLineups();
+
+    const unsettled = this.lootRecords.filter(r => !this.isLootRecordResolved(r));
+    const settledCount = this.lootRecords.length - unsettled.length;
+    const shown = this.showSettledLoot ? this.lootRecords : unsettled;
+
+    const filterBtn = this.getPageEl()?.querySelector('.loot-log-filter');
+    if (filterBtn) {
+      filterBtn.textContent = this.showSettledLoot ? `Hide settled (${settledCount})` : `Show settled (${settledCount})`;
+      filterBtn.style.display = settledCount > 0 ? '' : 'none';
+    }
+
+    if (shown.length === 0) {
+      list.innerHTML = `<div class="empty-state">${
+        this.lootRecords.length === 0
+          ? 'No loot records yet. Cleared raids with loot appear here after they\'re archived.'
+          : 'No unsettled loot — everything\'s sold and split. 🎉'
+      }</div>`;
+      return;
+    }
+
+    list.innerHTML = shown.map(r => this.renderLootRecordCard(r, canManage)).join('');
+    shown.forEach(r => this.wireLootRecordCard(r));
+  },
+
+  renderLootRecordCard(record, canManage) {
+    return `
+      <div class="loot-record-card ${this.isLootRecordResolved(record) ? 'resolved' : ''}" data-record-id="${record.id}">
+        ${this.renderLootRecordInner(record, canManage)}
+      </div>
+    `;
+  },
+
+  renderLootRecordInner(record, canManage) {
+    const resolved = this.isLootRecordResolved(record);
+    const roster = this.getPartyMemberNames(record);
+    const cleared = record.clearedAt ? moment(record.clearedAt) : null;
+    return `
+      <div class="loot-record-head">
+        <div class="loot-record-heading">
+          <span class="loot-record-name">${this.escapeHtml(record.name || 'Lineup')}</span>
+          ${record.raidType ? `<span class="loot-record-raid">${this.escapeHtml(formatRaidTypeLabel(record.raidType))}</span>` : ''}
+          ${resolved ? '<span class="loot-record-badge">Settled</span>' : ''}
+        </div>
+        <div class="loot-record-meta">
+          ${cleared ? `<span class="loot-record-date" title="${cleared.format('ddd, MMM D, YYYY h:mm A')}">cleared ${cleared.fromNow()}</span>` : ''}
+          ${canManage ? `<button class="loot-icon-btn loot-record-delete" title="Delete this record">🗑</button>` : ''}
+        </div>
+      </div>
+      ${roster.length ? `<div class="loot-record-roster">${roster.map(n => `<span class="loot-record-member">${this.escapeHtml(n)}</span>`).join('')}</div>` : ''}
+      ${this.renderLootSection(record, canManage)}
+    `;
+  },
+
+  wireLootRecordCard(record) {
+    const card = this.getPageEl()?.querySelector(`.loot-record-card[data-record-id="${record.id}"]`);
+    if (!card) return;
+
+    this.setupLootHandlers(record, card);
+    this.setupPayoutHandlers(record, card);
+
+    const delBtn = card.querySelector('.loot-record-delete');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        const confirmed = await modal.confirm(
+          `Delete the entire loot record for <strong>${this.escapeHtml(record.name || 'this lineup')}</strong>? This removes all its items and share tracking.`,
+          { title: 'Delete Loot Record', confirmText: 'Delete', cancelText: 'Cancel' }
+        );
+        if (!confirmed) return;
+        try {
+          await dataService.deleteLootRecord(record.id);
+          this.lootRecords = this.lootRecords.filter(r => r.id !== record.id);
+          this.renderLootLogList();
+          toast.success('Loot record deleted');
+        } catch (err) {
+          toast.error(err.message || 'Failed to delete record');
+        }
+      });
+    }
+  },
+
+  // Re-render one record's card in place (called by the loot mixin after a change).
+  rerenderLootRecordCard(record) {
+    const card = this.getPageEl()?.querySelector(`.loot-record-card[data-record-id="${record.id}"]`);
+    if (!card) { this.renderLootLogList(); return; }
+    card.className = `loot-record-card ${this.isLootRecordResolved(record) ? 'resolved' : ''}`;
+    card.innerHTML = this.renderLootRecordInner(record, authService.canEditLineups());
+    this.wireLootRecordCard(record);
+  },
+
+  getPageEl() {
+    return document.querySelector('.lineups-page');
   }
 };

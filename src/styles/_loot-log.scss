@@ -10,10 +10,19 @@
 $loot-gold: rgba(244, 196, 48, 1);
 $loot-green: rgba(76, 209, 106, 1);
 
-.loot-log-page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+// ---- top-level section switcher (Raid Lineups | Loot Log) --------------------
+// The tabs reuse the shared `.page-title-tabs` / `h1.view-tab` component (defined
+// in _players.scss) so they match the Characters page exactly.
+.lineups-page {
+  .page-title-tabs {
+    margin-bottom: 1rem;
+  }
+
+  .page-section[hidden] { display: none; }
+}
+
+.loot-log-section {
+  padding: 0.5rem 0 2rem;
 
   .loot-log-header {
     margin-bottom: 1.25rem;
@@ -21,15 +30,9 @@ $loot-green: rgba(76, 209, 106, 1);
     .loot-log-title-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: 1rem;
       flex-wrap: wrap;
-
-      h1 {
-        margin: 0;
-        font-size: 1.6rem;
-        color: rgba(255, 255, 255, 0.92);
-      }
     }
 
     .loot-log-sub {
@@ -457,7 +460,7 @@ $loot-green: rgba(76, 209, 106, 1);
 }
 
 @media (max-width: 768px) {
-  .loot-log-page #loot-log-list {
+  .loot-log-section #loot-log-list {
     grid-template-columns: 1fr;
   }
 }
