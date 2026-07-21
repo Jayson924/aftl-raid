@@ -920,6 +920,25 @@ class DataService {
     return { success: true, completed: newCompleted };
   }
 
+  /**
+   * Set a lineup's "Next Week" flag (is_template) — a lightweight single-column
+   * update used by the "Keep for next week" toggle on cleared cards. A kept
+   * lineup survives the Friday cleanup; its cleared status is reset then so it's
+   * runnable again next week (see weekly-cleanup-cron.sql).
+   */
+  async setLineupNextWeek(lineupId, value) {
+    if (!this.canEditLineups()) throw new Error('You do not have permission to edit lineups');
+    if (!lineupId) throw new Error('lineupId is required');
+
+    const { error } = await supabase
+      .from('lineups')
+      .update({ is_template: !!value })
+      .eq('id', lineupId);
+
+    if (error) throw error;
+    return { success: true, isNextWeek: !!value };
+  }
+
   // ============================================
   // LINEUP LOOT (per-lineup item + gold log)
   // ============================================

@@ -443,7 +443,8 @@ export const LineupsPage = {
             </select>
           ` : ''}
           ${isCleared && (lootCount > 0 || canManage) ? `<button class="btn btn-secondary btn-loot-toggle ${lootViewActive ? 'active' : ''}" data-lineup-id="${lineup.id}"><img src="/icons/scales.svg" alt="" class="btn-loot-icon">${lootViewActive ? 'Hide Loot' : `Loot${lootCount > 0 ? ` (${lootCount})` : ''}`}</button>` : ''}
-          ${isCleared && canManage && lootCount > 0 && !lineup.isStatic ? `<button class="btn btn-secondary btn-archive-loot" data-lineup-id="${lineup.id}" title="Free the members for new teams and move this loot to the Loot Log">Archive</button>` : ''}
+          ${isCleared && canManage && !lineup.isStatic ? `<button class="btn btn-secondary btn-keep-week ${lineup.isNextWeek ? 'active' : ''}" data-lineup-id="${lineup.id}" data-tooltip-fixed="${lineup.isNextWeek ? 'Kept for next week. Click to stop keeping' : 'Keep for next week. Survives the reset, runnable again'}"><img src="/icons/calendarclock.svg" alt="" class="btn-loot-icon">${lineup.isNextWeek ? 'Keeping ✓' : 'Keep'}</button>` : ''}
+          ${isCleared && canManage && lootCount > 0 && !lineup.isStatic ? `<button class="btn btn-secondary btn-archive-loot" data-lineup-id="${lineup.id}" data-tooltip-fixed="Move loot to the Loot Log and free the members"><img src="/icons/archive.svg" alt="" class="btn-loot-icon">Archive</button>` : ''}
           ${canManage && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">
@@ -605,6 +606,15 @@ export const LineupsPage = {
         });
       }
 
+      // Keep for next week: flag the team to survive the weekly reset (uncleared).
+      const keepBtn = showcaseContainer.querySelector('.btn-keep-week');
+      if (keepBtn) {
+        keepBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await this.handleKeepClick(keepBtn.dataset.lineupId);
+        });
+      }
+
       // Add handler for raid type reassign dropdown (Unspecified tab only)
       const reassignSelect = showcaseContainer.querySelector('.raid-type-reassign');
       if (reassignSelect) {
@@ -691,10 +701,11 @@ export const LineupsPage = {
   renderCarousel(playerMap) {
     const carouselContainer = document.getElementById('existing-lineups-container');
 
-    // Filter next-week lineups based on toggle
+    // Hide pure "Next Week" plans by default, but keep already-cleared teams that
+    // were flagged "Keep for next week" visible — they're this week's teams.
     const lineupsToShow = this.showNextWeek
       ? this.allLineups
-      : this.allLineups.filter(l => !l.isNextWeek);
+      : this.allLineups.filter(l => !l.isNextWeek || l.completed);
 
     if (lineupsToShow.length === 0) {
       carouselContainer.innerHTML = `<div class="empty-state">No lineups to show</div>`;
@@ -983,6 +994,47 @@ export const LineupsPage = {
     } catch (error) {
       this.pendingDeleteId = null;
       toast.error(`Failed to archive: ${error.message}`);
+    }
+  },
+
+  /**
+   * Toggle "Keep for next week" on a cleared team. Flags it Next Week
+   * (is_template) so it survives the Friday reset; the cleanup then resets its
+   * cleared status so it's runnable again. Optimistic + lightweight update.
+   */
+  async handleKeepClick(lineupId) {
+    const lineup = this.allLineups.find(l => l.id === lineupId);
+    if (!lineup) {
+      toast.error('Lineup not found');
+      return;
+    }
+
+    const next = !lineup.isNextWeek;
+    // Optimistic update + skip the self-notification from the realtime UPDATE
+    lineup.isNextWeek = next;
+    this.pendingToggleId = lineup.id;
+    if (this.currentShowcaseLineup?.id === lineupId) this.currentShowcaseLineup.isNextWeek = next;
+    this.renderShowcase(lineup, this.cachedPlayerMap);
+    this.renderCarousel(this.cachedPlayerMap);
+    this.setupCarouselHandlers();
+
+    try {
+      await dataService.setLineupNextWeek(lineup.id, next);
+      setTimeout(() => {
+        if (this.pendingToggleId === lineup.id) this.pendingToggleId = null;
+      }, 2000);
+      toast.success(next
+        ? `${lineup.name} will be kept for next week.`
+        : `${lineup.name} will no longer be kept.`);
+    } catch (err) {
+      // Revert on failure
+      lineup.isNextWeek = !next;
+      if (this.currentShowcaseLineup?.id === lineupId) this.currentShowcaseLineup.isNextWeek = !next;
+      this.pendingToggleId = null;
+      this.renderShowcase(lineup, this.cachedPlayerMap);
+      this.renderCarousel(this.cachedPlayerMap);
+      this.setupCarouselHandlers();
+      toast.error(err.message || 'Failed to update');
     }
   },
 

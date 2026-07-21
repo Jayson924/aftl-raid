@@ -692,27 +692,44 @@
       }
     }
 
-    .btn-loot-toggle {
+    // Cleared-card header actions — keep the trio (Loot / Keep / Archive) uniform:
+    // same compact size, same secondary background, icons aligned. Only the active
+    // (toggled-on) states differ in colour.
+    .btn-loot-toggle,
+    .btn-keep-week,
+    .btn-archive-loot {
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
       padding: 0.5rem 0.9rem;
       font-size: 0.9rem;
+      line-height: 1.2;
 
       .btn-loot-icon {
         width: 15px;
         height: 15px;
         filter: brightness(0) invert(1);
       }
+    }
 
-      &.active {
-        background-color: rgba(76, 209, 106, 0.2);
-        color: #6fe08a;
+    .btn-loot-toggle.active {
+      background-color: rgba(76, 209, 106, 0.2);
+      color: #6fe08a;
 
-        .btn-loot-icon {
-          filter: brightness(0) saturate(100%) invert(72%) sepia(40%) saturate(500%) hue-rotate(80deg) brightness(95%) contrast(90%);
-        }
+      .btn-loot-icon {
+        filter: brightness(0) saturate(100%) invert(72%) sepia(40%) saturate(500%) hue-rotate(80deg) brightness(95%) contrast(90%);
+      }
+    }
+
+    // "Keep for next week" toggle — blue when active, matching the Next Week theme.
+    .btn-keep-week.active {
+      background-color: rgba(150, 184, 255, 0.2);
+      color: #aecbff;
+      border-color: rgba(150, 184, 255, 0.4);
+
+      .btn-loot-icon {
+        filter: brightness(0) saturate(100%) invert(75%) sepia(30%) saturate(700%) hue-rotate(190deg) brightness(100%) contrast(95%);
       }
     }
 
