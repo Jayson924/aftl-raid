@@ -397,7 +397,7 @@ export const LineupsPage = {
             </select>
           ` : ''}
           ${isCleared && (lootCount > 0 || canManage) ? `<button class="btn btn-secondary btn-loot-toggle ${lootViewActive ? 'active' : ''}" data-lineup-id="${lineup.id}"><img src="/icons/scales.svg" alt="" class="btn-loot-icon">${lootViewActive ? 'Hide Loot' : `Loot${lootCount > 0 ? ` (${lootCount})` : ''}`}</button>` : ''}
-          ${isCleared && canManage && lootCount > 0 ? `<button class="btn btn-secondary btn-archive-loot" data-lineup-id="${lineup.id}" title="Free the members for new teams and move this loot to the Loot Log">Archive</button>` : ''}
+          ${isCleared && canManage && lootCount > 0 && !lineup.isStatic ? `<button class="btn btn-secondary btn-archive-loot" data-lineup-id="${lineup.id}" title="Free the members for new teams and move this loot to the Loot Log">Archive</button>` : ''}
           ${canManage && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">
@@ -899,6 +899,12 @@ export const LineupsPage = {
     const lineup = this.allLineups.find(l => l.id === lineupId);
     if (!lineup) {
       toast.error('Lineup not found');
+      return;
+    }
+    // Static teams are permanent — never delete them via Archive. Their loot is
+    // rolled into the Loot Log automatically by the weekly cleanup (lineup kept).
+    if (lineup.isStatic) {
+      toast.error('Static teams archive their loot automatically each week — they aren\'t deleted.');
       return;
     }
 
