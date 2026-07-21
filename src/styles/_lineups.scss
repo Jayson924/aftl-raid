@@ -823,10 +823,15 @@
           flex-direction: column;
         }
 
-        // Add form pinned at the top (under the header); items scroll below it
+        // Add form + share tracker pinned at the top (under the header);
+        // the items list scrolls below them.
         .loot-add-form {
           flex-shrink: 0;
           margin-bottom: 0.6rem;
+        }
+
+        .loot-payouts {
+          flex-shrink: 0;
         }
 
         .loot-groups,
@@ -1051,6 +1056,114 @@
         height: 12px;
         flex-shrink: 0;
         filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+      }
+
+      // "Gold shares received" tracker — a chip per party member.
+      .loot-payouts {
+        margin-bottom: 0.75rem;
+        padding: 0.5rem;
+        border: 1px solid rgba(244, 196, 48, 0.18);
+        border-radius: 6px;
+        background: rgba(244, 196, 48, 0.05);
+
+        .loot-payouts-head {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
+
+          .loot-payouts-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+          }
+
+          .loot-payouts-count {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.05rem 0.4rem;
+            border-radius: 9px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+
+            &.all-paid {
+              background-color: rgba(76, 209, 106, 0.18);
+              color: #6fe08a;
+            }
+          }
+        }
+
+        .loot-payouts-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.35rem;
+        }
+
+        .loot-payout-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.2rem 0.5rem;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.04);
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.75rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+          .loot-payout-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 13px;
+            height: 13px;
+            border: 1.5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            font-size: 0.6rem;
+            line-height: 1;
+            color: transparent;
+          }
+
+          .loot-payout-you {
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 0.02rem 0.28rem;
+            border-radius: 6px;
+            background-color: rgba(150, 184, 255, 0.2);
+            color: rgba(180, 205, 255, 0.95);
+          }
+
+          &:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.09);
+            border-color: rgba(255, 255, 255, 0.25);
+          }
+
+          &.received {
+            background: rgba(76, 209, 106, 0.14);
+            border-color: rgba(76, 209, 106, 0.45);
+            color: #a9e9ba;
+
+            .loot-payout-check {
+              border-color: #6fe08a;
+              background-color: rgba(76, 209, 106, 0.85);
+              color: #0d1f14;
+            }
+
+            &:hover:not(:disabled) {
+              background: rgba(76, 209, 106, 0.2);
+            }
+          }
+
+          &.locked,
+          &:disabled {
+            cursor: default;
+            opacity: 0.75;
+          }
+        }
       }
 
       .loot-groups {

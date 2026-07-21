@@ -698,7 +698,7 @@ class DataService {
     }
 
     // Transform to match old format
-    return data.map(lineup => {
+    const result = data.map(lineup => {
       const players = Array(8).fill('');
       const ticketPlayers = Array(8).fill(false);
       const pilotPlayers = Array(8).fill('');
@@ -740,9 +740,31 @@ class DataService {
         players,
         ticketPlayers,
         pilotPlayers,
-        loot
+        loot,
+        payouts: []
       };
     });
+
+    // Attach gold-share payouts via a SEPARATE query (not a nested embed) so a
+    // missing lineup_payouts table (before the migration is applied) degrades to
+    // empty payouts instead of erroring the whole lineups fetch.
+    const { data: payoutRows, error: payoutErr } = await supabase
+      .from('lineup_payouts')
+      .select('lineup_id, member_name, discord_id, source');
+    if (!payoutErr && payoutRows) {
+      const byLineup = new Map();
+      for (const p of payoutRows) {
+        if (!byLineup.has(p.lineup_id)) byLineup.set(p.lineup_id, []);
+        byLineup.get(p.lineup_id).push({
+          memberName: p.member_name,
+          discordId: p.discord_id || null,
+          source: p.source || 'web'
+        });
+      }
+      for (const l of result) l.payouts = byLineup.get(l.id) || [];
+    }
+
+    return result;
   }
 
   async addLineup(lineup) {
@@ -933,35 +955,41 @@ class DataService {
   }
 
   // New loot starts unsold (no gold yet); price is set later when it sells.
-  async addLineupLoot(lineupId, item, heldBy = '') {
+  // `parent` is { lineupId } for a live lineup or { recordId } for an archived
+  // loot record (see loot-records.sql). Exactly one is set.
+  async _insertLoot(parent, item, heldBy = '') {
     if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
-    if (!lineupId) throw new Error('lineupId is required');
+    const col = parent.recordId ? 'record_id' : 'lineup_id';
+    const parentId = parent.recordId || parent.lineupId;
+    if (!parentId) throw new Error('a lineupId or recordId is required');
 
     const trimmed = (item || '').trim();
     if (!trimmed) throw new Error('Item name cannot be empty');
 
-    // Append after the current last entry for this lineup
+    // Append after the current last entry for this parent
     const { data: existing } = await supabase
       .from('lineup_loot')
       .select('sort_order')
-      .eq('lineup_id', lineupId)
+      .eq(col, parentId)
       .order('sort_order', { ascending: false })
       .limit(1);
 
     const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
 
+    const row = {
+      item: trimmed,
+      sold: false,
+      price: 0,
+      sort_order: nextOrder,
+      held_by: (heldBy || '').trim() || null,
+      source: 'web',
+      created_by: this._user?.id || null
+    };
+    row[col] = parentId;
+
     const { data, error } = await supabase
       .from('lineup_loot')
-      .insert({
-        lineup_id: lineupId,
-        item: trimmed,
-        sold: false,
-        price: 0,
-        sort_order: nextOrder,
-        held_by: (heldBy || '').trim() || null,
-        source: 'web',
-        created_by: this._user?.id || null
-      })
+      .insert(row)
       .select('id, item, sold, price, sort_order, held_by, source')
       .single();
 
@@ -975,6 +1003,17 @@ class DataService {
       heldBy: data.held_by || '',
       source: data.source || 'web'
     };
+  }
+
+  async addLineupLoot(lineupId, item, heldBy = '') {
+    if (!lineupId) throw new Error('lineupId is required');
+    return this._insertLoot({ lineupId }, item, heldBy);
+  }
+
+  // Add an item to an archived loot record (Loot Log page).
+  async addLootRecordItem(recordId, item, heldBy = '') {
+    if (!recordId) throw new Error('recordId is required');
+    return this._insertLoot({ recordId }, item, heldBy);
   }
 
   async updateLineupLoot(lootId, updates) {
@@ -1020,6 +1059,239 @@ class DataService {
 
     if (error) throw error;
     return { success: true };
+  }
+
+  // ============================================
+  // LINEUP PAYOUTS (who's received their gold share)
+  // ============================================
+
+  /**
+   * Fetch which party members have confirmed receiving their gold share, for a
+   * single lineup. Returns [{ memberName, discordId, source }]. [] on error.
+   */
+  async getLineupPayouts(lineupId) {
+    if (!lineupId) return [];
+
+    const { data, error } = await supabase
+      .from('lineup_payouts')
+      .select('member_name, discord_id, source')
+      .eq('lineup_id', lineupId);
+
+    if (error) {
+      console.error('Error fetching lineup payouts:', error);
+      return [];
+    }
+
+    return (data || []).map(p => ({
+      memberName: p.member_name,
+      discordId: p.discord_id || null,
+      source: p.source || 'web'
+    }));
+  }
+
+  /**
+   * A member may mark their OWN share received; editors/admins may mark anyone.
+   * `ownerDiscordId` is the Discord id owning `memberName` (from the roster);
+   * pass null for guests/unowned (then only editors are allowed). Verified
+   * server-side against the players table for non-editors so it can't be spoofed.
+   */
+  async _canMarkShare(memberName, ownerDiscordId) {
+    if (this.canEditLineups()) return true;
+    const me = this._user?.id;
+    if (!me) return false;
+    // Trust, but verify: the character must actually be owned by the caller.
+    if (ownerDiscordId && ownerDiscordId === me) {
+      const { data } = await supabase
+        .from('players')
+        .select('discord_id')
+        .eq('name', memberName)
+        .limit(1);
+      if (data?.[0]?.discord_id === me) return true;
+    }
+    return false;
+  }
+
+  // `parent` is { lineupId } for a live lineup or { recordId } for an archived
+  // loot record. The unique index used as the upsert arbiter differs accordingly.
+  async _markShare(parent, memberName, ownerDiscordId = null) {
+    const col = parent.recordId ? 'record_id' : 'lineup_id';
+    const parentId = parent.recordId || parent.lineupId;
+    if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
+    if (!(await this._canMarkShare(memberName, ownerDiscordId))) {
+      throw new Error('You can only mark your own share received');
+    }
+
+    const row = {
+      member_name: memberName,
+      discord_id: ownerDiscordId || null,
+      source: 'web',
+      created_by: this._user?.id || null,
+      received_at: new Date().toISOString()
+    };
+    row[col] = parentId;
+
+    const { error } = await supabase
+      .from('lineup_payouts')
+      .upsert(row, { onConflict: `${col},member_name` });
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async _unmarkShare(parent, memberName, ownerDiscordId = null) {
+    const col = parent.recordId ? 'record_id' : 'lineup_id';
+    const parentId = parent.recordId || parent.lineupId;
+    if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
+    if (!(await this._canMarkShare(memberName, ownerDiscordId))) {
+      throw new Error('You can only mark your own share received');
+    }
+
+    const { error } = await supabase
+      .from('lineup_payouts')
+      .delete()
+      .eq(col, parentId)
+      .eq('member_name', memberName);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async markShareReceived(lineupId, memberName, ownerDiscordId = null) {
+    return this._markShare({ lineupId }, memberName, ownerDiscordId);
+  }
+
+  async unmarkShareReceived(lineupId, memberName, ownerDiscordId = null) {
+    return this._unmarkShare({ lineupId }, memberName, ownerDiscordId);
+  }
+
+  // Loot Log (archived record) variants.
+  async markRecordShareReceived(recordId, memberName, ownerDiscordId = null) {
+    return this._markShare({ recordId }, memberName, ownerDiscordId);
+  }
+
+  async unmarkRecordShareReceived(recordId, memberName, ownerDiscordId = null) {
+    return this._unmarkShare({ recordId }, memberName, ownerDiscordId);
+  }
+
+  // ============================================
+  // LOOT RECORDS (persistent loot that outlives its lineup — /loot-log page)
+  // ============================================
+
+  /**
+   * Archive a lineup's loot into a standalone loot record and delete the lineup
+   * (freeing its members for new teams). The loot + payout rows are moved onto the
+   * record so they survive. Atomic (Postgres fn). Returns the new record id.
+   */
+  async archiveLineupLoot(lineupId) {
+    if (!this.canEditLineups()) throw new Error('You do not have permission to archive loot');
+    if (!lineupId) throw new Error('lineupId is required');
+
+    const { data, error } = await supabase
+      .rpc('archive_lineup_to_loot_record', { p_lineup_id: lineupId });
+
+    if (error) throw error;
+    return data; // new loot_records.id
+  }
+
+  /**
+   * Fetch all loot records (newest first), each shaped like a lineup so the loot
+   * UI helpers work: `players`/`roster` = frozen member names, plus `loot` and
+   * `payouts` arrays. Payouts come via a SEPARATE query so a pre-migration DB
+   * degrades to empty instead of erroring. Returns [] on error.
+   */
+  async getLootRecords() {
+    const { data, error } = await supabase
+      .from('loot_records')
+      .select(`
+        id, lineup_name, raid_type, roster, raid_time, cleared_at,
+        loot_thread_id, loot_message_id, payout_message_id, loot_close_at, loot_closed,
+        lineup_loot ( id, item, sold, price, sort_order, held_by, source )
+      `)
+      .order('cleared_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching loot records:', error);
+      return [];
+    }
+
+    const result = (data || []).map(r => {
+      const roster = Array.isArray(r.roster) ? r.roster : [];
+      const loot = (r.lineup_loot || [])
+        .map(l => ({
+          id: l.id,
+          item: l.item,
+          sold: l.sold === true,
+          price: Number(l.price) || 0,
+          sortOrder: l.sort_order ?? 0,
+          heldBy: l.held_by || '',
+          source: l.source || 'web'
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+      return {
+        id: r.id,
+        name: r.lineup_name,
+        raidType: r.raid_type,
+        roster,
+        players: roster,             // loot helpers read `players` for the roster
+        raidTime: r.raid_time || null,
+        clearedAt: r.cleared_at || null,
+        threadId: r.loot_thread_id || null,
+        lootClosed: r.loot_closed === true,
+        loot,
+        payouts: [],
+        isRecord: true
+      };
+    });
+
+    // Attach payouts via a separate query (degrade-safe), keyed by record_id.
+    const { data: payoutRows, error: payoutErr } = await supabase
+      .from('lineup_payouts')
+      .select('record_id, member_name, discord_id, source')
+      .not('record_id', 'is', null);
+    if (!payoutErr && payoutRows) {
+      const byRecord = new Map();
+      for (const p of payoutRows) {
+        if (!byRecord.has(p.record_id)) byRecord.set(p.record_id, []);
+        byRecord.get(p.record_id).push({
+          memberName: p.member_name,
+          discordId: p.discord_id || null,
+          source: p.source || 'web'
+        });
+      }
+      for (const rec of result) rec.payouts = byRecord.get(rec.id) || [];
+    }
+
+    return result;
+  }
+
+  /**
+   * Permanently delete a loot record and its loot + payout rows (ON DELETE CASCADE).
+   */
+  async deleteLootRecord(recordId) {
+    if (!this.canEditLineups()) throw new Error('You do not have permission to delete loot records');
+    if (!recordId) throw new Error('recordId is required');
+
+    const { error } = await supabase
+      .from('loot_records')
+      .delete()
+      .eq('id', recordId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
+   * Subscribe to loot_records changes (e.g. bot marks a thread closed). Loot-row
+   * and payout-row changes on records also fire via subscribeToLineupLoot /
+   * subscribeToLineupPayouts (those listen table-wide).
+   */
+  subscribeToLootRecords(callback) {
+    const subscription = supabase
+      .channel('loot-records-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loot_records' }, callback)
+      .subscribe();
+    return subscription;
   }
 
   // ============================================
@@ -1786,6 +2058,18 @@ class DataService {
     return supabase
       .channel('lineup-loot-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lineup_loot' }, callback)
+      .subscribe();
+  }
+
+  /**
+   * Subscribe to lineup_payouts changes (gold shares marked received on the site
+   * or via a Discord ✅ reaction). Payload's new/old row carries `lineup_id`.
+   * Requires lineup_payouts in the supabase_realtime publication (lineup-payouts.sql).
+   */
+  subscribeToLineupPayouts(callback) {
+    return supabase
+      .channel('lineup-payouts-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lineup_payouts' }, callback)
       .subscribe();
   }
 

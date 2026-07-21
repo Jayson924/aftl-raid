@@ -6,6 +6,7 @@ import { LineupEditorPage } from './pages/lineup-editor.jsx'
 import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
+import { LootLogPage } from './pages/loot-log.jsx'
 // Parked with its route below — see the note in the route registrations.
 // import { RecruitingPage } from './pages/recruiting.jsx'
 import { EnhanceRacePage } from './pages/enhance-race.jsx'
@@ -80,6 +81,7 @@ async function initApp() {
   router.register('enhancement', EnhancementPage); // No auth required
   router.register('lavish', SpendingGuidePage); // Public - no auth required
   router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
+  router.register('loot-log', LootLogPage, 'guildmate'); // Guildmates and admins only
   // Recruiting is parked — page kept for possible future use, but not routable
   // here. Re-activate by uncommenting this line (and its import above). The
   // standalone recruiting site (recruit.html / vite.config.recruit.js) is a
@@ -119,7 +121,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.5.01</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.5.02</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -128,6 +130,9 @@ function renderNavigation() {
       <ul class="nav-links" id="nav-links">
         ${isPlayer ? `
           <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
+        ` : ''}
+        ${isPlayer ? `
+          <li><a href="#" class="nav-link" data-route="loot-log">Loot Log</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
         ${isPlayer ? `
