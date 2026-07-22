@@ -26,10 +26,17 @@ export const lootUiMixin = {
       ? dataService.addLootRecordItem(ctx.id, item, heldBy)
       : dataService.addLineupLoot(ctx.id, item, heldBy);
   },
-  _lootMarkShare(ctx, member, owner) {
+  _lootMarkShare(ctx, member, owner, amount) {
     return ctx.isRecord
-      ? dataService.markRecordShareReceived(ctx.id, member, owner)
-      : dataService.markShareReceived(ctx.id, member, owner);
+      ? dataService.markRecordShareReceived(ctx.id, member, owner, amount)
+      : dataService.markShareReceived(ctx.id, member, owner, amount);
+  },
+
+  // Current per-person payout for a lineup/record: sold gold ÷ party size.
+  _payoutEach(ctx) {
+    const total = (ctx.loot || []).reduce((s, l) => s + (l.sold ? (Number(l.price) || 0) : 0), 0);
+    const partySize = this.getPartyMemberNames(ctx).length;
+    return partySize > 0 ? Math.floor(total / partySize) : 0;
   },
   _lootUnmarkShare(ctx, member, owner) {
     return ctx.isRecord
@@ -155,39 +162,71 @@ export const lootUiMixin = {
    * toggle their OWN character's chip; editors/admins can toggle anyone's. Chips
    * reflect the shared lineup_payouts table (also driven by Discord ✅ reactions).
    */
-  renderPayoutTracker(ctx, canManage) {
+  renderPayoutTracker(ctx, canManage, payoutEach = 0) {
     const members = this.getPartyMemberNames(ctx);
     if (members.length === 0) return '';
 
-    const receivedSet = new Set((ctx.payouts || []).map(p => p.memberName));
+    const payoutMap = new Map((ctx.payouts || []).map(p => [p.memberName, p]));
     const playerMap = this.cachedPlayerMap;
     const currentUserId = dataService.getUser()?.id || null;
-    const receivedCount = members.filter(n => receivedSet.has(n)).length;
-    const allPaid = receivedCount === members.length;
+
+    // Guests = roster members with no owning Discord account. They're counted in
+    // the split but auto-settle once every linked member is settled (so the record
+    // resolves without anyone having to tick them).
+    const isGuest = (name) => !(playerMap?.get(name)?.discordId);
+    const settledByAmount = (name) => {
+      const row = payoutMap.get(name);
+      return !!row && (Number(row.amount) || 0) >= payoutEach;
+    };
+    const linkedNames = members.filter(n => !isGuest(n));
+    const allLinkedSettled = linkedNames.length > 0 && linkedNames.every(settledByAmount);
+
+    // A member is "settled" once they've withdrawn at least the current share.
+    // If a forgotten item was sold after they confirmed, they're "partial":
+    // withdrew the old amount, still owe the difference.
+    const stateOf = (name) => {
+      const row = payoutMap.get(name);
+      const withdrawn = row ? (Number(row.amount) || 0) : 0;
+      // Guests ride on the party: settled once all linked members are settled.
+      if (isGuest(name) && allLinkedSettled) return { settled: true, partial: false, withdrawn, auto: true };
+      if (row && withdrawn >= payoutEach) return { settled: true, partial: false, withdrawn };
+      if (row && withdrawn > 0) return { settled: false, partial: true, withdrawn };
+      return { settled: false, partial: false, withdrawn: 0 };
+    };
+
+    const settledCount = members.filter(n => stateOf(n).settled).length;
+    const allPaid = settledCount === members.length;
 
     const chips = members.map(name => {
       const owner = playerMap?.get(name)?.discordId || null;
-      const received = receivedSet.has(name);
+      const st = stateOf(name);
       const isYou = !!(owner && currentUserId && owner === currentUserId);
-      const canToggle = canManage || isYou;
-      const title = canToggle
-        ? (received ? 'Click to un-mark' : 'Click when you\'ve got your share')
-        : (received ? 'Share received' : 'Not yet received');
+      // Auto-covered guests aren't manually toggled (they follow the party).
+      const canToggle = !st.auto && (canManage || isYou);
+      const owed = Math.max(0, payoutEach - st.withdrawn);
+      const title = st.auto
+        ? 'Guest — auto-covered once all members are paid'
+        : canToggle
+          ? (st.settled ? 'Click to un-mark'
+            : st.partial ? `Already withdrew ${this.formatGold(st.withdrawn)} — grab the remaining ${this.formatGold(owed)}, then click`
+            : 'Click when you\'ve got your share')
+          : (st.settled ? 'Share received' : st.partial ? `Withdrew ${this.formatGold(st.withdrawn)}, owes ${this.formatGold(owed)}` : 'Not yet received');
+      const cls = `${st.settled ? 'received' : st.partial ? 'partial' : ''} ${st.auto ? 'auto' : ''}`;
       return `
-        <button type="button" class="loot-payout-chip ${received ? 'received' : ''} ${canToggle ? '' : 'locked'}"
+        <button type="button" class="loot-payout-chip ${cls} ${canToggle ? '' : 'locked'}"
           data-member="${this.escapeHtml(name)}" ${canToggle ? '' : 'disabled'} title="${title}">
-          <span class="loot-payout-check">${received ? '✓' : ''}</span>
+          <span class="loot-payout-check">${st.settled ? '✓' : st.partial ? '½' : ''}</span>
           <span class="loot-payout-name">${this.escapeHtml(name)}</span>
+          ${st.partial ? `<span class="loot-payout-owed">+${this.formatGold(owed)}</span>` : ''}
           ${isYou ? '<span class="loot-payout-you">you</span>' : ''}
-        </button>
-      `;
+        </button>`;
     }).join('');
 
     return `
       <div class="loot-payouts">
         <div class="loot-payouts-head">
           <span class="loot-payouts-label">Gold shares received</span>
-          <span class="loot-payouts-count ${allPaid ? 'all-paid' : ''}">${receivedCount}/${members.length}</span>
+          <span class="loot-payouts-count ${allPaid ? 'all-paid' : ''}">${settledCount}/${members.length}</span>
         </div>
         <div class="loot-payouts-chips">${chips}</div>
       </div>
@@ -246,7 +285,7 @@ export const lootUiMixin = {
         </div>
         <div class="lineup-loot-body">
           ${addFormHtml}
-          ${total > 0 ? this.renderPayoutTracker(ctx, canManage) : ''}
+          ${total > 0 ? this.renderPayoutTracker(ctx, canManage, payout) : ''}
           ${groupsHtml}
         </div>
       </div>
@@ -262,31 +301,38 @@ export const lootUiMixin = {
     if (!section) return;
 
     const playerMap = this.cachedPlayerMap;
+    const payoutEach = this._payoutEach(ctx);
     section.querySelectorAll('.loot-payout-chip:not([disabled])').forEach(chip => {
       chip.addEventListener('click', async () => {
         const member = chip.dataset.member;
         if (!member) return;
         const owner = playerMap?.get(member)?.discordId || null;
         ctx.payouts = ctx.payouts || [];
-        const already = ctx.payouts.some(p => p.memberName === member);
+        const existing = ctx.payouts.find(p => p.memberName === member);
+        // Settled = already withdrew at least the current share. Clicking a
+        // settled chip un-marks; clicking an unsettled OR partial one marks it
+        // received at the full current share (topping up a partial).
+        const settled = existing && (Number(existing.amount) || 0) >= payoutEach;
+        const before = ctx.payouts.map(p => ({ ...p })); // snapshot for revert
 
-        // Optimistic update + re-render
-        ctx.payouts = already
-          ? ctx.payouts.filter(p => p.memberName !== member)
-          : [...ctx.payouts, { memberName: member, discordId: owner, source: 'web' }];
+        if (settled) {
+          ctx.payouts = ctx.payouts.filter(p => p.memberName !== member);
+        } else {
+          ctx.payouts = [
+            ...ctx.payouts.filter(p => p.memberName !== member),
+            { memberName: member, discordId: owner, source: 'web', amount: payoutEach }
+          ];
+        }
         this._lootRerender(ctx);
 
         try {
-          if (already) {
+          if (settled) {
             await this._lootUnmarkShare(ctx, member, owner);
           } else {
-            await this._lootMarkShare(ctx, member, owner);
+            await this._lootMarkShare(ctx, member, owner, payoutEach);
           }
         } catch (err) {
-          // Revert on failure
-          ctx.payouts = already
-            ? [...ctx.payouts, { memberName: member, discordId: owner, source: 'web' }]
-            : ctx.payouts.filter(p => p.memberName !== member);
+          ctx.payouts = before; // revert on failure
           toast.error(err.message || 'Failed to update share');
           this._lootRerender(ctx);
         }

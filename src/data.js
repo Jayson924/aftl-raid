@@ -750,7 +750,7 @@ class DataService {
     // empty payouts instead of erroring the whole lineups fetch.
     const { data: payoutRows, error: payoutErr } = await supabase
       .from('lineup_payouts')
-      .select('lineup_id, member_name, discord_id, source');
+      .select('lineup_id, member_name, discord_id, source, amount');
     if (!payoutErr && payoutRows) {
       const byLineup = new Map();
       for (const p of payoutRows) {
@@ -758,7 +758,8 @@ class DataService {
         byLineup.get(p.lineup_id).push({
           memberName: p.member_name,
           discordId: p.discord_id || null,
-          source: p.source || 'web'
+          source: p.source || 'web',
+          amount: Number(p.amount) || 0
         });
       }
       for (const l of result) l.payouts = byLineup.get(l.id) || [];
@@ -1093,7 +1094,7 @@ class DataService {
 
     const { data, error } = await supabase
       .from('lineup_payouts')
-      .select('member_name, discord_id, source')
+      .select('member_name, discord_id, source, amount')
       .eq('lineup_id', lineupId);
 
     if (error) {
@@ -1104,7 +1105,8 @@ class DataService {
     return (data || []).map(p => ({
       memberName: p.member_name,
       discordId: p.discord_id || null,
-      source: p.source || 'web'
+      source: p.source || 'web',
+      amount: Number(p.amount) || 0
     }));
   }
 
@@ -1132,7 +1134,7 @@ class DataService {
 
   // `parent` is { lineupId } for a live lineup or { recordId } for an archived
   // loot record. The unique index used as the upsert arbiter differs accordingly.
-  async _markShare(parent, memberName, ownerDiscordId = null) {
+  async _markShare(parent, memberName, ownerDiscordId = null, amount = 0) {
     const col = parent.recordId ? 'record_id' : 'lineup_id';
     const parentId = parent.recordId || parent.lineupId;
     if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
@@ -1145,7 +1147,9 @@ class DataService {
       discord_id: ownerDiscordId || null,
       source: 'web',
       created_by: this._user?.id || null,
-      received_at: new Date().toISOString()
+      received_at: new Date().toISOString(),
+      // How much this member has now withdrawn — the current per-person payout.
+      amount: Math.max(0, Math.round(Number(amount) || 0))
     };
     row[col] = parentId;
 
@@ -1175,8 +1179,8 @@ class DataService {
     return { success: true };
   }
 
-  async markShareReceived(lineupId, memberName, ownerDiscordId = null) {
-    return this._markShare({ lineupId }, memberName, ownerDiscordId);
+  async markShareReceived(lineupId, memberName, ownerDiscordId = null, amount = 0) {
+    return this._markShare({ lineupId }, memberName, ownerDiscordId, amount);
   }
 
   async unmarkShareReceived(lineupId, memberName, ownerDiscordId = null) {
@@ -1184,8 +1188,8 @@ class DataService {
   }
 
   // Loot Log (archived record) variants.
-  async markRecordShareReceived(recordId, memberName, ownerDiscordId = null) {
-    return this._markShare({ recordId }, memberName, ownerDiscordId);
+  async markRecordShareReceived(recordId, memberName, ownerDiscordId = null, amount = 0) {
+    return this._markShare({ recordId }, memberName, ownerDiscordId, amount);
   }
 
   async unmarkRecordShareReceived(recordId, memberName, ownerDiscordId = null) {
@@ -1266,7 +1270,7 @@ class DataService {
     // Attach payouts via a separate query (degrade-safe), keyed by record_id.
     const { data: payoutRows, error: payoutErr } = await supabase
       .from('lineup_payouts')
-      .select('record_id, member_name, discord_id, source')
+      .select('record_id, member_name, discord_id, source, amount')
       .not('record_id', 'is', null);
     if (!payoutErr && payoutRows) {
       const byRecord = new Map();
@@ -1275,7 +1279,8 @@ class DataService {
         byRecord.get(p.record_id).push({
           memberName: p.member_name,
           discordId: p.discord_id || null,
-          source: p.source || 'web'
+          source: p.source || 'web',
+          amount: Number(p.amount) || 0
         });
       }
       for (const rec of result) rec.payouts = byRecord.get(rec.id) || [];

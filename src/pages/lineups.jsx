@@ -39,6 +39,8 @@ export const LineupsPage = {
   editingForceSold: false, // When opening edit via "Mark sold", pre-check the Sold toggle
   lootRecords: [], // Loot Log section: archived loot records
   showSettledLoot: false, // Loot Log filter: hide fully-resolved records by default
+  lootScope: 'mine', // Loot Log scope: 'mine' (records I'm in) | 'all'
+  lootRaidFilter: 'all', // Loot Log raid-type filter: 'all' | raid type string
   _lootLogRefreshTimer: null,
 
   /**
@@ -115,7 +117,14 @@ export const LineupsPage = {
 
         <div id="loot-log-section" class="page-section loot-log-section" ${this.activeSection === 'loot-log' ? '' : 'hidden'}>
           <div class="loot-log-header">
-            <div class="loot-log-title-row">
+            <div class="loot-log-filters">
+              <div class="loot-scope-toggle">
+                <button class="loot-scope-btn ${this.lootScope === 'mine' ? 'active' : ''}" data-scope="mine">My loot</button>
+                <button class="loot-scope-btn ${this.lootScope === 'all' ? 'active' : ''}" data-scope="all">All loot</button>
+              </div>
+              <select class="loot-raid-select" aria-label="Filter by raid">
+                <option value="all">All raids</option>
+              </select>
               <button class="btn btn-secondary loot-log-filter" type="button"></button>
             </div>
             <p class="loot-log-sub">Loot from cleared raids — finish selling and splitting here. Settled records clear on the next weekly reset.</p>
@@ -1292,12 +1301,37 @@ export const LineupsPage = {
       ]);
       this.lootRecords = records;
       if (players) this.cachedPlayerMap = new Map(players.map(p => [p.name, p]));
+      this.populateRaidFilterOptions();
       this.renderLootLogList();
     } catch (err) {
       console.error('[loot-log] load failed:', err);
       const list = document.getElementById('loot-log-list');
       if (list) list.innerHTML = `<div class="empty-state">Failed to load loot records.</div>`;
     }
+  },
+
+  // True if the logged-in user owns any character in this record's roster.
+  isMyLootRecord(record) {
+    const uid = dataService.getUser()?.id;
+    const map = this.cachedPlayerMap;
+    if (!uid || !map) return false;
+    return this.getPartyMemberNames(record).some(n => map.get(n)?.discordId === uid);
+  },
+
+  // Rebuild the raid-type <select> from the raid types actually present in the
+  // records (stable order), preserving the current selection.
+  populateRaidFilterOptions() {
+    const sel = this.getPageEl()?.querySelector('.loot-raid-select');
+    if (!sel) return;
+    const order = ['DDN Hardcore', 'DDN Classic', 'Hardcore', 'Classic', 'Unspecified'];
+    const types = [...new Set(this.lootRecords.map(r => r.raidType).filter(Boolean))]
+      .sort((a, b) => {
+        const ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+    if (this.lootRaidFilter !== 'all' && !types.includes(this.lootRaidFilter)) this.lootRaidFilter = 'all';
+    sel.innerHTML = `<option value="all">All raids</option>` +
+      types.map(t => `<option value="${this.escapeHtml(t)}" ${t === this.lootRaidFilter ? 'selected' : ''}>${this.escapeHtml(formatRaidTypeLabel(t))}</option>`).join('');
   },
 
   // Reload + re-render the Loot Log (debounced; skipped mid-edit).
@@ -1310,20 +1344,43 @@ export const LineupsPage = {
   },
 
   // A record is fully resolved when it has loot, every item is sold, and every
-  // roster member has received their share. (Mirrors loot_record_is_resolved SQL.)
+  // LINKED member has withdrawn their full share. Guests are auto-covered (counted
+  // in the split, but don't need to confirm). (Mirrors loot_record_is_resolved SQL.)
   isLootRecordResolved(record) {
     const loot = record.loot || [];
     if (loot.length === 0) return false;
     if (loot.some(l => !l.sold)) return false;
-    const received = new Set((record.payouts || []).map(p => p.memberName));
     const members = this.getPartyMemberNames(record);
-    return members.length > 0 && members.every(n => received.has(n));
+    if (members.length === 0) return false;
+    const payoutEach = this._payoutEach(record);
+    const withdrawn = new Map((record.payouts || []).map(p => [p.memberName, Number(p.amount) || 0]));
+    const linked = members.filter(n => this.cachedPlayerMap?.get(n)?.discordId);
+    // Guests auto-considered settled → require every linked member settled.
+    return linked.every(n => (withdrawn.get(n) || 0) >= payoutEach);
   },
 
   setupLootLogFilter() {
-    const btn = this.getPageEl()?.querySelector('.loot-log-filter');
-    if (btn) {
+    const root = this.getPageEl();
+    if (!root) return;
+
+    root.querySelectorAll('.loot-scope-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        this.lootScope = btn.dataset.scope;
+        this.renderLootLogList();
+      });
+    });
+
+    const raidSel = root.querySelector('.loot-raid-select');
+    if (raidSel) {
+      raidSel.addEventListener('change', () => {
+        this.lootRaidFilter = raidSel.value;
+        this.renderLootLogList();
+      });
+    }
+
+    const filterBtn = root.querySelector('.loot-log-filter');
+    if (filterBtn) {
+      filterBtn.addEventListener('click', () => {
         this.showSettledLoot = !this.showSettledLoot;
         this.renderLootLogList();
       });
@@ -1334,23 +1391,40 @@ export const LineupsPage = {
     const list = document.getElementById('loot-log-list');
     if (!list) return;
     const canManage = authService.canEditLineups();
+    const root = this.getPageEl();
 
-    const unsettled = this.lootRecords.filter(r => !this.isLootRecordResolved(r));
-    const settledCount = this.lootRecords.length - unsettled.length;
-    const shown = this.showSettledLoot ? this.lootRecords : unsettled;
+    // Scope (mine/all) + raid-type filters
+    let base = this.lootRecords;
+    if (this.lootScope === 'mine') base = base.filter(r => this.isMyLootRecord(r));
+    if (this.lootRaidFilter !== 'all') base = base.filter(r => r.raidType === this.lootRaidFilter);
 
-    const filterBtn = this.getPageEl()?.querySelector('.loot-log-filter');
+    const unsettled = base.filter(r => !this.isLootRecordResolved(r));
+    const settledCount = base.length - unsettled.length;
+    const shown = this.showSettledLoot ? base : unsettled;
+
+    // Reflect the active scope button
+    root?.querySelectorAll('.loot-scope-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.scope === this.lootScope));
+
+    // Settled toggle button
+    const filterBtn = root?.querySelector('.loot-log-filter');
     if (filterBtn) {
       filterBtn.textContent = this.showSettledLoot ? `Hide settled (${settledCount})` : `Show settled (${settledCount})`;
       filterBtn.style.display = settledCount > 0 ? '' : 'none';
     }
 
     if (shown.length === 0) {
-      list.innerHTML = `<div class="empty-state">${
-        this.lootRecords.length === 0
-          ? 'No loot records yet. Cleared raids with loot appear here after they\'re archived.'
-          : 'No unsettled loot — everything\'s sold and split. 🎉'
-      }</div>`;
+      let msg;
+      if (this.lootRecords.length === 0) {
+        msg = 'No loot records yet. Cleared raids with loot appear here after they\'re archived.';
+      } else if (base.length === 0) {
+        msg = this.lootScope === 'mine'
+          ? 'None of your characters are in a logged raid here yet. Switch to “All loot” to see everything.'
+          : 'No loot records match this raid filter.';
+      } else {
+        msg = 'No unsettled loot — everything\'s sold and split. 🎉';
+      }
+      list.innerHTML = `<div class="empty-state">${msg}</div>`;
       return;
     }
 

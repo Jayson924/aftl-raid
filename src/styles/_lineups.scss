@@ -1175,6 +1175,40 @@
             }
           }
 
+          // Partially paid: withdrew a prior (smaller) share, still owes the top-up.
+          &.partial {
+            background: rgba(244, 196, 48, 0.12);
+            border-color: rgba(244, 196, 48, 0.45);
+            color: #f4d77a;
+
+            .loot-payout-check {
+              border-color: #f4c430;
+              background-color: rgba(244, 196, 48, 0.85);
+              color: #2a2200;
+            }
+          }
+
+          .loot-payout-owed {
+            font-size: 0.62rem;
+            font-weight: 700;
+            padding: 0.02rem 0.3rem;
+            border-radius: 6px;
+            background-color: rgba(244, 196, 48, 0.22);
+            color: #f4d77a;
+          }
+
+          // Auto-covered guest: settled by the party, not an explicit tick.
+          &.auto {
+            opacity: 0.72;
+            font-style: italic;
+
+            .loot-payout-check {
+              background-color: transparent;
+              color: #6fe08a;
+              border-style: dashed;
+            }
+          }
+
           &.locked,
           &:disabled {
             cursor: default;
