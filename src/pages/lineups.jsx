@@ -1199,6 +1199,11 @@ export const LineupsPage = {
       if (changedLineupId) this.refreshLineupLoot(changedLineupId);
       // Loot on an archived record (or moved off a lineup) → refresh the Loot Log.
       if (changedRecordId || !changedLineupId) this.scheduleLootLogRefresh();
+      // Id-less payload (a DELETE before REPLICA IDENTITY FULL is applied) —
+      // conservatively refresh the lineup being viewed so it can't go stale.
+      if (!changedLineupId && !changedRecordId && this.currentShowcaseLineup) {
+        this.refreshLineupLoot(this.currentShowcaseLineup.id);
+      }
     });
   },
 
@@ -1244,6 +1249,11 @@ export const LineupsPage = {
       const changedRecordId = payload.new?.record_id || payload.old?.record_id;
       if (changedLineupId) this.refreshLineupPayouts(changedLineupId);
       if (changedRecordId || !changedLineupId) this.scheduleLootLogRefresh();
+      // Id-less payload (a DELETE before REPLICA IDENTITY FULL is applied) —
+      // conservatively refresh the lineup being viewed so its chips can't go stale.
+      if (!changedLineupId && !changedRecordId && this.currentShowcaseLineup) {
+        this.refreshLineupPayouts(this.currentShowcaseLineup.id);
+      }
     });
   },
 
