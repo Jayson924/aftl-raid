@@ -12,10 +12,11 @@ import { lootUiMixin } from '../loot-ui.js';
 
 export const LineupsPage = {
   ...lootUiMixin,
-  // Re-render after a loot mixin change — the showcase card for a live lineup, or
-  // the record's card in the Loot Log section for an archived record.
+  // Re-render after a loot mixin change. Records always live in the Loot Log;
+  // a live lineup renders in the Loot Log too when that section is active (the
+  // "This week" view), otherwise on the showcase card.
   _lootRerender(ctx) {
-    if (ctx.isRecord) {
+    if (ctx.isRecord || this.activeSection === 'loot-log') {
       this.rerenderLootRecordCard(ctx);
     } else {
       this.renderShowcase(ctx, this.cachedPlayerMap);
@@ -37,10 +38,12 @@ export const LineupsPage = {
   lootViewActive: null, // Cleared-card loot view: null = auto (on when loot exists), else explicit
   editingLootId: null, // Loot entry currently being inline-edited (null = none)
   editingForceSold: false, // When opening edit via "Mark sold", pre-check the Sold toggle
-  lootRecords: [], // Loot Log section: archived loot records
+  lootRecords: [], // Loot Log section: archived loot records (previous weeks)
+  lootWeekLineups: [], // Loot Log section: live lineups with loot (current week)
   showSettledLoot: false, // Loot Log filter: hide fully-resolved records by default
   lootScope: 'mine', // Loot Log scope: 'mine' (records I'm in) | 'all'
   lootRaidFilter: 'all', // Loot Log raid-type filter: 'all' | raid type string
+  lootWeek: 'current', // Loot Log week filter: 'current' (live lineups) | 'previous' (records)
   _lootLogRefreshTimer: null,
 
   /**
@@ -118,6 +121,10 @@ export const LineupsPage = {
         <div id="loot-log-section" class="page-section loot-log-section" ${this.activeSection === 'loot-log' ? '' : 'hidden'}>
           <div class="loot-log-header">
             <div class="loot-log-filters">
+              <div class="loot-scope-toggle loot-week-toggle">
+                <button class="loot-week-btn ${this.lootWeek === 'current' ? 'active' : ''}" data-week="current">This Week</button>
+                <button class="loot-week-btn ${this.lootWeek === 'previous' ? 'active' : ''}" data-week="previous">Previous Weeks<span class="loot-week-badge" hidden></span></button>
+              </div>
               <div class="loot-scope-toggle">
                 <button class="loot-scope-btn ${this.lootScope === 'mine' ? 'active' : ''}" data-scope="mine">My loot</button>
                 <button class="loot-scope-btn ${this.lootScope === 'all' ? 'active' : ''}" data-scope="all">All loot</button>
@@ -1195,12 +1202,13 @@ export const LineupsPage = {
 
     this.lootSubscription = dataService.subscribeToLineupLoot((payload) => {
       const changedLineupId = payload.new?.lineup_id || payload.old?.lineup_id;
-      const changedRecordId = payload.new?.record_id || payload.old?.record_id;
       if (changedLineupId) this.refreshLineupLoot(changedLineupId);
-      // Loot on an archived record (or moved off a lineup) → refresh the Loot Log.
-      if (changedRecordId || !changedLineupId) this.scheduleLootLogRefresh();
+      // The Loot Log shows BOTH live (this week) and archived loot → any change
+      // refreshes it (debounced; no-op unless the section is active).
+      this.scheduleLootLogRefresh();
       // Id-less payload (a DELETE before REPLICA IDENTITY FULL is applied) —
       // conservatively refresh the lineup being viewed so it can't go stale.
+      const changedRecordId = payload.new?.record_id || payload.old?.record_id;
       if (!changedLineupId && !changedRecordId && this.currentShowcaseLineup) {
         this.refreshLineupLoot(this.currentShowcaseLineup.id);
       }
@@ -1248,7 +1256,8 @@ export const LineupsPage = {
       const changedLineupId = payload.new?.lineup_id || payload.old?.lineup_id;
       const changedRecordId = payload.new?.record_id || payload.old?.record_id;
       if (changedLineupId) this.refreshLineupPayouts(changedLineupId);
-      if (changedRecordId || !changedLineupId) this.scheduleLootLogRefresh();
+      // Loot Log shows live + archived entries → refresh on any payout change.
+      this.scheduleLootLogRefresh();
       // Id-less payload (a DELETE before REPLICA IDENTITY FULL is applied) —
       // conservatively refresh the lineup being viewed so its chips can't go stale.
       if (!changedLineupId && !changedRecordId && this.currentShowcaseLineup) {
@@ -1305,11 +1314,21 @@ export const LineupsPage = {
 
   async loadLootRecords() {
     try {
-      const [records, players] = await Promise.all([
+      const [records, lineups, players] = await Promise.all([
         dataService.getLootRecords(),
+        dataService.getLineups(),
         this.cachedPlayerMap ? Promise.resolve(null) : dataService.getPlayers(),
       ]);
       this.lootRecords = records;
+      // "This week" = live lineups that already have loot logged, newest clear first.
+      this.lootWeekLineups = (lineups || [])
+        .filter(l => (l.loot || []).length > 0)
+        .sort((a, b) => {
+          const ta = a.clearedAt ? new Date(a.clearedAt).getTime() : 0;
+          const tb = b.clearedAt ? new Date(b.clearedAt).getTime() : 0;
+          if (tb !== ta) return tb - ta;
+          return (a.name || '').localeCompare(b.name || '');
+        });
       if (players) this.cachedPlayerMap = new Map(players.map(p => [p.name, p]));
       this.populateRaidFilterOptions();
       this.renderLootLogList();
@@ -1320,21 +1339,32 @@ export const LineupsPage = {
     }
   },
 
-  // True if the logged-in user owns any character in this record's roster.
-  isMyLootRecord(record) {
+  // True if the logged-in user still has a share to claim on this entry: a
+  // character they own OR pilot is in the roster with sold gold owed.
+  userHasUnclaimedShare(entry) {
     const uid = dataService.getUser()?.id;
-    const map = this.cachedPlayerMap;
-    if (!uid || !map) return false;
-    return this.getPartyMemberNames(record).some(n => map.get(n)?.discordId === uid);
+    if (!uid || !this.cachedPlayerMap) return false;
+    const payoutEach = this._payoutEach(entry);
+    if (payoutEach <= 0) return false;
+    const withdrawn = new Map((entry.payouts || []).map(p => [p.memberName, Number(p.amount) || 0]));
+    return this.getPartyMemberNames(entry).some(n =>
+      this._isMyMember(entry, n) && (withdrawn.get(n) || 0) < payoutEach);
+  },
+
+  // True if the logged-in user owns OR pilots any character in this roster.
+  isMyLootRecord(record) {
+    if (!dataService.getUser()?.id || !this.cachedPlayerMap) return false;
+    return this.getPartyMemberNames(record).some(n => this._isMyMember(record, n));
   },
 
   // Rebuild the raid-type <select> from the raid types actually present in the
-  // records (stable order), preserving the current selection.
+  // records + this week's loot-bearing lineups (stable order), preserving the
+  // current selection.
   populateRaidFilterOptions() {
     const sel = this.getPageEl()?.querySelector('.loot-raid-select');
     if (!sel) return;
     const order = ['DDN Hardcore', 'DDN Classic', 'Hardcore', 'Classic', 'Unspecified'];
-    const types = [...new Set(this.lootRecords.map(r => r.raidType).filter(Boolean))]
+    const types = [...new Set([...this.lootRecords, ...this.lootWeekLineups].map(r => r.raidType).filter(Boolean))]
       .sort((a, b) => {
         const ia = order.indexOf(a), ib = order.indexOf(b);
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
@@ -1344,9 +1374,11 @@ export const LineupsPage = {
       types.map(t => `<option value="${this.escapeHtml(t)}" ${t === this.lootRaidFilter ? 'selected' : ''}>${this.escapeHtml(formatRaidTypeLabel(t))}</option>`).join('');
   },
 
-  // Reload + re-render the Loot Log (debounced; skipped mid-edit).
+  // Reload + re-render the Loot Log (debounced; skipped mid-edit or while the
+  // user is typing in one of the log's inputs, so we don't yank their focus).
   scheduleLootLogRefresh() {
     if (this.editingLootId) return;
+    if (document.activeElement?.closest?.('#loot-log-list')) return;
     clearTimeout(this._lootLogRefreshTimer);
     this._lootLogRefreshTimer = setTimeout(() => {
       if (this.activeSection === 'loot-log') this.loadLootRecords();
@@ -1372,6 +1404,13 @@ export const LineupsPage = {
   setupLootLogFilter() {
     const root = this.getPageEl();
     if (!root) return;
+
+    root.querySelectorAll('.loot-week-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.lootWeek = btn.dataset.week;
+        this.renderLootLogList();
+      });
+    });
 
     root.querySelectorAll('.loot-scope-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1403,8 +1442,10 @@ export const LineupsPage = {
     const canManage = authService.canEditLineups();
     const root = this.getPageEl();
 
-    // Scope (mine/all) + raid-type filters
-    let base = this.lootRecords;
+    // Week (current = live lineups with loot / previous = archived records),
+    // then scope (mine/all) + raid-type filters on top.
+    const pool = this.lootWeek === 'current' ? this.lootWeekLineups : this.lootRecords;
+    let base = pool;
     if (this.lootScope === 'mine') base = base.filter(r => this.isMyLootRecord(r));
     if (this.lootRaidFilter !== 'all') base = base.filter(r => r.raidType === this.lootRaidFilter);
 
@@ -1412,9 +1453,19 @@ export const LineupsPage = {
     const settledCount = base.length - unsettled.length;
     const shown = this.showSettledLoot ? base : unsettled;
 
-    // Reflect the active scope button
+    // Reflect the active week + scope buttons
+    root?.querySelectorAll('.loot-week-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.week === this.lootWeek));
     root?.querySelectorAll('.loot-scope-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.scope === this.lootScope));
+
+    // Unclaimed-share badge on "Previous Weeks" (your gold still waiting there)
+    const prevUnclaimed = this.lootRecords.filter(r => this.userHasUnclaimedShare(r)).length;
+    const badge = root?.querySelector('.loot-week-badge');
+    if (badge) {
+      badge.textContent = prevUnclaimed;
+      badge.hidden = prevUnclaimed === 0;
+    }
 
     // Settled toggle button
     const filterBtn = root?.querySelector('.loot-log-filter');
@@ -1425,12 +1476,14 @@ export const LineupsPage = {
 
     if (shown.length === 0) {
       let msg;
-      if (this.lootRecords.length === 0) {
-        msg = 'No loot records yet. Cleared raids with loot appear here after they\'re archived.';
+      if (pool.length === 0) {
+        msg = this.lootWeek === 'current'
+          ? 'No loot logged this week yet. Loot shows up here as cleared raids log items.'
+          : 'No loot records yet. Cleared raids with loot appear here after they\'re archived.';
       } else if (base.length === 0) {
         msg = this.lootScope === 'mine'
           ? 'None of your characters are in a logged raid here yet. Switch to “All loot” to see everything.'
-          : 'No loot records match this raid filter.';
+          : 'No loot matches this raid filter.';
       } else {
         msg = 'No unsettled loot — everything\'s sold and split. 🎉';
       }
@@ -1456,16 +1509,15 @@ export const LineupsPage = {
     const cleared = record.clearedAt ? moment(record.clearedAt) : null;
     return `
       <div class="loot-record-head">
-        <div class="loot-record-heading">
-          <span class="loot-record-name">${this.escapeHtml(record.name || 'Lineup')}</span>
-          ${record.raidType ? `<span class="loot-record-raid">${this.escapeHtml(formatRaidTypeLabel(record.raidType))}</span>` : ''}
-          ${resolved ? '<span class="loot-record-badge">Settled</span>' : ''}
-        </div>
-        <div class="loot-record-meta">
-          ${cleared ? `<span class="loot-record-date" title="${cleared.format('ddd, MMM D, YYYY h:mm A')}">cleared ${cleared.fromNow()}</span>` : ''}
-          ${canManage ? `<button class="loot-icon-btn loot-record-delete" title="Delete this record">🗑</button>` : ''}
-        </div>
+        <span class="loot-record-name" title="${this.escapeHtml(record.name || 'Lineup')}">${this.escapeHtml(record.name || 'Lineup')}</span>
+        ${resolved ? '<span class="loot-record-badge">Settled</span>' : ''}
+        ${record.raidType ? `<span class="loot-record-raid">${this.escapeHtml(formatRaidTypeLabel(record.raidType))}</span>` : ''}
       </div>
+      ${cleared || (canManage && record.isRecord) ? `
+      <div class="loot-record-subhead">
+        ${cleared ? `<span class="loot-record-date" title="${cleared.format('ddd, MMM D, YYYY h:mm A')}">cleared ${cleared.fromNow()}</span>` : ''}
+        ${canManage && record.isRecord ? `<button class="loot-icon-btn loot-record-delete" title="Delete this record">🗑</button>` : ''}
+      </div>` : ''}
       ${roster.length ? `<div class="loot-record-roster">${roster.map(n => `<span class="loot-record-member">${this.escapeHtml(n)}</span>`).join('')}</div>` : ''}
       ${this.renderLootSection(record, canManage)}
     `;

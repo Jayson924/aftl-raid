@@ -1035,25 +1035,24 @@
           color: rgba(255, 255, 255, 0.7);
         }
 
-        .loot-total {
-          margin-left: auto;
-          font-size: 0.85rem;
-          font-weight: 700;
-          color: #f4c430;
-        }
-
+        // The per-person share is the headline — it's the number each member
+        // needs to know to claim their gold. The total is secondary context.
         .loot-payout {
-          font-size: 0.78rem;
-          font-weight: 600;
-          color: #6fe08a;
-          padding: 0.1rem 0.45rem;
+          margin-left: auto;
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #f4c430;
+          padding: 0.12rem 0.55rem;
           border-radius: 9px;
-          background-color: rgba(76, 209, 106, 0.12);
+          background-color: rgba(244, 196, 48, 0.12);
           white-space: nowrap;
         }
 
-        .loot-total + .loot-payout {
-          margin-left: 0;
+        .loot-total {
+          font-size: 0.72rem;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.45);
+          white-space: nowrap;
         }
       }
 
@@ -1108,6 +1107,31 @@
               color: #6fe08a;
             }
           }
+
+          // One-click "Claim my share · 🪙X" (turns green once claimed)
+          .loot-claim-btn {
+            margin-left: auto;
+            border: 1px solid rgba(244, 196, 48, 0.5);
+            background-color: rgba(244, 196, 48, 0.15);
+            color: #f4c430;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.22rem 0.6rem;
+            border-radius: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+
+            &:hover { background-color: rgba(244, 196, 48, 0.25); }
+
+            &.claimed {
+              border-color: rgba(76, 209, 106, 0.45);
+              background-color: rgba(76, 209, 106, 0.12);
+              color: #8fe6a4;
+
+              &:hover { background-color: rgba(76, 209, 106, 0.2); }
+            }
+          }
         }
 
         .loot-payouts-chips {
@@ -1144,6 +1168,9 @@
           }
 
           .loot-payout-you {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
             font-size: 0.6rem;
             font-weight: 700;
             letter-spacing: 0.03em;
@@ -1152,6 +1179,19 @@
             border-radius: 6px;
             background-color: rgba(150, 184, 255, 0.2);
             color: rgba(180, 205, 255, 0.95);
+          }
+
+          .loot-payout-pilot {
+            display: inline-flex;
+            align-items: center;
+          }
+
+          .loot-payout-pilot-icon {
+            width: 10px;
+            height: 10px;
+            flex-shrink: 0;
+            // Same soft-blue tint as the slot pilot icon.
+            filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
           }
 
           &:hover:not(:disabled) {
@@ -1477,6 +1517,12 @@
         option {
           background: #1f1f1f;
           color: #e0e0e0;
+        }
+
+        // No holder picked yet → the "— holder —" prompt reads like a
+        // placeholder, not full-brightness text.
+        &:has(option[value='']:checked) {
+          color: rgba(255, 255, 255, 0.35);
         }
       }
 

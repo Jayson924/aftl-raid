@@ -736,6 +736,7 @@ class DataService {
         isStatic: lineup.is_static || false,
         notes: lineup.notes || '',
         raidTime: lineup.raid_time || null,
+        clearedAt: lineup.cleared_at || null,
         threadId: lineup.thread_id || null,
         players,
         ticketPlayers,
@@ -1111,15 +1112,18 @@ class DataService {
   }
 
   /**
-   * A member may mark their OWN share received; editors/admins may mark anyone.
+   * A member may mark a share received when they OWN the character or are its
+   * PILOT (the person who actually ran it); editors/admins may mark anyone.
    * `ownerDiscordId` is the Discord id owning `memberName` (from the roster);
-   * pass null for guests/unowned (then only editors are allowed). Verified
-   * server-side against the players table for non-editors so it can't be spoofed.
+   * pass null for guests/unowned. Both paths are verified server-side (players
+   * ownership / the stored pilot name vs the caller's app_users names) so
+   * neither can be spoofed. `parent` = { lineupId } | { recordId }.
    */
-  async _canMarkShare(memberName, ownerDiscordId) {
+  async _canMarkShare(parent, memberName, ownerDiscordId) {
     if (this.canEditLineups()) return true;
     const me = this._user?.id;
     if (!me) return false;
+
     // Trust, but verify: the character must actually be owned by the caller.
     if (ownerDiscordId && ownerDiscordId === me) {
       const { data } = await supabase
@@ -1129,7 +1133,36 @@ class DataService {
         .limit(1);
       if (data?.[0]?.discord_id === me) return true;
     }
-    return false;
+
+    // Pilot path: the slot's stored pilot name must resolve to the caller
+    // (same display_name/username convention the Discord bot uses).
+    let pilotName = null;
+    if (parent?.recordId) {
+      const { data } = await supabase
+        .from('loot_records')
+        .select('pilots')
+        .eq('id', parent.recordId)
+        .maybeSingle();
+      pilotName = ((data?.pilots || {})[memberName] || '').trim() || null;
+    } else if (parent?.lineupId) {
+      const { data } = await supabase
+        .from('lineup_players')
+        .select('pilot_name')
+        .eq('lineup_id', parent.lineupId)
+        .eq('player_name', memberName)
+        .limit(1);
+      pilotName = (data?.[0]?.pilot_name || '').trim() || null;
+    }
+    if (!pilotName) return false;
+
+    const { data: meRow } = await supabase
+      .from('app_users')
+      .select('display_name, username')
+      .eq('discord_id', me)
+      .maybeSingle();
+    const p = pilotName.toLowerCase();
+    return p === (meRow?.display_name || '').trim().toLowerCase()
+        || p === (meRow?.username || '').trim().toLowerCase();
   }
 
   // `parent` is { lineupId } for a live lineup or { recordId } for an archived
@@ -1138,7 +1171,7 @@ class DataService {
     const col = parent.recordId ? 'record_id' : 'lineup_id';
     const parentId = parent.recordId || parent.lineupId;
     if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
-    if (!(await this._canMarkShare(memberName, ownerDiscordId))) {
+    if (!(await this._canMarkShare(parent, memberName, ownerDiscordId))) {
       throw new Error('You can only mark your own share received');
     }
 
@@ -1165,7 +1198,7 @@ class DataService {
     const col = parent.recordId ? 'record_id' : 'lineup_id';
     const parentId = parent.recordId || parent.lineupId;
     if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
-    if (!(await this._canMarkShare(memberName, ownerDiscordId))) {
+    if (!(await this._canMarkShare(parent, memberName, ownerDiscordId))) {
       throw new Error('You can only mark your own share received');
     }
 
@@ -1226,7 +1259,7 @@ class DataService {
     const { data, error } = await supabase
       .from('loot_records')
       .select(`
-        id, lineup_name, raid_type, roster, raid_time, cleared_at,
+        id, lineup_name, raid_type, roster, pilots, raid_time, cleared_at,
         loot_thread_id, loot_message_id, payout_message_id, loot_close_at, loot_closed,
         lineup_loot ( id, item, sold, price, sort_order, held_by, source )
       `)
@@ -1257,6 +1290,7 @@ class DataService {
         raidType: r.raid_type,
         roster,
         players: roster,             // loot helpers read `players` for the roster
+        pilots: (r.pilots && typeof r.pilots === 'object') ? r.pilots : {}, // member name → pilot name
         raidTime: r.raid_time || null,
         clearedAt: r.cleared_at || null,
         threadId: r.loot_thread_id || null,

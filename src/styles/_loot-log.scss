@@ -41,7 +41,8 @@ $loot-green: rgba(76, 209, 106, 1);
       border-radius: 7px;
       overflow: hidden;
 
-      .loot-scope-btn {
+      .loot-scope-btn,
+      .loot-week-btn {
         appearance: none;
         border: none;
         background: transparent;
@@ -51,8 +52,12 @@ $loot-green: rgba(76, 209, 106, 1);
         padding: 0.35rem 0.75rem;
         cursor: pointer;
         transition: background 0.15s ease, color 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
 
-        & + .loot-scope-btn { border-left: 1px solid rgba(255, 255, 255, 0.14); }
+        & + .loot-scope-btn,
+        & + .loot-week-btn { border-left: 1px solid rgba(255, 255, 255, 0.14); }
 
         &:hover { color: rgba(255, 255, 255, 0.85); }
 
@@ -60,6 +65,24 @@ $loot-green: rgba(76, 209, 106, 1);
           background: rgba(244, 196, 48, 0.16);
           color: #f4c430;
         }
+      }
+
+      // "You still have unclaimed gold in previous weeks" count
+      .loot-week-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 0.28rem;
+        border-radius: 8px;
+        background: #f4c430;
+        color: #2a2200;
+        font-size: 0.65rem;
+        font-weight: 800;
+        line-height: 1;
+
+        &[hidden] { display: none; }
       }
     }
 
@@ -104,17 +127,22 @@ $loot-green: rgba(76, 209, 106, 1);
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 1.25rem;
-    align-items: start;
   }
 }
 
 // --- one record card ----------------------------------------------------------
+// Uniform height: head + roster pinned on top, the loot header / add form /
+// share tracker pinned under them, and the grouped items scrolling inside.
 .loot-record-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.025);
   padding: 0.9rem 1rem 1rem;
   transition: opacity 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  height: 480px;
+  overflow: hidden;
 
   &.resolved {
     opacity: 0.62;
@@ -123,70 +151,78 @@ $loot-green: rgba(76, 209, 106, 1);
     &:hover { opacity: 1; }
   }
 
+  // Row 1: [name (+Settled)] ………………… [raid badge] — identical on every card;
+  // long names truncate with an ellipsis (full name in the tooltip).
   .loot-record-head {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.6rem;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+    flex-shrink: 0;
 
-    .loot-record-heading {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-
-      .loot-record-name {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: rgba(255, 255, 255, 0.9);
-      }
-
-      .loot-record-raid {
-        font-size: 0.68rem;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        padding: 0.12rem 0.45rem;
-        border-radius: 5px;
-        background: rgba(150, 184, 255, 0.14);
-        color: rgba(190, 210, 255, 0.9);
-      }
-
-      .loot-record-badge {
-        font-size: 0.62rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        padding: 0.12rem 0.45rem;
-        border-radius: 5px;
-        background: rgba(76, 209, 106, 0.18);
-        color: #8fe6a4;
-      }
+    .loot-record-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.9);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
     }
 
-    .loot-record-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+    .loot-record-badge {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.12rem 0.45rem;
+      border-radius: 5px;
+      background: rgba(76, 209, 106, 0.18);
+      color: #8fe6a4;
       flex-shrink: 0;
+      white-space: nowrap;
+    }
 
-      .loot-record-date {
-        font-size: 0.72rem;
-        color: rgba(255, 255, 255, 0.4);
-        white-space: nowrap;
-      }
+    .loot-record-raid {
+      margin-left: auto;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      padding: 0.12rem 0.45rem;
+      border-radius: 5px;
+      background: rgba(150, 184, 255, 0.14);
+      color: rgba(190, 210, 255, 0.9);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+  }
 
-      .loot-record-delete {
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 0.85rem;
-        opacity: 0.5;
-        transition: opacity 0.15s ease;
+  // Row 2: cleared date (+ delete on archived records)
+  .loot-record-subhead {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
 
-        &:hover { opacity: 1; }
-      }
+    .loot-record-date {
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, 0.4);
+      white-space: nowrap;
+    }
+
+    .loot-record-delete {
+      margin-left: auto;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.85rem;
+      opacity: 0.5;
+      transition: opacity 0.15s ease;
+
+      &:hover { opacity: 1; }
     }
   }
 
@@ -195,6 +231,7 @@ $loot-green: rgba(76, 209, 106, 1);
     flex-wrap: wrap;
     gap: 0.3rem;
     margin-bottom: 0.25rem;
+    flex-shrink: 0;
 
     .loot-record-member {
       font-size: 0.7rem;
@@ -205,10 +242,16 @@ $loot-green: rgba(76, 209, 106, 1);
     }
   }
 
-  // --- the shared loot box, styled for the log (simple stacked layout) --------
+  // --- the shared loot box, styled for the log --------------------------------
+  // Fills the rest of the fixed-height card; header/add form/tracker pinned,
+  // the grouped items scroll (see .loot-groups below).
   .lineup-loot {
     margin-top: 0.75rem;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 
     .lineup-loot-header {
       display: flex;
@@ -230,23 +273,37 @@ $loot-green: rgba(76, 209, 106, 1);
         color: rgba(255, 255, 255, 0.7);
       }
 
-      .loot-total {
+      // The per-person share is the headline — what each member claims at a glance.
+      .loot-payout {
         margin-left: auto;
+        font-size: 0.95rem;
+        font-weight: 800;
         color: $loot-gold;
-        font-weight: 700;
+        padding: 0.12rem 0.55rem;
+        border-radius: 9px;
+        background: rgba(244, 196, 48, 0.12);
+        white-space: nowrap;
       }
 
-      .loot-payout {
-        font-size: 0.78rem;
-        color: rgba(255, 255, 255, 0.5);
+      .loot-total {
+        font-size: 0.72rem;
         font-weight: 600;
+        color: rgba(255, 255, 255, 0.45);
+        white-space: nowrap;
       }
     }
 
+    // The body is the card's scroll region — everything under the pinned loot
+    // header (add form, share tracker, item groups) scrolls together, so the
+    // card stays scrollable no matter how tall the roster/tracker get.
     .lineup-loot-body {
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 0.15rem; // breathing room next to the scrollbar
     }
   }
 
@@ -255,6 +312,7 @@ $loot-green: rgba(76, 209, 106, 1);
     display: flex;
     gap: 0.4rem;
     flex-wrap: wrap;
+    flex-shrink: 0;
 
     .loot-add-item {
       flex: 1 1 120px;
@@ -265,12 +323,54 @@ $loot-green: rgba(76, 209, 106, 1);
     .loot-add-btn { flex-shrink: 0; padding: 0.3rem 0.9rem; }
   }
 
+  // Inputs styled like the rest of the site (mirrors the showcase loot box).
+  .loot-add-item,
+  .loot-edit-item,
+  .loot-edit-price,
+  .loot-add-holder,
+  .loot-edit-holder {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #e0e0e0;
+
+    &:focus {
+      outline: none;
+      border-color: $loot-gold;
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.35);
+    }
+  }
+
+  .loot-add-holder,
+  .loot-edit-holder {
+    max-width: 140px;
+    cursor: pointer;
+
+    option {
+      background: #1f1f1f;
+      color: #e0e0e0;
+    }
+
+    // No holder picked yet → the "— holder —" prompt reads like a placeholder,
+    // not full-brightness text.
+    &:has(option[value='']:checked) {
+      color: rgba(255, 255, 255, 0.35);
+    }
+  }
+
   // --- gold-share tracker -------------------------------------------------------
   .loot-payouts {
     padding: 0.5rem;
     border: 1px solid rgba(244, 196, 48, 0.18);
     border-radius: 6px;
     background: rgba(244, 196, 48, 0.05);
+    flex-shrink: 0;
 
     .loot-payouts-head {
       display: flex;
@@ -295,6 +395,31 @@ $loot-green: rgba(76, 209, 106, 1);
         &.all-paid {
           background: rgba(76, 209, 106, 0.18);
           color: #6fe08a;
+        }
+      }
+
+      // One-click "Claim my share · 🪙X" (turns green once claimed)
+      .loot-claim-btn {
+        margin-left: auto;
+        border: 1px solid rgba(244, 196, 48, 0.5);
+        background: rgba(244, 196, 48, 0.15);
+        color: $loot-gold;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.22rem 0.6rem;
+        border-radius: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s ease, border-color 0.15s ease;
+
+        &:hover { background: rgba(244, 196, 48, 0.25); }
+
+        &.claimed {
+          border-color: rgba(76, 209, 106, 0.45);
+          background: rgba(76, 209, 106, 0.12);
+          color: #8fe6a4;
+
+          &:hover { background: rgba(76, 209, 106, 0.2); }
         }
       }
     }
@@ -333,6 +458,9 @@ $loot-green: rgba(76, 209, 106, 1);
       }
 
       .loot-payout-you {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
         font-size: 0.6rem;
         font-weight: 700;
         letter-spacing: 0.03em;
@@ -341,6 +469,19 @@ $loot-green: rgba(76, 209, 106, 1);
         border-radius: 6px;
         background: rgba(150, 184, 255, 0.2);
         color: rgba(180, 205, 255, 0.95);
+      }
+
+      .loot-payout-pilot {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .loot-payout-pilot-icon {
+        width: 10px;
+        height: 10px;
+        flex-shrink: 0;
+        // Same soft-blue tint as the slot pilot icon.
+        filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
       }
 
       &:hover:not(:disabled) {
@@ -413,6 +554,7 @@ $loot-green: rgba(76, 209, 106, 1);
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
+    flex-shrink: 0; // natural height — the .lineup-loot-body scrolls, not this
   }
 
   .loot-group {
@@ -436,7 +578,13 @@ $loot-green: rgba(76, 209, 106, 1);
         font-weight: 600;
         color: rgba(255, 255, 255, 0.8);
 
-        .loot-holder-icon { width: 13px; height: 13px; opacity: 0.6; }
+        .loot-holder-icon {
+          width: 13px;
+          height: 13px;
+          flex-shrink: 0;
+          // The raw SVG is black — tint it the same soft blue as the showcase.
+          filter: brightness(0) saturate(100%) invert(60%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(100%) contrast(95%);
+        }
 
         &.loot-group-holder--none { color: rgba(255, 255, 255, 0.4); font-style: italic; }
 

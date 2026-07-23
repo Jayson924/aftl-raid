@@ -38,6 +38,46 @@ export const lootUiMixin = {
     const partySize = this.getPartyMemberNames(ctx).length;
     return partySize > 0 ? Math.floor(total / partySize) : 0;
   },
+
+  // The pilot name recorded for a roster member: records carry a {name → pilot}
+  // snapshot; live lineups have slot-aligned players/pilotPlayers arrays.
+  _pilotNameOf(ctx, memberName) {
+    if (ctx.isRecord) return ((ctx.pilots || {})[memberName] || '').trim();
+    const size = getLineupSize(ctx.raidType);
+    const raw = (ctx.players || []).slice(0, size);
+    for (let i = 0; i < raw.length; i++) {
+      const rn = raw[i];
+      if (!rn) continue;
+      let resolved = rn;
+      if (rn.startsWith('[PUB]')) {
+        const parts = rn.substring(5).split('|');
+        resolved = parts[0] || parts[1] || 'Guest';
+      }
+      if (resolved === memberName) return (((ctx.pilotPlayers || [])[i]) || '').trim();
+    }
+    return '';
+  },
+
+  // Is the logged-in user this member's PILOT? Pilot names are display-name
+  // strings — match against the user's display name / username (the same
+  // convention the Discord bot uses). Server-side re-verified in data.js.
+  _isPilotOfMember(ctx, memberName) {
+    const pilot = this._pilotNameOf(ctx, memberName).toLowerCase();
+    if (!pilot) return false;
+    const user = dataService.getUser();
+    if (!user) return false;
+    const dn = (dataService.getDisplayName?.() || '').trim().toLowerCase();
+    const un = (user.username || user.name || '').trim().toLowerCase();
+    return (!!dn && pilot === dn) || (!!un && pilot === un);
+  },
+
+  // "Mine" = a character the user owns OR pilots.
+  _isMyMember(ctx, memberName) {
+    const uid = dataService.getUser()?.id;
+    if (!uid) return false;
+    if (this.cachedPlayerMap?.get(memberName)?.discordId === uid) return true;
+    return this._isPilotOfMember(ctx, memberName);
+  },
   _lootUnmarkShare(ctx, member, owner) {
     return ctx.isRecord
       ? dataService.unmarkRecordShareReceived(ctx.id, member, owner)
@@ -197,12 +237,30 @@ export const lootUiMixin = {
     const settledCount = members.filter(n => stateOf(n).settled).length;
     const allPaid = settledCount === members.length;
 
+    // One-click self-claim: covers every character the viewer owns OR pilots.
+    const myNames = currentUserId ? members.filter(n => this._isMyMember(ctx, n)) : [];
+    const myOwed = myNames.reduce((s, n) => {
+      const st = stateOf(n);
+      return s + (st.settled ? 0 : Math.max(0, payoutEach - st.withdrawn));
+    }, 0);
+    const myClaimed = myNames.length > 0 && myNames.every(n => stateOf(n).settled);
+    const claimBtn = myNames.length === 0 ? '' : myClaimed
+      ? `<button type="button" class="loot-claim-btn claimed" title="You've claimed your ${myNames.length > 1 ? 'shares' : 'share'} — click to un-claim">✓ Claimed</button>`
+      : `<button type="button" class="loot-claim-btn" title="Mark ${myNames.length > 1 ? `all ${myNames.length} of your characters'` : 'your'} share as received — 🪙 ${this.formatGold(myOwed)}">🪙 Claim</button>`;
+
     const chips = members.map(name => {
       const owner = playerMap?.get(name)?.discordId || null;
       const st = stateOf(name);
-      const isYou = !!(owner && currentUserId && owner === currentUserId);
-      // Auto-covered guests aren't manually toggled (they follow the party).
-      const canToggle = !st.auto && (canManage || isYou);
+      // "You" covers characters the viewer owns or pilots.
+      const isYou = !!currentUserId && this._isMyMember(ctx, name);
+      // Piloted slot: everyone sees the pilot icon; the pilot themselves gets it
+      // inside their "you" badge.
+      const pilotName = this._pilotNameOf(ctx, name);
+      const iAmPilot = !!pilotName && this._isPilotOfMember(ctx, name);
+      const pilotIcon = `<img src="/icons/headphones.svg" alt="pilot" class="loot-payout-pilot-icon">`;
+      // Auto-covered guests aren't manually toggled (they follow the party) —
+      // unless the viewer pilots that guest slot (then it's genuinely theirs).
+      const canToggle = (!st.auto || isYou) && (canManage || isYou);
       const owed = Math.max(0, payoutEach - st.withdrawn);
       const title = st.auto
         ? 'Guest — auto-covered once all members are paid'
@@ -218,7 +276,8 @@ export const lootUiMixin = {
           <span class="loot-payout-check">${st.settled ? '✓' : st.partial ? '½' : ''}</span>
           <span class="loot-payout-name">${this.escapeHtml(name)}</span>
           ${st.partial ? `<span class="loot-payout-owed">+${this.formatGold(owed)}</span>` : ''}
-          ${isYou ? '<span class="loot-payout-you">you</span>' : ''}
+          ${isYou ? `<span class="loot-payout-you">you${iAmPilot ? pilotIcon : ''}</span>` : ''}
+          ${pilotName && !iAmPilot ? `<span class="loot-payout-pilot" title="Piloted by ${this.escapeHtml(pilotName)}">${pilotIcon}</span>` : ''}
         </button>`;
     }).join('');
 
@@ -227,6 +286,7 @@ export const lootUiMixin = {
         <div class="loot-payouts-head">
           <span class="loot-payouts-label">Gold shares received</span>
           <span class="loot-payouts-count ${allPaid ? 'all-paid' : ''}">${settledCount}/${members.length}</span>
+          ${claimBtn}
         </div>
         <div class="loot-payouts-chips">${chips}</div>
       </div>
@@ -280,8 +340,8 @@ export const lootUiMixin = {
         <div class="lineup-loot-header">
           <span class="loot-title">Loot</span>
           <span class="loot-count">${loot.length}</span>
-          ${total > 0 ? `<span class="loot-total">🪙 ${this.formatGold(total)}</span>` : ''}
-          ${total > 0 && partySize > 0 ? `<span class="loot-payout" title="Total ÷ ${partySize} in party">🪙 ${this.formatGold(payout)} each</span>` : ''}
+          ${total > 0 && partySize > 0 ? `<span class="loot-payout" title="Your share — ${this.formatGold(total)} total ÷ ${partySize} in party">🪙 ${this.formatGold(payout)} each</span>` : ''}
+          ${total > 0 ? `<span class="loot-total" title="Total sold gold">🪙 ${this.formatGold(total)} total</span>` : ''}
         </div>
         <div class="lineup-loot-body">
           ${addFormHtml}
@@ -302,6 +362,51 @@ export const lootUiMixin = {
 
     const playerMap = this.cachedPlayerMap;
     const payoutEach = this._payoutEach(ctx);
+
+    // "Claim my share" — marks (or un-marks) every character the viewer owns in
+    // this roster in one click, at the current full share.
+    const claimBtn = section.querySelector('.loot-claim-btn');
+    if (claimBtn) {
+      claimBtn.addEventListener('click', async () => {
+        const uid = dataService.getUser()?.id;
+        if (!uid) return;
+        const mine = this.getPartyMemberNames(ctx).filter(n => this._isMyMember(ctx, n));
+        if (mine.length === 0) return;
+
+        ctx.payouts = ctx.payouts || [];
+        const ownerOf = (n) => playerMap?.get(n)?.discordId || null; // pilots authorize via the pilot path
+        const isSettled = (n) => {
+          const r = ctx.payouts.find(p => p.memberName === n);
+          return !!r && (Number(r.amount) || 0) >= payoutEach;
+        };
+        const targets = mine.filter(n => !isSettled(n)); // unsettled → claim these
+        const claiming = targets.length > 0;             // none left → un-claim all
+        const before = ctx.payouts.map(p => ({ ...p })); // snapshot for revert
+
+        if (claiming) {
+          ctx.payouts = [
+            ...ctx.payouts.filter(p => !targets.includes(p.memberName)),
+            ...targets.map(n => ({ memberName: n, discordId: ownerOf(n), source: 'web', amount: payoutEach })),
+          ];
+        } else {
+          ctx.payouts = ctx.payouts.filter(p => !mine.includes(p.memberName));
+        }
+        this._lootRerender(ctx);
+
+        try {
+          if (claiming) {
+            for (const n of targets) await this._lootMarkShare(ctx, n, ownerOf(n), payoutEach);
+          } else {
+            for (const n of mine) await this._lootUnmarkShare(ctx, n, ownerOf(n));
+          }
+        } catch (err) {
+          ctx.payouts = before;
+          toast.error(err.message || 'Failed to update share');
+          this._lootRerender(ctx);
+        }
+      });
+    }
+
     section.querySelectorAll('.loot-payout-chip:not([disabled])').forEach(chip => {
       chip.addEventListener('click', async () => {
         const member = chip.dataset.member;
