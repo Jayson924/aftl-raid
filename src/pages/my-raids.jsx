@@ -1827,16 +1827,17 @@ export const MyRaidsPage = {
       listEl.innerHTML = '<p class="empty-state">Loading cards…</p>';
       try {
         const playerIds = cardEligiblePlayers.map(p => p.id);
+        // Scoped to this user's characters — no reason to pull the whole guild's cards.
         const [allCards, allExtras, names, pageCount] = await Promise.all([
-          dataService.getPlayerCards(),
-          dataService.getExtraCards(),
+          dataService.getPlayerCards(playerIds),
+          dataService.getExtraCards(playerIds),
           dataService.getCardSlotNames(),
           dataService.getCardPageCount()
         ]);
-        this._playerCards = allCards.filter(c => playerIds.includes(c.playerId));
+        this._playerCards = allCards;
         // Group extras by player and sort
         const extrasByPlayer = {};
-        (allExtras || []).filter(e => playerIds.includes(e.playerId)).forEach(e => {
+        (allExtras || []).forEach(e => {
           if (!extrasByPlayer[e.playerId]) extrasByPlayer[e.playerId] = [];
           extrasByPlayer[e.playerId].push(e);
         });

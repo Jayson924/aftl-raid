@@ -1939,16 +1939,55 @@ class DataService {
   // PLAYER CARDS (monster card collection)
   // ============================================
 
-  async getPlayerCards(playerId = null) {
-    let query = supabase.from('player_cards').select('*');
-    if (playerId) query = query.eq('player_id', playerId);
-    const { data, error } = await query;
+  /**
+   * Select every row of a table, paging past PostgREST's 1000-row response cap.
+   * A stable sort is required or ranges can skip/repeat rows between requests.
+   *
+   * @param {string} table
+   * @param {string} orderBy - comma-separated columns forming a unique-enough sort
+   * @param {(query: any) => any} [applyFilters]
+   */
+  async _fetchAllRows(table, orderBy, applyFilters = q => q) {
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 50; // runaway guard; 50k rows is far past anything here
+    const columns = orderBy.split(',').map(c => c.trim()).filter(Boolean);
+    const all = [];
 
-    if (error) {
-      console.error('Error fetching player cards:', error);
-      return [];
+    for (let page = 0; page < MAX_PAGES; page++) {
+      let query = applyFilters(supabase.from(table).select('*'));
+      columns.forEach(col => { query = query.order(col, { ascending: true }); });
+
+      const { data, error } = await query.range(all.length, all.length + PAGE_SIZE - 1);
+      if (error) {
+        console.error(`Error fetching ${table}:`, error);
+        return all;
+      }
+
+      // Advance by what actually came back, so a server cap below PAGE_SIZE
+      // still pages through instead of stopping short.
+      if (!data?.length) return all;
+      all.push(...data);
     }
-    return data.map(c => ({
+
+    console.warn(`_fetchAllRows(${table}) hit the page guard — results may be incomplete`);
+    return all;
+  }
+
+  /**
+   * @param {string|string[]|null} playerId - one id, a list of ids, or null for every character.
+   *
+   * PostgREST caps a single response at 1000 rows (db-max-rows) and truncates
+   * SILENTLY, so an unfiltered fetch used to drop the newest rows — which read
+   * as "the last card page won't save". Always paged; never a bare select.
+   */
+  async getPlayerCards(playerId = null) {
+    const rows = await this._fetchAllRows('player_cards', 'player_id,slot_index', q => {
+      if (Array.isArray(playerId)) return q.in('player_id', playerId);
+      if (playerId) return q.eq('player_id', playerId);
+      return q;
+    });
+
+    return rows.map(c => ({
       id: c.id,
       playerId: c.player_id,
       slotIndex: c.slot_index,
@@ -2014,16 +2053,15 @@ class DataService {
   // PLAYER EXTRA CARDS (duplicates / stash, by name+rarity+amount)
   // ============================================
 
+  /** @param {string|string[]|null} playerId - see getPlayerCards; same 1000-row paging. */
   async getExtraCards(playerId = null) {
-    let query = supabase.from('player_extra_cards').select('*');
-    if (playerId) query = query.eq('player_id', playerId);
-    const { data, error } = await query;
+    const rows = await this._fetchAllRows('player_extra_cards', 'player_id,card_name,rarity', q => {
+      if (Array.isArray(playerId)) return q.in('player_id', playerId);
+      if (playerId) return q.eq('player_id', playerId);
+      return q;
+    });
 
-    if (error) {
-      console.error('Error fetching extra cards:', error);
-      return [];
-    }
-    return (data || []).map(e => ({
+    return (rows || []).map(e => ({
       id: e.id,
       playerId: e.player_id,
       cardName: e.card_name,
