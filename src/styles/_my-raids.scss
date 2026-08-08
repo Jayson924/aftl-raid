@@ -1177,6 +1177,43 @@
   border-radius: 6px;
 }
 
+// Move-to-group band under each group's cards. Dropping a character here pulls
+// it out of its current group instead of swapping with a card. Hidden until a
+// drag starts, except on empty groups where it doubles as the placeholder.
+.my-raids-page .character-drop-zone {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.5rem;
+  padding: 0.55rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: $text-muted;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+
+  &.is-empty,
+  &.active {
+    display: flex;
+  }
+
+  &.active {
+    border-color: rgba(244, 196, 48, 0.3);
+    background: rgba(244, 196, 48, 0.04);
+    color: rgba(244, 196, 48, 0.7);
+  }
+
+  &.drag-over {
+    border-style: solid;
+    border-color: $primary-color;
+    background: rgba(244, 196, 48, 0.14);
+    color: $primary-color;
+    box-shadow: 0 0 12px rgba(244, 196, 48, 0.25);
+  }
+}
+
 // Drop-zone highlight while dragging a character — kept subtle so the
 // swap-target highlight on the specific card is the primary cue.
 .my-raids-page .character-cards.drag-over {
@@ -1270,6 +1307,11 @@
 
   .my-raids-page .char-move-controls {
     display: flex;
+  }
+
+  // No dragging here, so only the empty-group placeholder band is useful
+  .my-raids-page .character-drop-zone:not(.is-empty) {
+    display: none;
   }
 }
 

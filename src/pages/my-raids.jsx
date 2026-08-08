@@ -478,6 +478,9 @@ export const MyRaidsPage = {
 
     structure.forEach(acct => {
       const sections = [];
+      // Drop zones only make sense once the account actually has groups to move
+      // between — a lone Ungrouped bucket has nowhere to move a character to.
+      const showDropZone = editable && acct.hasGroups;
 
       if (acct.hasGroups || editable) {
         acct.groups.forEach(group => {
@@ -485,7 +488,7 @@ export const MyRaidsPage = {
           sections.push(this.renderGroupSection({
             groupId: group.id, name: group.name, players: group.players,
             accountNumber: acct.accountNumber, editable, renderCharacter, containerClass,
-            showHeader: true
+            showHeader: true, showDropZone
           }));
         });
         // Ungrouped bucket — header only shown when real groups exist
@@ -493,7 +496,7 @@ export const MyRaidsPage = {
           sections.push(this.renderGroupSection({
             groupId: '', name: 'Ungrouped', players: acct.ungrouped,
             accountNumber: acct.accountNumber, editable, renderCharacter, containerClass,
-            showHeader: acct.hasGroups, isUngrouped: true
+            showHeader: acct.hasGroups, isUngrouped: true, showDropZone
           }));
         }
       } else {
@@ -523,7 +526,7 @@ export const MyRaidsPage = {
     return html;
   },
 
-  renderGroupSection({ groupId, name, players, accountNumber, editable, renderCharacter, containerClass, showHeader, isUngrouped = false }) {
+  renderGroupSection({ groupId, name, players, accountNumber, editable, renderCharacter, containerClass, showHeader, isUngrouped = false, showDropZone = false }) {
     let html = `<div class="character-group" data-group-id="${groupId}" data-account="${accountNumber}">`;
 
     if (showHeader) {
@@ -543,10 +546,21 @@ export const MyRaidsPage = {
 
     html += `<div class="${containerClass}" data-group-id="${groupId}" data-account="${accountNumber}">`;
     players.forEach(p => { html += renderCharacter(p); });
-    if (editable && players.length === 0) {
+    html += `</div>`;
+
+    // Move-to-group drop band. Sits outside .character-cards so it never gets
+    // treated as a swap target. Hidden until a drag starts, except for empty
+    // groups where it doubles as the "this group is empty" placeholder.
+    if (showDropZone) {
+      const label = isUngrouped ? 'Ungrouped' : (name || 'Ungrouped');
+      html += `<div class="character-drop-zone${players.length === 0 ? ' is-empty' : ''}" data-group-id="${groupId}" data-account="${accountNumber}">
+        <span>${players.length === 0 ? 'Drop a character here' : `Move to ${escapeHtml(label)}`}</span>
+      </div>`;
+    } else if (editable && players.length === 0) {
       html += `<div class="character-group-empty">Drop a character here</div>`;
     }
-    html += `</div></div>`;
+
+    html += `</div>`;
     return html;
   },
 
@@ -725,15 +739,39 @@ export const MyRaidsPage = {
     }
   },
 
-  async changeCharacterGroup(playerId, newGroupId) {
+  // Mobile group <select> — same operation as dropping on a group's band.
+  changeCharacterGroup(playerId, newGroupId) {
+    return this.handleCharacterMove(playerId, newGroupId);
+  },
+
+  // Move a character out of its current group and onto the end of `newGroupId`
+  // (null = Ungrouped). Unlike a swap nobody trades places: both buckets keep
+  // their relative order, the character just changes membership.
+  async handleCharacterMove(playerId, newGroupId) {
     const player = this._myPlayers.find(p => p.id === playerId);
     if (!player) return;
-    if ((player.groupId || null) === (newGroupId || null)) return;
-    const dest = this.bucketPlayers(player.accountNumber || 1, newGroupId).filter(p => p.id !== playerId);
+    const acct = player.accountNumber || 1;
+    const gid = newGroupId || null;
+    const from = player.groupId || null;
+
+    const dest = this.bucketPlayers(acct, gid).filter(p => p.id !== playerId);
+    // Dropping on your own group's band sends you to the end of it — unless
+    // you're already there, in which case there's nothing to save.
+    if (from === gid) {
+      const bucket = this.bucketPlayers(acct, gid);
+      if (bucket[bucket.length - 1]?.id === playerId) return;
+    }
     dest.push(player); // append to end of destination
+
     try {
-      await this.persistBucketOrder(dest, newGroupId);
+      await this.persistBucketOrder(dest, gid);
       this.renderRaidsList();
+      if (from !== gid) {
+        const name = gid
+          ? (this._characterGroups.find(g => g.id === gid)?.name || 'group')
+          : 'Ungrouped';
+        toast.success(`${player.name} moved to ${name}`);
+      }
     } catch (e) {
       toast.error(`Failed to move: ${e.message}`);
     }
@@ -754,6 +792,11 @@ export const MyRaidsPage = {
         block.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         try { e.dataTransfer.setData('text/plain', block.dataset.playerId); } catch (_) {}
+        // Reveal the "move to group" bands for this character's account only
+        // (groups are per-account, so other accounts aren't valid targets).
+        root.querySelectorAll('.character-drop-zone').forEach(zone => {
+          if (zone.dataset.account === block.dataset.account) zone.classList.add('active');
+        });
       });
       block.addEventListener('dragend', () => {
         block.classList.remove('dragging');
@@ -761,6 +804,35 @@ export const MyRaidsPage = {
         this._draggingPlayerId = null;
         root.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         root.querySelectorAll('.swap-target').forEach(el => el.classList.remove('swap-target'));
+        root.querySelectorAll('.character-drop-zone.active').forEach(el => el.classList.remove('active'));
+      });
+    });
+
+    // Drop bands: dropping here lifts the character out of its current group
+    // and appends it to this one (a move, not a swap).
+    root.querySelectorAll('.character-drop-zone').forEach(zone => {
+      const accepts = () => {
+        if (!this._draggingPlayerId) return false;
+        const dragging = this._myPlayers.find(p => p.id === this._draggingPlayerId);
+        return !!dragging && String(dragging.accountNumber || 1) === String(zone.dataset.account);
+      };
+      zone.addEventListener('dragover', (e) => {
+        if (!accepts()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        zone.classList.add('drag-over');
+        root.querySelectorAll('.swap-target').forEach(el => el.classList.remove('swap-target'));
+      });
+      zone.addEventListener('dragleave', (e) => {
+        if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+      });
+      zone.addEventListener('drop', (e) => {
+        if (!accepts()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.remove('drag-over');
+        this.handleCharacterMove(this._draggingPlayerId, zone.dataset.groupId || null);
       });
     });
 
