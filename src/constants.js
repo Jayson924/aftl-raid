@@ -167,7 +167,7 @@ export const DAMAGE_AMP_SOURCES = {
     name: 'Mecha Duck',
     physical: 12,
     magic: 12,
-    classes: ['Gear Master, Shooting Star']
+    classes: ['Gear Master', 'Shooting Star']
   },
   tempest: {
     name: 'Binding Shot EX',
@@ -210,6 +210,24 @@ export const DAMAGE_AMP_SOURCES = {
     physical: 20,
     magic: 20,
     classes: ['Dark Avenger']
+  },
+  abyssWalker: {
+    name: 'Nightfall',
+    physical: 25,
+    magic: 25,
+    classes: ['Abyss Walker']
+  },
+  lightFury: {
+    name: 'Sunshine Spark',
+    physical: 20,
+    magic: 20,
+    classes: ['Light Fury']
+  },
+  elestra: {
+    name: 'Icy Shards',
+    physical: 20,
+    magic: 20,
+    classes: ['Elestra']
   }
 };
 
