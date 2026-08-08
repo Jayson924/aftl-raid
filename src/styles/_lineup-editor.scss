@@ -1173,6 +1173,7 @@
 
     .class-family-filter {
       display: flex;
+      flex-wrap: wrap;
       gap: 0.5rem;
       margin-bottom: 0.5rem;
       justify-content: center;

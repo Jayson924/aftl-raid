@@ -90,7 +90,7 @@ Decision rule to resist the most common mistake: a warm RED / PINK-RED / ROSE / 
 Enhancement levels appear as small "+X" numbers overlaid on each equipment icon, typically in the bottom-right or center of the icon. They are small white or yellow text. Look carefully at each icon — most equipped items WILL have an enhancement number. Common values range from +9 to +15. If you can make out any number on the icon, report it. If the number is hard to read, give your best guess rather than leaving it as 0. Only use 0 for accessories (which have no enhancement).
 
 Valid class names (use EXACTLY one of these):
-Gladiator, Moon Lord, Barbarian, Destroyer, Dark Avenger, Sniper, Artillery, Tempest, Wind Walker, Saleana, Elestra, Smasher, Majesty, Guardian, Crusader, Saint, Inquisitor, Shooting Star, Gear Master, Adept, Physician, Dark Summoner, Soul Eater, Blade Dancer, Spirit Dancer
+Gladiator, Moon Lord, Barbarian, Destroyer, Dark Avenger, Sniper, Artillery, Tempest, Wind Walker, Saleana, Elestra, Smasher, Majesty, Guardian, Crusader, Saint, Inquisitor, Shooting Star, Gear Master, Adept, Physician, Dark Summoner, Soul Eater, Blade Dancer, Spirit Dancer, Ripper, Raven, Light Fury, Abyss Walker
 
 Return this JSON structure. IMPORTANT: the rarity and enhancement values shown below are FORMAT PLACEHOLDERS ONLY — they are deliberately mixed so you do not copy them. Read each border color yourself and report what you actually see; do NOT default any slot to the value shown here.
 {

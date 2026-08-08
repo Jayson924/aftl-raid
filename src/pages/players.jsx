@@ -60,7 +60,8 @@ export const PlayersPage = {
     sorceress: '#DF69FF',
     cleric: '#6CC9EB',
     academic: '#F7DA6F',
-    kali: '#756EFF'
+    kali: '#756EFF',
+    assassin: '#3FD68C'
   },
 
   // Check if current user can edit a player (using Discord-linked ownership)
@@ -2173,14 +2174,15 @@ export const PlayersPage = {
         const enhEl = document.getElementById(`${prefix}-${slotId}-enhance`);
         if (enhEl) enhEl.value = String(piece.enhancement);
       }
-      // Default Lv60 for rare/epic, Lv50 for unique/legend
+      // Equipment level isn't visible on a character sheet screenshot (it only
+      // shows in the hover tooltip), so it can't be read — assume Lv60 for every
+      // imported piece and let the user correct the toggle before saving.
       const levelBtn = document.getElementById(`${prefix}-${slotId}-level`);
       if (levelBtn) {
-        const defaultLevel = (piece.rarity === 'rare' || piece.rarity === 'epic') ? '60' : '50';
-        levelBtn.dataset.level = defaultLevel;
-        levelBtn.textContent = `Lv${defaultLevel}`;
+        levelBtn.dataset.level = '60';
+        levelBtn.textContent = 'Lv60';
         levelBtn.classList.remove('level-40', 'level-50', 'level-60');
-        levelBtn.classList.add(`level-${defaultLevel}`);
+        levelBtn.classList.add('level-60');
       }
     };
 

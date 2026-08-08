@@ -18,6 +18,7 @@ export const CLASS_SPRITE_MAP = {
   'Cleric':         [0, 3],
   'Academic':       [0, 4],
   'Kali':           [0, 5],
+  'Assassin':       [0, 6],
   // 1st specializations
   'Swordmaster':    [0, 8],
   'Mercenary':      [1, 0],
@@ -32,6 +33,8 @@ export const CLASS_SPRITE_MAP = {
   'Alchemist':      [4, 3],
   'Screamer':       [4, 6],
   'Dancer':         [5, 0],
+  'Chaser':         [5, 3],
+  'Bringer':        [5, 6],
   // Final classes
   'Gladiator':      [1, 2],
   'Moon Lord':      [1, 3],
@@ -58,6 +61,10 @@ export const CLASS_SPRITE_MAP = {
   'Soul Eater':     [4, 8],
   'Blade Dancer':   [5, 1],
   'Spirit Dancer':  [5, 2],
+  'Ripper':         [5, 4],
+  'Raven':          [5, 5],
+  'Light Fury':     [5, 7],
+  'Abyss Walker':   [5, 8],
 };
 
 // Returns true if a raid type uses 4 slots instead of 8
@@ -116,7 +123,11 @@ export const CLASSES = [
   'Dark Summoner',
   'Soul Eater',
   'Blade Dancer',
-  'Spirit Dancer'
+  'Spirit Dancer',
+  'Ripper',
+  'Raven',
+  'Light Fury',
+  'Abyss Walker'
 ];
 
 // Damage amplification sources - each source only counts once even if multiple classes provide it
@@ -310,6 +321,23 @@ export const CLASS_FAMILIES = {
         classes: ['Blade Dancer', 'Spirit Dancer']
       }
     }
+  },
+  assassin: {
+    name: 'Assassin',
+    icon: 'assassin.png',
+    classes: ['Ripper', 'Raven', 'Light Fury', 'Abyss Walker'],
+    specializations: {
+      chaser: {
+        name: 'Chaser',
+        icon: 'assassin.png',
+        classes: ['Ripper', 'Raven']
+      },
+      bringer: {
+        name: 'Bringer',
+        icon: 'assassin.png',
+        classes: ['Light Fury', 'Abyss Walker']
+      }
+    }
   }
 };
 
@@ -380,12 +408,53 @@ export const WEAPON_SUFFIXES = [
 ];
 
 // Gearscore calculation
-// Weighted 0-100 scale based on equipment rarity, level, enhancement, and suffixes
-// Gearscore formula: 60% gear, 40% FD
-// Gear: 7 equipment (rarity + enhancement) + 4 accessories (rarity only)
-// FD: percentage of community-found cap, using breakpoint table
+// Weighted 0-100 scale based on equipment rarity, level, enhancement and FD.
+//
+// A perfect 100 is the in-game maximum:
+//   • Final Damage MAX_FD (3762)
+//   • all 7 armour/weapon pieces Lv60 Legend +15
+//   • all 4 accessories Lv60 Legend
+//
+// Split: 60% gear, 40% FD.
+// Gear: 7 equipment (gear value + enhancement) + 4 accessories (gear value only —
+// accessories can't be enhanced in game).
+// FD: position on the admin breakpoint table, anchored so MAX_FD == full marks.
 
-const GS_RARITY_PERCENT = { legend: 1.0, unique: 0.65, epic: 0.35, rare: 0.15, magic: 0.05, normal: 0, '': 0 };
+// Final Damage cap. Also the last row of the admin FD table (3762 → 60%).
+export const MAX_FD = 3762;
+
+// Gear value per rarity per equipment level. 1.0 = Lv60 Legend = the cap.
+// Interleaved progression — dropping one rarity costs about the same as
+// dropping one level, so the tiers alternate:
+//   Lv60 Legend > Lv60 Unique > Lv50 Legend > Lv60 Epic > Lv50 Unique > Lv50 Epic
+//
+// The Lv60 Unique / Lv50 Legend gap is deliberately tight (0.06). Accessories
+// can't be enhanced, so their 18 pts are decided on gear value alone — if that
+// gap grows past ~0.081 a full Lv60 Unique +12 set out-scores a Lv50 Legend +13
+// set even though the Legend piece wins slot for slot. Keep it under 0.08 or
+// "one more enhancement level beats one tier up" stops holding for whole
+// characters. See the ladder in the gearscore memory before retuning.
+export const GEARSCORE_GEAR_VALUES = {
+  legend: { 60: 1.00, 50: 0.60, 40: 0.30 },
+  unique: { 60: 0.66, 50: 0.34, 40: 0.17 },
+  epic:   { 60: 0.42, 50: 0.20, 40: 0.10 },
+  rare:   { 60: 0.22, 50: 0.10, 40: 0.05 },
+  magic:  { 60: 0.10, 50: 0.05, 40: 0.02 },
+  normal: { 60: 0,    50: 0,    40: 0 }
+};
+
+// Pieces saved before per-piece level existed have no `level` — treat them as Lv50,
+// which is what the character editor defaults the toggle to.
+const GS_DEFAULT_LEVEL = '50';
+
+// Value of a single piece from its rarity + equipment level, 0–1.
+export function getGearValue(rarity, level) {
+  const byLevel = GEARSCORE_GEAR_VALUES[rarity];
+  if (!byLevel) return 0;
+  const key = String(level ?? GS_DEFAULT_LEVEL);
+  return byLevel[key] ?? byLevel[GS_DEFAULT_LEVEL] ?? 0;
+}
+
 const GS_ENHANCE_PERCENT = { 15: 1.0, 14: 0.85, 13: 0.7, 12: 0.55, 11: 0.4, 10: 0.28, 9: 0.18, 0: 0 };
 
 const GEAR_WEIGHT = 60;
@@ -423,6 +492,23 @@ export function fdToPercent(rawFd, fdTable) {
   return max.pct;
 }
 
+// FD as a fraction of the cap, 0–1, following the admin breakpoint curve.
+// Anchored at MAX_FD rather than the table's last row, so adding a row above
+// 3762 can't silently move the goalposts. Falls back to linear if the table
+// doesn't reach the cap — otherwise the anchor would collapse onto the last
+// row and everyone at or above it would read as perfect.
+export function fdToScorePercent(rawFd, fdTable) {
+  if (!rawFd || rawFd <= 0) return 0;
+  const table = fdTable || _fdTable;
+  const capped = Math.min(rawFd, MAX_FD);
+
+  if (table && table.length > 0 && table[table.length - 1].fd >= MAX_FD) {
+    const capPct = fdToPercent(MAX_FD, table);
+    if (capPct > 0) return Math.min(1, fdToPercent(capped, table) / capPct);
+  }
+  return capped / MAX_FD;
+}
+
 export function calculateGearscore(player) {
   const equip = player.equipment || {};
   const stats = player.characterStats || {};
@@ -433,29 +519,27 @@ export function calculateGearscore(player) {
   let gearScore = 0;
   let hasAnyGear = false;
 
-  // Equipment: rarity (50%) + enhancement (50%) per piece
+  // Equipment: gear value (50%) + enhancement (50%) per piece
   equipSlots.forEach(slot => {
     const piece = equip[slot];
     if (!piece?.rarity) return;
     hasAnyGear = true;
-    const r = GS_RARITY_PERCENT[piece.rarity] || 0;
+    const r = getGearValue(piece.rarity, piece.level);
     const e = GS_ENHANCE_PERCENT[piece.enhancement] || 0;
     gearScore += PER_EQUIP * (r * 0.5 + e * 0.5);
   });
 
-  // Accessories: rarity only
+  // Accessories: gear value only — they can't be enhanced
   accessorySlots.forEach(slot => {
     const piece = equip[slot];
     if (!piece?.rarity) return;
     hasAnyGear = true;
-    gearScore += PER_ACCESSORY * (GS_RARITY_PERCENT[piece.rarity] || 0);
+    gearScore += PER_ACCESSORY * getGearValue(piece.rarity, piece.level);
   });
 
-  // FD portion
+  // FD portion — full marks at MAX_FD
   const fd = stats.finalDamage || 0;
-  const maxPct = _fdTable.length > 0 ? _fdTable[_fdTable.length - 1].pct : 0;
-  const fdPct = fdToPercent(fd);
-  const fdScore = maxPct > 0 ? FD_WEIGHT * (fdPct / maxPct) : 0;
+  const fdScore = FD_WEIGHT * fdToScorePercent(fd);
 
   // If no equipment data at all and no FD, fall back to legacy calculation
   if (!hasAnyGear && !fd) {
