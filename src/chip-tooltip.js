@@ -4,7 +4,7 @@
 //   renderGearscoreBadge(player) → <span> badge with rich-tip data attached
 //   initChipTooltip() → floating tooltip handler (position: fixed, escapes overflow)
 
-import { calculateGearscore, getGearscoreTier, EQUIPMENT_ICONS } from './constants.js';
+import { calculateGearscore, getGearscoreTier, calculatePowerIndex, formatPowerIndex, EQUIPMENT_ICONS } from './constants.js';
 
 const RARITY_CLASSES = new Set(['legend', 'unique', 'epic', 'rare']);
 
@@ -41,9 +41,11 @@ export function renderChipTipBody(player) {
   ];
   const fd = player.characterStats?.finalDamage;
 
+  const power = calculatePowerIndex(player);
+
   const hasWeapon = mw != null || sw != null;
   const hasArmor = armor.some(([, v]) => v != null);
-  if (!hasWeapon && !hasArmor && !fd) return '';
+  if (!hasWeapon && !hasArmor && !fd && !power) return '';
 
   const weaponSection = hasWeapon ? `
     <div class="chip-tip__section">
@@ -69,7 +71,13 @@ export function renderChipTipBody(player) {
       <span class="chip-tip__fd-val">${Number(fd).toLocaleString()}</span>
     </div>` : '';
 
-  return `${weaponSection}${armorSection}${fdSection}`;
+  const powerSection = power ? `
+    <div class="chip-tip__fd">
+      <span class="chip-tip__fd-label">Power Index</span>
+      <span class="chip-tip__fd-val">${formatPowerIndex(power.raw)} · ${power.score}</span>
+    </div>` : '';
+
+  return `${weaponSection}${armorSection}${fdSection}${powerSection}`;
 }
 
 // Convenience for places that previously rendered a plain gs-inline span inline.

@@ -116,7 +116,13 @@ Return this JSON structure. IMPORTANT: the rarity and enhancement values shown b
     "hp": 165350,
     "finalDamage": 2104,
     "defense": 8448,
-    "magicDefense": 7797
+    "magicDefense": 7797,
+    "criticalRate": 62.5,
+    "criticalDamage": 230.0,
+    "fireAttack": 18.2,
+    "iceAttack": 0,
+    "lightAttack": 0,
+    "darkAttack": 0
   },
   "confidence": "high|medium|low",
   "notes": "any issues or things that couldn't be read clearly"
@@ -124,6 +130,8 @@ Return this JSON structure. IMPORTANT: the rarity and enhancement values shown b
 
 For rarity, use lowercase: "legend", "unique", "epic", "rare", "magic", "normal".
 Use null for any field you cannot determine. For enhancement, use the number only (e.g., 12 not "+12").
+
+Critical, Critical Damage and the elemental attacks (Fire/Ice/Light/Dark Atk) are shown as percentages when visible (critical and critical damage may also show a raw value next to the percentage). Report the PERCENTAGE only, as a plain number without the % sign: criticalRate is the crit chance percentage, criticalDamage is the critical damage percentage exactly as displayed, and each element is its attack percentage. Use null for any of these that are not visible on the sheet — do not guess them.
 
 IMPORTANT: Atk Power and Magic Atk are displayed as ranges (e.g., "17103-19194"). Always use the HIGHER number (the one after the dash). For example, "17103-19194" → attackPower: 19194, "6548-7943" → magicAttack: 7943.`;
 

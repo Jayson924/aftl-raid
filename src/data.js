@@ -24,6 +24,7 @@ function raidTypeToCompletionColumn(raidType) {
   if (raidType === 'DDN Hardcore') return 'ddn_hardcore_completed';
   if (raidType === 'DDN Classic') return 'ddn_classic_completed';
   if (raidType === 'DDN Normal') return 'ddn_normal_completed';
+  if (raidType === 'BDN Classic') return 'bdn_classic_completed';
   return null;
 }
 
@@ -373,6 +374,7 @@ class DataService {
         ddnHardcoreCompleted: p.ddn_hardcore_completed || '',
         ddnClassicCompleted: p.ddn_classic_completed || '',
         ddnNormalCompleted: p.ddn_normal_completed || '',
+        bdnClassicCompleted: p.bdn_classic_completed || '',
         classicTicketUsed: p.classic_ticket_used || '',
         discordId: p.discord_id || null,
         accountNumber: p.account_number || null,
@@ -569,6 +571,7 @@ class DataService {
       ddn_hardcore_completed: player.ddnHardcoreCompleted || null,
       ddn_classic_completed: player.ddnClassicCompleted || null,
       ddn_normal_completed: player.ddnNormalCompleted || null,
+      bdn_classic_completed: player.bdnClassicCompleted || null,
       classic_ticket_used: player.classicTicketUsed || null,
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
@@ -1400,6 +1403,7 @@ class DataService {
     if (raidType === 'DDN Hardcore') return !this.isCompletedThisWeek(player.ddnHardcoreCompleted);
     if (raidType === 'DDN Classic') return !this.isCompletedThisWeek(player.ddnClassicCompleted);
     if (raidType === 'DDN Normal') return !this.isCompletedThisWeek(player.ddnNormalCompleted);
+    if (raidType === 'BDN Classic') return !this.isCompletedThisWeek(player.bdnClassicCompleted);
     const timestamp = raidType === 'Hardcore' ? player.hardcoreCompleted : player.classicCompleted;
     return !this.isCompletedThisWeek(timestamp);
   }

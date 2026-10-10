@@ -17,7 +17,7 @@ export const LineupEditorPage = {
   currentLineup: {
     id: null, // UUID from database (null for new unsaved lineups)
     name: '',
-    raidType: 'DDN Hardcore',
+    raidType: 'BDN Classic',
     status: 'ready',
     players: [],
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
@@ -55,7 +55,7 @@ export const LineupEditorPage = {
     this.currentLineup = {
       id: null,
       name: '',
-      raidType: 'DDN Hardcore',
+      raidType: 'BDN Classic',
       status: 'ready',
       players: [],
       ticketSlots: Array(8).fill(false),
@@ -91,6 +91,7 @@ export const LineupEditorPage = {
                 <div class="form-group raid-type-group">
                   <label for="raid-type">Raid Type:</label>
                   <select id="raid-type">
+                    <option value="BDN Classic">BDN Classic</option>
                     <option value="DDN Hardcore">DDN Hardcore</option>
                     <option value="DDN Classic">DDN Classic</option>
                     <option value="Hardcore">GDN Hardcore</option>
@@ -221,7 +222,7 @@ export const LineupEditorPage = {
                 </button>
               </div>
               <div class="player-filter">
-                <input type="text" id="player-search" placeholder="Search characters...">
+                <input type="text" id="player-search" placeholder="Search characters or owners...">
               </div>
               <div class="class-family-filter">
                 ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
@@ -934,6 +935,10 @@ export const LineupEditorPage = {
       const noTimePrefBadge = showNoTimePrefBadge
         ? `<span class="player-card-availability player-card-availability--warning" data-tooltip-fixed="No time preference saved">!</span>`
         : '';
+      const ownerTip = this.renderOwnerTipHtml(player);
+      const nameHtml = ownerTip
+        ? `<span class="player-owner-trigger has-chip-tip" data-chip-tip-html="${escapeAttr(ownerTip)}">${player.name}</span>`
+        : player.name;
 
       return `
         <div class="player-card ${!needsThisRaid ? 'completed' : ''} ${isInLineup ? 'in-lineup' : ''} ${ticketUsed ? 'ticket-used' : ''} ${isExcluded ? 'is-alt' : ''} ${showNoTimePrefBadge ? 'no-time-pref' : ''} ${presentInLineup ? 'present-in' : ''}"
@@ -945,7 +950,7 @@ export const LineupEditorPage = {
           ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
             <div class="player-name-row">
-              <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+              <div class="player-name">${nameHtml} ${renderGearscoreBadge(player)}</div>
               ${availBadge || noTimePrefBadge}
               ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
             </div>
@@ -964,6 +969,26 @@ export const LineupEditorPage = {
     this.setupPlayerDragHandlers();
     this.setupAddPubHandler();
     initFixedTooltip();
+  },
+
+  // Owner card for the chip tooltip on a character name: avatar, display name,
+  // and account number for alt accounts. Empty when the owner is unknown.
+  renderOwnerTipHtml(player) {
+    const owner = player.discordId ? this._userMap?.[player.discordId] : null;
+    if (!owner) return '';
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const name = owner.displayName || owner.username || 'Unknown';
+    const acct = player.accountNumber > 1 ? ` <span class="chip-tip__owner-acct">(Acct ${player.accountNumber})</span>` : '';
+    return `<div class="chip-tip__owner"><img class="chip-tip__owner-avatar" src="${esc(owner.avatarUrl || '/icons/avatar.svg')}" alt="" onerror="this.src='/icons/avatar.svg'"><span class="chip-tip__owner-name">${esc(name)}</span>${acct}</div>`;
+  },
+
+  // Search match on character name, class, or the owner's display/user name.
+  matchesPlayerSearch(player, searchTerm) {
+    if (!searchTerm) return true;
+    if (player.name.toLowerCase().includes(searchTerm)) return true;
+    if (player.role?.toLowerCase().includes(searchTerm)) return true;
+    const owner = player.discordId ? this._userMap?.[player.discordId] : null;
+    return !!owner && [owner.displayName, owner.username].some(n => n?.toLowerCase().includes(searchTerm));
   },
 
   getTimeFilterStatus(player) {
@@ -991,8 +1016,7 @@ export const LineupEditorPage = {
 
     return this.players
       .filter(player => {
-        const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
-                            player.role.toLowerCase().includes(searchTerm);
+        const matchesSearch = this.matchesPlayerSearch(player, searchTerm);
 
         const matchesGearscore = minGs === 0 || calculateGearscore(player) >= minGs;
 
@@ -1477,7 +1501,7 @@ export const LineupEditorPage = {
         <h2>Select Player for Slot ${slotIndex + 1}</h2>
 
         <div class="modal-filters">
-          <input type="text" id="modal-player-search" placeholder="Search characters...">
+          <input type="text" id="modal-player-search" placeholder="Search characters or owners...">
         </div>
 
         <div class="modal-class-family-filter">
@@ -1521,8 +1545,7 @@ export const LineupEditorPage = {
 
       const filteredPlayers = this.players
         .filter(player => {
-          const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
-                              player.role.toLowerCase().includes(searchTerm);
+          const matchesSearch = this.matchesPlayerSearch(player, searchTerm);
 
           // Class family, specialization, or final class filter
           let matchesClassFamily = true;

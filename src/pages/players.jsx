@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
@@ -328,11 +328,12 @@ export const PlayersPage = {
 
   // Filter for prioritizing uncleared raids — keyed by raid bucket
   // (ghc = GDN Hardcore, gcl = GDN Classic, dhc = DDN Hardcore,
-  //  dcl = DDN Classic, dn = DDN Normal).
-  _raidPriorityFilter: { ghc: false, gcl: false, dhc: false, dcl: false, dn: false },
+  //  dcl = DDN Classic, dn = DDN Normal, bcl = BDN Classic).
+  _raidPriorityFilter: { bcl: false, ghc: false, gcl: false, dhc: false, dcl: false, dn: false },
 
-  // Render the GDN/DDN raid badge group for a player.
+  // Render the BDN/GDN/DDN raid badge group for a player.
   renderRaidBadgesHTML(player, canToggleRaid) {
+    const needsBCL = dataService.playerNeedsRaid(player, 'BDN Classic');
     const needsGHC = dataService.playerNeedsRaid(player, 'Hardcore');
     const needsGCL = dataService.playerNeedsRaid(player, 'Classic');
     const needsDHC = dataService.playerNeedsRaid(player, 'DDN Hardcore');
@@ -348,6 +349,12 @@ export const PlayersPage = {
     const lbl = (text) => `<span class="raid-badge-label">${text}</span>`;
     return `
       <div class="raid-badge-group">
+        <div class="raid-row bdn-row">
+          <span class="raid-row-label">BDN</span>
+          <span class="raid-badge raid-bdn-classic ${!needsBCL ? 'completed' : ''} ${clickClass}"
+                ${toggleAttrs('BDN Classic', !needsBCL)}
+                title="${titleAttr}">${lbl('CL')}${!needsBCL ? check : ''}</span>
+        </div>
         <div class="raid-row gdn-row">
           <span class="raid-row-label">GDN</span>
           <span class="raid-badge raid-hardcore ${!needsGHC ? 'completed' : ''} ${clickClass}"
@@ -533,6 +540,7 @@ export const PlayersPage = {
   sortPlayersByRaidPriority(players) {
     const filter = this._raidPriorityFilter;
     const activeRaidTypes = [];
+    if (filter.bcl) activeRaidTypes.push('BDN Classic');
     if (filter.ghc) activeRaidTypes.push('Hardcore');
     if (filter.gcl) activeRaidTypes.push('Classic');
     if (filter.dhc) activeRaidTypes.push('DDN Hardcore');
@@ -989,7 +997,7 @@ export const PlayersPage = {
               </td>
               <td class="browse-acc-cell" data-label="Acc">${size > 1 ? `<span class="acct-badge" data-account="${n}">A${n}</span>` : '<span class="acct-dash">—</span>'}</td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role || ''}</td>
-              <td class="gs-cell" data-label="GS"><span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span></td>
+              <td class="gs-cell" data-label="GS"><span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span></td>
               <td class="raids-needed" data-label="Raids Needed">${this.renderRaidBadgesHTML(player, canToggleRaid)}</td>
             </tr>`;
           }).join('')}
@@ -1416,6 +1424,7 @@ export const PlayersPage = {
     listElement.innerHTML = `
       ${this.renderClassFamilyFilter()}
       <div class="raid-priority-filter mobile-filter">
+        <button class="filter-btn bdn ${this._raidPriorityFilter.bcl ? 'active' : ''}" data-filter="bcl">B CL</button>
         <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
         <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
@@ -1443,6 +1452,7 @@ export const PlayersPage = {
             <td></td>
             <td>
               <div class="raid-priority-filter">
+                <button class="filter-btn bdn ${this._raidPriorityFilter.bcl ? 'active' : ''}" data-filter="bcl">B CL</button>
                 <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
                 <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
@@ -1478,7 +1488,7 @@ export const PlayersPage = {
               </td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>`; })()}
               </td>
               <td data-label="Equipment">
                 ${this._buildEquipSummaryHtml(player)}
@@ -1719,7 +1729,7 @@ export const PlayersPage = {
       const rInfo = EQUIPMENT_RARITIES.find(r => r.value === piece.rarity);
       const color = rInfo?.color || 'inherit';
       const enh = piece.enhancement ? ` +${piece.enhancement}` : '';
-      const lvl = piece.level === '60' ? 'Lv60' : piece.level === '40' ? 'Lv40' : 'Lv50';
+      const lvl = `Lv${['70', '60', '40'].includes(String(piece.level)) ? piece.level : '50'}`;
       return `<div class="equip-cell"><span class="equip-cell-label">${label}</span><span class="equip-cell-value" style="color: ${color}"><span class="equip-cell-lv">${lvl}</span> ${rInfo?.label || piece.rarity}${enh}</span></div>`;
     };
 
@@ -1811,7 +1821,7 @@ export const PlayersPage = {
               </td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`; })()}
+                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>`; })()}
               </td>
               <td data-label="Equipment">
                 ${formatPlayerEquipmentHtml(player)}
@@ -2142,6 +2152,17 @@ export const PlayersPage = {
     if (val('hp') != null) stats.hp = val('hp');
     if (val('def') != null) stats.defense = val('def');
     if (val('mdef') != null) stats.magicDefense = val('mdef');
+    // Percentages for the power index — keep decimals.
+    const pct = (id) => {
+      const v = document.getElementById(`${prefix}-${id}`)?.value;
+      return v ? parseFloat(v) : null;
+    };
+    if (pct('crit') != null) stats.criticalRate = pct('crit');
+    if (pct('critdmg') != null) stats.criticalDamage = pct('critdmg');
+    if (pct('fire') != null) stats.fireAttack = pct('fire');
+    if (pct('ice') != null) stats.iceAttack = pct('ice');
+    if (pct('light') != null) stats.lightAttack = pct('light');
+    if (pct('dark') != null) stats.darkAttack = pct('dark');
     return stats;
   },
 
@@ -2175,14 +2196,14 @@ export const PlayersPage = {
         if (enhEl) enhEl.value = String(piece.enhancement);
       }
       // Equipment level isn't visible on a character sheet screenshot (it only
-      // shows in the hover tooltip), so it can't be read — assume Lv60 for every
-      // imported piece and let the user correct the toggle before saving.
+      // shows in the hover tooltip), so it can't be read — assume Lv70 (the cap)
+      // for every imported piece and let the user correct the toggle before saving.
       const levelBtn = document.getElementById(`${prefix}-${slotId}-level`);
       if (levelBtn) {
-        levelBtn.dataset.level = '60';
-        levelBtn.textContent = 'Lv60';
-        levelBtn.classList.remove('level-40', 'level-50', 'level-60');
-        levelBtn.classList.add('level-60');
+        levelBtn.dataset.level = '70';
+        levelBtn.textContent = 'Lv70';
+        levelBtn.classList.remove('level-40', 'level-50', 'level-60', 'level-70');
+        levelBtn.classList.add('level-70');
       }
     };
 
@@ -2205,6 +2226,12 @@ export const PlayersPage = {
     if (stats.hp) document.getElementById(`${prefix}-hp`).value = stats.hp;
     if (stats.defense) document.getElementById(`${prefix}-def`).value = stats.defense;
     if (stats.magicDefense) document.getElementById(`${prefix}-mdef`).value = stats.magicDefense;
+    if (stats.criticalRate != null) document.getElementById(`${prefix}-crit`).value = stats.criticalRate;
+    if (stats.criticalDamage != null) document.getElementById(`${prefix}-critdmg`).value = stats.criticalDamage;
+    if (stats.fireAttack != null) document.getElementById(`${prefix}-fire`).value = stats.fireAttack;
+    if (stats.iceAttack != null) document.getElementById(`${prefix}-ice`).value = stats.iceAttack;
+    if (stats.lightAttack != null) document.getElementById(`${prefix}-light`).value = stats.lightAttack;
+    if (stats.darkAttack != null) document.getElementById(`${prefix}-dark`).value = stats.darkAttack;
   },
 
   // Helper: setup screenshot upload handlers
@@ -2313,11 +2340,11 @@ export const PlayersPage = {
     modalElement.querySelectorAll('.equip-level-toggle').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        const cycle = { '50': '60', '60': '40', '40': '50' };
+        const cycle = { '50': '60', '60': '70', '70': '40', '40': '50' };
         const next = cycle[btn.dataset.level] || '50';
         btn.dataset.level = next;
         btn.textContent = `Lv${next}`;
-        btn.classList.remove('level-40', 'level-50', 'level-60');
+        btn.classList.remove('level-40', 'level-50', 'level-60', 'level-70');
         btn.classList.add(`level-${next}`);
       });
     });
@@ -2420,6 +2447,30 @@ export const PlayersPage = {
             <div class="stat-input-row">
               <label>MDef</label>
               <input type="number" id="${prefix}-mdef" value="${st.magicDefense || ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Crit %</label>
+              <input type="number" step="0.1" id="${prefix}-crit" value="${st.criticalRate ?? ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Crit Dmg %</label>
+              <input type="number" step="0.1" id="${prefix}-critdmg" value="${st.criticalDamage ?? ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Fire %</label>
+              <input type="number" step="0.1" id="${prefix}-fire" value="${st.fireAttack ?? ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Ice %</label>
+              <input type="number" step="0.1" id="${prefix}-ice" value="${st.iceAttack ?? ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Light %</label>
+              <input type="number" step="0.1" id="${prefix}-light" value="${st.lightAttack ?? ''}" placeholder="0" />
+            </div>
+            <div class="stat-input-row">
+              <label>Dark %</label>
+              <input type="number" step="0.1" id="${prefix}-dark" value="${st.darkAttack ?? ''}" placeholder="0" />
             </div>
           </div>
         </div>

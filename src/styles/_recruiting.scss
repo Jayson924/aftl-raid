@@ -962,6 +962,38 @@
   }
 }
 
+// Owner card shown on character names in the lineup editor.
+.chip-tip:has(.chip-tip__owner) {
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.chip-tip__owner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.chip-tip__owner-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.chip-tip__owner-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.chip-tip__owner-acct {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
 // ─── Slot Picker (sticky bottom dock — drag from picker into party slots) ───
 
 body.slot-picker-open {

@@ -381,6 +381,7 @@ export const MAX_CARD_PAGES = 16; // matches DB CHECK constraint (slot_index < 2
 
 // Equipment levels (for epic/unique/legend rarity)
 export const EQUIPMENT_LEVELS = [
+  { value: '70', label: 'Lv70' },
   { value: '60', label: 'Lv60' },
   { value: '50', label: 'Lv50' },
   { value: '40', label: 'Lv40' }
@@ -425,40 +426,21 @@ export const WEAPON_SUFFIXES = [
   { value: 'health', label: 'Health' }
 ];
 
-// Gearscore calculation
-// Weighted 0-100 scale based on equipment rarity, level, enhancement and FD.
-//
-// A perfect 100 is the in-game maximum:
-//   • Final Damage MAX_FD (3762)
-//   • all 7 armour/weapon pieces Lv60 Legend +15
-//   • all 4 accessories Lv60 Legend
-//
-// Split: 60% gear, 40% FD.
-// Gear: 7 equipment (gear value + enhancement) + 4 accessories (gear value only —
-// accessories can't be enhanced in game).
-// FD: position on the admin breakpoint table, anchored so MAX_FD == full marks.
+// Gearscore 0-100: 60% gear, 40% FD. 100 = max FD plus full Lv70 Legend gear at +15
+// (accessories can't be enhanced, so they score on rarity and level only).
 
 // Final Damage cap. Also the last row of the admin FD table (3762 → 60%).
 export const MAX_FD = 3762;
 
-// Gear value per rarity per equipment level. 1.0 = Lv60 Legend = the cap.
-// Interleaved progression — dropping one rarity costs about the same as
-// dropping one level, so the tiers alternate:
-//   Lv60 Legend > Lv60 Unique > Lv50 Legend > Lv60 Epic > Lv50 Unique > Lv50 Epic
-//
-// The Lv60 Unique / Lv50 Legend gap is deliberately tight (0.06). Accessories
-// can't be enhanced, so their 18 pts are decided on gear value alone — if that
-// gap grows past ~0.081 a full Lv60 Unique +12 set out-scores a Lv50 Legend +13
-// set even though the Legend piece wins slot for slot. Keep it under 0.08 or
-// "one more enhancement level beats one tier up" stops holding for whole
-// characters. See the ladder in the gearscore memory before retuning.
+// 1.0 = Lv70 Legend (the cap). Keep the Lv70 Unique / Lv60 Legend gap under 0.08,
+// or unenhanceable accessories let a Unique set out-score a better Legend set.
 export const GEARSCORE_GEAR_VALUES = {
-  legend: { 60: 1.00, 50: 0.60, 40: 0.30 },
-  unique: { 60: 0.66, 50: 0.34, 40: 0.17 },
-  epic:   { 60: 0.42, 50: 0.20, 40: 0.10 },
-  rare:   { 60: 0.22, 50: 0.10, 40: 0.05 },
-  magic:  { 60: 0.10, 50: 0.05, 40: 0.02 },
-  normal: { 60: 0,    50: 0,    40: 0 }
+  legend: { 70: 1.00, 60: 0.60, 50: 0.30, 40: 0.15 },
+  unique: { 70: 0.66, 60: 0.34, 50: 0.17, 40: 0.08 },
+  epic:   { 70: 0.42, 60: 0.20, 50: 0.10, 40: 0.05 },
+  rare:   { 70: 0.22, 60: 0.10, 50: 0.05, 40: 0.02 },
+  magic:  { 70: 0.10, 60: 0.05, 50: 0.02, 40: 0.01 },
+  normal: { 70: 0,    60: 0,    50: 0,    40: 0 }
 };
 
 // Pieces saved before per-piece level existed have no `level` — treat them as Lv50,
@@ -581,6 +563,64 @@ function calculateGearscoreLegacy(player) {
   const suffixCount = [player.suffix1, player.suffix2].filter(s => s && s !== '').length;
 
   return wr + ar + we + ae + (suffixCount * 5);
+}
+
+// Crit rate cap at max level in Classic DN. Unconfirmed.
+export const POWER_CRIT_RATE_CAP = 0.89;
+// Crit damage multiplier assumed when the sheet doesn't show one (200%).
+const POWER_DEFAULT_CRIT_MULT = 2.0;
+// Raw index that maps to 100 when normalising. Overridden by app_config
+// `power_index_max` (admin page) via setPowerIndexMax().
+export const POWER_INDEX_MAX_DEFAULT = 100000;
+
+let _powerIndexMax = POWER_INDEX_MAX_DEFAULT;
+
+export function setPowerIndexMax(value) {
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) _powerIndexMax = n;
+}
+
+export function getPowerIndexMax() {
+  return _powerIndexMax;
+}
+
+// Damage proxy from sheet stats: { raw, score 0–100 }, or null without an attack value.
+// Missing crit/element stats count as no bonus.
+export function calculatePowerIndex(player) {
+  const s = player.characterStats || {};
+  const atk = Math.max(Number(s.attackPower) || 0, Number(s.magicAttack) || 0);
+  if (!atk) return null;
+
+  const fdPct = fdToPercent(Number(s.finalDamage) || 0) / 100;
+
+  let critTerm = 1;
+  const critRate = Number(s.criticalRate);
+  if (critRate > 0) {
+    const rate = Math.min(critRate / 100, POWER_CRIT_RATE_CAP);
+    const critDmg = Number(s.criticalDamage);
+    const mult = critDmg > 0 ? critDmg / 100 : POWER_DEFAULT_CRIT_MULT;
+    critTerm = 1 + rate * (mult - 1);
+  }
+
+  const bestElement = Math.max(0, ...['fireAttack', 'iceAttack', 'lightAttack', 'darkAttack'].map(k => Number(s[k]) || 0));
+  const elementTerm = 1 + bestElement / 100;
+
+  const raw = Math.round(atk * (1 + fdPct) * critTerm * elementTerm);
+  const score = Math.min(100, Math.round((raw / _powerIndexMax) * 100));
+  return { raw, score };
+}
+
+// Compact display for raw power values, e.g. 73400 → "73.4k".
+export function formatPowerIndex(raw) {
+  if (raw >= 1e6) return `${(raw / 1e6).toFixed(2)}M`;
+  if (raw >= 1e3) return `${(raw / 1e3).toFixed(1)}k`;
+  return String(raw);
+}
+
+// Plain-text tooltip for GS badges: "Gearscore · Power 73.4k (73)".
+export function gearscoreTooltipText(player) {
+  const power = calculatePowerIndex(player);
+  return power ? `Gearscore · Power ${formatPowerIndex(power.raw)} (${power.score})` : 'Gearscore';
 }
 
 // Gearscore tier thresholds and colors

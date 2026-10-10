@@ -23,7 +23,7 @@ export const LineupsPage = {
     }
   },
   activeSection: 'lineups', // 'lineups' | 'loot-log'
-  currentRaidType: 'DDN Hardcore',
+  currentRaidType: 'BDN Classic',
   currentShowcaseLineup: null,
   allLineups: [],
   cachedPlayerMap: null,
@@ -87,6 +87,7 @@ export const LineupsPage = {
 
         <div id="lineups-section" class="page-section" ${this.activeSection === 'lineups' ? '' : 'hidden'}>
           <div class="raid-tabs">
+            <button class="tab-button ${this.currentRaidType === 'BDN Classic' ? 'active' : ''}" data-raid-type="BDN Classic">BDN Classic</button>
             <button class="tab-button ${this.currentRaidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
             <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
             <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
@@ -452,6 +453,7 @@ export const LineupsPage = {
           ${canManage && this.currentRaidType === 'Unspecified' ? `
             <select class="raid-type-reassign" data-lineup-id="${lineup.id}">
               <option value="Unspecified" selected>Unspecified</option>
+              <option value="BDN Classic">BDN Classic</option>
               <option value="DDN Hardcore">DDN Hardcore</option>
               <option value="DDN Classic">DDN Classic</option>
               <option value="Hardcore">GDN Hardcore</option>
@@ -1363,7 +1365,7 @@ export const LineupsPage = {
   populateRaidFilterOptions() {
     const sel = this.getPageEl()?.querySelector('.loot-raid-select');
     if (!sel) return;
-    const order = ['DDN Hardcore', 'DDN Classic', 'Hardcore', 'Classic', 'Unspecified'];
+    const order = ['BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Hardcore', 'Classic', 'Unspecified'];
     const types = [...new Set([...this.lootRecords, ...this.lootWeekLineups].map(r => r.raidType).filter(Boolean))]
       .sort((a, b) => {
         const ia = order.indexOf(a), ib = order.indexOf(b);

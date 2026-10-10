@@ -6,8 +6,8 @@
  */
 
 // Raid types where availability should be surfaced in the UI.
-// Only the DDN raids, since prog raids run long and need scheduling lead time.
-const AVAILABILITY_RAID_TYPES = new Set(['DDN Classic', 'DDN Hardcore']);
+// Only the DDN/BDN raids, since prog raids run long and need scheduling lead time.
+const AVAILABILITY_RAID_TYPES = new Set(['BDN Classic', 'DDN Classic', 'DDN Hardcore']);
 
 export function shouldShowAvailabilityForRaid(raidType) {
   return AVAILABILITY_RAID_TYPES.has(raidType);

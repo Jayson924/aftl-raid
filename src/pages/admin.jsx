@@ -3,6 +3,8 @@ import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import {
   setFdTable,
+  setPowerIndexMax,
+  POWER_INDEX_MAX_DEFAULT,
   CARDS_PER_PAGE,
   DEFAULT_CARD_PAGES,
   MAX_CARD_PAGES,
@@ -93,6 +95,18 @@ export const AdminPage = {
               <p class="loading">Loading...</p>
             </div>
           </div>
+          <div class="section">
+            <div class="admin-section-header">
+              <h2>Power Index</h2>
+              <div class="admin-fd-actions">
+                <button class="btn btn-sm btn-primary admin-power-save-btn">Save</button>
+              </div>
+            </div>
+            <p class="admin-fd-desc">Raw power (ATK × FD × crit × element) that counts as 100 on the power index. Set it a little above the strongest character.</p>
+            <div class="form-group">
+              <input type="number" id="admin-power-max" min="1" step="1000" placeholder="${POWER_INDEX_MAX_DEFAULT}" />
+            </div>
+          </div>
         </div>
         <div class="admin-tab-content" id="admin-tab-card-map" style="display:none">
           <div class="section">
@@ -155,6 +169,7 @@ export const AdminPage = {
     // FD table actions
     document.querySelector('.admin-fd-add-btn').addEventListener('click', () => this._addFdRow());
     document.querySelector('.admin-fd-save-btn').addEventListener('click', () => this._saveFdTable());
+    document.querySelector('.admin-power-save-btn').addEventListener('click', () => this._savePowerIndexMax());
 
     // Card Map actions
     document.querySelector('.admin-card-add-page-btn').addEventListener('click', () => this._addCardPage());
@@ -165,6 +180,7 @@ export const AdminPage = {
     await this._loadPlayers();
     this._renderUsers();
     this._loadFdTable();
+    this._loadPowerIndexMax();
     this._loadWhitelistQueue();
   },
 
@@ -284,6 +300,32 @@ export const AdminPage = {
       };
       document.addEventListener('keydown', handleKey);
     });
+  },
+
+  async _loadPowerIndexMax() {
+    try {
+      const saved = await dataService.getAppConfig('power_index_max');
+      const input = document.getElementById('admin-power-max');
+      if (input && saved) input.value = saved;
+    } catch (err) {
+      console.error('Failed to load power index max:', err);
+    }
+  },
+
+  async _savePowerIndexMax() {
+    const value = parseInt(document.getElementById('admin-power-max')?.value, 10);
+    if (!value || value <= 0) {
+      toast.error('Enter a positive number');
+      return;
+    }
+    try {
+      await dataService.setAppConfig('power_index_max', value);
+      setPowerIndexMax(value);
+      toast.success('Power index max saved');
+    } catch (err) {
+      console.error('Failed to save power index max:', err);
+      toast.error('Failed to save power index max');
+    }
   },
 
   async _saveFdTable() {

@@ -662,6 +662,12 @@
   }
 
   &.level-60 {
+    color: rgba(120, 180, 240, 0.9);
+    border-color: rgba(120, 180, 240, 0.45);
+    background: rgba(120, 180, 240, 0.12);
+  }
+
+  &.level-70 {
     color: rgba(120, 220, 120, 0.9);
     border-color: rgba(120, 220, 120, 0.45);
     background: rgba(120, 220, 120, 0.12);

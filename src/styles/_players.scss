@@ -701,6 +701,11 @@
         color: #d9b07c;
       }
 
+      &.bdn.active {
+        background-color: rgba(122, 82, 184, 0.2);
+        color: #b49be0;
+      }
+
       &:disabled,
       &.disabled {
         color: rgba(255, 255, 255, 0.18);
@@ -1049,6 +1054,7 @@
 
       .gdn-row & { color: #6fa843; }
       .ddn-row & { color: #c69257; }
+      .bdn-row & { color: #9b7fd0; }
     }
 
     .raid-badge {
@@ -1115,6 +1121,12 @@
         color: #3a2614;
       }
 
+      // BDN — dusk palette
+      &.raid-bdn-classic {
+        background-color: #5b3a8c;
+        color: white;
+      }
+
       &.disabled {
         background-color: rgba(255, 255, 255, 0.08);
         color: rgba(255, 255, 255, 0.3);
@@ -1139,6 +1151,7 @@
         &.raid-ddn-hardcore   { background-color: rgba(160, 100, 48, 0.4); }
         &.raid-ddn-classic    { background-color: rgba(198, 146, 87, 0.4); }
         &.raid-ddn-normal     { background-color: rgba(217, 176, 124, 0.4); }
+        &.raid-bdn-classic    { background-color: rgba(91, 58, 140, 0.4); }
       }
     }
 
@@ -1379,6 +1392,7 @@
 
     .gdn-row & { color: #6fa843; }
     .ddn-row & { color: #c69257; }
+    .bdn-row & { color: #9b7fd0; }
   }
 
   .raid-badge {
@@ -1443,6 +1457,12 @@
       color: #3a2614;
     }
 
+    // BDN — dusk palette
+    &.raid-bdn-classic {
+      background-color: rgba(91, 58, 140, 0.85);
+      color: white;
+    }
+
     &.disabled {
       background-color: rgba(255, 255, 255, 0.08);
       color: rgba(255, 255, 255, 0.3);
@@ -1464,6 +1484,7 @@
       &.raid-ddn-hardcore   { background-color: rgba(160, 100, 48, 0.4); }
       &.raid-ddn-classic    { background-color: rgba(198, 146, 87, 0.4); }
       &.raid-ddn-normal     { background-color: rgba(217, 176, 124, 0.4); }
+      &.raid-bdn-classic    { background-color: rgba(91, 58, 140, 0.4); }
     }
   }
 }

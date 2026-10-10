@@ -427,6 +427,7 @@
 
     .gdn-row & { color: #6fa843; }
     .ddn-row & { color: #c69257; }
+    .bdn-row & { color: #9b7fd0; }
   }
 
   .raid-badge {
@@ -499,6 +500,13 @@
       box-shadow: 0 2px 6px rgba(217, 176, 124, 0.3);
     }
 
+    // BDN — dusk palette
+    &.raid-bdn-classic {
+      background: linear-gradient(135deg, #5b3a8c 0%, #472d6e 100%);
+      color: white;
+      box-shadow: 0 2px 6px rgba(91, 58, 140, 0.3);
+    }
+
     &.disabled {
       background: rgba(255, 255, 255, 0.06);
       color: rgba(255, 255, 255, 0.3);
@@ -541,6 +549,10 @@
 
       &.raid-ddn-normal {
         background: linear-gradient(135deg, rgba(217, 176, 124, 0.5) 0%, rgba(193, 153, 103, 0.5) 100%);
+      }
+
+      &.raid-bdn-classic {
+        background: linear-gradient(135deg, rgba(91, 58, 140, 0.5) 0%, rgba(71, 45, 110, 0.5) 100%);
       }
     }
   }
