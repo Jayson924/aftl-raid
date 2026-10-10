@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { usesTickets } from './constants.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -19,8 +20,6 @@ const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 // Map a raid_type string to the players-table completion column it tracks.
 // Returns null for raid types that don't track weekly completion.
 function raidTypeToCompletionColumn(raidType) {
-  if (raidType === 'Hardcore') return 'hardcore_completed';
-  if (raidType === 'Classic') return 'classic_completed';
   if (raidType === 'DDN Hardcore') return 'ddn_hardcore_completed';
   if (raidType === 'DDN Classic') return 'ddn_classic_completed';
   if (raidType === 'DDN Normal') return 'ddn_normal_completed';
@@ -369,13 +368,11 @@ class DataService {
         armorEnhance: helmet.enhancement != null ? String(helmet.enhancement) : (p.armor_enhance || ''),
         weaponLevel: p.weapon_level || '',
         armorLevel: p.armor_level || '',
-        hardcoreCompleted: p.hardcore_completed || '',
-        classicCompleted: p.classic_completed || '',
         ddnHardcoreCompleted: p.ddn_hardcore_completed || '',
         ddnClassicCompleted: p.ddn_classic_completed || '',
         ddnNormalCompleted: p.ddn_normal_completed || '',
         bdnClassicCompleted: p.bdn_classic_completed || '',
-        classicTicketUsed: p.classic_ticket_used || '',
+        ticketsUsed: p.tickets_used || {},
         discordId: p.discord_id || null,
         accountNumber: p.account_number || null,
         groupId: p.group_id || null,
@@ -566,13 +563,10 @@ class DataService {
       // New jsonb columns
       equipment: player.equipment || {},
       character_stats: player.characterStats || {},
-      hardcore_completed: player.hardcoreCompleted || null,
-      classic_completed: player.classicCompleted || null,
       ddn_hardcore_completed: player.ddnHardcoreCompleted || null,
       ddn_classic_completed: player.ddnClassicCompleted || null,
       ddn_normal_completed: player.ddnNormalCompleted || null,
       bdn_classic_completed: player.bdnClassicCompleted || null,
-      classic_ticket_used: player.classicTicketUsed || null,
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
       exclude_label: player.excludeLabel?.trim() || null,
@@ -1404,19 +1398,29 @@ class DataService {
     if (raidType === 'DDN Classic') return !this.isCompletedThisWeek(player.ddnClassicCompleted);
     if (raidType === 'DDN Normal') return !this.isCompletedThisWeek(player.ddnNormalCompleted);
     if (raidType === 'BDN Classic') return !this.isCompletedThisWeek(player.bdnClassicCompleted);
-    const timestamp = raidType === 'Hardcore' ? player.hardcoreCompleted : player.classicCompleted;
-    return !this.isCompletedThisWeek(timestamp);
+    // Retired or unknown raid types have no completion column.
+    return true;
   }
 
   playerTicketUsed(player, raidType) {
-    if (raidType !== 'Classic') return false;
-    return this.isCompletedThisWeek(player.classicTicketUsed);
+    if (!usesTickets(raidType)) return false;
+    return this.isCompletedThisWeek(player.ticketsUsed?.[raidType]);
+  }
+
+  // Sets or clears one raid's entry in players.tickets_used (see add-classic-tickets.sql).
+  async setTicketsUsed(playerNames, raidType, used) {
+    if (!usesTickets(raidType) || playerNames.length === 0) return;
+    const { error } = await supabase.rpc('set_ticket_used', {
+      p_names: playerNames,
+      p_raid: raidType,
+      p_used: used
+    });
+    if (error) throw error;
   }
 
   async markPlayersCompleted(playerNames, raidType, ticketPlayerNames = []) {
-    // 4-man and Unspecified don't track weekly completion
-    if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
     const column = raidTypeToCompletionColumn(raidType);
+    if (!column) return { success: true };
     const now = new Date().toISOString();
 
     // Update completion timestamp
@@ -1426,24 +1430,13 @@ class DataService {
       .in('name', playerNames);
 
     if (error) throw error;
-
-    // Update ticket usage if applicable
-    if (ticketPlayerNames.length > 0 && raidType === 'Classic') {
-      const { error: ticketError } = await supabase
-        .from('players')
-        .update({ classic_ticket_used: now })
-        .in('name', ticketPlayerNames);
-
-      if (ticketError) throw ticketError;
-    }
-
+    await this.setTicketsUsed(ticketPlayerNames, raidType, true);
     return { success: true };
   }
 
   async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName, ticketPlayerNames = []) {
-    // 4-man and Unspecified don't track weekly completion
-    if (raidType === 'Unspecified' || raidType === '4-man') return { success: true };
     const column = raidTypeToCompletionColumn(raidType);
+    if (!column) return { success: true };
 
     // Clear completion timestamp
     const { error } = await supabase
@@ -1452,24 +1445,14 @@ class DataService {
       .in('name', playerNames);
 
     if (error) throw error;
-
-    // Clear ticket usage if applicable
-    if (ticketPlayerNames.length > 0 && raidType === 'Classic') {
-      const { error: ticketError } = await supabase
-        .from('players')
-        .update({ classic_ticket_used: null })
-        .in('name', ticketPlayerNames);
-
-      if (ticketError) throw ticketError;
-    }
-
+    await this.setTicketsUsed(ticketPlayerNames, raidType, false);
     return { success: true };
   }
 
   /**
    * Toggle a single player's raid completion status
    * @param {string} playerId - Player's UUID
-   * @param {string} raidType - 'Hardcore' or 'Classic'
+   * @param {string} raidType - e.g. 'BDN Classic', 'DDN Hardcore'
    * @param {boolean} completed - Whether to mark as completed or not
    */
   async togglePlayerRaidCompletion(playerId, raidType, completed) {

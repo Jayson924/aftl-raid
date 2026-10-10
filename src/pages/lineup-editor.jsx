@@ -1,6 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, usesTickets } from '../constants.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
@@ -94,8 +94,6 @@ export const LineupEditorPage = {
                     <option value="BDN Classic">BDN Classic</option>
                     <option value="DDN Hardcore">DDN Hardcore</option>
                     <option value="DDN Classic">DDN Classic</option>
-                    <option value="Hardcore">GDN Hardcore</option>
-                    <option value="Classic">GDN Classic</option>
                     <option value="Unspecified">Unspecified</option>
                   </select>
                 </div>
@@ -590,7 +588,7 @@ export const LineupEditorPage = {
 
       // Filter lineups by current raid type and selected tabs
       const lineups = this.allLineups.filter(lineup => {
-        const lineupRaidType = lineup.raidType || 'Hardcore'; // Default to Hardcore if not set
+        const lineupRaidType = lineup.raidType || 'Unspecified';
         const matchesRaidType = lineupRaidType === this.currentLineup.raidType;
         const matchesFilter = (this.showCarouselLineups && !lineup.isNextWeek) ||
                               (this.showCarouselNextWeek && lineup.isNextWeek);
@@ -902,7 +900,7 @@ export const LineupEditorPage = {
       }, viewerTz) : '';
       const availBadge = availText ? `<span class="player-card-availability" data-tooltip-fixed="When this player is typically online (your timezone)">🕒 ${availText}</span>` : '';
 
-      // Check if player has already used their ticket this week (Classic only)
+      // Check if player has already used their ticket this week
       const ticketUsed = this.currentLineup.isNextWeek ? false : dataService.playerTicketUsed(player, this.currentLineup.raidType);
 
       // Check if player is in another lineup (not the current one)
@@ -913,7 +911,7 @@ export const LineupEditorPage = {
           // Skip the current lineup being edited (by ID if available, otherwise skip none)
           if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
           // Only check lineups of the same raid type
-          const lineupRaidType = lineup.raidType || 'Hardcore';
+          const lineupRaidType = lineup.raidType || 'Unspecified';
           if (lineupRaidType !== this.currentLineup.raidType) return false;
           // Check if player is in this lineup
           return lineup.players && lineup.players.includes(player.name);
@@ -923,7 +921,7 @@ export const LineupEditorPage = {
         }
       }
 
-      // Ticket used badge (only for Classic)
+      // Ticket used badge
       const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/icons/ticket.svg" alt="T"></span>` : '';
       const isExcluded = this.isPlayerExcluded(player);
       const exclusion = isExcluded ? this.getExclusionInfo(player) : null;
@@ -1048,7 +1046,7 @@ export const LineupEditorPage = {
             // Skip the current lineup being edited (by ID if available)
             if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
             // Only check lineups of the same raid type
-            const lineupRaidType = lineup.raidType || 'Hardcore';
+            const lineupRaidType = lineup.raidType || 'Unspecified';
             if (lineupRaidType !== this.currentLineup.raidType) return false;
             // Check if player is in this lineup
             return lineup.players && lineup.players.includes(player.name);
@@ -2305,9 +2303,9 @@ export const LineupEditorPage = {
     const slotElement = document.querySelector(`[data-slot="${slotIndex}"]`);
     const slotContent = slotElement.querySelector('.slot-content');
 
-    // Get current ticket status for this slot (only show for Classic raid)
+    // Ticket toggle shows on every classic raid
     const hasTicket = this.currentLineup.ticketSlots[slotIndex];
-    const showTicketToggle = this.currentLineup.raidType === 'Classic';
+    const showTicketToggle = usesTickets(this.currentLineup.raidType);
 
     // Get current pilot for this slot
     const pilotName = this.currentLineup.pilotSlots[slotIndex] || '';
@@ -2798,7 +2796,7 @@ export const LineupEditorPage = {
     this.currentLineup = {
       id: lineup.id, // Store the ID for updates
       name: lineup.name,
-      raidType: lineup.raidType || 'Hardcore',
+      raidType: lineup.raidType || 'Unspecified',
       status: 'ready',
       players: [...lineup.players],
       ticketSlots,
@@ -2812,11 +2810,11 @@ export const LineupEditorPage = {
     };
 
     document.getElementById('lineup-name').value = lineup.name;
-    document.getElementById('raid-type').value = lineup.raidType || 'Hardcore';
+    document.getElementById('raid-type').value = lineup.raidType || 'Unspecified';
     // Apply four-man class based on raid type
     const slotsContainer = document.getElementById('lineup-slots-container');
     if (slotsContainer) {
-      slotsContainer.classList.toggle('four-man', isFourManRaid(lineup.raidType || 'Hardcore'));
+      slotsContainer.classList.toggle('four-man', isFourManRaid(lineup.raidType || 'Unspecified'));
     }
     document.getElementById('cleared-toggle').checked = lineup.completed || false;
     document.getElementById('next-week-toggle').checked = lineup.isNextWeek || false;

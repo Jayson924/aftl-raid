@@ -74,19 +74,21 @@ export function isFourManRaid(raidType) {
   return raidType === '4-man' || raidType === 'DDN Normal';
 }
 
+// Every "<X> Classic" raid allows one extra Pania ticket clear per week.
+export function usesTickets(raidType) {
+  return / Classic$/.test(raidType || '');
+}
+
 // Returns the number of lineup slots for a given raid type
 // 4-man raids have 4 slots, all others have 8
 export function getLineupSize(raidType) {
   return isFourManRaid(raidType) ? 4 : 8;
 }
 
-// Display label for a raid type — legacy "Hardcore"/"Classic" map to GDN
+// Display label for a raid type.
 export function formatRaidTypeLabel(raidType) {
-  const rt = raidType || 'Hardcore';
-  if (rt === 'Unspecified') return 'Unspecified';
-  if (rt === '4-man') return '4-Man';
-  if (rt === 'Hardcore' || rt === 'Classic') return `GDN ${rt}`;
-  return rt;
+  if (raidType === '4-man') return '4-Man';
+  return raidType || 'Unspecified';
 }
 
 // Get inline style for a class sprite icon background

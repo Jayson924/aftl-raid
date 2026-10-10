@@ -326,16 +326,12 @@ export const PlayersPage = {
   // Store expanded state for owner groups (collapsed by default)
   _expandedOwners: new Set(),
 
-  // Filter for prioritizing uncleared raids — keyed by raid bucket
-  // (ghc = GDN Hardcore, gcl = GDN Classic, dhc = DDN Hardcore,
-  //  dcl = DDN Classic, dn = DDN Normal, bcl = BDN Classic).
-  _raidPriorityFilter: { bcl: false, ghc: false, gcl: false, dhc: false, dcl: false, dn: false },
+  // Uncleared-raid filter: bcl = BDN Classic, dhc/dcl/dn = DDN Hardcore/Classic/Normal.
+  _raidPriorityFilter: { bcl: false, dhc: false, dcl: false, dn: false },
 
-  // Render the BDN/GDN/DDN raid badge group for a player.
+  // Render the BDN/DDN raid badge group for a player.
   renderRaidBadgesHTML(player, canToggleRaid) {
     const needsBCL = dataService.playerNeedsRaid(player, 'BDN Classic');
-    const needsGHC = dataService.playerNeedsRaid(player, 'Hardcore');
-    const needsGCL = dataService.playerNeedsRaid(player, 'Classic');
     const needsDHC = dataService.playerNeedsRaid(player, 'DDN Hardcore');
     const needsDCL = dataService.playerNeedsRaid(player, 'DDN Classic');
     const needsDN = dataService.playerNeedsRaid(player, 'DDN Normal');
@@ -354,15 +350,6 @@ export const PlayersPage = {
           <span class="raid-badge raid-bdn-classic ${!needsBCL ? 'completed' : ''} ${clickClass}"
                 ${toggleAttrs('BDN Classic', !needsBCL)}
                 title="${titleAttr}">${lbl('CL')}${!needsBCL ? check : ''}</span>
-        </div>
-        <div class="raid-row gdn-row">
-          <span class="raid-row-label">GDN</span>
-          <span class="raid-badge raid-hardcore ${!needsGHC ? 'completed' : ''} ${clickClass}"
-                ${toggleAttrs('Hardcore', !needsGHC)}
-                title="${titleAttr}">${lbl('HC')}${!needsGHC ? check : ''}</span>
-          <span class="raid-badge raid-classic ${!needsGCL ? 'completed' : ''} ${clickClass}"
-                ${toggleAttrs('Classic', !needsGCL)}
-                title="${titleAttr}">${lbl('CL')}${!needsGCL ? check : ''}</span>
         </div>
         <div class="raid-row ddn-row">
           <span class="raid-row-label">DDN</span>
@@ -541,8 +528,6 @@ export const PlayersPage = {
     const filter = this._raidPriorityFilter;
     const activeRaidTypes = [];
     if (filter.bcl) activeRaidTypes.push('BDN Classic');
-    if (filter.ghc) activeRaidTypes.push('Hardcore');
-    if (filter.gcl) activeRaidTypes.push('Classic');
     if (filter.dhc) activeRaidTypes.push('DDN Hardcore');
     if (filter.dcl) activeRaidTypes.push('DDN Classic');
     if (filter.dn) activeRaidTypes.push('DDN Normal');
@@ -647,7 +632,7 @@ export const PlayersPage = {
       // Add event listeners for raid priority filter (multi-select)
       document.querySelectorAll('.raid-priority-filter .filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const filter = btn.dataset.filter; // 'ghc' | 'gcl' | 'dcl'
+          const filter = btn.dataset.filter;
           if (!filter) return;
           this._raidPriorityFilter[filter] = !this._raidPriorityFilter[filter];
           this.loadPlayers();
@@ -1425,8 +1410,6 @@ export const PlayersPage = {
       ${this.renderClassFamilyFilter()}
       <div class="raid-priority-filter mobile-filter">
         <button class="filter-btn bdn ${this._raidPriorityFilter.bcl ? 'active' : ''}" data-filter="bcl">B CL</button>
-        <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
-        <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dn ? 'active' : ''}" data-filter="dn">D N</button>
@@ -1453,8 +1436,6 @@ export const PlayersPage = {
             <td>
               <div class="raid-priority-filter">
                 <button class="filter-btn bdn ${this._raidPriorityFilter.bcl ? 'active' : ''}" data-filter="bcl">B CL</button>
-                <button class="filter-btn gdn ${this._raidPriorityFilter.ghc ? 'active' : ''}" data-filter="ghc">G HC</button>
-                <button class="filter-btn gdn ${this._raidPriorityFilter.gcl ? 'active' : ''}" data-filter="gcl">G CL</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dn ? 'active' : ''}" data-filter="dn">D N</button>

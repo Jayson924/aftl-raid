@@ -1,4 +1,4 @@
-import { EQUIPMENT_RARITIES, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel } from './constants.js';
+import { EQUIPMENT_RARITIES, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel, usesTickets } from './constants.js';
 import { dataService } from './data.js';
 
 /**
@@ -36,7 +36,7 @@ const PUB_BACKGROUND = 'background: repeating-linear-gradient(45deg, rgba(255, 1
  */
 function renderMiniPlayerCard(playerName, playerMap, lineup, idx) {
   const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
-  const showTicketFlag = lineup.raidType === 'Classic';
+  const showTicketFlag = usesTickets(lineup.raidType);
 
   let player = null;
   let isPub = false;

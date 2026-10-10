@@ -74,8 +74,6 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
             <button class="creator-toggle ${raidType === 'BDN Classic' ? 'active' : ''}" data-raid-type="BDN Classic">BDN Classic</button>
             <button class="creator-toggle ${raidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
             <button class="creator-toggle ${raidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
-            <button class="creator-toggle ${raidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
-            <button class="creator-toggle ${raidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
             <button class="creator-toggle ${raidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
           </div>
         </div>

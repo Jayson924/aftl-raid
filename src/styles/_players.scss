@@ -691,11 +691,6 @@
         color: rgba($primary-color, 0.8);
       }
 
-      &.gdn.active {
-        background-color: rgba(91, 156, 62, 0.18);
-        color: #8fc56b;
-      }
-
       &.ddn.active {
         background-color: rgba(198, 146, 87, 0.18);
         color: #d9b07c;
@@ -1052,7 +1047,6 @@
       flex-shrink: 0;
       text-transform: uppercase;
 
-      .gdn-row & { color: #6fa843; }
       .ddn-row & { color: #c69257; }
       .bdn-row & { color: #9b7fd0; }
     }
@@ -1092,17 +1086,6 @@
 
       &.completed .raid-badge-label {
         opacity: 0.25;
-      }
-
-      // GDN — jungle palette
-      &.raid-hardcore {
-        background-color: #2d6a3a;
-        color: white;
-      }
-
-      &.raid-classic {
-        background-color: #5b9c3e;
-        color: white;
       }
 
       // DDN — desert palette
@@ -1146,8 +1129,6 @@
         border-color: $success-color;
         position: relative;
 
-        &.raid-hardcore       { background-color: rgba(45, 106, 58, 0.4); }
-        &.raid-classic        { background-color: rgba(91, 156, 62, 0.4); }
         &.raid-ddn-hardcore   { background-color: rgba(160, 100, 48, 0.4); }
         &.raid-ddn-classic    { background-color: rgba(198, 146, 87, 0.4); }
         &.raid-ddn-normal     { background-color: rgba(217, 176, 124, 0.4); }
@@ -1390,7 +1371,6 @@
     flex-shrink: 0;
     text-transform: uppercase;
 
-    .gdn-row & { color: #6fa843; }
     .ddn-row & { color: #c69257; }
     .bdn-row & { color: #9b7fd0; }
   }
@@ -1428,17 +1408,6 @@
 
     &.completed .raid-badge-label {
       opacity: 0.25;
-    }
-
-    // GDN — jungle palette
-    &.raid-hardcore {
-      background-color: rgba(45, 106, 58, 0.85);
-      color: white;
-    }
-
-    &.raid-classic {
-      background-color: rgba(91, 156, 62, 0.85);
-      color: white;
     }
 
     // DDN — desert palette
@@ -1479,8 +1448,6 @@
     &.completed {
       border: 1px solid $success-color;
 
-      &.raid-hardcore       { background-color: rgba(45, 106, 58, 0.4); }
-      &.raid-classic        { background-color: rgba(91, 156, 62, 0.4); }
       &.raid-ddn-hardcore   { background-color: rgba(160, 100, 48, 0.4); }
       &.raid-ddn-classic    { background-color: rgba(198, 146, 87, 0.4); }
       &.raid-ddn-normal     { background-color: rgba(217, 176, 124, 0.4); }

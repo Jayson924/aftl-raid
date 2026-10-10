@@ -2,7 +2,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel, usesTickets } from '../constants.js';
 import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
 import { renderMiniLineupCard, renderMiniPlayerCards, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
@@ -90,8 +90,6 @@ export const LineupsPage = {
             <button class="tab-button ${this.currentRaidType === 'BDN Classic' ? 'active' : ''}" data-raid-type="BDN Classic">BDN Classic</button>
             <button class="tab-button ${this.currentRaidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
             <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
-            <button class="tab-button ${this.currentRaidType === 'Hardcore' ? 'active' : ''}" data-raid-type="Hardcore">GDN Hardcore</button>
-            <button class="tab-button ${this.currentRaidType === 'Classic' ? 'active' : ''}" data-raid-type="Classic">GDN Classic</button>
             <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
           </div>
           <div class="tab-content-wrapper">
@@ -456,8 +454,6 @@ export const LineupsPage = {
               <option value="BDN Classic">BDN Classic</option>
               <option value="DDN Hardcore">DDN Hardcore</option>
               <option value="DDN Classic">DDN Classic</option>
-              <option value="Hardcore">GDN Hardcore</option>
-              <option value="Classic">GDN Classic</option>
             </select>
           ` : ''}
           ${isCleared && (lootCount > 0 || canManage) ? `<button class="btn btn-secondary btn-loot-toggle ${lootViewActive ? 'active' : ''}" data-lineup-id="${lineup.id}"><img src="/icons/scales.svg" alt="" class="btn-loot-icon">${lootViewActive ? 'Hide Loot' : `Loot${lootCount > 0 ? ` (${lootCount})` : ''}`}</button>` : ''}
@@ -509,9 +505,9 @@ export const LineupsPage = {
         // Check if lineup is cleared (all players completed)
         const lineupPlayers = lineup.players.map(name => playerMap.get(name)).filter(p => p);
 
-            // Check ticket status for this player (Classic only)
+            // Ticket flag on every classic raid
             const hasTicket = lineup.ticketPlayers && lineup.ticketPlayers[idx];
-            const showTicketFlag = lineup.raidType === 'Classic';
+            const showTicketFlag = usesTickets(lineup.raidType);
 
             // Check if this is a guest character
             let player = null;
@@ -652,7 +648,7 @@ export const LineupsPage = {
         });
       }
 
-      // Add click handlers for ticket flags (Classic only)
+      // Add click handlers for ticket flags
       const ticketFlags = showcaseContainer.querySelectorAll('.ticket-flag--clickable');
       ticketFlags.forEach(flag => {
         flag.addEventListener('click', async (e) => {
@@ -1365,7 +1361,7 @@ export const LineupsPage = {
   populateRaidFilterOptions() {
     const sel = this.getPageEl()?.querySelector('.loot-raid-select');
     if (!sel) return;
-    const order = ['BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Hardcore', 'Classic', 'Unspecified'];
+    const order = ['BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Unspecified'];
     const types = [...new Set([...this.lootRecords, ...this.lootWeekLineups].map(r => r.raidType).filter(Boolean))]
       .sort((a, b) => {
         const ia = order.indexOf(a), ib = order.indexOf(b);
