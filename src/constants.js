@@ -1,3 +1,5 @@
+import { computeGearScore, fdToPercent as gameFdToPercent, fdForPercent, CRIT_CAP } from './gear-calc.js';
+
 // ─── Class Icon Sprite Sheet ───
 // Sprite: /icons/classes.png (512×1024)
 // Grid: 44×46 cells, gap 11×9, offset 6×5
@@ -426,127 +428,32 @@ export const WEAPON_SUFFIXES = [
   { value: 'health', label: 'Health' }
 ];
 
-// Gearscore 0-100: 60% gear, 40% FD. 100 = max FD plus full Lv70 Legend gear at +15
-// (accessories can't be enhanced, so they score on rarity and level only).
-
-// Final Damage cap. Also the last row of the admin FD table (3762 → 60%).
-export const MAX_FD = 3762;
-
-// 1.0 = Lv70 Legend (the cap). Keep the Lv70 Unique / Lv60 Legend gap under 0.08,
-// or unenhanceable accessories let a Unique set out-score a better Legend set.
-export const GEARSCORE_GEAR_VALUES = {
-  legend: { 70: 1.00, 60: 0.60, 50: 0.30, 40: 0.15 },
-  unique: { 70: 0.66, 60: 0.34, 50: 0.17, 40: 0.08 },
-  epic:   { 70: 0.42, 60: 0.20, 50: 0.10, 40: 0.05 },
-  rare:   { 70: 0.22, 60: 0.10, 50: 0.05, 40: 0.02 },
-  magic:  { 70: 0.10, 60: 0.05, 50: 0.02, 40: 0.01 },
-  normal: { 70: 0,    60: 0,    50: 0,    40: 0 }
-};
-
-// Pieces saved before per-piece level existed have no `level` — treat them as Lv50,
-// which is what the character editor defaults the toggle to.
-const GS_DEFAULT_LEVEL = '50';
-
-// Value of a single piece from its rarity + equipment level, 0–1.
-export function getGearValue(rarity, level) {
-  const byLevel = GEARSCORE_GEAR_VALUES[rarity];
-  if (!byLevel) return 0;
-  const key = String(level ?? GS_DEFAULT_LEVEL);
-  return byLevel[key] ?? byLevel[GS_DEFAULT_LEVEL] ?? 0;
-}
-
-const GS_ENHANCE_PERCENT = { 15: 1.0, 14: 0.85, 13: 0.7, 12: 0.55, 11: 0.4, 10: 0.28, 9: 0.18, 0: 0 };
+// Gearscore 0-100: 60% table-derived gear score (gear-calc.js), 40% FD toward the 60% cap.
 
 const GEAR_WEIGHT = 60;
 const FD_WEIGHT = 40;
-const EQUIP_TOTAL = GEAR_WEIGHT * 0.7; // 42 pts for 7 equipment pieces
-const ACCESSORY_TOTAL = GEAR_WEIGHT * 0.3; // 18 pts for 4 accessories
-const PER_EQUIP = EQUIP_TOTAL / 7;
-const PER_ACCESSORY = ACCESSORY_TOTAL / 4;
+const FD_CAP_PERCENT = 60;
 
-// FD table — loaded from Supabase via setFdTable()
-let _fdTable = [];
+// Raw FD that reaches the 60% cap at Lv70.
+export const MAX_FD = Math.round(fdForPercent(FD_CAP_PERCENT));
 
-export function setFdTable(table) {
-  if (table && table.length > 0) _fdTable = table;
+// Game FD curve at Lv70; the old admin breakpoint table was this curve at Lv60.
+export function fdToPercent(rawFd) {
+  return gameFdToPercent(rawFd);
 }
 
-export function getFdTable() {
-  return _fdTable;
-}
-
-export function fdToPercent(rawFd, fdTable) {
-  if (!rawFd || rawFd <= 0) return 0;
-  const table = fdTable || _fdTable;
-  if (!table || table.length === 0) return 0;
-  if (rawFd <= table[0].fd) return (rawFd / table[0].fd) * table[0].pct;
-  const max = table[table.length - 1];
-  if (rawFd >= max.fd) return max.pct;
-  for (let i = 0; i < table.length - 1; i++) {
-    if (rawFd >= table[i].fd && rawFd < table[i + 1].fd) {
-      const range = table[i + 1].fd - table[i].fd;
-      const progress = (rawFd - table[i].fd) / range;
-      return table[i].pct + progress * (table[i + 1].pct - table[i].pct);
-    }
-  }
-  return max.pct;
-}
-
-// FD as a fraction of the cap, 0–1, following the admin breakpoint curve.
-// Anchored at MAX_FD rather than the table's last row, so adding a row above
-// 3762 can't silently move the goalposts. Falls back to linear if the table
-// doesn't reach the cap — otherwise the anchor would collapse onto the last
-// row and everyone at or above it would read as perfect.
-export function fdToScorePercent(rawFd, fdTable) {
-  if (!rawFd || rawFd <= 0) return 0;
-  const table = fdTable || _fdTable;
-  const capped = Math.min(rawFd, MAX_FD);
-
-  if (table && table.length > 0 && table[table.length - 1].fd >= MAX_FD) {
-    const capPct = fdToPercent(MAX_FD, table);
-    if (capPct > 0) return Math.min(1, fdToPercent(capped, table) / capPct);
-  }
-  return capped / MAX_FD;
+// FD as a fraction of the cap, 0–1.
+export function fdToScorePercent(rawFd) {
+  return Math.min(1, fdToPercent(rawFd) / FD_CAP_PERCENT);
 }
 
 export function calculateGearscore(player) {
-  const equip = player.equipment || {};
-  const stats = player.characterStats || {};
+  const fd = player.characterStats?.finalDamage || 0;
+  const gear = computeGearScore(player);
+  if (!gear && !fd) return calculateGearscoreLegacy(player);
 
-  const equipSlots = ['helmet', 'top', 'bottom', 'gloves', 'boots', 'mainWeapon', 'subWeapon'];
-  const accessorySlots = ['necklace', 'earring', 'ring1', 'ring2'];
-
-  let gearScore = 0;
-  let hasAnyGear = false;
-
-  // Equipment: gear value (50%) + enhancement (50%) per piece
-  equipSlots.forEach(slot => {
-    const piece = equip[slot];
-    if (!piece?.rarity) return;
-    hasAnyGear = true;
-    const r = getGearValue(piece.rarity, piece.level);
-    const e = GS_ENHANCE_PERCENT[piece.enhancement] || 0;
-    gearScore += PER_EQUIP * (r * 0.5 + e * 0.5);
-  });
-
-  // Accessories: gear value only — they can't be enhanced
-  accessorySlots.forEach(slot => {
-    const piece = equip[slot];
-    if (!piece?.rarity) return;
-    hasAnyGear = true;
-    gearScore += PER_ACCESSORY * getGearValue(piece.rarity, piece.level);
-  });
-
-  // FD portion — full marks at MAX_FD
-  const fd = stats.finalDamage || 0;
-  const fdScore = FD_WEIGHT * fdToScorePercent(fd);
-
-  // If no equipment data at all and no FD, fall back to legacy calculation
-  if (!hasAnyGear && !fd) {
-    return calculateGearscoreLegacy(player);
-  }
-
-  return Math.round(gearScore + fdScore);
+  const gearScore = GEAR_WEIGHT * Math.min(1, (gear?.score ?? 0) / 100);
+  return Math.round(gearScore + FD_WEIGHT * fdToScorePercent(fd));
 }
 
 // Legacy formula for characters that haven't been updated yet
@@ -565,8 +472,7 @@ function calculateGearscoreLegacy(player) {
   return wr + ar + we + ae + (suffixCount * 5);
 }
 
-// Crit rate cap at max level in Classic DN. Unconfirmed.
-export const POWER_CRIT_RATE_CAP = 0.89;
+export const POWER_CRIT_RATE_CAP = CRIT_CAP;
 // Crit damage multiplier assumed when the sheet doesn't show one (200%).
 const POWER_DEFAULT_CRIT_MULT = 2.0;
 // Raw index that maps to 100 when normalising. Overridden by app_config

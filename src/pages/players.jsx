@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
@@ -1234,7 +1234,7 @@ export const PlayersPage = {
                 <span class="roster-chart-center-label">total</span>
               </div>
             </div>
-            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and would need 3762 FD, +15 weapon, and +15 armor.</div>
+            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and would need ${MAX_FD.toLocaleString()} FD and full Lv70 Legend gear at +15.</div>
           </div>
           <div class="roster-breakdown">
             <h3>Class Breakdown</h3>

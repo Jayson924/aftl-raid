@@ -2,7 +2,6 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import {
-  setFdTable,
   setPowerIndexMax,
   POWER_INDEX_MAX_DEFAULT,
   CARDS_PER_PAGE,
@@ -10,6 +9,7 @@ import {
   MAX_CARD_PAGES,
   getClassSpriteStyle
 } from '../constants.js';
+import { fdForPercent } from '../gear-calc.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 
 // Escape user-controlled values before interpolating into innerHTML.
@@ -27,7 +27,6 @@ export const AdminPage = {
   _sortBy: 'date', // 'name' or 'date' — default to date so newly joined users surface at the top
   _sortAsc: false, // date desc = newest first
   _activeTab: 'users',
-  _fdTable: [],
   _cardNames: {},        // slotIndex -> name
   _cardPageCount: DEFAULT_CARD_PAGES,
   _cardMapPage: 1,       // currently-viewed page in editor
@@ -84,13 +83,9 @@ export const AdminPage = {
         <div class="admin-tab-content" id="admin-tab-discord-bot" style="display:none">
           <div class="section">
             <div class="admin-section-header">
-              <h2>FD Breakpoints</h2>
-              <div class="admin-fd-actions">
-                <button class="btn btn-sm admin-fd-add-btn">+ Add Value</button>
-                <button class="btn btn-sm btn-primary admin-fd-save-btn">Save</button>
-              </div>
+              <h2>FD Curve</h2>
             </div>
-            <p class="admin-fd-desc">Final Damage breakpoint table, also used for gearscore calculation.</p>
+            <p class="admin-fd-desc">Raw Final Damage needed for each FD% at Lv70, from the game formula. Used for gearscore.</p>
             <div id="admin-fd-table" class="admin-fd-table">
               <p class="loading">Loading...</p>
             </div>
@@ -166,9 +161,6 @@ export const AdminPage = {
       });
     });
 
-    // FD table actions
-    document.querySelector('.admin-fd-add-btn').addEventListener('click', () => this._addFdRow());
-    document.querySelector('.admin-fd-save-btn').addEventListener('click', () => this._saveFdTable());
     document.querySelector('.admin-power-save-btn').addEventListener('click', () => this._savePowerIndexMax());
 
     // Card Map actions
@@ -179,127 +171,31 @@ export const AdminPage = {
     await this._loadUsers();
     await this._loadPlayers();
     this._renderUsers();
-    this._loadFdTable();
+    this._renderFdPreview();
     this._loadPowerIndexMax();
     this._loadWhitelistQueue();
   },
 
   // ============================================
-  // FD TABLE
+  // FD CURVE (read-only, from the game formula)
   // ============================================
 
-  async _loadFdTable() {
-    try {
-      const saved = await dataService.getAppConfig('fd_table');
-      this._fdTable = saved && saved.length > 0 ? [...saved] : [];
-    } catch {
-      this._fdTable = [];
-    }
-    this._renderFdTable();
-  },
-
-  _renderFdTable() {
+  _renderFdPreview() {
     const container = document.getElementById('admin-fd-table');
     if (!container) return;
-
-    if (this._fdTable.length === 0) {
-      container.innerHTML = '<p class="empty-state">No FD breakpoints configured.</p>';
-      return;
-    }
-
-    const rows = Math.ceil(this._fdTable.length / 3);
+    const rows = [];
+    for (let pct = 20; pct <= 60; pct += 5) rows.push({ pct, fd: Math.round(fdForPercent(pct)) });
     container.innerHTML = `
-      <div class="fd-table-grid" style="--fd-rows: ${rows}">
-        ${this._fdTable.map((row, i) => `
-          <div class="fd-table-row" data-index="${i}">
-            <input type="number" class="fd-input fd-input-pct" data-field="pct" data-index="${i}" value="${row.pct}" min="0" max="100" step="1" />
+      <div class="fd-table-grid" style="--fd-rows: ${Math.ceil(rows.length / 3)}">
+        ${rows.map(row => `
+          <div class="fd-table-row">
+            <input type="number" class="fd-input fd-input-pct" value="${row.pct}" readonly tabindex="-1" />
             <span class="fd-row-separator">%</span>
-            <input type="number" class="fd-input fd-input-fd" data-field="fd" data-index="${i}" value="${row.fd}" min="0" step="1" />
-            <button class="fd-row-delete" data-index="${i}" title="Remove row">&times;</button>
+            <input type="number" class="fd-input fd-input-fd" value="${row.fd}" readonly tabindex="-1" />
           </div>
         `).join('')}
       </div>
     `;
-
-    // Input change listeners
-    container.querySelectorAll('.fd-input').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.dataset.index);
-        const field = e.target.dataset.field;
-        this._fdTable[idx][field] = parseInt(e.target.value) || 0;
-      });
-    });
-
-    // Delete row listeners
-    container.querySelectorAll('.fd-row-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const idx = parseInt(e.target.dataset.index);
-        this._fdTable.splice(idx, 1);
-        this._renderFdTable();
-      });
-    });
-  },
-
-  _addFdRow() {
-    return new Promise((resolve) => {
-      const overlay = document.createElement('div');
-      overlay.className = 'modal';
-      overlay.innerHTML = `
-        <div class="modal-content confirmation-modal">
-          <h2>Add FD Breakpoint</h2>
-          <div class="form-group">
-            <label>Damage %</label>
-            <input type="number" id="fd-add-pct" placeholder="e.g. 57" min="0" max="100" />
-          </div>
-          <div class="form-group">
-            <label>FD Value</label>
-            <input type="number" id="fd-add-fd" placeholder="e.g. 2453" min="0" />
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-primary" id="fd-add-confirm">Add</button>
-            <button type="button" class="btn btn-secondary" id="fd-add-cancel">Cancel</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-
-      const pctInput = document.getElementById('fd-add-pct');
-      const fdInput = document.getElementById('fd-add-fd');
-      pctInput.focus();
-
-      const cleanup = () => {
-        document.body.removeChild(overlay);
-        document.removeEventListener('keydown', handleKey);
-      };
-
-      const submit = () => {
-        const pct = parseInt(pctInput.value);
-        const fd = parseInt(fdInput.value);
-        if (isNaN(pct) || isNaN(fd)) {
-          toast.error('Enter both values');
-          return;
-        }
-        if (this._fdTable.some(r => r.pct === pct)) {
-          toast.error(`${pct}% already exists`);
-          return;
-        }
-        this._fdTable.push({ pct, fd });
-        this._fdTable.sort((a, b) => a.pct - b.pct);
-        this._renderFdTable();
-        cleanup();
-        resolve();
-      };
-
-      document.getElementById('fd-add-confirm').addEventListener('click', submit);
-      document.getElementById('fd-add-cancel').addEventListener('click', () => { cleanup(); resolve(); });
-      overlay.addEventListener('click', (e) => { if (e.target === overlay) { cleanup(); resolve(); } });
-
-      const handleKey = (e) => {
-        if (e.key === 'Escape') { cleanup(); resolve(); }
-        if (e.key === 'Enter') submit();
-      };
-      document.addEventListener('keydown', handleKey);
-    });
   },
 
   async _loadPowerIndexMax() {
@@ -325,26 +221,6 @@ export const AdminPage = {
     } catch (err) {
       console.error('Failed to save power index max:', err);
       toast.error('Failed to save power index max');
-    }
-  },
-
-  async _saveFdTable() {
-    // Validate: sort by pct, check for duplicates
-    this._fdTable.sort((a, b) => a.pct - b.pct);
-    const dupes = this._fdTable.some((r, i) => i > 0 && r.pct === this._fdTable[i - 1].pct);
-    if (dupes) {
-      toast.error('Duplicate percentage values found. Please fix before saving.');
-      return;
-    }
-
-    try {
-      await dataService.setAppConfig('fd_table', this._fdTable);
-      setFdTable(this._fdTable);
-      toast.success('FD table saved');
-      this._renderFdTable();
-    } catch (err) {
-      console.error('Failed to save FD table:', err);
-      toast.error('Failed to save FD table');
     }
   },
 

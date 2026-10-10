@@ -28,10 +28,32 @@ const CONVERSION = {
   agiToCrit: 3.5,
 };
 
-// Level 70 scaling, same as the classic-dn-toolbox calculator.
-export const CRIT_PER_PERCENT = 433;
+export const PLAYER_LEVEL = 70;
 export const CRIT_CAP = 0.9;
-export const CRIT_DMG_DIVISOR = 62500;
+
+export function levelCoefficients(level = PLAYER_LEVEL) {
+  return tables.coefficients[String(level)] || tables.coefficients[String(PLAYER_LEVEL)];
+}
+
+// Game FD curve: linear to 45% at 0.5625 of the level divisor, then 240/7 % per divisor.
+// The divisor is 3762 at Lv60 (the old admin table) and 5540 at Lv70.
+export function fdToPercent(fd, level = PLAYER_LEVEL) {
+  const x = Math.max(0, Number(fd) || 0) / levelCoefficients(level).fd;
+  return x <= 0.5625 ? 80 * x : 45 + (240 / 7) * (x - 0.5625);
+}
+
+export function fdForPercent(percent, level = PLAYER_LEVEL) {
+  const c = levelCoefficients(level).fd;
+  return percent <= 45 ? (percent / 80) * c : (0.5625 + (percent - 45) * 7 / 240) * c;
+}
+
+export function critToRate(crit, level = PLAYER_LEVEL) {
+  return Math.min(CRIT_CAP, Math.max(0, crit) / levelCoefficients(level).crit);
+}
+
+export function critDamageMultiplier(critDmg, level = PLAYER_LEVEL) {
+  return 2 + Math.max(0, critDmg) / levelCoefficients(level).critDmg;
+}
 
 const STAT_KEYS = ['str', 'agi', 'int', 'vit', 'patkMin', 'patkMax', 'matkMin', 'matkMax', 'crit', 'fd', 'critDmg',
   'fireAtk', 'iceAtk', 'lightAtk', 'darkAtk'];
@@ -114,9 +136,10 @@ export function computeGearStats(player) {
   return { total, slots, baseJob, covered };
 }
 
-// attack x (1 + FD%) x (1 + critRate x (critDamage - 1)). Gear FD counts only if fdToPercent is given.
+// attack x (1 + FD%) x (1 + critRate x (critDamage - 1)), using the level's divisors.
 export function computeGearPower(stats, className, opts = {}) {
   const magic = MAGIC_CLASSES.has(className);
+  const level = opts.level || PLAYER_LEVEL;
   const s = { ...stats };
   if (opts.extraStats) addStats(s, opts.extraStats);
 
@@ -124,12 +147,11 @@ export function computeGearPower(stats, className, opts = {}) {
   const matk = (s.matkMin + s.matkMax) / 2 + s.int * CONVERSION.intToMatk;
   const attack = magic ? matk : patk;
 
-  const crit = s.crit + s.agi * CONVERSION.agiToCrit;
-  const critRate = Math.min(CRIT_CAP, crit / CRIT_PER_PERCENT / 100);
-  const critDamage = 2 + s.critDmg / CRIT_DMG_DIVISOR;
+  const critRate = critToRate(s.crit + s.agi * CONVERSION.agiToCrit, level);
+  const critDamage = critDamageMultiplier(s.critDmg, level);
   const critMult = 1 + critRate * (critDamage - 1);
 
-  const fdPercent = opts.fdToPercent ? (opts.fdToPercent(s.fd) || 0) : 0;
+  const fdPercent = opts.ignoreFd ? 0 : fdToPercent(s.fd, level);
   const element = Math.max(s.fireAtk, s.iceAtk, s.lightAtk, s.darkAtk);
 
   const power = attack * (1 + fdPercent / 100) * critMult * (1 + element / 100);
@@ -146,10 +168,10 @@ export function referencePlayer(className) {
 
 const referenceCache = new Map();
 function referencePower(className, opts) {
-  const key = `${className}|${opts.fdToPercent ? 'fd' : 'nofd'}`;
+  const key = `${className}|${opts.level || PLAYER_LEVEL}|${opts.ignoreFd ? 'nofd' : 'fd'}`;
   if (!referenceCache.has(key)) {
     const stats = computeGearStats(referencePlayer(className)).total;
-    referenceCache.set(key, computeGearPower(stats, className, { fdToPercent: opts.fdToPercent }).power);
+    referenceCache.set(key, computeGearPower(stats, className, opts).power);
   }
   return referenceCache.get(key);
 }
@@ -158,7 +180,7 @@ function referencePower(className, opts) {
 export function computeGearScore(player, opts = {}) {
   const gear = computeGearStats(player);
   if (!gear.baseJob || gear.covered === 0) return null;
-  const { power, ...detail } = computeGearPower(gear.total, player.role, { fdToPercent: opts.fdToPercent });
+  const { power, ...detail } = computeGearPower(gear.total, player.role, opts);
   const ref = referencePower(player.role, opts);
   const score = ref > 0 ? Math.round((power / ref) * 100) : null;
   return { score, power, reference: ref, ...detail, stats: gear.total, slots: gear.slots, covered: gear.covered };

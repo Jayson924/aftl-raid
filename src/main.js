@@ -19,7 +19,7 @@ import { ArenaTiebreakerPage } from './arena/arena-tiebreaker.jsx'
 import { ArenaResultsPage } from './arena/arena-results.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
-import { setFdTable, setPowerIndexMax } from './constants.js'
+import { setPowerIndexMax } from './constants.js'
 
 // Initialize the app
 async function initApp() {
@@ -62,16 +62,11 @@ async function initApp() {
     }
   });
 
-  // Load FD table for gearscore calculations
   try {
-    const [fdTable, powerMax] = await Promise.all([
-      dataService.getAppConfig('fd_table'),
-      dataService.getAppConfig('power_index_max'),
-    ]);
-    if (fdTable) setFdTable(fdTable);
+    const powerMax = await dataService.getAppConfig('power_index_max');
     if (powerMax) setPowerIndexMax(powerMax);
   } catch (e) {
-    console.error('Failed to load FD table:', e);
+    console.error('Failed to load power index max:', e);
   }
 
   // Create navigation

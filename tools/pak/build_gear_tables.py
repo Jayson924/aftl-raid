@@ -199,6 +199,14 @@ def main() -> None:
     potentials: dict[int, list[dict]] = collections.defaultdict(list)
     for r in parse_dnt(locate(root, "potentialtable.dnt")):
         potentials[r["_PotentialID"]].append(r)
+    # Per-level divisors that turn raw FD / crit / defense values into percentages.
+    coefficients = {
+        str(r["RowId"]): {
+            "fd": r["_Cfinaldamage"], "crit": r["_Ccritical"], "critDmg": r["_CcriticalDamage"],
+            "defense": r["_Cdefense"], "critResist": r["_CcriticalResistPvE"],
+        }
+        for r in parse_dnt(locate(root, "playercommonleveltable.dnt"))
+    }
 
     def noun_of(r: dict) -> str:
         params = re.findall(r"\{(\d+)\}", r.get("_NameIDParam") or "")
@@ -276,6 +284,7 @@ def main() -> None:
             "maxEnhance": MAX_ENHANCE,
             "note": "Entries keyed level:kindCode:rarity. Curve values are cumulative totals at +N (index N-1).",
         },
+        "coefficients": coefficients,
         "baseJobs": BASE_JOBS,
         "classBaseJob": CLASS_BASE_JOB,
         "kinds": {str(code): v for code, v in sorted(kinds.items())},

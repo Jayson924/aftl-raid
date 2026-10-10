@@ -5,8 +5,14 @@
 //   initChipTooltip() → floating tooltip handler (position: fixed, escapes overflow)
 
 import { calculateGearscore, getGearscoreTier, calculatePowerIndex, formatPowerIndex, EQUIPMENT_ICONS } from './constants.js';
+import { slotContributions } from './gear-calc.js';
 
 const RARITY_CLASSES = new Set(['legend', 'unique', 'epic', 'rare']);
+
+const SLOT_LABELS = {
+  mainWeapon: 'Main', subWeapon: 'Sub', helmet: 'Helmet', top: 'Top', bottom: 'Bottom',
+  gloves: 'Gloves', boots: 'Boots', necklace: 'Necklace', earring: 'Earring', ring1: 'Ring 1', ring2: 'Ring 2',
+};
 
 function fmtEnh(n, rarity) {
   if (n == null) return `<span class="chip-tip__dash">–</span>`;
@@ -77,7 +83,16 @@ export function renderChipTipBody(player) {
       <span class="chip-tip__fd-val">${formatPowerIndex(power.raw)} · ${power.score}</span>
     </div>` : '';
 
-  return `${weaponSection}${armorSection}${fdSection}${powerSection}`;
+  const shares = slotContributions(player)
+    .filter(c => c.share >= 0.005)
+    .sort((a, b) => b.share - a.share);
+  const shareSection = shares.length ? `
+    <div class="chip-tip__section">
+      <div class="chip-tip__heading"><span>Gear power by slot</span></div>
+      <div class="chip-tip__rows">${shares.map(c => `<div class="chip-tip__row"><span class="chip-tip__label">${SLOT_LABELS[c.slot]}</span><span class="chip-tip__val chip-tip__val--low">${Math.round(c.share * 100)}%</span></div>`).join('')}</div>
+    </div>` : '';
+
+  return `${weaponSection}${armorSection}${shareSection}${fdSection}${powerSection}`;
 }
 
 // Convenience for places that previously rendered a plain gs-inline span inline.
