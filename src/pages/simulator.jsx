@@ -204,7 +204,7 @@ function normalizeBuild(raw) {
 function loadBuilds() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (saved?.A && saved?.B) return { A: normalizeBuild(saved.A), B: normalizeBuild(saved.B) };
+    if (saved?.A && saved?.B) return { A: normalizeBuild(saved.A), B: normalizeBuild(saved.B), characterIds: saved.characterIds || { A: null, B: null } };
   } catch (e) { /* fall through to defaults */ }
   return { A: normalizeBuild(options.defaults.build1), B: normalizeBuild(options.defaults.build1) };
 }
@@ -312,7 +312,11 @@ export const SimulatorPage = {
 
   render(container) {
     this.container = container;
-    if (!this.builds) this.builds = loadBuilds();
+    if (!this.builds) {
+      this.builds = loadBuilds();
+      this.characterIds = this.builds.characterIds || { A: null, B: null };
+      delete this.builds.characterIds;
+    }
     initFixedTooltip();
     container.innerHTML = `
       <div class="simulator-page">
@@ -373,7 +377,7 @@ export const SimulatorPage = {
   },
 
   save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.builds)); } catch (e) { /* storage may be unavailable */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...this.builds, characterIds: this.characterIds })); } catch (e) { /* storage may be unavailable */ }
   },
 
   recalculate() {
@@ -499,6 +503,7 @@ export const SimulatorPage = {
     if (action === 'copy') {
       const [from, to] = value.split('>');
       this.builds[to] = clone(this.builds[from]);
+      this.characterIds[to] = this.characterIds[from];
       this.recalculate(); this.renderPanel();
       toast.success(`Build ${from} copied to Build ${to}`); return;
     }
@@ -598,7 +603,7 @@ export const SimulatorPage = {
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
             <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
-            <button class="btn btn-secondary" data-action="save-character" ${this.characterIds[this.active] ? '' : 'disabled'} title="Keeps this build's title, card mastery, collection level, engravings and buffs on the character across syncs">Save to character</button>
+            <button class="btn btn-secondary" data-action="save-character" title="Keeps this build's title, card mastery, collection level, engravings and buffs on the character across syncs">Save to character</button>
           </span>
         </label>
         <label><span>Saved builds</span>
