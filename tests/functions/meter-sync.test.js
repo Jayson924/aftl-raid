@@ -253,10 +253,11 @@ test('overrides set on the site survive a sync and recalculate the panel', async
   };
   stubDb(db);
   // The site saves hand-set fields from a loaded build.
-  const edited = { ...base, title: 'Song of Wind', collection_level: 12, card_bonus_levels: { HP: 20 }, buffs: [{ skill: 'Physical Mastery', level: 6 }, { skill: 'Mental Mastery', level: 0 }] };
+  const edited = { ...base, title: 'Song of Wind', collection_level: 12, card_bonus_levels: { HP: 20 }, buffs: [{ skill: 'Battle Howl', level: 5 }] };
   const saved = parse(await characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', build: edited })));
   assert.equal(saved.status, 200);
-  assert.deepEqual(saved.overrides, { title: 'Song of Wind', card_bonus_levels: { HP: 20 }, collection_level: 12, buffs: [{ skill: 'Physical Mastery', level: 6 }] });
+  // Buffs never go onto the character; its panel must match the game's window.
+  assert.deepEqual(saved.overrides, { title: 'Song of Wind', card_bonus_levels: { HP: 20 }, collection_level: 12 });
   const row = db.players[0];
   assert.equal(row.build.title, 'Song of Wind');
   assert.ok(row.panel && row.panel.summary && row.panel.rows.length);
@@ -264,7 +265,7 @@ test('overrides set on the site survive a sync and recalculate the panel', async
   // Another user cannot write, and a never-synced character is refused.
   assert.equal(parse(await characterOverrides(post({ session: signSession('v9', 'test-secret'), player_id: 'p1', build: edited }))).status, 403);
   // A later sync keeps the overrides on top of the fresh build and recalculates.
-  const synced = parse(await characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: { ...base, title: 'None' }, panel: { summary: { HP: 1 } } }, { 'x-meter-token': token })));
+  const synced = parse(await characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: { ...base, title: 'None', buffs: [{ skill: 'Physical Mastery', level: 6 }] }, panel: { summary: { HP: 1 } } }, { 'x-meter-token': token })));
   assert.equal(synced.status, 200);
   assert.equal(db.players[0].build.title, 'Song of Wind');
   assert.equal(db.players[0].build.collection_level, 12);
@@ -272,3 +273,117 @@ test('overrides set on the site survive a sync and recalculate the panel', async
   assert.notEqual(db.players[0].panel.summary.HP, 1);
 });
 
+
+test('a partial override save keeps fields saved earlier', async () => {
+  const base = { ...syncedBuild, card_grades: [], buffs: [] };
+  const engravings = [{ slot: 'Helmet', grade: 'Rare', rank: 1 }];
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Elestra', build: base }],
+  };
+  stubDb(db);
+  const save = (build) => characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', build }));
+  assert.equal(parse(await save({ ...base, engravings })).status, 200);
+  assert.equal(parse(await save({ title: 'Song of Wind' })).status, 200);
+  const row = db.players[0];
+  assert.deepEqual(row.overrides.engravings, engravings);
+  assert.equal(row.overrides.title, 'Song of Wind');
+  assert.deepEqual(row.build.engravings, engravings);
+  assert.equal(row.build.title, 'Song of Wind');
+});
+
+test('passive levels are saved per character and survive a sync; party buffs are not', async () => {
+  const token = 'meter-token-value';
+  const top = [{ skill: 'Physical Mastery', level: 6 }, { skill: 'Mental Mastery', level: 6 }, { skill: 'Mind Conquer', level: 6 }];
+  const base = { ...syncedBuild, card_grades: [], buffs: top };
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Elestra', build: base }],
+  };
+  stubDb(db);
+  const buffs = [{ skill: 'Mental Mastery', level: 1 }, { skill: 'Mind Conquer', level: 0 }, { skill: 'Battle Howl', level: 5 }];
+  const saved = parse(await characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', build: { buffs } })));
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.overrides.passives, [{ skill: 'Mental Mastery', level: 1 }, { skill: 'Mind Conquer', level: 0 }]);
+  const levels = () => Object.fromEntries(db.players[0].build.buffs.map((b) => [b.skill, b.level]));
+  assert.deepEqual(levels(), { 'Physical Mastery': 6, 'Mental Mastery': 1 });
+  await characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: base }, { 'x-meter-token': token }));
+  assert.deepEqual(levels(), { 'Physical Mastery': 6, 'Mental Mastery': 1 });
+});
+
+test('a typed name cannot move a synced character to another class; a captured name can', async () => {
+  const token = 'meter-token-value';
+  const base = { ...syncedBuild, card_grades: [], buffs: [] };
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Moonlord', build: base, synced_at: 'earlier' }],
+  };
+  stubDb(db);
+  const send = (job, source) => characterSync(post({ character: { name: 'Swipe', job, name_source: source }, build: base }, { 'x-meter-token': token }));
+  const refused = parse(await send('Elestra', 'typed'));
+  assert.equal(refused.status, 422);
+  assert.match(refused.error, /Swipe is a Moonlord on Afterlight, but this Elestra build has a typed name/);
+  assert.equal(db.players[0].role, 'Moonlord');
+  assert.equal(parse(await send('Moonlord', 'typed')).status, 200);
+  assert.equal(parse(await send('Gladiator', 'game')).status, 200);
+  assert.equal(db.players[0].role, 'Gladiator');
+});
+
+test('a sync without cards keeps the stored cards in the build and the panel', async () => {
+  const token = 'meter-token-value';
+  const cards = [{ name: 'Deputy Umzaka', grade: 'L' }];
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Elestra', build: { ...syncedBuild, card_grades: cards }, synced_at: 'earlier' }],
+  };
+  stubDb(db);
+  const send = (cardGrades) => characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: { ...syncedBuild, card_grades: cardGrades } }, { 'x-meter-token': token }));
+  await send([{ name: 'Deputy Umzaka', grade: 'None' }]);
+  assert.deepEqual(db.players[0].build.card_grades, cards);
+  await send([{ name: 'Deputy Umzaka', grade: 'S' }]);
+  assert.deepEqual(db.players[0].build.card_grades, [{ name: 'Deputy Umzaka', grade: 'S' }]);
+});
+
+test('cleared cards stay cleared while the same set is resent; a new set replaces them', async () => {
+  const token = 'meter-token-value';
+  const cards = [{ name: 'Deputy Umzaka', grade: 'L' }, { name: 'Deputy Umhar', grade: 'S' }];
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Elestra', build: { ...syncedBuild, card_grades: cards }, synced_at: 'earlier', overrides: { title: 'Song of Wind' } }],
+    player_cards: [{ player_id: 'p1', slot_index: 0, rarity: 'legend' }],
+  };
+  stubDb(db);
+  const cleared = parse(await characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', clear_cards: true })));
+  assert.equal(cleared.status, 200);
+  const grades = () => db.players[0].build.card_grades.map((c) => c.grade);
+  assert.deepEqual(grades(), ['None', 'None']);
+  assert.equal(db.player_cards.length, 0);
+  assert.deepEqual(db.players[0].overrides.cleared_cards, ['Deputy Umhar|S', 'Deputy Umzaka|L']);
+  assert.equal(db.players[0].overrides.title, 'Song of Wind');
+
+  const send = (cardGrades) => characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: { ...syncedBuild, card_grades: cardGrades } }, { 'x-meter-token': token }));
+  await send(cards);
+  assert.deepEqual(grades(), ['None', 'None']);
+  await send([{ name: 'Deputy Umzaka', grade: 'A' }]);
+  assert.deepEqual(grades(), ['A']);
+  assert.equal(db.players[0].overrides.cleared_cards, undefined);
+  assert.equal(db.players[0].overrides.title, 'Song of Wind');
+});
+
+test('the role column uses the site spelling of the class', async () => {
+  const token = 'meter-token-value';
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Moonlord', build: { ...syncedBuild }, synced_at: 'earlier' }],
+  };
+  stubDb(db);
+  const sent = parse(await characterSync(post({ character: { name: 'Swipe', job: 'Moonlord', name_source: 'typed' }, build: { ...syncedBuild, second_job: 'Moonlord' } }, { 'x-meter-token': token })));
+  assert.equal(sent.status, 200);
+  assert.equal(db.players[0].role, 'Moon Lord');
+  assert.equal(db.players[0].build.second_job, 'Moonlord');
+});

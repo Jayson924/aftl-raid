@@ -563,6 +563,35 @@
   }
 }
 
+.modal-overrides {
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: $border-radius;
+
+  h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+  input[type="number"] { width: 5rem; padding: 0.4rem 0.5rem; font-variant-numeric: tabular-nums; }
+
+  .override-row { display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; }
+  .override-mastery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem 0.75rem; }
+  .override-table {
+    width: 100%; border-collapse: collapse; font-size: 0.9rem;
+    td { padding: 0.3rem 0.5rem 0.3rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    td:last-child { text-align: right; padding-right: 0; }
+  }
+  .override-muted { color: rgba(255, 255, 255, 0.6); font-size: 0.85rem; }
+  .override-cards { display: flex; align-items: center; gap: 0.75rem; label { margin: 0; } span { flex: 1; } }
+  .override-mastery-cell {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overrides .override-mastery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal-overrides .override-row { grid-template-columns: 1fr; }
+}
+
 .class-picker.locked {
   opacity: 0.6;
   pointer-events: none;

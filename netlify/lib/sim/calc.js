@@ -399,6 +399,15 @@ class BuildCalculator {
     return byRank.length ? byRank.reduce((s, v) => s + v, 0) / byRank.length : 0;
   }
 
+  // The game takes the ratio from the low and the high attack separately (matched to an in-game window).
+  coreDeductions(values, attr, maxDeduct, ratio) {
+    const ends = { PATK: ['PATK min', 'PATK max'], MATK: ['MATK min', 'MATK max'] }[attr] || [attr];
+    return Object.fromEntries(ends.map((end) => {
+      const value = get(values, end);
+      return [end, (maxDeduct > 0 ? Math.min(value, maxDeduct) : value) * ratio / 100];
+    }));
+  }
+
   coreSourceValue(values, attr) {
     if (attr === 'PATK') return (get(values, 'PATK min') + get(values, 'PATK max')) / 2;
     if (attr === 'MATK') return (get(values, 'MATK min') + get(values, 'MATK max')) / 2;
@@ -413,11 +422,9 @@ class BuildCalculator {
     const coeff = this.coreSelectedValue(node?.coefficient, core.coeff_rank);
     const maxDeduct = num(node?.cap);
     if (ratio <= 0 || coeff <= 0) return;
-    const sourceValue = this.coreSourceValue(sourceValues, source);
-    const capped = maxDeduct > 0 ? Math.min(sourceValue, maxDeduct) : sourceValue;
-    const deducted = capped * ratio / 100;
-    const gained = deducted * coeff;
-    addAttr(bucket, source, -deducted);
+    const deductions = this.coreDeductions(sourceValues, source, maxDeduct, ratio);
+    const gained = Object.values(deductions).reduce((s, v) => s + v, 0) / Object.keys(deductions).length * coeff;
+    for (const [attr, deducted] of Object.entries(deductions)) addAttr(bucket, attr, -deducted);
     addAttr(bucket, target, gained);
     if ((target === 'PATK' || target === 'MATK') && exempt) addAttr(exempt, target, gained);
   }
@@ -773,8 +780,8 @@ class BuildCalculator {
       deduct: 0, gain: 0, max_deduct: maxDeduct, normal_boost: num(core.enhance),
     };
     if (ratio <= 0 || coeff <= 0) return preview;
-    const capped = maxDeduct > 0 ? Math.min(sourceValue, maxDeduct) : sourceValue;
-    preview.deduct = capped * ratio / 100;
+    const deductions = Object.values(this.coreDeductions(converted, source, maxDeduct, ratio));
+    preview.deduct = deductions.reduce((s, v) => s + v, 0) / deductions.length;
     preview.gain = preview.deduct * coeff;
     return preview;
   }

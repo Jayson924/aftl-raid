@@ -2,9 +2,11 @@
 import { sha256 } from '../lib/session.js';
 import { sbGet, sbPost, sbPatch, sbDelete, userRole, PLAYER_ROLES, json } from '../lib/db.js';
 import { deriveColumns, deriveCardRows } from '../lib/sync-derive.js';
-import { applyOverrides, calculatePanel } from '../lib/sync-merge.js';
+import { applyOverrides, calculatePanel, gradedCards } from '../lib/sync-merge.js';
 
 const MAX_BODY = 512 * 1024;
+// The toolbox's class names where the site's CLASSES spell them differently.
+const SITE_CLASS_NAMES = { Moonlord: 'Moon Lord' };
 
 export async function handler(event) {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: json(204, {}).headers };
@@ -30,12 +32,25 @@ export async function handler(event) {
     if (!PLAYER_ROLES.has(role)) return json(403, { error: 'Guildmates only' });
 
     const now = new Date().toISOString();
-    const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id,account_number,overrides`);
+    const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id,account_number,overrides,role,synced_at,build`);
+    // A typed name with another class is a different character borrowing it; a captured name means a real class change.
+    const prior = existing[0];
+    const siteRole = SITE_CLASS_NAMES[job] || job;
+    if (prior?.synced_at && prior.role && prior.role !== siteRole && SITE_CLASS_NAMES[prior.role] !== siteRole && body.character?.name_source === 'typed') {
+      return json(422, { error: `${name} is a ${prior.role} on Afterlight, but this ${siteRole} build has a typed name. Check the name on the sync screen.` });
+    }
     // Values set on the site stay on top of every sync; the panel is then the site's own calculation.
-    const build = applyOverrides(body.build, existing[0]?.overrides);
+    // Cards cleared on the site stay cleared while the toolbox resends that same remembered set.
+    const cleared = prior?.overrides?.cleared_cards;
+    const incoming = gradedCards(body.build.card_grades);
+    const resent = Array.isArray(cleared) && incoming.length && incoming.join() === cleared.join();
+    const synced = resent ? { ...body.build, card_grades: (body.build.card_grades || []).map((c) => ({ ...c, grade: 'None' })) } : body.build;
+    const build = applyOverrides(withStoredCards(synced, prior?.build), prior?.overrides);
     const panel = calculatePanel(build) || body.panel || null;
     const fields = {
-      role: job, discord_id: discordId, build, panel, synced_at: now,
+      role: siteRole, discord_id: discordId, build, panel, synced_at: now,
+      // New cards replace the cleared set, so the mark goes.
+      ...(Array.isArray(cleared) && incoming.length && !resent ? { overrides: Object.fromEntries(Object.entries(prior.overrides).filter(([k]) => k !== 'cleared_cards')) } : {}),
       ...deriveColumns(build, panel, job),
     };
     const accountName = String(body.character?.account || '').trim().slice(0, 40);
@@ -54,13 +69,19 @@ export async function handler(event) {
     } else {
       return json(409, { error: `"${name}" belongs to another user on the site` });
     }
-    await syncCards(playerId, body.build);
+    if (!resent) await syncCards(playerId, body.build);
     await sbPatch('meter_tokens', `token_hash=eq.${tokens[0].token_hash}`, { last_used_at: now });
     return json(200, { ok: true, player_id: playerId, created, synced_at: now });
   } catch (err) {
     console.error('character-sync error:', err);
     return json(500, { error: err.message });
   }
+}
+
+// The game sends cards once per session; a sync without any keeps the cards already stored.
+function withStoredCards(build, stored) {
+  if (gradedCards(build.card_grades).length || !gradedCards(stored?.card_grades).length) return build;
+  return { ...build, card_grades: stored.card_grades };
 }
 
 // Replaces the character's cards in the admin's slots the sync knows about.

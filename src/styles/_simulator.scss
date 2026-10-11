@@ -124,6 +124,8 @@
   td:first-child { white-space: nowrap; }
   td:last-child { color: $primary-color; font-variant-numeric: tabular-nums; }
   input[type="number"] { width: 5rem; padding: 0.4rem 0.5rem; }
+  tr.sim-buff-passive td { background: rgba($primary-color, 0.08); }
+  tr.sim-buff-passive td:first-child { padding-left: 0.5rem; }
 }
 .sim-set-stats {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.15rem 1.25rem; font-size: 0.85rem;
@@ -203,6 +205,13 @@ $rune-board: 320px;
 
 // Card window
 .sim-window-card .sim-char-top { margin-bottom: 0.75rem; }
+// Card, heraldry and engraving totals sit in the editor beside the window, where there is room for all of them.
+// Capped at the window's height so the page below stays put; the totals scroll inside.
+.sim-slot-editor:has(.sim-board-totals) {
+  display: flex; flex-direction: column; max-height: $window-h; box-sizing: border-box;
+  > * { flex: none; }
+  > .sim-board-totals { flex: 1 1 auto; min-height: 6rem; overflow-y: auto; }
+}
 // Card tier filter: the site's underline tabs, sized for the window.
 .sim-card-tabs {
   display: flex; justify-content: center; margin-bottom: 0.6rem; border-bottom: 2px solid rgba(255, 255, 255, 0.1);
@@ -436,6 +445,7 @@ $rune-board: 320px;
   .sim-rail { flex-direction: row; flex-wrap: wrap; padding-top: 0; button { min-width: 0; flex: 1 1 auto; padding: 0.4rem 0.5rem; } }
   .sim-window, .sim-char { width: 100%; max-width: $window-w; height: auto; }
   .sim-board-totals { overflow-y: visible; }
+  .sim-slot-editor:has(.sim-board-totals) { max-height: none; > .sim-board-totals { overflow-y: visible; } }
 }
 @media (max-width: 420px) {
   .sim-char { grid-template-columns: minmax(0, 1fr) $slot; padding: 0.75rem; }

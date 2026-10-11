@@ -4,6 +4,9 @@ import { inputValidator } from '../input-validator.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
+import simOptions from '../data/sim/options.json' with { type: 'json' };
+import { NONE } from '../sim/remote.js';
+import { emptyEngravings, engravingMainOptions, setEngravingRank } from '../sim/engravings.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
@@ -1782,6 +1785,7 @@ export const PlayersPage = {
             <div class="equip-group-title">${synced.length ? 'Stats · synced' : 'Stats'}</div>
             ${statRows.join('')}
             ${synced.length ? `<div class="equip-cell synced-note"><span class="equip-cell-value">${syncedLabel(player.syncedAt)}</span></div>` : ''}
+            ${synced.length && player.build ? `<div class="equip-cell synced-note"><span class="equip-cell-value">${this._overridesSummary(player.build)}</span></div>` : ''}
           </div>
         ` : ''}
       </div>
@@ -2681,6 +2685,102 @@ export const PlayersPage = {
     });
   },
 
+  // Hand-set fields of a synced character (the meter never sends them); buffs stay on the simulator.
+  _overridesHtml(player) {
+    const b = player.build || {};
+    const L = simOptions.lists;
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const opts = (list, current) => list.map((v) => `<option value="${esc(v)}" ${v === current ? 'selected' : ''}>${esc(v)}</option>`).join('');
+    const num = (attrs, value, [min, max]) => `<input type="number" ${attrs} min="${min}" max="${max}" step="1" value="${Number(value) || 0}">`;
+
+    const cardCount = (b.card_grades || []).filter((c) => c?.grade && c.grade !== NONE).length;
+    const title = b.title || NONE;
+    const titles = [NONE, ...L.titles, ...(title !== NONE && !L.titles.includes(title) ? [title] : [])];
+    const mastery = Object.keys(simOptions.defaults.build1.card_bonus_levels).map((key) => `
+      <label class="override-mastery-cell"><span>${esc(key)}</span>${num(`data-mastery="${esc(key)}"`, b.card_bonus_levels?.[key], L.limits.card_bonus_level)}</label>`).join('');
+    const passives = this._overridePassives(b, player.role).map(({ skill, level, max }) => `
+      <tr><td>${esc(skill)}</td><td>${num(`data-passive="${esc(skill)}"`, level, [0, max])}</td></tr>`).join('');
+    const engravings = this._overrideEngravings(b).map((item) => `
+      <tr data-engraving="${esc(item.slot)}">
+        <td>${esc(item.slot)}</td>
+        <td><select data-engraving-grade>${opts(L.engraving.grades, item.grade)}</select></td>
+        <td><select data-engraving-rank ${item.grade === NONE ? 'disabled' : ''}>${opts(engravingMainOptions(item), item.value_rank)}</select></td>
+      </tr>`).join('');
+
+    return `
+      <div class="modal-overrides">
+        <h3>Not from the sync</h3>
+        <div class="override-row">
+          <div class="form-group"><label for="override-title">Title:</label><select id="override-title">${opts(titles, title)}</select></div>
+          <div class="form-group"><label for="override-collection">Collection level:</label>${num('id="override-collection"', b.collection_level, L.limits.collection_level)}</div>
+        </div>
+        <div class="form-group"><label>Card mastery:</label><div class="override-mastery">${mastery}</div></div>
+        <div class="form-group override-cards"><label>Cards:</label>
+          <span>${cardCount} registered</span>
+          ${cardCount ? '<button type="button" class="btn btn-secondary" id="override-clear-cards">Clear cards</button>' : ''}
+        </div>
+        ${passives ? `<div class="form-group"><label>Passives:</label><table class="override-table"><tbody>${passives}</tbody></table></div>` : ''}
+        <div class="form-group"><label>Engravings:</label>
+          <table class="override-table"><tbody>${engravings}</tbody></table>
+          <span class="override-muted">Extras in the simulator</span>
+        </div>
+      </div>`;
+  },
+
+  // The class's passive skills at their current level; the sync sends them at their top level.
+  _overridePassives(build, role) {
+    const keys = simOptions.lists.buffs?.[build.second_job || role] || [];
+    return keys.map((key) => simOptions.buffs?.[key]).filter((f) => f?.category === 'Passive').map((f) => {
+      const hit = (build.buffs || []).find((x) => x?.skill === f.skill);
+      return { skill: f.skill, max: f.max_level || 0, level: Math.min(f.max_level || 0, Number(hit?.level) || 0) };
+    });
+  },
+
+  _overrideEngravings(build) {
+    return emptyEngravings().map((empty) => ({ ...empty, ...(build.engravings || []).find((e) => e.slot === empty.slot) }));
+  },
+
+  _setupOverrides(modalElement) {
+    modalElement.querySelectorAll('[data-engraving-grade]').forEach((select) => select.addEventListener('change', () => {
+      const row = select.closest('[data-engraving]');
+      const rank = row.querySelector('[data-engraving-rank]');
+      const options = engravingMainOptions({ slot: row.dataset.engraving, grade: select.value });
+      rank.innerHTML = options.map((v) => `<option value="${v}">${v}</option>`).join('');
+      rank.disabled = select.value === NONE;
+    }));
+  },
+
+  // Title · Collection Lv · Mastery n/13 set, for the expanded detail.
+  _overridesSummary(build) {
+    const keys = Object.keys(simOptions.defaults.build1.card_bonus_levels);
+    const mastery = keys.filter((k) => Number(build.card_bonus_levels?.[k]) > 0).length;
+    const title = (build.title && build.title !== NONE ? build.title : 'No title').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return `${title} · Collection Lv ${Number(build.collection_level) || 0} · Mastery ${mastery}/${keys.length} set`;
+  },
+
+  // The section's values as a partial build for character-overrides; unchanged extras ride along.
+  _readOverrides(modalElement, player) {
+    const b = player.build || {};
+    const clamp = (input) => Math.max(Number(input.min), Math.min(Number(input.max), Math.round(Number(input.value) || 0)));
+    const card_bonus_levels = { ...(b.card_bonus_levels || {}) };
+    modalElement.querySelectorAll('[data-mastery]').forEach((input) => { card_bonus_levels[input.dataset.mastery] = clamp(input); });
+    const engravings = this._overrideEngravings(b).map((stored) => {
+      const row = modalElement.querySelector(`[data-engraving="${CSS.escape(stored.slot)}"]`);
+      const grade = row.querySelector('[data-engraving-grade]').value;
+      const rank = row.querySelector('[data-engraving-rank]').value || NONE;
+      const item = { ...stored };
+      if (grade !== stored.grade) Object.assign(item, { grade, value_rank: NONE, main_value: 0, secondary_value: 0, extra_tier: NONE, extra_value: 0 });
+      if (grade !== NONE && rank !== item.value_rank) setEngravingRank(item, rank);
+      return item;
+    });
+    return {
+      title: modalElement.querySelector('#override-title').value,
+      collection_level: clamp(modalElement.querySelector('#override-collection')),
+      card_bonus_levels, engravings,
+      buffs: [...modalElement.querySelectorAll('[data-passive]')].map((input) => ({ skill: input.dataset.passive, level: clamp(input) })),
+    };
+  },
+
   showEditPlayerModal(player) {
     const isAdmin = dataService.isAdmin();
     const maxAccount = player.discordId ? this.getMaxAccountForOwner(player.discordId) : 0;
@@ -2719,6 +2819,7 @@ export const PlayersPage = {
             <span>Re-sync from the toolbox to change gear or stats</span>
           </div>
           ` : this._screenshotUploadHtml('edit-player')}
+          ${synced ? this._overridesHtml(player) : ''}
           <div class="form-group">
             <label>Class:</label>
             <input type="hidden" id="edit-player-class" value="${player.role || ''}">
@@ -2770,6 +2871,25 @@ export const PlayersPage = {
     if (!synced) {
       this._setupScreenshotUpload('edit-player', modalElement);
       this._setupEquipLevelButtons('edit-player', modalElement);
+    } else {
+      this._setupOverrides(modalElement);
+      document.getElementById('override-clear-cards')?.addEventListener('click', async (e) => {
+        const confirmed = await modal.confirm(
+          `Clear ${player.name}'s cards? Use this after removing every card in game. The same cards coming back from the toolbox are ignored; new cards replace them.`,
+          { title: 'Clear Cards', confirmText: 'Clear', cancelText: 'Cancel', danger: true },
+        );
+        if (!confirmed) return;
+        e.target.disabled = true;
+        try {
+          await dataService.clearCharacterCards(player.id);
+          document.body.removeChild(modalElement);
+          toast.success(`Cleared ${player.name}'s cards`);
+          this.loadPlayers();
+        } catch (error) {
+          toast.error(error.message);
+          e.target.disabled = false;
+        }
+      });
     }
 
     if (isAdmin) {
@@ -2825,6 +2945,7 @@ export const PlayersPage = {
         if (isAdmin && newOwnerId !== player.discordId) {
           await dataService.assignCharacterOwner(player.id, newOwnerId || null);
         }
+        if (synced) await dataService.saveCharacterOverrides(player.id, this._readOverrides(modalElement, player));
 
         document.body.removeChild(modalElement);
         toast.success(`Character "${name}" updated successfully!`);

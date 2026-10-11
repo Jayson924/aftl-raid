@@ -2,7 +2,11 @@
 import { createCalculator, NONE } from './sim/calc.js';
 import { getTables } from './sim/tables.js';
 
-export const OVERRIDE_FIELDS = ['title', 'card_bonus_levels', 'collection_level', 'engravings', 'buffs'];
+// Party and self buffs are not here: the character's panel must match the game's window.
+// Passive levels are, since the game never sends skill levels.
+export const OVERRIDE_FIELDS = ['title', 'card_bonus_levels', 'collection_level', 'engravings', 'passives'];
+
+const isPassive = (skill) => Object.values(getTables().buffs || {}).some((b) => b.category === 'Passive' && b.skill === skill);
 
 // The hand-set fields of a build, as the simulator saves them.
 export function pickOverrides(build) {
@@ -12,7 +16,11 @@ export function pickOverrides(build) {
   if (build.card_bonus_levels && typeof build.card_bonus_levels === 'object') out.card_bonus_levels = build.card_bonus_levels;
   if (Number.isFinite(Number(build.collection_level))) out.collection_level = Number(build.collection_level);
   if (Array.isArray(build.engravings)) out.engravings = build.engravings;
-  if (Array.isArray(build.buffs)) out.buffs = build.buffs.filter((b) => b && b.skill && Number(b.level) > 0).map((b) => ({ skill: b.skill, level: Number(b.level), ...(b.key ? { key: b.key } : {}) }));
+  // Level 0 is kept: it turns a passive off.
+  if (Array.isArray(build.buffs)) {
+    const passives = build.buffs.filter((b) => b && isPassive(b.skill)).map((b) => ({ skill: b.skill, level: Math.max(0, Number(b.level) || 0) }));
+    if (passives.length) out.passives = passives;
+  }
   return out;
 }
 
@@ -20,8 +28,21 @@ export function pickOverrides(build) {
 export function applyOverrides(build, overrides) {
   const out = { ...(build || {}) };
   if (!overrides || typeof overrides !== 'object') return out;
-  for (const field of OVERRIDE_FIELDS) if (overrides[field] !== undefined && overrides[field] !== null) out[field] = overrides[field];
+  for (const field of OVERRIDE_FIELDS) {
+    if (field === 'passives' || overrides[field] === undefined || overrides[field] === null) continue;
+    out[field] = overrides[field];
+  }
+  if (Array.isArray(overrides.passives)) {
+    const levels = new Map(overrides.passives.map((p) => [p.skill, p.level]));
+    const kept = (out.buffs || []).filter((b) => !levels.has(b?.skill));
+    out.buffs = [...kept, ...overrides.passives.filter((p) => p.level > 0).map((p) => ({ skill: p.skill, level: p.level }))];
+  }
   return out;
+}
+
+// Graded cards as "name|grade", sorted, to compare two card sets.
+export function gradedCards(cards) {
+  return (cards || []).filter((c) => c?.grade && c.grade !== 'None').map((c) => `${c.name}|${c.grade}`).sort();
 }
 
 let calculator = null;

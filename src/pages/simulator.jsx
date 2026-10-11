@@ -1,6 +1,7 @@
 // Character simulator: the meter's Build page on the site; builds A and B live in localStorage.
 import options from '../data/sim/options.json' with { type: 'json' };
 import { createRemoteCalculator, NONE } from '../sim/remote.js';
+import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, engravingSecondaryOptions, setEngravingRank } from '../sim/engravings.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
@@ -52,14 +53,22 @@ const RESULT_COLUMNS = [
   ['buffed', 'Buffed'],
 ];
 const SUMMARY_METRICS = [
-  ['effective_panel', 'Effective stats'], ['physical_average', 'Phys atk'], ['magic_average', 'Mag atk'],
+  ['effective_panel', 'Power level'], ['physical_average', 'Phys atk'], ['magic_average', 'Mag atk'],
   ['final_percent', 'Final dmg %'], ['crit_percent', 'Crit %'], ['crit_damage_percent', 'Crit dmg %'],
 ];
+// Hover text for summary labels: [heading, lines].
+const METRIC_TIPS = {
+  effective_panel: ['Site score, not in game', 'Attack × Final dmg × Crit\nAgainst the boss crit resist'],
+};
+const metricLabel = (key, label) => {
+  const tip = METRIC_TIPS[key];
+  return tip ? `<span data-tooltip-head="${esc(tip[0])}" data-tooltip-fixed="${esc(tip[1])}">${esc(label)}</span>` : `<span>${esc(label)}</span>`;
+};
 const PENDING_TEXT = 'Pending verification';
 const PENDING_TIP = {
   runes: 'Normal rune rolls are server-side and cannot be read from the client; values are the CN table\'s.',
 };
-const MAX_ENCHANTS = 5;
+const MAX_ENCHANTS = 6;
 const ICON_SPRITE = '/sim/item-icons.webp';  // built by tools/pak/build_sim_icons.py
 const ICON_PX = 44;  // icon drawn inside the game's slot frame
 const RARITIES = ['Magic', 'Rare', 'Epic', 'Unique', 'Legend'];
@@ -68,7 +77,6 @@ const RARITIES = ['Magic', 'Rare', 'Epic', 'Unique', 'Legend'];
 
 const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clone = (value) => JSON.parse(JSON.stringify(value));
-const optionNumber = (text) => { const m = String(text ?? '').match(/-?\d+(?:\.\d+)?/g); return m ? Number(m.at(-1)) : 0; };
 
 function fmt(value, digits = 0) {
   if (value === null || value === undefined || Number.isNaN(value)) return '';
@@ -151,12 +159,6 @@ function setPath(obj, path, value) {
 
 // ---- build shape ----------------------------------------------------------------------
 
-function emptyEngravings() {
-  return ENGRAVING_SLOTS.map((slot) => ({
-    slot, grade: NONE, value_rank: NONE, main_value: 0, secondary_value: 0, extra: NONE, extra_tier: NONE, extra_value: 0,
-  }));
-}
-
 // The job's buffs in a fixed order so the editor can address them by index; a build that never
 // named buffs starts with the job's always-on passives at their top level, as the meter sends them.
 function buffRows(build, raw) {
@@ -226,14 +228,6 @@ const jewelryLookupSlot = (slot) => (slot.startsWith('Ring') ? 'Ring' : slot);
 const jewelryOptions = (slot) => L.jewelry[jewelryLookupSlot(slot)] || [NONE];
 const jewelryEntry = (slot, name) => options.accessories[jewelryLookupSlot(slot)]?.[name];
 const variantOptions = (slot, name) => [NONE, ...(jewelryEntry(slot, name)?.variants || [])];
-function engravingKind(slot) {
-  if (['Helmet', 'Upper', 'Lower', 'Gloves', 'Shoes'].includes(slot)) return 'Armor DEF/MDEF';
-  if (['Main weapon', 'Secondary weapon'].includes(slot)) return 'Weapon PATK/MATK';
-  if (['Necklace', 'Earring', 'Ring 1', 'Ring 2'].includes(slot)) return 'Accessory HP';
-  return '3-piece Crit';
-}
-const engravingMainOptions = (item) => [NONE, ...(L.engraving.main_values[`${engravingKind(item.slot)}|${item.grade}`] || [])];
-const engravingSecondaryOptions = (item) => L.engraving.secondary_values[`${engravingKind(item.slot)}|${item.grade}`] || [];
 const engravingExtraRanks = (item) => L.engraving.extra_ranks[item.extra] || [NONE];
 function engravingExtraOption(item) {
   if (item.extra_tier === NONE || !item.extra_value) return NONE;
@@ -444,12 +438,7 @@ export const SimulatorPage = {
     } else if (field === 'engravings') {
       const item = build.engravings[index];
       if (key === 'grade') { item.value_rank = NONE; item.main_value = 0; item.secondary_value = 0; item.extra_tier = NONE; item.extra_value = 0; }
-      if (key === 'value_rank') {
-        const options = engravingMainOptions(item);
-        const at = options.indexOf(value);
-        item.main_value = optionNumber(value);
-        item.secondary_value = optionNumber(engravingSecondaryOptions(item)[Math.max(0, at - 1)] || NONE);
-      }
+      if (key === 'value_rank') setEngravingRank(item, value);
       if (key === 'extra') { item.extra_tier = NONE; item.extra_value = 0; }
       if (key === 'extra_option') {
         delete item.extra_option;
@@ -561,7 +550,7 @@ export const SimulatorPage = {
     }
   },
 
-  // Title, card mastery, collection level, engravings and buff levels go onto the character; the meter
+  // Title, card mastery, collection level, engravings and passive levels go onto the character; the meter
   // never sends them, so the sync keeps them on top of every later build.
   async saveCharacter() {
     const id = this.characterIds[this.active];
@@ -570,7 +559,7 @@ export const SimulatorPage = {
     try {
       await dataService.saveCharacterOverrides(row.id, this.build);
       await this.loadGuild();
-      toast.success(`Saved to ${row.name}: title, card mastery, collection, engravings and buffs`);
+      toast.success(`Saved to ${row.name}: title, card mastery, collection, engravings and passive levels`);
     } catch (err) {
       toast.error(err.message || 'Could not save to the character');
     }
@@ -603,7 +592,7 @@ export const SimulatorPage = {
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
             <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
-            <button class="btn btn-secondary" data-action="save-character" title="Keeps this build's title, card mastery, collection level, engravings and buffs on the character across syncs">Save to character</button>
+            <button class="btn btn-secondary" data-action="save-character" title="Keeps this build's title, card mastery, collection level, engravings and passive levels on the character across syncs">Save to character</button>
           </span>
         </label>
         <label><span>Saved builds</span>
@@ -625,13 +614,13 @@ export const SimulatorPage = {
     const { summary, rows } = this.results[this.active];
     const row = (attr) => rows.find((r) => r.attr === attr);
     const cards = [
-      ...SUMMARY_METRICS.map(([key, label]) => [label, fmt(summary[key], key.endsWith('percent') ? 1 : 0)]),
-      ['HP', fmt(row('HP')?.buffed)],
-      ['DEF rate %', fmt(row('DEF rate %')?.buffed, 1)],
+      ...SUMMARY_METRICS.map(([key, label]) => [metricLabel(key, label), fmt(summary[key], key.endsWith('percent') ? 1 : 0)]),
+      [metricLabel('', 'HP'), fmt(row('HP')?.buffed)],
+      [metricLabel('', 'DEF rate %'), fmt(row('DEF rate %')?.buffed, 1)],
     ];
     el.innerHTML = `
       <div class="sim-summary-head"><strong>Build ${this.active}</strong><span>${esc(this.build.second_job)} · ${esc(this.build.first_job)}</span>${rows.length ? '' : '<em class="sim-calculating">Calculating…</em>'}</div>
-      <div class="sim-metrics">${cards.map(([label, value]) => `<article><span>${esc(label)}</span><strong>${value}</strong></article>`).join('')}</div>`;
+      <div class="sim-metrics">${cards.map(([label, value]) => `<article>${label}<strong>${value}</strong></article>`).join('')}</div>`;
     const stats = this.container.querySelector('#sim-char-stats');
     if (stats) stats.innerHTML = this.characterStats();
   },
@@ -804,7 +793,7 @@ export const SimulatorPage = {
     const pct = (attr) => Number(rows.find((r) => r.attr === attr)?.buffed || 0).toFixed(2);  // the game shows "6.00"
     const line = (label, value) => `<div><span>${label}</span><strong>${value}</strong></div>`;
     return `
-      ${line('Class', esc(this.build.second_job))}${line('HP', v('HP'))}${line('MP', v('MP'))}${line('MP Recovery', v('MP regen'))}
+      ${line('Class', esc(this.build.second_job))}${line('HP', v('HP'))}${line('MP', v('MP'))}${line('MP Recovery', `<span data-tooltip-fixed="Will not match the game; part of MP recovery is not modeled yet">${v('MP regen')}</span>`)}
       <h4>Special Attk. Info</h4>
       ${line('Critical', v('Crit'))}${line('Critical Damage', v('Crit damage'))}${line('Final Damage', v('Final damage'))}
       <h4>Basic Info</h4>
@@ -948,7 +937,8 @@ export const SimulatorPage = {
           <div class="sim-field"><span>Extra roll</span>${this.itemPicker(`${path}.extra_option`, engravingExtraRanks(item), engravingExtraOption(item), (o) => engravingRarity(o.split(' ')[0], o), { sort: false })}</div>
         </div>
         <h4>Stats</h4>
-        ${statGrid(calc.engravingAttrs(item))}`,
+        ${statGrid(calc.engravingAttrs(item))}
+        ${this.engravingTotals()}`,
     });
   },
 
@@ -978,9 +968,23 @@ export const SimulatorPage = {
   // Stats one column of the calculator contributes, listed like the game's "Rune Stats" box.
   boardTotals(title, column) {
     const rows = this.results[this.active].rows.filter((r) => r[column]);
-    const lines = rows.map((r) => `<div><span>${esc(statLabel(r.attr))}</span><strong>${r.attr.endsWith('%') ? fmt(r[column], 2) : fmt(r[column])}</strong></div>`).join('');
+    return this.totalsBox(title, rows.map((r) => [r.attr, r[column]]));
+  },
+
+  // Every engraving's stats added up; the calculator counts them with title and costumes.
+  engravingTotals() {
+    const sum = new Map();
+    for (const item of this.build.engravings || []) {
+      for (const [attr, value] of Object.entries(calc.engravingAttrs(item) || {})) sum.set(attr, (sum.get(attr) || 0) + (Number(value) || 0));
+    }
+    const entries = [...sum].filter(([, v]) => v).sort(([a], [b]) => orderOf(a) - orderOf(b));
+    return this.totalsBox('Engraving Stats', entries);
+  },
+
+  totalsBox(title, entries) {
+    const lines = entries.map(([attr, value]) => `<div><span>${esc(statLabel(attr))}</span><strong>${attr.endsWith('%') ? fmt(value, 2) : fmt(value)}</strong></div>`).join('');
     // Two columns filled top to bottom, so min/max pairs stay together.
-    const half = Math.max(1, Math.ceil(rows.length / 2));
+    const half = Math.max(1, Math.ceil(entries.length / 2));
     return `<div class="sim-board-totals"><h4>${title}</h4><div class="sim-totals-grid" style="grid-template-rows:repeat(${half},auto)">${lines || '<div><span>—</span></div>'}</div></div>`;
   },
 
@@ -1014,8 +1018,7 @@ export const SimulatorPage = {
     return `
       <div class="sim-board-title">Heraldry</div>
       <div class="sim-board sim-heraldry">${grid}</div>
-      <div class="sim-board-row">${a(8)}${a(9)}${a(10)}</div>
-      ${this.boardTotals('Heraldry Stats', 'glyph')}`;
+      <div class="sim-board-row">${a(8)}${a(9)}${a(10)}</div>`;
   },
 
   heraldryEditor(kind, index) {
@@ -1047,7 +1050,8 @@ export const SimulatorPage = {
           ${fields}
         </div>
         <h4>Stats</h4>
-        ${statGrid(fellowship ? calc.glyphSAttrs(item) : calc.glyphAAttrs(item))}`,
+        ${statGrid(fellowship ? calc.glyphSAttrs(item) : calc.glyphAAttrs(item))}
+        ${this.boardTotals('Heraldry Stats', 'glyph')}`,
     });
   },
 
@@ -1171,8 +1175,7 @@ export const SimulatorPage = {
     return `
       <div class="sim-card-tabs">${tiers.map(([v, label]) => `<button class="${String(tier ?? 'all') === v ? 'active' : ''}" data-action="card-tier" data-value="${v}">${label}</button>`).join('')}</div>
       <div class="sim-card-grid">${grid}</div>
-      <div class="sim-pager">${pager}</div>
-      ${this.boardTotals('Card Stats', 'card')}`;
+      <div class="sim-pager">${pager}</div>`;
   },
 
   masteryList() {
@@ -1196,7 +1199,8 @@ export const SimulatorPage = {
         <h4>Stats</h4>
         ${statGrid(calc.cardAttrs(card.name, card.grade))}
         <h4>Set all shown cards (${this.cardTier === null ? 'all tiers' : `Lv${this.cardTier}`}) to</h4>
-        <div class="sim-card-bulk">${L.card_grades.map((g) => `<button class="btn btn-secondary" data-action="cards-set" data-value="${g}"><span class="sim-rarity-text ${cardRarity(g).rarity}">${esc(cardRarity(g).label)}</span></button>`).join('')}</div>`,
+        <div class="sim-card-bulk">${L.card_grades.map((g) => `<button class="btn btn-secondary" data-action="cards-set" data-value="${g}"><span class="sim-rarity-text ${cardRarity(g).rarity}">${esc(cardRarity(g).label)}</span></button>`).join('')}</div>
+        ${this.boardTotals('Card Stats', 'card')}`,
     });
   },
 
@@ -1211,17 +1215,20 @@ export const SimulatorPage = {
       body: `
         <div class="sim-editor-fields"><label><span>Level</span>${number(`card_bonus_levels.${attr}`, b.card_bonus_levels[attr] || 0, L.limits.card_bonus_level)}</label></div>
         <h4>Stats</h4>
-        ${statGrid(gain)}`,
+        ${statGrid(gain)}
+        ${this.boardTotals('Card Stats', 'card')}`,
     });
   },
 
   renderOther() {
     const b = this.build;
     // One row per specialization: its level and what that level gives.
-    // One row per buff the job can use; level 0 leaves it out. Synced builds arrive with the passives set.
-    const buffs = (b.buffs || []).map((row, i) => {
+    // One row per buff the job can use; level 0 leaves it out. Passives (permanent) come first.
+    const passive = (row) => options.buffs?.[row.key]?.category === 'Passive';
+    const order = (b.buffs || []).map((row, i) => [row, i]).sort(([x], [y]) => passive(y) - passive(x));
+    const buffs = order.map(([row, i]) => {
       const facts = options.buffs?.[row.key] || {};
-      return `<tr><td>${esc(facts.category || '')}</td><td>${esc(row.skill)}</td><td>${number(`buffs.${i}.level`, row.level, [0, facts.max_level || 0])}</td></tr>`;
+      return `<tr${passive(row) ? ' class="sim-buff-passive"' : ''}><td>${esc(facts.category || '')}</td><td>${esc(row.skill)}</td><td>${number(`buffs.${i}.level`, row.level, [0, facts.max_level || 0])}</td></tr>`;
     }).join('');
     const mastery = b.mastery.map((m, i) => `
       <tr><td>${esc(m.name)}</td><td>${number(`mastery.${i}.level`, m.level, L.limits.mastery_level)}</td>
@@ -1255,7 +1262,7 @@ export const SimulatorPage = {
     const metrics = SUMMARY_METRICS.map(([key, label]) => {
       const x = Number(a.summary[key] || 0); const y = Number(b.summary[key] || 0);
       const digits = key.endsWith('percent') ? 1 : 0;
-      return `<article><span>${label}</span><strong>${fmt(x, digits)} → ${fmt(y, digits)}</strong><em class="${y - x >= 0 ? 'up' : 'down'}">${signed(y - x, digits)} · ${x ? ((y - x) / Math.abs(x) * 100).toFixed(2) : '0.00'}%</em></article>`;
+      return `<article>${metricLabel(key, label)}<strong>${fmt(x, digits)} → ${fmt(y, digits)}</strong><em class="${y - x >= 0 ? 'up' : 'down'}">${signed(y - x, digits)} · ${x ? ((y - x) / Math.abs(x) * 100).toFixed(2) : '0.00'}%</em></article>`;
     }).join('');
     const left = new Map(a.rows.map((r) => [r.attr, r])); const right = new Map(b.rows.map((r) => [r.attr, r]));
     const attrs = [...new Set([...left.keys(), ...right.keys()])];

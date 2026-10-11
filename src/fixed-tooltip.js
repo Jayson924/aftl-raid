@@ -15,7 +15,16 @@ export function initFixedTooltip() {
   const show = (el) => {
     const text = el.getAttribute('data-tooltip-fixed');
     if (!text) return;
-    tip.textContent = text;
+    // Optional bold first line from data-tooltip-head.
+    const head = el.getAttribute('data-tooltip-head');
+    tip.textContent = '';
+    if (head) {
+      const strong = document.createElement('strong');
+      strong.className = 'tooltip-fixed-head';
+      strong.textContent = head;
+      tip.append(strong, '\n');
+    }
+    tip.append(text);
     tip.style.display = 'block';
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();

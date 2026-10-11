@@ -426,6 +426,18 @@ class DataService {
     return result;
   }
 
+  // Empty a synced character's cards; the sync then ignores that same set until new cards arrive.
+  async clearCharacterCards(playerId) {
+    const response = await fetch('/.netlify/functions/character-overrides', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: this.getSessionToken(), player_id: playerId, clear_cards: true }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not clear the cards');
+    return result;
+  }
+
   async getSavedBuilds() {
     if (!this._user) return [];
     const { data, error } = await supabase

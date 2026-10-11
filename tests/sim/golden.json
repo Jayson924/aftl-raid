@@ -7826,6 +7826,1564 @@
    }
   },
   {
+   "label": "Lv70 legend gear, core rune PATK to MATK Lv70 rank 21/21",
+   "build": {
+    "talismans": [
+     {
+      "slot": "200% slot 1",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "200% slot 2",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "175% slot 1",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "175% slot 2",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "125% slot 1",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "125% slot 2",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "100% slot 1",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     },
+     {
+      "slot": "100% slot 2",
+      "grade": "None",
+      "name": "None",
+      "extra": "None"
+     }
+    ],
+    "first_job": "Elemental Lord",
+    "second_job": "Elestra",
+    "crit_resist_value": 19000,
+    "equipment": [
+     {
+      "slot": "Helmet",
+      "name": "Black Dragon Terminator Tiara",
+      "suffix": "Intellect II",
+      "enhance": 15,
+      "enchants": [
+       "VIT 3.25%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Upper",
+      "name": "Black Dragon Terminator Robe",
+      "suffix": "Intellect II",
+      "enhance": 15,
+      "enchants": [
+       "VIT 3.25%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Lower",
+      "name": "Black Dragon Terminator Tights",
+      "suffix": "Intellect II",
+      "enhance": 15,
+      "enchants": [
+       "AGI 4.5%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Gloves",
+      "name": "Black Dragon Terminator Muffs",
+      "suffix": "Iron Wall II",
+      "enhance": 15,
+      "enchants": [
+       "AGI 4.5%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Shoes",
+      "name": "Black Dragon Terminator Heels",
+      "suffix": "Intellect II",
+      "enhance": 15,
+      "enchants": [
+       "AGI 4.5%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Main weapon",
+      "name": "Black Dragon Terminator Crystal Ball",
+      "suffix": "Magic II",
+      "enhance": 15,
+      "enchants": [
+       "MATK 2.88%",
+       "AGI 4.5%",
+       "INT 3.5%",
+       "Water attack 8%"
+      ]
+     },
+     {
+      "slot": "Secondary weapon",
+      "name": "Black Dragon Terminator Staff",
+      "suffix": "Magic II",
+      "enhance": 15,
+      "enchants": [
+       "MATK 2.88%",
+       "AGI 4.5%",
+       "INT 3.5%",
+       "Water attack 8%"
+      ]
+     }
+    ],
+    "jewelry": [
+     {
+      "slot": "Necklace",
+      "name": "Green Dragon Hunter Necklace",
+      "variant": "AGI/INT",
+      "enchants": [
+       "AGI 4.5%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Earring",
+      "name": "Green Dragon Hunter Earrings",
+      "variant": "AGI/INT",
+      "enchants": [
+       "AGI 4.5%",
+       "INT 3.5%",
+       "HP 6.5%"
+      ]
+     },
+     {
+      "slot": "Ring 1",
+      "name": "Green Dragon Hunter Ring",
+      "variant": "AGI/INT",
+      "enchants": [
+       "MATK 2.88%",
+       "AGI 4.5%",
+       "INT 3.5%",
+       "Water attack 8%"
+      ]
+     },
+     {
+      "slot": "Ring 2",
+      "name": "Green Dragon Hunter Ring",
+      "variant": "AGI/INT",
+      "enchants": [
+       "MATK 2.88%",
+       "AGI 4.5%",
+       "INT 3.5%",
+       "Water attack 8%"
+      ]
+     }
+    ],
+    "glyph_a": [
+     {
+      "level": "Lv70",
+      "name": "Premium Health Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Tent of Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv60",
+      "name": "Premium Intellect Enhancement Heraldry",
+      "extra": "MATK max"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Ultimate Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Limitation Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Life Vitality's Enhancement Heraldry",
+      "extra": "Crit"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Wind Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Fatal Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Iron Wall Enhancement Heraldry",
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Magic Enhancement Heraldry",
+      "extra": "Crit"
+     },
+     {
+      "level": "Lv70",
+      "name": "Premium Dauntless Enhancement Heraldry",
+      "extra": "MATK max"
+     }
+    ],
+    "glyph_s": [
+     {
+      "level": "Lv70",
+      "name": "Elevation Fellowship Heraldry",
+      "base_attr1": "INT",
+      "rank1": 9,
+      "base_attr2": null,
+      "rank2": null,
+      "extra": null
+     },
+     {
+      "level": "Lv70",
+      "name": "Attack Fellowship Heraldry",
+      "base_attr1": "MATK",
+      "rank1": 8,
+      "base_attr2": null,
+      "rank2": null,
+      "extra": null
+     },
+     {
+      "level": "Lv70",
+      "name": "Origin's Fellowship Heraldry",
+      "base_attr1": null,
+      "rank1": null,
+      "base_attr2": null,
+      "rank2": null,
+      "extra": "INT"
+     },
+     {
+      "level": "Lv70",
+      "name": "Resistance Fellowship Heraldry",
+      "base_attr1": null,
+      "rank1": null,
+      "base_attr2": null,
+      "rank2": null,
+      "extra": "INT"
+     }
+    ],
+    "normal_runes": [
+     {
+      "type": "Attack",
+      "level": "60",
+      "entries": [
+       {
+        "attr": "Final damage",
+        "rank": 5
+       },
+       {
+        "attr": "Final damage",
+        "rank": 5
+       },
+       {
+        "attr": "MATK",
+        "rank": 5
+       },
+       {
+        "attr": "MATK",
+        "rank": 5
+       },
+       {
+        "attr": "INT",
+        "rank": 5
+       },
+       {
+        "attr": "INT",
+        "rank": 5
+       }
+      ]
+     },
+     {
+      "type": "Attack",
+      "level": "70",
+      "entries": [
+       {
+        "attr": "Final damage",
+        "rank": 5
+       },
+       {
+        "attr": "Final damage",
+        "rank": 5
+       },
+       {
+        "attr": "MATK",
+        "rank": 5
+       },
+       {
+        "attr": "MATK",
+        "rank": 5
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       }
+      ]
+     },
+     {
+      "type": "Defense",
+      "level": null,
+      "entries": [
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       }
+      ]
+     },
+     {
+      "type": "Defense",
+      "level": null,
+      "entries": [
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       },
+       {
+        "attr": null,
+        "rank": null
+       }
+      ]
+     }
+    ],
+    "core_rune": {
+     "level": "70",
+     "conversion": "PATK → MATK",
+     "ratio_rank": 21,
+     "coeff_rank": 21,
+     "enhance": 10
+    },
+    "collection_level": 33,
+    "mastery": [
+     {
+      "name": "Max HP",
+      "level": 10
+     },
+     {
+      "name": "Max MP",
+      "level": 10
+     },
+     {
+      "name": "Physical Damage",
+      "level": 10
+     },
+     {
+      "name": "Magic Damage",
+      "level": 10
+     },
+     {
+      "name": "Physical Defense",
+      "level": 10
+     },
+     {
+      "name": "Magic Defense",
+      "level": 10
+     },
+     {
+      "name": "Critical",
+      "level": 10
+     },
+     {
+      "name": "Final Damage",
+      "level": 10
+     }
+    ],
+    "title": "Desert Resource · Explorer",
+    "fashion": [
+     {
+      "slot": "Main weapon",
+      "name": "Costume Main Weapon (Lv60)"
+     },
+     {
+      "slot": "Secondary weapon",
+      "name": "Costume Secondary Weapon (Lv60)"
+     },
+     {
+      "slot": "Wings",
+      "name": "Costume Wings (Lv70)"
+     },
+     {
+      "slot": "Tail",
+      "name": "Costume Tail (Lv70)"
+     },
+     {
+      "slot": "Decal",
+      "name": "Costume Decal (Lv70)"
+     },
+     {
+      "slot": "Necklace",
+      "name": "Necklace A"
+     },
+     {
+      "slot": "Earring",
+      "name": "Earring A"
+     },
+     {
+      "slot": "Ring 1",
+      "name": "Ring A"
+     },
+     {
+      "slot": "Ring 2",
+      "name": "Ring A"
+     }
+    ],
+    "buffs": [
+     {
+      "skill": "",
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     },
+     {
+      "skill": null,
+      "level": null
+     }
+    ],
+    "card_grades": [
+     {
+      "name": "Deputy Umzaka",
+      "grade": "L"
+     },
+     {
+      "name": "Deputy Umhar",
+      "grade": "L"
+     },
+     {
+      "name": "General Crimson Ummanba",
+      "grade": "L"
+     },
+     {
+      "name": "Minotaur Knight",
+      "grade": "L"
+     },
+     {
+      "name": "Minotaur Commander",
+      "grade": "L"
+     },
+     {
+      "name": "Crow Hobgoblin",
+      "grade": "L"
+     },
+     {
+      "name": "Brother Summoner",
+      "grade": "L"
+     },
+     {
+      "name": "Ogre Slave",
+      "grade": "L"
+     },
+     {
+      "name": "Ogre Commander",
+      "grade": "L"
+     },
+     {
+      "name": "Cerberus Kakari",
+      "grade": "L"
+     },
+     {
+      "name": "Gargoyle Stinger",
+      "grade": "L"
+     },
+     {
+      "name": "Lamia Attacker",
+      "grade": "L"
+     },
+     {
+      "name": "Giant Stone Half Golem",
+      "grade": "L"
+     },
+     {
+      "name": "Manticore Lord Kram",
+      "grade": "L"
+     },
+     {
+      "name": "Fearful Death Ray",
+      "grade": "L"
+     },
+     {
+      "name": "Midnight Death Howl",
+      "grade": "L"
+     },
+     {
+      "name": "Five Brothers' Specter",
+      "grade": "L"
+     },
+     {
+      "name": "Vengeful Ling",
+      "grade": "L"
+     },
+     {
+      "name": "Obsessed Grunt",
+      "grade": "L"
+     },
+     {
+      "name": "Wild Hellglaze",
+      "grade": "L"
+     },
+     {
+      "name": "Enraged Umhama",
+      "grade": "L"
+     },
+     {
+      "name": "Prideful Levant",
+      "grade": "L"
+     },
+     {
+      "name": "Fanatic Blan",
+      "grade": "L"
+     },
+     {
+      "name": "Judge Apocalypse",
+      "grade": "L"
+     },
+     {
+      "name": "Cyclops Berserker",
+      "grade": "L"
+     },
+     {
+      "name": "Ogre Berserker",
+      "grade": "L"
+     },
+     {
+      "name": "Minotaur",
+      "grade": "L"
+     },
+     {
+      "name": "Rotting One-Eyed Orc",
+      "grade": "L"
+     },
+     {
+      "name": "Golem Lava",
+      "grade": "L"
+     },
+     {
+      "name": "Revived Kakari",
+      "grade": "L"
+     },
+     {
+      "name": "Kakari Returns with Vengeance",
+      "grade": "L"
+     },
+     {
+      "name": "Lizardman Brother Claw",
+      "grade": "L"
+     },
+     {
+      "name": "Lizardman Brother Tooth",
+      "grade": "L"
+     },
+     {
+      "name": "Lizardman Brother Tail",
+      "grade": "L"
+     },
+     {
+      "name": "Scout Captain Norbak",
+      "grade": "L"
+     },
+     {
+      "name": "Golem Moltan",
+      "grade": "L"
+     },
+     {
+      "name": "Sea Dragon Serpentra",
+      "grade": "S"
+     },
+     {
+      "name": "Shaman Lich Andara",
+      "grade": "L"
+     },
+     {
+      "name": "Golem Toadstool",
+      "grade": "L"
+     },
+     {
+      "name": "Treacherous Preacher Adolf",
+      "grade": "L"
+     },
+     {
+      "name": "Vengeful Assassin Bonita",
+      "grade": "L"
+     },
+     {
+      "name": "Cold-blooded Magician Rasputin",
+      "grade": "L"
+     },
+     {
+      "name": "Fallen Sage Ballius",
+      "grade": "L"
+     },
+     {
+      "name": "Resurrected Punisher Brass",
+      "grade": "L"
+     },
+     {
+      "name": "Archbishop Kazalman",
+      "grade": "L"
+     },
+     {
+      "name": "Golem Fujinorth",
+      "grade": "L"
+     },
+     {
+      "name": "Gatekeeper Quercus",
+      "grade": "L"
+     },
+     {
+      "name": "Watcher Blanco 04",
+      "grade": "L"
+     },
+     {
+      "name": "Immoral Ghost",
+      "grade": "L"
+     },
+     {
+      "name": "Slave Leader Constan",
+      "grade": "L"
+     },
+     {
+      "name": "Gigantes Maha",
+      "grade": "L"
+     },
+     {
+      "name": "Bishop Gaius",
+      "grade": "L"
+     },
+     {
+      "name": "Golem Morgon",
+      "grade": "L"
+     },
+     {
+      "name": "White-eyed Krakes",
+      "grade": "L"
+     },
+     {
+      "name": "Swamp Queen Zabel",
+      "grade": "L"
+     },
+     {
+      "name": "Sorcerer Karahan",
+      "grade": "L"
+     },
+     {
+      "name": "Green Dragon Karahan",
+      "grade": "S"
+     },
+     {
+      "name": "Experiment No. 287 Upgraded Tenakrun",
+      "grade": "L"
+     },
+     {
+      "name": "Experiment No. 171 Kalamari Dienu",
+      "grade": "L"
+     },
+     {
+      "name": "Experiment No. 172 Kalamari Elube",
+      "grade": "L"
+     },
+     {
+      "name": "Experiment No. 060 Proto Omega",
+      "grade": "L"
+     },
+     {
+      "name": "Fairy Queen Lantana",
+      "grade": "L"
+     },
+     {
+      "name": "Experiment No. 665 Super Strong XXXX",
+      "grade": "L"
+     },
+     {
+      "name": "Professor K",
+      "grade": "L"
+     },
+     {
+      "name": "Cursed Soul Hero",
+      "grade": "L"
+     },
+     {
+      "name": "Cursed Soul Chemise",
+      "grade": "L"
+     },
+     {
+      "name": "Gardener Garland",
+      "grade": "L"
+     },
+     {
+      "name": "Blacksmith Little John",
+      "grade": "L"
+     },
+     {
+      "name": "Orc Kim Trio",
+      "grade": "L"
+     },
+     {
+      "name": "Harpy Dark Mage",
+      "grade": "L"
+     },
+     {
+      "name": "Typhoon Kim",
+      "grade": "L"
+     },
+     {
+      "name": "Spitflower Ignis",
+      "grade": "L"
+     },
+     {
+      "name": "Storm Master Zuu",
+      "grade": "L"
+     },
+     {
+      "name": "Canyon Guardian Abubbah",
+      "grade": "L"
+     },
+     {
+      "name": "Sandworm Hazal",
+      "grade": "L"
+     },
+     {
+      "name": "Loyal Follower Kajif",
+      "grade": "L"
+     },
+     {
+      "name": "Desert Dragon Jakard",
+      "grade": "B"
+     },
+     {
+      "name": "Arch Frogolin Augur",
+      "grade": "A"
+     },
+     {
+      "name": "Furious Aera Venom",
+      "grade": "A"
+     },
+     {
+      "name": "The Great Dux Arks",
+      "grade": "A"
+     },
+     {
+      "name": "Ignacio Gigante",
+      "grade": "A"
+     },
+     {
+      "name": "Rusty Mist Gustcry",
+      "grade": "A"
+     },
+     {
+      "name": "Devoured Echo Adventurer",
+      "grade": "A"
+     },
+     {
+      "name": "Fell Guardian, Keeper of the Forest",
+      "grade": "A"
+     },
+     {
+      "name": "Weeping Mist Queen",
+      "grade": "A"
+     },
+     {
+      "name": "Devoured Echo Chemise",
+      "grade": "A"
+     },
+     {
+      "name": "Centurion Ogre Baopar",
+      "grade": "A"
+     },
+     {
+      "name": "Engata General Umbala",
+      "grade": "A"
+     },
+     {
+      "name": "Punisher Meluka",
+      "grade": "A"
+     },
+     {
+      "name": "Chiliarch Titanion",
+      "grade": "A"
+     },
+     {
+      "name": "Black Dragon Feder",
+      "grade": "None"
+     }
+    ],
+    "card_bonus_levels": {
+     "HP": 25,
+     "MP": 0,
+     "VIT": 0,
+     "STR": 25,
+     "AGI": 25,
+     "INT": 25,
+     "Final damage": 25,
+     "PATK": 20,
+     "Crit": 25,
+     "Crit damage": 0,
+     "DEF": 25,
+     "MATK": 25,
+     "MDEF": 25
+    }
+   },
+   "rows": [
+    {
+     "attr": "HP",
+     "base": 7423,
+     "equipment": 86753,
+     "card": 26689,
+     "talisman": 0.0,
+     "glyph": 6822,
+     "normal_rune": 0.0,
+     "core_mastery": 5000,
+     "actual": 203553,
+     "converted": 305809,
+     "buffed": 305809,
+     "percent": null
+    },
+    {
+     "attr": "HP %",
+     "base": 0.0,
+     "equipment": 45.5,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 55.5,
+     "converted": 55.5,
+     "buffed": 55.5,
+     "percent": null
+    },
+    {
+     "attr": "MP",
+     "base": 6929,
+     "equipment": 58790,
+     "card": 12699,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 3000,
+     "actual": 81418,
+     "converted": 343673,
+     "buffed": 343673,
+     "percent": null
+    },
+    {
+     "attr": "MP %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 0.0,
+     "converted": 0.0,
+     "buffed": 0.0,
+     "percent": null
+    },
+    {
+     "attr": "Move speed %",
+     "base": 12.0,
+     "equipment": 3.5,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 15.5,
+     "converted": 15.5,
+     "buffed": 15.5,
+     "percent": null
+    },
+    {
+     "attr": "STR",
+     "base": 837,
+     "equipment": 44,
+     "card": 1217,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 2098,
+     "converted": 2098,
+     "buffed": 2098,
+     "percent": null
+    },
+    {
+     "attr": "STR %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 0.0,
+     "converted": 0.0,
+     "buffed": 0.0,
+     "percent": null
+    },
+    {
+     "attr": "AGI",
+     "base": 1021,
+     "equipment": 455,
+     "card": 1208,
+     "talisman": 0.0,
+     "glyph": 267,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 4441,
+     "converted": 4441,
+     "buffed": 4441,
+     "percent": null
+    },
+    {
+     "attr": "AGI %",
+     "base": 0.0,
+     "equipment": 40.5,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 50.5,
+     "converted": 50.5,
+     "buffed": 50.5,
+     "percent": null
+    },
+    {
+     "attr": "INT",
+     "base": 1162,
+     "equipment": 1322,
+     "card": 909,
+     "talisman": 0.0,
+     "glyph": 1557,
+     "normal_rune": 165,
+     "core_mastery": 0.0,
+     "actual": 7493,
+     "converted": 7493,
+     "buffed": 7493,
+     "percent": null
+    },
+    {
+     "attr": "INT %",
+     "base": 0.0,
+     "equipment": 38.5,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 8.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 46.5,
+     "converted": 46.5,
+     "buffed": 46.5,
+     "percent": null
+    },
+    {
+     "attr": "VIT",
+     "base": 746,
+     "equipment": 637,
+     "card": 325,
+     "talisman": 0.0,
+     "glyph": 224,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 2192,
+     "converted": 2192,
+     "buffed": 2192,
+     "percent": null
+    },
+    {
+     "attr": "VIT %",
+     "base": 0.0,
+     "equipment": 6.5,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 7.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 13.5,
+     "converted": 13.5,
+     "buffed": 13.5,
+     "percent": null
+    },
+    {
+     "attr": "PATK min",
+     "base": 604,
+     "equipment": 7530,
+     "card": 1636,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": -2208,
+     "actual": 8148,
+     "converted": 10036,
+     "buffed": 10036,
+     "percent": null
+    },
+    {
+     "attr": "PATK max",
+     "base": 604,
+     "equipment": 10586,
+     "card": 1636,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": -2856,
+     "actual": 10739,
+     "converted": 12627,
+     "buffed": 12627,
+     "percent": null
+    },
+    {
+     "attr": "PATK %",
+     "base": 6.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 6.0,
+     "converted": 6.0,
+     "buffed": 6.0,
+     "percent": null
+    },
+    {
+     "attr": "MATK min",
+     "base": 898,
+     "equipment": 9515,
+     "card": 1831,
+     "talisman": 0.0,
+     "glyph": 1053,
+     "normal_rune": 605,
+     "core_mastery": 1716,
+     "actual": 19999,
+     "converted": 27390,
+     "buffed": 27390,
+     "percent": null
+    },
+    {
+     "attr": "MATK max",
+     "base": 898,
+     "equipment": 13150,
+     "card": 1831,
+     "talisman": 0.0,
+     "glyph": 1053,
+     "normal_rune": 605,
+     "core_mastery": 1716,
+     "actual": 24780,
+     "converted": 32171,
+     "buffed": 32171,
+     "percent": null
+    },
+    {
+     "attr": "MATK %",
+     "base": 6.0,
+     "equipment": 15.52,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 31.52,
+     "converted": 31.52,
+     "buffed": 31.52,
+     "percent": null
+    },
+    {
+     "attr": "Final damage",
+     "base": 624,
+     "equipment": 1176,
+     "card": 254,
+     "talisman": 0.0,
+     "glyph": 267,
+     "normal_rune": 301,
+     "core_mastery": 100,
+     "actual": 2722,
+     "converted": 2722,
+     "buffed": 2722,
+     "percent": 39.3
+    },
+    {
+     "attr": "Fire attack %",
+     "base": 0.0,
+     "equipment": 10.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 10.0,
+     "converted": 10.0,
+     "buffed": 10.0,
+     "percent": null
+    },
+    {
+     "attr": "Water attack %",
+     "base": 0.0,
+     "equipment": 42.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 42.0,
+     "converted": 42.0,
+     "buffed": 42.0,
+     "percent": null
+    },
+    {
+     "attr": "Light attack %",
+     "base": 0.0,
+     "equipment": 6.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 6.0,
+     "converted": 6.0,
+     "buffed": 6.0,
+     "percent": null
+    },
+    {
+     "attr": "Dark attack %",
+     "base": 0.0,
+     "equipment": 6.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 6.0,
+     "converted": 6.0,
+     "buffed": 6.0,
+     "percent": null
+    },
+    {
+     "attr": "DEF",
+     "base": 130,
+     "equipment": 3737,
+     "card": 6360,
+     "talisman": 0.0,
+     "glyph": 1220,
+     "normal_rune": 0.0,
+     "core_mastery": 500,
+     "actual": 13091,
+     "converted": 14537,
+     "buffed": 14537,
+     "percent": null
+    },
+    {
+     "attr": "DEF %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 10.0,
+     "converted": 10.0,
+     "buffed": 10.0,
+     "percent": null
+    },
+    {
+     "attr": "MDEF",
+     "base": 170,
+     "equipment": 7020,
+     "card": 6347,
+     "talisman": 0.0,
+     "glyph": 1626,
+     "normal_rune": 0.0,
+     "core_mastery": 500,
+     "actual": 17179,
+     "converted": 23772,
+     "buffed": 23772,
+     "percent": null
+    },
+    {
+     "attr": "MDEF %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 10.0,
+     "converted": 10.0,
+     "buffed": 10.0,
+     "percent": null
+    },
+    {
+     "attr": "Crit",
+     "base": 1284,
+     "equipment": 3635,
+     "card": 6345,
+     "talisman": 0.0,
+     "glyph": 5777,
+     "normal_rune": 0.0,
+     "core_mastery": 500,
+     "actual": 20949,
+     "converted": 39601,
+     "buffed": 39601,
+     "percent": 90
+    },
+    {
+     "attr": "Crit %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 20.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 20.0,
+     "converted": 20.0,
+     "buffed": 20.0,
+     "percent": null
+    },
+    {
+     "attr": "Crit damage",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 1056,
+     "talisman": 0.0,
+     "glyph": 2167,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 3867,
+     "converted": 7234,
+     "buffed": 7234,
+     "percent": 11.574
+    },
+    {
+     "attr": "Crit damage %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 20.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 20.0,
+     "converted": 20.0,
+     "buffed": 20.0,
+     "percent": null
+    },
+    {
+     "attr": "MP regen",
+     "base": 46,
+     "equipment": 19,
+     "card": 37,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 102,
+     "converted": 102,
+     "buffed": 102,
+     "percent": null
+    },
+    {
+     "attr": "Crit resist",
+     "base": 2574,
+     "equipment": 1616,
+     "card": 4600,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 8790,
+     "converted": 8790,
+     "buffed": 8790,
+     "percent": null
+    },
+    {
+     "attr": "Paralyze resist",
+     "base": 1430,
+     "equipment": 1076,
+     "card": 4667,
+     "talisman": 0.0,
+     "glyph": 3852,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 11025,
+     "converted": 11025,
+     "buffed": 11025,
+     "percent": null
+    },
+    {
+     "attr": "Paralyze",
+     "base": 2214,
+     "equipment": 417,
+     "card": 4648,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 7279,
+     "converted": 7279,
+     "buffed": 7279,
+     "percent": null
+    },
+    {
+     "attr": "Stun",
+     "base": 1785,
+     "equipment": 521,
+     "card": 4561,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 6867,
+     "converted": 6867,
+     "buffed": 6867,
+     "percent": null
+    },
+    {
+     "attr": "Stun resist",
+     "base": 1785,
+     "equipment": 1345,
+     "card": 4679,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 7809,
+     "converted": 7809,
+     "buffed": 7809,
+     "percent": null
+    },
+    {
+     "attr": "MATK min %",
+     "base": 0.0,
+     "equipment": 4.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 14.0,
+     "converted": 14.0,
+     "buffed": 14.0,
+     "percent": null
+    },
+    {
+     "attr": "MATK max %",
+     "base": 0.0,
+     "equipment": 4.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 10.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 14.0,
+     "converted": 14.0,
+     "buffed": 14.0,
+     "percent": null
+    },
+    {
+     "attr": "Paralyze resist %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 20.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 20.0,
+     "converted": 20.0,
+     "buffed": 20.0,
+     "percent": null
+    },
+    {
+     "attr": "DEF rate %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 55.8,
+     "converted": 58.4,
+     "buffed": 58.4,
+     "percent": null
+    },
+    {
+     "attr": "MDEF rate %",
+     "base": 0.0,
+     "equipment": 0.0,
+     "card": 0.0,
+     "talisman": 0.0,
+     "glyph": 0.0,
+     "normal_rune": 0.0,
+     "core_mastery": 0.0,
+     "actual": 62.4,
+     "converted": 69.6,
+     "buffed": 69.6,
+     "percent": null
+    }
+   ],
+   "summary": {
+    "HP": 305809,
+    "effective_panel": 92092.4628311843,
+    "final_percent": 39.3,
+    "crit_percent": 90,
+    "crit_damage_percent": 11.574,
+    "crit_resist_percent": 43.9,
+    "effective_crit_resist_value": 19000.0,
+    "crit_resist_reduction_percent": 0.0,
+    "monster_defense": 0.0,
+    "effective_monster_defense": 0.0,
+    "defense_reduction_percent": 0.0,
+    "monster_defense_rate": 0.0,
+    "element_resist_percent": 0.0,
+    "physical_min": 10036,
+    "physical_max": 12627,
+    "physical_average": 11331.5,
+    "magic_min": 27390,
+    "magic_max": 32171,
+    "magic_average": 29780.5,
+    "Fire attack %": 10.0,
+    "Water attack %": 42.0,
+    "Light attack %": 6.0,
+    "Dark attack %": 6.0,
+    "Fire resistance %": 0.0,
+    "Water resistance %": 0.0,
+    "Light resistance %": 0.0,
+    "Dark resistance %": 0.0,
+    "Fire effective resistance %": 0.0,
+    "Water effective resistance %": 0.0,
+    "Light effective resistance %": 0.0,
+    "Dark effective resistance %": 0.0,
+    "Damage increase %": 0.0,
+    "Physical damage increase %": 0.0,
+    "Magic damage increase %": 0.0,
+    "Crit extra damage %": 0,
+    "Crit expected gain %": 0.0,
+    "Dedicate Crow average gain %": 0.0,
+    "Ecstatic Dance average gain %": 0.0,
+    "Independent damage multiplier %": 0.0
+   },
+   "core_rune_preview": {
+    "source_attr": "PATK",
+    "target_attr": "MATK",
+    "source_value": 14163.5,
+    "deduct": 2832.7,
+    "gain": 1416.35,
+    "max_deduct": 28000.0,
+    "normal_boost": 10.0
+   }
+  },
+  {
    "label": "Majesty, Lv70 legend +15 gear",
    "build": {
     "talismans": [

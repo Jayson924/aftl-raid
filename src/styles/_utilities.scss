@@ -210,10 +210,12 @@
   padding: 0.35rem 0.6rem;
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.85);
-  white-space: nowrap;
+  white-space: pre;  // keeps line breaks, never wraps
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   line-height: 1.4;
+
+  .tooltip-fixed-head { color: $primary-color; font-weight: 600; }
 }
 
 .settings-info {
