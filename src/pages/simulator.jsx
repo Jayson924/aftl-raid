@@ -157,6 +157,19 @@ function emptyEngravings() {
   }));
 }
 
+// The job's buffs in a fixed order so the editor can address them by index; a build that never
+// named buffs starts with the job's always-on passives at their top level, as the meter sends them.
+function buffRows(build, raw) {
+  const keys = L.buffs?.[build.second_job] || [];
+  const given = Array.isArray(raw) ? raw : L.passives?.[build.second_job] || [];
+  const level = (key) => {
+    const facts = options.buffs?.[key] || {};
+    const hit = given.find((b) => b && (b.key === key || (b.skill === facts.skill && !b.key)));
+    return Math.max(0, Math.min(facts.max_level || 0, Number(hit?.level) || 0));
+  };
+  return keys.map((key) => ({ key, skill: options.buffs?.[key]?.skill || key, level: level(key) }));
+}
+
 function normalizeBuild(raw) {
   const build = clone(raw || options.defaults.build1);
   build.equipment = EQUIPMENT_SLOTS.map((slot) => ({ slot, name: NONE, suffix: NONE, enhance: 0, enchants: [], ...(build.equipment || []).find((e) => e.slot === slot) }));
@@ -184,7 +197,7 @@ function normalizeBuild(raw) {
   build.title = build.title || NONE;
   build.collection_level = build.collection_level ?? 0;
   build.crit_resist_value = build.crit_resist_value ?? 0;
-  build.buffs = [];
+  build.buffs = buffRows(build, raw?.buffs);
   return build;
 }
 
@@ -405,9 +418,11 @@ export const SimulatorPage = {
     if (path === 'first_job') {
       build.second_job = L.jobs.find((j) => j.first === value)?.seconds[0] || NONE;
       this.resetClassGear(build);
+      build.buffs = buffRows(build);
     } else if (path === 'second_job') {
       build.first_job = L.jobs.find((j) => j.seconds.includes(value))?.first || build.first_job;
       this.resetClassGear(build);
+      build.buffs = buffRows(build);
     } else if (field === 'equipment' && key === 'name') {
       build.equipment[index].suffix = NONE;
     } else if (field === 'jewelry' && key === 'name') {
@@ -1176,6 +1191,11 @@ export const SimulatorPage = {
   renderOther() {
     const b = this.build;
     // One row per specialization: its level and what that level gives.
+    // One row per buff the job can use; level 0 leaves it out. Synced builds arrive with the passives set.
+    const buffs = (b.buffs || []).map((row, i) => {
+      const facts = options.buffs?.[row.key] || {};
+      return `<tr><td>${esc(facts.category || '')}</td><td>${esc(row.skill)}</td><td>${number(`buffs.${i}.level`, row.level, [0, facts.max_level || 0])}</td></tr>`;
+    }).join('');
     const mastery = b.mastery.map((m, i) => `
       <tr><td>${esc(m.name)}</td><td>${number(`mastery.${i}.level`, m.level, L.limits.mastery_level)}</td>
         <td>${esc(statPairs(calc.masteryAttrs(m.name, m.level)).map(([k, v]) => `${k} ${v}`).join(' · ') || '—')}</td></tr>`).join('');
@@ -1189,6 +1209,10 @@ export const SimulatorPage = {
         <section class="sim-set-panel">
           <header><strong>Specialization</strong></header>
           <table class="sim-mastery-table"><tbody>${mastery}</tbody></table>
+        </section>
+        <section class="sim-set-panel">
+          <header><strong>Passives &amp; Buffs</strong></header>
+          <table class="sim-mastery-table"><tbody>${buffs}</tbody></table>
         </section>
       </div>`;
   },

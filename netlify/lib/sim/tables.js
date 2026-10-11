@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const TABLE_NAMES = ['equipment', 'jewelry', 'sets', 'potentials', 'heraldry', 'cards', 'talismans', 'runes',
   'engraving', 'costumes', 'titles', 'collection', 'mastery', 'class_base', 'job_map', 'effective_panel',
-  'attribute_order', 'conversion', 'lists', 'defaults'];
+  'attribute_order', 'conversion', 'lists', 'defaults', 'buffs'];
 
 // Deployed functions are bundled, so the data dir is found rather than assumed.
 function dataDir() {

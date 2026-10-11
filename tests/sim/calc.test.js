@@ -7,7 +7,7 @@ import { createCalculator, finalPercent, defensePercent, NONE } from '../../netl
 const dataDir = new URL('../../netlify/data/sim/', import.meta.url);
 const TABLE_NAMES = ['equipment', 'jewelry', 'sets', 'potentials', 'heraldry', 'cards', 'talismans', 'runes',
   'engraving', 'costumes', 'titles', 'collection', 'mastery', 'class_base', 'job_map', 'effective_panel',
-  'attribute_order', 'conversion', 'lists', 'defaults'];
+  'attribute_order', 'conversion', 'lists', 'defaults', 'buffs'];
 const tables = Object.fromEntries(TABLE_NAMES.map((n) => [n, JSON.parse(fs.readFileSync(new URL(`${n}.json`, dataDir), 'utf8'))]));
 const golden = JSON.parse(fs.readFileSync(new URL('./golden.json', import.meta.url), 'utf8'));
 const calc = createCalculator(tables);
@@ -21,7 +21,6 @@ function close(got, want, label) {
   assert.ok(Math.abs(got - want) <= 1e-6 * Math.max(1, Math.abs(want)), `${label}: ${got} vs ${want}`);
 }
 
-// Skill buffs are phase 2, so the buffed column and the summary are checked only for builds without them.
 const hasSkillBuffs = (build) => (build.buffs || []).some((b) => b && b.skill && b.skill !== NONE);
 
 for (const g of golden.builds) {
@@ -30,7 +29,7 @@ for (const g of golden.builds) {
     const byAttr = new Map(rows.map((r) => [r.attr, r]));
     assert.deepEqual(rows.slice(0, golden.attribute_order.length).map((r) => r.attr), golden.attribute_order);
     assert.deepEqual([...byAttr.keys()].sort(), g.rows.map((r) => r.attr).sort());
-    const checkBuffs = !hasSkillBuffs(g.build);
+    const checkBuffs = true;
     for (const want of g.rows) {
       const got = byAttr.get(want.attr);
       for (const col of COLUMNS) close(got[col], want[col], `${want.attr}.${col}`);
@@ -46,8 +45,9 @@ for (const g of golden.builds) {
   });
 }
 
-test('the golden set covers builds without skill buffs', () => {
+test('the golden set covers builds with and without skill buffs', () => {
   assert.ok(golden.builds.filter((g) => !hasSkillBuffs(g.build)).length >= 2);
+  assert.ok(golden.builds.filter((g) => hasSkillBuffs(g.build)).length >= 2);
 });
 
 test('final damage percent curve', () => {

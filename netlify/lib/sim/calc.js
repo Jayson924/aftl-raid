@@ -183,7 +183,7 @@ function defenseReductionForAttack(buffs, attack, physicalWeight = 1, magicalWei
 
 const TABLE_NAMES = ['equipment', 'jewelry', 'sets', 'potentials', 'heraldry', 'cards', 'talismans', 'runes',
   'engraving', 'costumes', 'titles', 'collection', 'mastery', 'class_base', 'job_map', 'effective_panel',
-  'attribute_order', 'conversion', 'lists', 'defaults'];
+  'attribute_order', 'conversion', 'lists', 'defaults', 'buffs'];
 
 export function createCalculator(tables) {
   for (const name of TABLE_NAMES) if (!tables[name]) throw new Error(`simulator tables: missing ${name}`);
@@ -497,9 +497,30 @@ class BuildCalculator {
     return out;
   }
 
-  // Phase 2 adds the skill rows; until then only the free buff attributes count.
+  // Skill rows at the highest level named per skill, one per exclusive group; skill-scoped effects
+  // only count inside their trigger window, so the panel leaves them out.
   buffValues(build) {
     const out = {};
+    const rows = this.t.buffs || {};
+    const keys = (this.t.lists?.buffs || {})[norm(build.second_job)] || Object.keys(rows);
+    const chosen = new Map();
+    for (const item of build.buffs || []) {
+      const skill = norm(item?.skill);
+      const level = num(item?.level);
+      if (!skill || skill === NONE || level <= 0) continue;
+      const key = (item?.key && rows[item.key] ? item.key : null)
+        ?? keys.find((k) => rows[k] && (k === skill || rows[k].skill === skill))
+        ?? Object.keys(rows).find((k) => k === skill || rows[k].skill === skill);
+      if (!key) continue;
+      const slot = rows[key].exclusive_group || key;
+      const current = chosen.get(slot);
+      if (!current || level > current.level) chosen.set(slot, { key, level });
+    }
+    for (const { key, level } of chosen.values()) {
+      const entry = rows[key];
+      if (entry.skill_scope) continue;
+      for (const [attr, value] of Object.entries(entry.levels[String(level)] || {})) addAttr(out, attr, value);
+    }
     for (const [attr, value] of Object.entries(build.extra_buff_attrs || {})) addAttr(out, attr, value);
     return out;
   }

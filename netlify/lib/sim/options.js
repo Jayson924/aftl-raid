@@ -26,6 +26,7 @@ export function buildOptions(tables) {
     attribute_order: tables.attribute_order,
     job_map: tables.job_map,
     cards: { names: tables.cards.names, levels: tables.cards.levels },
+    buffs: Object.fromEntries(Object.entries(tables.buffs || {}).map(([key, b]) => [key, { category: b.category, source: b.source, skill: b.skill, max_level: b.max_level }])),
     gear,
     suffix_sets: suffixSets,
     accessories,
