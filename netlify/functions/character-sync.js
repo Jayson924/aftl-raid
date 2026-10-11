@@ -29,7 +29,13 @@ export async function handler(event) {
 
     const now = new Date().toISOString();
     const fields = { role: job, discord_id: discordId, build: body.build, panel: body.panel || null, synced_at: now };
-    const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id`);
+    const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id,account_number`);
+    const accountName = String(body.character?.account || '').trim().slice(0, 40);
+    if (accountName) {
+      fields.account_name = accountName;
+      const accountNumber = await accountNumberFor(discordId, accountName, existing[0]);
+      if (accountNumber) fields.account_number = accountNumber;
+    }
     let playerId; let created = false;
     if (!existing.length) {
       const rows = await sbPost('players', { name, ...fields });
@@ -46,4 +52,13 @@ export async function handler(event) {
     console.error('character-sync error:', err);
     return json(500, { error: err.message });
   }
+}
+
+// Characters that share an account nickname follow the account number the owner already
+// gave one of them; a number set on this character stays, and nothing is invented otherwise.
+async function accountNumberFor(discordId, accountName, current) {
+  const siblings = await sbGet('players', `discord_id=eq.${encodeURIComponent(discordId)}&select=account_name,account_number`);
+  const match = siblings.find((p) => p.account_name === accountName && p.account_number);
+  if (match) return match.account_number;
+  return current?.account_number || null;
 }

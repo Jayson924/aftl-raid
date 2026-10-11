@@ -114,3 +114,33 @@ test('character-sync creates, updates, and refuses another user\'s character', a
   assert.equal(refused.status, 409);
   assert.equal(db.players.find((p) => p.name === 'Taken').discord_id, 'z9');
 });
+
+test('character-sync keeps characters of one game account on one account number', async () => {
+  const token = 'meter-token-value';
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [
+      { id: 'p-main', name: 'Swipe', discord_id: 'g1', account_name: 'Satan', account_number: 2 },
+      { id: 'p-set', name: 'Picked', discord_id: 'g1', account_number: 1 },
+    ],
+  };
+  stubDb(db);
+  const send = (name, account) => characterSync(post({ character: { name, job: 'Elestra', account }, build: {} }, { 'x-meter-token': token }));
+
+  // A new character of a known account follows that account's number.
+  await send('Alt', 'Satan');
+  assert.equal(db.players.find((p) => p.name === 'Alt').account_number, 2);
+  assert.equal(db.players.find((p) => p.name === 'Alt').account_name, 'Satan');
+  // A number the owner set on this character stays, and later siblings of that account follow it.
+  await send('Picked', 'Other');
+  assert.equal(db.players.find((p) => p.name === 'Picked').account_number, 1);
+  await send('Fresh', 'Other');
+  assert.equal(db.players.find((p) => p.name === 'Fresh').account_number, 1);
+  // A nickname no character carries a number for gets none.
+  await send('Lone', 'Nobody');
+  assert.equal(db.players.find((p) => p.name === 'Lone').account_number, undefined);
+  // No nickname sent: nothing about accounts is touched.
+  await send('Plain', '');
+  assert.equal('account_name' in db.players.find((p) => p.name === 'Plain'), false);
+});
