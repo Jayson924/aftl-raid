@@ -8,8 +8,6 @@ import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
 const CARD_RARITIES_PLAYERS = EQUIPMENT_RARITIES.filter(r => r.value);
-// Where guildmates get the toolbox. Placeholder until there is a public download.
-const TOOLBOX_DOWNLOAD_URL = '#';
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
@@ -2496,14 +2494,11 @@ export const PlayersPage = {
       modalElement.querySelector('#add-choice-hand').addEventListener('click', () => { close(); this.showAddPlayerModal(); });
     };
     const showSteps = () => {
-      const download = TOOLBOX_DOWNLOAD_URL
-        ? `<a href="${TOOLBOX_DOWNLOAD_URL}" target="_blank" rel="noopener">Download the toolbox</a> and open it.`
-        : 'Download the toolbox and open it.';
       modalElement.innerHTML = `
         <div class="modal-content modal-add-chooser">
           <h2>Sync with the toolbox</h2>
           <ol class="sync-steps">
-            <li>${download}</li>
+            <li>Download the latest toolbox from the Discord announcements and open it.</li>
             <li>Open Afterlight Sync and press Link with Afterlight. Approve the link on the page it opens.</li>
             <li>Turn on Auto-sync, log in to the game and change maps once.</li>
           </ol>
