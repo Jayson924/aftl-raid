@@ -2,6 +2,7 @@
 import { sha256 } from '../lib/session.js';
 import { sbGet, sbPost, sbPatch, sbDelete, userRole, PLAYER_ROLES, json } from '../lib/db.js';
 import { deriveColumns, deriveCardRows } from '../lib/sync-derive.js';
+import { applyOverrides, calculatePanel } from '../lib/sync-merge.js';
 
 const MAX_BODY = 512 * 1024;
 
@@ -29,11 +30,14 @@ export async function handler(event) {
     if (!PLAYER_ROLES.has(role)) return json(403, { error: 'Guildmates only' });
 
     const now = new Date().toISOString();
+    const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id,account_number,overrides`);
+    // Values set on the site stay on top of every sync; the panel is then the site's own calculation.
+    const build = applyOverrides(body.build, existing[0]?.overrides);
+    const panel = calculatePanel(build) || body.panel || null;
     const fields = {
-      role: job, discord_id: discordId, build: body.build, panel: body.panel || null, synced_at: now,
-      ...deriveColumns(body.build, body.panel, job),
+      role: job, discord_id: discordId, build, panel, synced_at: now,
+      ...deriveColumns(build, panel, job),
     };
-    const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id,account_number`);
     const accountName = String(body.character?.account || '').trim().slice(0, 40);
     if (accountName) {
       fields.account_name = accountName;

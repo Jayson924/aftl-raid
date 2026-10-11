@@ -304,6 +304,8 @@ export const SimulatorPage = {
   // Guildmates: characters the meter synced and builds saved on the site.
   guild: { characters: [], saved: [], loaded: false },
   savedIds: { A: null, B: null },
+  // The synced character each build slot was loaded from, for Save to character.
+  characterIds: { A: null, B: null },
 
   get build() { return this.builds[this.active]; },
   get slotKey() { return this.view === 'costume' ? this.costumeMode : this.view; },
@@ -500,7 +502,9 @@ export const SimulatorPage = {
       this.recalculate(); this.renderPanel();
       toast.success(`Build ${from} copied to Build ${to}`); return;
     }
+    if (action === 'save-character') { void this.saveCharacter(); return; }
     if (action === 'reset') {
+      this.characterIds[this.active] = null;
       this.builds[this.active] = normalizeBuild(options.defaults.build1);
       this.recalculate(); this.render(this.container); return;
     }
@@ -514,6 +518,7 @@ export const SimulatorPage = {
       if (!row) { toast.warning('Pick a character first'); return; }
       this.builds[this.active] = normalizeBuild(row.build);
       this.savedIds[this.active] = null;
+      this.characterIds[this.active] = row.id;
       this.recalculate(); this.render(this.container);
       toast.success(`${row.name} loaded into Build ${this.active}`); return;
     }
@@ -523,6 +528,7 @@ export const SimulatorPage = {
       if (!row) { toast.warning('Pick a saved build first'); return; }
       this.builds[this.active] = normalizeBuild(row.build);
       this.savedIds[this.active] = row.id;
+      this.characterIds[this.active] = null;
       this.recalculate(); this.render(this.container);
       toast.success(`${row.name} loaded into Build ${this.active}`); return;
     }
@@ -547,6 +553,21 @@ export const SimulatorPage = {
       toast.success(`Saved ${row.name}`);
     } catch (err) {
       toast.error(err.message || 'Could not save the build');
+    }
+  },
+
+  // Title, card mastery, collection level, engravings and buff levels go onto the character; the meter
+  // never sends them, so the sync keeps them on top of every later build.
+  async saveCharacter() {
+    const id = this.characterIds[this.active];
+    const row = this.guild.characters.find((c) => c.id === id);
+    if (!row) { toast.warning('Load one of your synced characters first'); return; }
+    try {
+      await dataService.saveCharacterOverrides(row.id, this.build);
+      await this.loadGuild();
+      toast.success(`Saved to ${row.name}: title, card mastery, collection, engravings and buffs`);
+    } catch (err) {
+      toast.error(err.message || 'Could not save to the character');
     }
   },
 
@@ -577,6 +598,7 @@ export const SimulatorPage = {
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
             <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
+            <button class="btn btn-secondary" data-action="save-character" ${this.characterIds[this.active] ? '' : 'disabled'} title="Keeps this build's title, card mastery, collection level, engravings and buffs on the character across syncs">Save to character</button>
           </span>
         </label>
         <label><span>Saved builds</span>

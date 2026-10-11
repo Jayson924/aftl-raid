@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { signSession, verifySession, sha256 } from '../../netlify/lib/session.js';
 import { handler as meterToken } from '../../netlify/functions/meter-token.js';
 import { handler as characterSync } from '../../netlify/functions/character-sync.js';
+import { handler as characterOverrides } from '../../netlify/functions/character-overrides.js';
+import { deriveStats } from '../../netlify/lib/sync-derive.js';
+import { calculatePanel } from '../../netlify/lib/sync-merge.js';
 
 process.env.SESSION_SECRET = 'test-secret';
 process.env.SUPABASE_URL = 'https://db.test';
@@ -185,10 +188,11 @@ test('character-sync derives equipment, stats and suffixes from the build', asyn
     necklace: { level: '70', rarity: 'legend', enhancement: 0 },
     ring2: { level: '50', rarity: 'legend', enhancement: 0 },
   });
-  assert.deepEqual(row.character_stats, {
-    attackPower: 10375, magicAttack: 23481, finalDamage: 4210, hp: 213517, defense: 30112, magicDefense: 28000,
-    criticalRate: 87.3, criticalDamage: 211.3, fireAttack: 10, iceAttack: 42, lightAttack: 6, darkAttack: 6.13,
-  });
+  // The site recalculates the panel from the build; the meter's panel is only a fallback.
+  const panel = calculatePanel(syncedBuild);
+  assert.deepEqual(row.panel.summary, panel.summary);
+  assert.deepEqual(row.character_stats, deriveStats(panel));
+  assert.notEqual(row.character_stats.hp, 213517);
   assert.equal(row.suffix1, 'intellect');
   // A suffix the site has no key for leaves the old value.
   assert.equal(row.suffix2, 'fire');
@@ -238,3 +242,33 @@ test('character-sync replaces the cards the sync knows and leaves the rest', asy
   assert.deepEqual(mine(), [[0, 'legend'], [1, 'unique'], [3, 'rare']]);
   assert.equal(db.player_cards.find((c) => c.player_id === 'other').rarity, 'magic');
 });
+
+test('overrides set on the site survive a sync and recalculate the panel', async () => {
+  const token = 'meter-token-value';
+  const base = { ...syncedBuild, card_grades: [], buffs: [] };
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Elestra', build: base }],
+  };
+  stubDb(db);
+  // The site saves hand-set fields from a loaded build.
+  const edited = { ...base, title: 'Song of Wind', collection_level: 12, card_bonus_levels: { HP: 20 }, buffs: [{ skill: 'Physical Mastery', level: 6 }, { skill: 'Mental Mastery', level: 0 }] };
+  const saved = parse(await characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', build: edited })));
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.overrides, { title: 'Song of Wind', card_bonus_levels: { HP: 20 }, collection_level: 12, buffs: [{ skill: 'Physical Mastery', level: 6 }] });
+  const row = db.players[0];
+  assert.equal(row.build.title, 'Song of Wind');
+  assert.ok(row.panel && row.panel.summary && row.panel.rows.length);
+  assert.ok(row.character_stats.hp > 0);
+  // Another user cannot write, and a never-synced character is refused.
+  assert.equal(parse(await characterOverrides(post({ session: signSession('v9', 'test-secret'), player_id: 'p1', build: edited }))).status, 403);
+  // A later sync keeps the overrides on top of the fresh build and recalculates.
+  const synced = parse(await characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: { ...base, title: 'None' }, panel: { summary: { HP: 1 } } }, { 'x-meter-token': token })));
+  assert.equal(synced.status, 200);
+  assert.equal(db.players[0].build.title, 'Song of Wind');
+  assert.equal(db.players[0].build.collection_level, 12);
+  assert.deepEqual(db.players[0].build.buffs, [{ skill: 'Physical Mastery', level: 6 }]);
+  assert.notEqual(db.players[0].panel.summary.HP, 1);
+});
+

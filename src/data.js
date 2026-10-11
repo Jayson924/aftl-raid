@@ -414,6 +414,18 @@ class DataService {
     return data;
   }
 
+  // Save a synced character's hand-set fields (title, card mastery, collection, engravings, buffs).
+  async saveCharacterOverrides(playerId, build) {
+    const response = await fetch('/.netlify/functions/character-overrides', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: this.getSessionToken(), player_id: playerId, build }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not save to the character');
+    return result;
+  }
+
   async getSavedBuilds() {
     if (!this._user) return [];
     const { data, error } = await supabase
