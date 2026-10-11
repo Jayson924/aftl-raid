@@ -8,6 +8,8 @@ import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
 const CARD_RARITIES_PLAYERS = EQUIPMENT_RARITIES.filter(r => r.value);
+// Where guildmates get the toolbox. Placeholder until there is a public download.
+const TOOLBOX_DOWNLOAD_URL = '#';
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
@@ -299,7 +301,7 @@ export const PlayersPage = {
 
     if (canViewFull) {
       document.getElementById('add-player-btn').addEventListener('click', () => {
-        this.showAddPlayerModal();
+        this.showAddChooser();
       });
 
       // Flat view disabled for now - group-by-owner toggle hidden
@@ -2463,6 +2465,49 @@ export const PlayersPage = {
         </div>
       </div>
     `;
+  },
+
+  // Add Character: syncing from the toolbox first, hand entry as the fallback.
+  showAddChooser() {
+    const modalElement = document.createElement('div');
+    modalElement.className = 'modal';
+    const close = () => modalElement.remove();
+    const showChoice = () => {
+      modalElement.innerHTML = `
+        <div class="modal-content modal-add-chooser">
+          <h2>Add Character</h2>
+          <button type="button" class="btn btn-primary" id="add-choice-sync">Sync with the toolbox</button>
+          <button type="button" class="btn btn-secondary" id="add-choice-hand">Manual/Screenshot (Old version)</button>
+        </div>
+      `;
+      modalElement.querySelector('#add-choice-sync').addEventListener('click', showSteps);
+      modalElement.querySelector('#add-choice-hand').addEventListener('click', () => { close(); this.showAddPlayerModal(); });
+    };
+    const showSteps = () => {
+      const download = TOOLBOX_DOWNLOAD_URL
+        ? `<a href="${TOOLBOX_DOWNLOAD_URL}" target="_blank" rel="noopener">Download the toolbox</a> and open it.`
+        : 'Download the toolbox and open it.';
+      modalElement.innerHTML = `
+        <div class="modal-content modal-add-chooser">
+          <h2>Sync with the toolbox</h2>
+          <ol class="sync-steps">
+            <li>${download}</li>
+            <li>Open Afterlight Sync and press Link with Afterlight. Approve the link on the page it opens.</li>
+            <li>Turn on Auto-sync, log in to the game and change maps once.</li>
+          </ol>
+          <p class="sync-steps-note">Cards arrive on the first map change. Title and card mastery are entered in the toolbox.</p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="add-steps-back">Back</button>
+            <button type="button" class="btn btn-primary" id="add-steps-done">Done</button>
+          </div>
+        </div>
+      `;
+      modalElement.querySelector('#add-steps-back').addEventListener('click', showChoice);
+      modalElement.querySelector('#add-steps-done').addEventListener('click', close);
+    };
+    modalElement.addEventListener('click', (e) => { if (e.target === modalElement) close(); });
+    showChoice();
+    document.body.appendChild(modalElement);
   },
 
   showAddPlayerModal() {

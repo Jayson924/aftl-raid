@@ -990,7 +990,7 @@ export const MyRaidsPage = {
         this.loadMyCharacters();
       };
 
-      PlayersPage.showAddPlayerModal();
+      PlayersPage.showAddChooser();
     });
   },
 

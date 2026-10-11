@@ -57,7 +57,9 @@ export const LinkMeterPage = {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Could not link');
         forgetCode();
-        container.querySelector('#link-meter-card').innerHTML = '<p>Linked. Go back to the meter; it picks the link up on its own.</p>';
+        container.querySelector('#link-meter-card').innerHTML = `<p>Linked. Go back to the meter; it picks the link up on its own.</p>
+          <a href="/my-raids" id="link-back">Back to my characters</a>`;
+        container.querySelector('#link-back').addEventListener('click', (ev) => { ev.preventDefault(); router.navigate('my-raids'); });
       } catch (err) {
         toast.error(err.message);
         button.disabled = false;
