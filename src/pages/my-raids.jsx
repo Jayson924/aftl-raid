@@ -9,6 +9,7 @@ import {
 } from '../constants.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
+import { syncedLabel } from '../sim/panel.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -1944,13 +1945,20 @@ export const MyRaidsPage = {
     this.setupCardGridHandlers();
   },
 
+  // Equipped cards come from the meter once a sync carried them; extras stay hand-kept.
+  cardsSynced(playerOrId) {
+    const player = typeof playerOrId === 'string' ? this._myPlayers.find(p => p.id === playerOrId) : playerOrId;
+    return !!player?.syncedAt && (player.build?.card_grades || []).some(c => ['C', 'B', 'A', 'S', 'L'].includes(c?.grade));
+  },
+
   renderCardCharacterBlockHTML(player) {
     const iconStyle = getClassSpriteStyle(player.role);
     const currentPage = this._cardsPageByPlayer[player.id] || 1;
+    const synced = this.cardsSynced(player);
     const section = this._sectionByPlayer[player.id] || 'slots';
     const showSlots = section === 'slots';
     return `
-      <div class="card-character-block" data-player-id="${player.id}">
+      <div class="card-character-block${synced ? ' cards-synced' : ''}" data-player-id="${player.id}">
         <div class="card-character-header">
           <div class="character-info">
             ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
@@ -1960,6 +1968,7 @@ export const MyRaidsPage = {
             </div>
           </div>
           <div class="card-character-actions">
+            ${synced ? `<span class="card-synced-note" data-tooltip="Re-sync from the toolbox to change equipped cards">${syncedLabel(player.syncedAt)}</span>` : `
             <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page" ${showSlots ? '' : 'style="display:none"'}>
               <svg class="card-paste-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1967,7 +1976,7 @@ export const MyRaidsPage = {
                 <line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
               <span>Upload/Paste page ${currentPage}</span>
-            </button>
+            </button>`}
           </div>
         </div>
         <div class="card-section-tabs" data-player-id="${player.id}">
@@ -2250,6 +2259,7 @@ export const MyRaidsPage = {
   },
 
   bindCardSlotHandlers(playerId) {
+    if (this.cardsSynced(playerId)) return;
     document.querySelectorAll(`.card-slot[data-player-id="${playerId}"]`).forEach(slot => {
       slot.addEventListener('click', () => this.cycleSlotRarity(slot));
       slot.addEventListener('contextmenu', (e) => {
@@ -2351,7 +2361,7 @@ export const MyRaidsPage = {
     if (!file || !file.type.startsWith('image/')) return;
 
     const player = this._myPlayers.find(p => p.id === playerId);
-    if (!player) return;
+    if (!player || this.cardsSynced(player)) return;
 
     const page = this._cardsPageByPlayer[playerId] || 1;
     const block = document.querySelector(`.card-character-block[data-player-id="${playerId}"]`);

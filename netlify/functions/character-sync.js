@@ -1,7 +1,7 @@
 // POST a synced character with X-Meter-Token; upserts the guildmate's players row.
 import { sha256 } from '../lib/session.js';
-import { sbGet, sbPost, sbPatch, userRole, PLAYER_ROLES, json } from '../lib/db.js';
-import { deriveColumns } from '../lib/sync-derive.js';
+import { sbGet, sbPost, sbPatch, sbDelete, userRole, PLAYER_ROLES, json } from '../lib/db.js';
+import { deriveColumns, deriveCardRows } from '../lib/sync-derive.js';
 
 const MAX_BODY = 512 * 1024;
 
@@ -50,12 +50,24 @@ export async function handler(event) {
     } else {
       return json(409, { error: `"${name}" belongs to another user on the site` });
     }
+    await syncCards(playerId, body.build);
     await sbPatch('meter_tokens', `token_hash=eq.${tokens[0].token_hash}`, { last_used_at: now });
     return json(200, { ok: true, player_id: playerId, created, synced_at: now });
   } catch (err) {
     console.error('character-sync error:', err);
     return json(500, { error: err.message });
   }
+}
+
+// Replaces the character's cards in the admin's slots the sync knows about.
+async function syncCards(playerId, build) {
+  const config = await sbGet('app_config', 'key=eq.card_slot_names&select=value');
+  let slotNames = config[0]?.value || {};
+  if (typeof slotNames === 'string') { try { slotNames = JSON.parse(slotNames); } catch (e) { slotNames = {}; } }
+  const cards = deriveCardRows(build, slotNames);
+  if (!cards || !cards.slots.length) return;
+  await sbDelete('player_cards', `player_id=eq.${playerId}&slot_index=in.(${cards.slots.join(',')})`);
+  if (cards.rows.length) await sbPost('player_cards', cards.rows.map((row) => ({ player_id: playerId, ...row })));
 }
 
 // Characters that share an account nickname follow the account number the owner already

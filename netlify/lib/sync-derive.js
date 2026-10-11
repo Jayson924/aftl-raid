@@ -88,3 +88,23 @@ export function deriveColumns(build, panel, job, tables = getTables()) {
   if (suffix2) fields.suffix2 = suffix2;
   return fields;
 }
+
+// The builder's card grades, lowest first, as the site's card rarities.
+const CARD_RARITY = { C: 'magic', B: 'rare', A: 'epic', S: 'unique', L: 'legend' };
+
+// player_cards rows for the admin's card slots; null when no cards arrived, so stored ones stay.
+// `slots` are the slots the sync speaks for; a card synced as None empties its slot.
+export function deriveCardRows(build, slotNames) {
+  const grades = new Map((build?.card_grades || []).map((c) => [c?.name, c?.grade]));
+  if (![...grades.values()].some((g) => CARD_RARITY[g])) return null;
+  const slots = [];
+  const rows = [];
+  for (const [index, name] of Object.entries(slotNames || {})) {
+    if (!grades.has(name)) continue;
+    const slot = Number(index);
+    slots.push(slot);
+    const rarity = CARD_RARITY[grades.get(name)];
+    if (rarity) rows.push({ slot_index: slot, rarity });
+  }
+  return { slots, rows };
+}

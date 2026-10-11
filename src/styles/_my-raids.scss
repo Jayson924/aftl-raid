@@ -1388,6 +1388,15 @@
   }
 }
 
+.my-raids-page .card-synced-note {
+  color: $text-muted;
+  font-size: 0.8rem;
+}
+
+.my-raids-page .cards-synced .card-slot {
+  cursor: default;
+}
+
 .my-raids-page .card-paste-btn {
   display: inline-flex;
   align-items: center;

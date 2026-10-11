@@ -18,12 +18,13 @@ function stubDb(tables) {
     const method = init.method || 'GET';
     const body = init.body ? JSON.parse(init.body) : null;
     calls.push({ method, table, body, query: u.search });
-    const filters = [...u.searchParams].filter(([k]) => !['select', 'order'].includes(k)).map(([k, v]) => [k, v.replace(/^eq\./, '')]);
-    const match = (row) => filters.every(([k, v]) => String(row[k]) === v);
+    const filters = [...u.searchParams].filter(([k]) => !['select', 'order'].includes(k));
+    const test = (value, f) => (f.startsWith('in.(') ? f.slice(4, -1).split(',').includes(String(value)) : String(value) === f.replace(/^eq\./, ''));
+    const match = (row) => filters.every(([k, f]) => test(row[k], f));
     const rows = tables[table] || (tables[table] = []);
     let result;
     if (method === 'GET') result = rows.filter(match);
-    else if (method === 'POST') { const row = { id: `id-${rows.length + 1}`, created_at: 'now', ...body }; rows.push(row); result = [row]; }
+    else if (method === 'POST') { result = [].concat(body).map((b) => ({ id: `id-${rows.length + 1}`, created_at: 'now', ...b })); rows.push(...result); }
     else if (method === 'PATCH') { result = rows.filter(match); for (const r of result) Object.assign(r, body); }
     else if (method === 'DELETE') { result = rows.filter(match); tables[table] = rows.filter((r) => !match(r)); }
     return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -207,4 +208,33 @@ test('a sync without gear or panel keeps hand-entered columns', async () => {
   assert.deepEqual(row.equipment, hand.equipment);
   assert.deepEqual(row.character_stats, hand.character_stats);
   assert.equal(row.suffix1, 'fire');
+});
+
+test('character-sync replaces the cards the sync knows and leaves the rest', async () => {
+  const token = 'meter-token-value';
+  const slotNames = { 0: 'Deputy Umzaka', 1: 'Deputy Umhar', 2: 'Minotaur Knight', 3: 'Not In The Sync' };
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    app_config: [{ key: 'card_slot_names', value: JSON.stringify(slotNames) }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1' }],
+    player_cards: [
+      { id: 'c1', player_id: 'p1', slot_index: 1, rarity: 'epic' },
+      { id: 'c2', player_id: 'p1', slot_index: 2, rarity: 'legend' },
+      { id: 'c3', player_id: 'p1', slot_index: 3, rarity: 'rare' },
+      { id: 'c4', player_id: 'other', slot_index: 0, rarity: 'magic' },
+    ],
+  };
+  stubDb(db);
+  const send = (cardGrades) => characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: { card_grades: cardGrades } }, { 'x-meter-token': token }));
+  const mine = () => db.player_cards.filter((c) => c.player_id === 'p1').map((c) => [c.slot_index, c.rarity]).sort((a, b) => a[0] - b[0]);
+
+  // No graded card at all: the archive had not arrived, nothing changes.
+  await send([{ name: 'Deputy Umzaka', grade: 'None' }, { name: 'Minotaur Knight', grade: 'None' }]);
+  assert.deepEqual(mine(), [[1, 'epic'], [2, 'legend'], [3, 'rare']]);
+
+  await send([{ name: 'Deputy Umzaka', grade: 'L' }, { name: 'Deputy Umhar', grade: 'S' }, { name: 'Minotaur Knight', grade: 'None' }]);
+  // Synced grades replace their slots, None empties one, an unsynced slot keeps its row.
+  assert.deepEqual(mine(), [[0, 'legend'], [1, 'unique'], [3, 'rare']]);
+  assert.equal(db.player_cards.find((c) => c.player_id === 'other').rarity, 'magic');
 });
