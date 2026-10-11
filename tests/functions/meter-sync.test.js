@@ -144,3 +144,67 @@ test('character-sync keeps characters of one game account on one account number'
   await send('Plain', '');
   assert.equal('account_name' in db.players.find((p) => p.name === 'Plain'), false);
 });
+
+// Shaped like the toolbox's payload: English slot names, the item tables' names, the calculator's panel.
+const syncedBuild = {
+  second_job: 'Elestra',
+  equipment: [
+    { slot: 'Helmet', name: 'Green Dragon Terminator Tiara', suffix: 'Iron Wall II', enhance: 11 },
+    { slot: 'Shoes', name: 'Not An Item', enhance: 15 },
+    { slot: 'Main weapon', name: 'Green Dragon Terminator Crystal Ball', suffix: 'Intellect II', enhance: 13 },
+    { slot: 'Secondary weapon', name: 'Green Dragon Terminator Staff', suffix: 'Hero II', enhance: 13 },
+  ],
+  jewelry: [
+    { slot: 'Necklace', name: 'Black Dragon Hunter Necklace', variant: 'AGI/INT' },
+    { slot: 'Ring 2', name: 'Green Dragon Hunter Ring', variant: 'AGI/INT' },
+  ],
+};
+const syncedPanel = {
+  rows: [{ attr: 'Final damage', buffed: 4210 }, { attr: 'DEF', buffed: 30111.6 }, { attr: 'MDEF', buffed: 28000 }],
+  summary: {
+    HP: 213517, physical_max: 10375, magic_max: 23481, crit_percent: 87.3, crit_damage_percent: 11.302,
+    'Fire attack %': 10, 'Water attack %': 42, 'Light attack %': 6, 'Dark attack %': 6.125,
+  },
+};
+
+test('character-sync derives equipment, stats and suffixes from the build', async () => {
+  const token = 'meter-token-value';
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', suffix2: 'fire', equipment: { boots: { rarity: 'epic', level: '60', enhancement: 9 } } }],
+  };
+  stubDb(db);
+  await characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: syncedBuild, panel: syncedPanel }, { 'x-meter-token': token }));
+  const row = db.players[0];
+  assert.deepEqual(row.equipment, {
+    helmet: { level: '50', rarity: 'legend', enhancement: 11 },
+    mainWeapon: { level: '50', rarity: 'legend', enhancement: 13 },
+    subWeapon: { level: '50', rarity: 'legend', enhancement: 13 },
+    necklace: { level: '70', rarity: 'legend', enhancement: 0 },
+    ring2: { level: '50', rarity: 'legend', enhancement: 0 },
+  });
+  assert.deepEqual(row.character_stats, {
+    attackPower: 10375, magicAttack: 23481, finalDamage: 4210, hp: 213517, defense: 30112, magicDefense: 28000,
+    criticalRate: 87.3, criticalDamage: 211.3, fireAttack: 10, iceAttack: 42, lightAttack: 6, darkAttack: 6.13,
+  });
+  assert.equal(row.suffix1, 'intellect');
+  // A suffix the site has no key for leaves the old value.
+  assert.equal(row.suffix2, 'fire');
+});
+
+test('a sync without gear or panel keeps hand-entered columns', async () => {
+  const token = 'meter-token-value';
+  const hand = { equipment: { helmet: { rarity: 'unique', level: '70', enhancement: 12 } }, character_stats: { attackPower: 9000 }, suffix1: 'fire' };
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', ...structuredClone(hand) }],
+  };
+  stubDb(db);
+  await characterSync(post({ character: { name: 'Swipe', job: 'Elestra' }, build: {} }, { 'x-meter-token': token }));
+  const row = db.players[0];
+  assert.deepEqual(row.equipment, hand.equipment);
+  assert.deepEqual(row.character_stats, hand.character_stats);
+  assert.equal(row.suffix1, 'fire');
+});

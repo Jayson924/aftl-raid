@@ -1,6 +1,7 @@
 // POST a synced character with X-Meter-Token; upserts the guildmate's players row.
 import { sha256 } from '../lib/session.js';
 import { sbGet, sbPost, sbPatch, userRole, PLAYER_ROLES, json } from '../lib/db.js';
+import { deriveColumns } from '../lib/sync-derive.js';
 
 const MAX_BODY = 512 * 1024;
 
@@ -28,7 +29,10 @@ export async function handler(event) {
     if (!PLAYER_ROLES.has(role)) return json(403, { error: 'Guildmates only' });
 
     const now = new Date().toISOString();
-    const fields = { role: job, discord_id: discordId, build: body.build, panel: body.panel || null, synced_at: now };
+    const fields = {
+      role: job, discord_id: discordId, build: body.build, panel: body.panel || null, synced_at: now,
+      ...deriveColumns(body.build, body.panel, job),
+    };
     const existing = await sbGet('players', `name=eq.${encodeURIComponent(name)}&select=id,discord_id,account_number`);
     const accountName = String(body.character?.account || '').trim().slice(0, 40);
     if (accountName) {
