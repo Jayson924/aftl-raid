@@ -647,25 +647,31 @@ class DataService {
 
   async updatePlayer(player, oldName) {
     // Find by old name if provided, otherwise use id or current name
-    let query = supabase.from('players').update({
+    const fields = {
       name: player.name || '',
-      role: player.role || '',
       notes: player.notes || '',
-      // Legacy fields
-      weapon: player.weapon || '',
-      weapon_enhance: player.weaponEnhance || '',
-      suffix1: player.suffix1 || '',
-      suffix2: player.suffix2 || '',
-      armor: player.armor || '',
-      armor_enhance: player.armorEnhance || '',
-      // New jsonb columns
-      equipment: player.equipment || {},
-      character_stats: player.characterStats || {},
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
       exclude_label: player.excludeLabel?.trim() || null,
       exclude_reason: player.excludeReason?.trim() || null
-    });
+    };
+    // The sync owns class, gear and stats of a synced character.
+    if (!player.syncedAt) {
+      Object.assign(fields, {
+        role: player.role || '',
+        // Legacy fields
+        weapon: player.weapon || '',
+        weapon_enhance: player.weaponEnhance || '',
+        suffix1: player.suffix1 || '',
+        suffix2: player.suffix2 || '',
+        armor: player.armor || '',
+        armor_enhance: player.armorEnhance || '',
+        // New jsonb columns
+        equipment: player.equipment || {},
+        character_stats: player.characterStats || {}
+      });
+    }
+    let query = supabase.from('players').update(fields);
 
     if (player.id) {
       query = query.eq('id', player.id);

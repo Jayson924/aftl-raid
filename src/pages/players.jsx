@@ -2632,6 +2632,7 @@ export const PlayersPage = {
   showEditPlayerModal(player) {
     const isAdmin = dataService.isAdmin();
     const maxAccount = player.discordId ? this.getMaxAccountForOwner(player.discordId) : 0;
+    const synced = !!player.syncedAt;
 
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
@@ -2660,13 +2661,18 @@ export const PlayersPage = {
             <label>Account:</label>
             <div id="edit-account-buttons-container"></div>
           </div>
-          ${this._screenshotUploadHtml('edit-player')}
+          ${synced ? `
+          <div class="modal-synced-note">
+            Synced from the meter on ${new Date(player.syncedAt).toLocaleDateString()}
+            <span>Re-sync from the toolbox to change gear or stats</span>
+          </div>
+          ` : this._screenshotUploadHtml('edit-player')}
           <div class="form-group">
             <label>Class:</label>
             <input type="hidden" id="edit-player-class" value="${player.role || ''}">
-            <div class="class-picker" id="edit-class-picker"></div>
+            <div class="class-picker${synced ? ' locked' : ''}" id="edit-class-picker" ${synced ? 'inert' : ''}></div>
           </div>
-          ${this._equipmentFormHtml('edit-player', player.equipment || {}, player.characterStats || {}, player.suffix1 || '', player.suffix2 || '')}
+          ${synced ? '' : this._equipmentFormHtml('edit-player', player.equipment || {}, player.characterStats || {}, player.suffix1 || '', player.suffix2 || '')}
           <div class="form-group">
             <label for="edit-player-notes">Notes:</label>
             <textarea id="edit-player-notes" rows="3" maxlength="140">${player.notes}</textarea>
@@ -2709,8 +2715,10 @@ export const PlayersPage = {
     this.renderAccountButtons('edit-account-buttons-container', player.accountNumber || 1, editMaxAccount);
 
     // Setup screenshot upload and equip level buttons
-    this._setupScreenshotUpload('edit-player', modalElement);
-    this._setupEquipLevelButtons('edit-player', modalElement);
+    if (!synced) {
+      this._setupScreenshotUpload('edit-player', modalElement);
+      this._setupEquipLevelButtons('edit-player', modalElement);
+    }
 
     if (isAdmin) {
       const ownerSelect = document.getElementById('edit-player-owner');
@@ -2727,8 +2735,8 @@ export const PlayersPage = {
       const role = document.getElementById('edit-player-class').value;
       const notes = document.getElementById('edit-player-notes').value;
       const accountNumber = this.getSelectedAccount('edit-account-buttons-container');
-      const equipment = this._readEquipmentForm('edit-player');
-      const characterStats = this._readStatsForm('edit-player');
+      const equipment = synced ? {} : this._readEquipmentForm('edit-player');
+      const characterStats = synced ? {} : this._readStatsForm('edit-player');
 
       const weapon = equipment.mainWeapon?.rarity || '';
       const weaponEnhance = equipment.mainWeapon?.enhancement ? String(equipment.mainWeapon.enhancement) : '';
@@ -2749,8 +2757,8 @@ export const PlayersPage = {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
 
-        const suffix1 = document.getElementById('edit-player-suffix1').value;
-        const suffix2 = document.getElementById('edit-player-suffix2').value;
+        const suffix1 = document.getElementById('edit-player-suffix1')?.value || '';
+        const suffix2 = document.getElementById('edit-player-suffix2')?.value || '';
         const exclude = document.getElementById('edit-player-exclude')?.checked ?? player.exclude ?? false;
         const excludeLabel = document.getElementById('edit-player-exclude-label')?.value ?? player.excludeLabel ?? '';
         const excludeReason = document.getElementById('edit-player-exclude-reason')?.value ?? player.excludeReason ?? '';
@@ -2758,7 +2766,8 @@ export const PlayersPage = {
           id: player.id, name, role,
           weapon, weaponEnhance, suffix1, suffix2,
           armor, armorEnhance, equipment, characterStats,
-          notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason
+          notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason,
+          syncedAt: player.syncedAt
         }, player.name);
 
         if (isAdmin && newOwnerId !== player.discordId) {
