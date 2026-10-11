@@ -9,6 +9,8 @@ import { MyRaidsPage } from './pages/my-raids.jsx'
 // Parked with its route below — see the note in the route registrations.
 // import { RecruitingPage } from './pages/recruiting.jsx'
 import { EnhanceRacePage } from './pages/enhance-race.jsx'
+import { SimulatorPage } from './pages/simulator.jsx'
+import { LinkMeterPage, LINK_CODE_KEY } from './pages/link-meter.jsx'
 import { AdminPage } from './pages/admin.jsx'
 import { ArenaHubPage } from './arena/arena-hub.jsx'
 import { ArenaSetupPage } from './arena/arena-setup.jsx'
@@ -51,7 +53,9 @@ async function initApp() {
       toast.success(`Welcome, ${dataService.getDisplayName()}!`);
       renderNavigation();
       // Navigate players/admins to lineups, guests stay on current page
-      if (dataService.isPlayer()) {
+      if (localStorage.getItem(LINK_CODE_KEY)) {
+        router.navigate('link-meter');
+      } else if (dataService.isPlayer()) {
         router.navigate('lineups');
       } else {
         router.refresh();
@@ -77,6 +81,8 @@ async function initApp() {
   router.register('characters', PlayersPage); // Public - guests see roster only
   router.register('editor', LineupEditorPage, 'guildmate'); // Guildmates and admins only
   router.register('enhancement', EnhancementPage); // No auth required
+  router.register('simulator', SimulatorPage, 'guildmate'); // Guildmates only while it is tested; make public afterwards
+  router.register('link-meter', LinkMeterPage); // Public - signs in first, then approves a meter link code
   router.register('lavish', SpendingGuidePage); // Public - no auth required
   router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
   // Recruiting is parked — page kept for possible future use, but not routable
@@ -99,6 +105,9 @@ async function initApp() {
 
   // Initialize router
   router.init();
+
+  // The Discord round trip lands here; a saved meter link code still needs approving.
+  if (localStorage.getItem(LINK_CODE_KEY) && dataService.isAuthenticated()) router.navigate('link-meter');
 }
 
 function renderNavigation() {
@@ -118,7 +127,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v2.6.00</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v3.0.00</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
@@ -135,6 +144,7 @@ function renderNavigation() {
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
         ${isPlayer ? `
+          <li><a href="#" class="nav-link" data-route="simulator">Simulator</a></li>
           <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
         ` : ''}
         <li class="nav-auth-mobile">

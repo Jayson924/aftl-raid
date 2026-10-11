@@ -4,6 +4,7 @@
  * Exchanges OAuth code for user info without exposing client secret.
  * Only requests 'identify' scope - no email access.
  */
+import { signSession } from '../lib/session.js';
 
 export async function handler(event) {
   const headers = {
@@ -93,10 +94,12 @@ export async function handler(event) {
         : null
     };
 
+    // The session proves this user to functions that need to know who is calling (meter-token).
+    const session = process.env.SESSION_SECRET ? signSession(user.id, process.env.SESSION_SECRET) : null;
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ user })
+      body: JSON.stringify({ user, session })
     };
 
   } catch (error) {

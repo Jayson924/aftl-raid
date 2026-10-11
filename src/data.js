@@ -31,6 +31,7 @@ function raidTypeToCompletionColumn(raidType) {
 const DISCORD_CLIENT_ID = import.meta.env.VITE_DISCORD_CLIENT_ID;
 const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize';
 const SESSION_KEY = 'aftl_discord_user';
+const SESSION_TOKEN_KEY = 'aftl_session';
 
 class DataService {
   constructor() {
@@ -92,10 +93,12 @@ class DataService {
       throw new Error(error.error || 'Authentication failed');
     }
 
-    const { user } = await response.json();
+    const { user, session } = await response.json();
 
     // Save user to localStorage
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    if (session) localStorage.setItem(SESSION_TOKEN_KEY, session);
+    else localStorage.removeItem(SESSION_TOKEN_KEY);
     this._user = user;
 
     // Load or create user in database
@@ -105,6 +108,11 @@ class DataService {
     this._notifyAuthChange('SIGNED_IN');
 
     return user;
+  }
+
+  // The signed session from the last login, or null for sessions older than the feature.
+  getSessionToken() {
+    return localStorage.getItem(SESSION_TOKEN_KEY);
   }
 
   /**
@@ -129,6 +137,7 @@ class DataService {
    */
   async signOut() {
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     this._user = null;
     this._userRole = null;
     this._notifyAuthChange('SIGNED_OUT');
@@ -359,6 +368,10 @@ class DataService {
         // New equipment jsonb
         equipment: equip,
         characterStats: p.character_stats || {},
+        // Synced from the meter (Afterlight Sync)
+        build: p.build || null,
+        panel: p.panel || null,
+        syncedAt: p.synced_at || null,
         // Legacy fields (derived from equipment for backward compat)
         weapon: mainWeapon.rarity || p.weapon || '',
         weaponEnhance: mainWeapon.enhancement != null ? String(mainWeapon.enhancement) : (p.weapon_enhance || ''),
@@ -384,6 +397,53 @@ class DataService {
         whitelistIgnored: p.whitelist_ignored === true
       };
     });
+  }
+
+  // Characters of the logged-in user that the meter has synced (they carry a build).
+  async getMySyncedCharacters() {
+    if (!this._user) return [];
+    const { data, error } = await supabase
+      .from('players')
+      .select('id, name, role, build, panel, synced_at')
+      .eq('discord_id', this._user.id)
+      .not('build', 'is', null)
+      .order('synced_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching synced characters:', error);
+      return [];
+    }
+    return data;
+  }
+
+  async getSavedBuilds() {
+    if (!this._user) return [];
+    const { data, error } = await supabase
+      .from('saved_builds')
+      .select('id, name, build, updated_at')
+      .eq('discord_id', this._user.id)
+      .order('updated_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching saved builds:', error);
+      return [];
+    }
+    return data;
+  }
+
+  async saveBuild(name, build, id = null) {
+    if (!this._user) throw new Error('Log in first');
+    const row = { discord_id: this._user.id, name, build };
+    const query = id
+      ? supabase.from('saved_builds').update(row).eq('id', id).eq('discord_id', this._user.id)
+      : supabase.from('saved_builds').insert(row);
+    const { data, error } = await query.select('id, name, build, updated_at').single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteSavedBuild(id) {
+    if (!this._user) throw new Error('Log in first');
+    const { error } = await supabase.from('saved_builds').delete().eq('id', id).eq('discord_id', this._user.id);
+    if (error) throw error;
   }
 
   /**

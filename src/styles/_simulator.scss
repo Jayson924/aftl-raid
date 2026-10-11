@@ -1,0 +1,461 @@
+// Character simulator page
+.simulator-page {
+  .page-subtitle { margin: 0.25rem 0 0; color: $text-muted; }
+  h2 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
+  // Site buttons with lighter text; the em padding keeps them as tall as the fields beside them.
+  .sim-class-actions, .sim-guild-row, .sim-card-bulk, .sim-compare-head {
+    .btn { font-size: 0.9rem; padding: 0.7em 1.2em; white-space: nowrap; }
+  }
+
+  // Same fields as the site's forms (_forms.scss .form-group).
+  select, input[type="number"] {
+    padding: 0.6rem;
+    border-radius: $border-radius;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.05);
+    color: $text-light;
+    font-family: inherit;
+    font-size: 1rem;
+    max-width: 100%;
+    &:focus { outline: none; border-color: $primary-color; }
+    option { background-color: #2a2a2a; color: rgba(255, 255, 255, 0.87); }
+  }
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1rem;
+    padding-right: 2.5rem;
+  }
+  input[type="number"] { width: 6rem; }
+}
+
+.sim-build-switch { display: flex; gap: 0.5rem; }
+
+.sim-summary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $border-radius;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.sim-summary-head { display: flex; gap: 0.75rem; align-items: baseline; margin-bottom: 0.75rem; span { color: $text-muted; } em.sim-calculating { margin-left: auto; font-style: normal; color: $text-muted; } }
+
+.sim-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.6rem;
+  article {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    display: flex; flex-direction: column; gap: 0.2rem;
+    span { font-size: 0.75rem; color: $text-muted; text-transform: uppercase; letter-spacing: 0.04em; }
+    strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+    em { font-style: normal; font-size: 0.85rem; &.up { color: $success-color; } &.down { color: $danger-color; } }
+  }
+}
+
+// Same underline tabs as the rest of the site (.raid-tabs, .admin-tabs).
+.sim-tabs {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 1.5rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  button {
+    padding: 0.75rem 1.5rem; background: transparent; border: none; border-bottom: 3px solid transparent;
+    color: $text-light; cursor: pointer; font-family: inherit; font-size: 1rem; font-weight: 500;
+    &:hover { background-color: rgba(255, 255, 255, 0.05); }
+    &.active { color: $primary-color; border-bottom-color: $primary-color; background-color: rgba(244, 196, 48, 0.1); }
+  }
+}
+.sim-main { margin-bottom: 1rem; }
+
+.sim-class-row {
+  display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1rem;
+  label { display: flex; flex-direction: column; gap: 0.3rem; span { font-size: 0.8rem; color: $text-muted; } }
+}
+.sim-class-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-left: auto; }
+
+.sim-guild-row {
+  display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin: -0.25rem 0 1rem;
+  label { display: flex; flex-direction: column; gap: 0.3rem; span:first-child { font-size: 0.8rem; color: $text-muted; } }
+  select { min-width: 14rem; max-width: 22rem; }
+}
+.sim-inline { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+
+.sim-table-scroll { overflow-x: auto; }
+.sim-table {
+  width: 100%; border-collapse: collapse; font-size: 0.9rem;
+  th, td { padding: 0.45rem 0.5rem; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.08); vertical-align: middle; white-space: nowrap; }
+  th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: $text-muted; }
+  td small { display: block; color: $text-muted; font-size: 0.7rem; }
+  td select { min-width: 7rem; }
+  &.sim-numbers td { font-variant-numeric: tabular-nums; text-align: right; &:first-child { text-align: left; } }
+  &.sim-numbers th { text-align: right; &:first-child { text-align: left; } }
+  tr.up td:nth-child(n+4) { color: $success-color; }
+  tr.down td:nth-child(n+4) { color: $danger-color; }
+}
+.sim-detail td { color: $text-muted; font-size: 0.8rem; white-space: normal; }
+
+// Set bonus panels under the General window.
+.sim-sets { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.75rem; }
+.sim-set-panel {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $border-radius; padding: 0.75rem 1rem;
+  header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem; margin-bottom: 0.5rem;
+    span { font-size: 0.75rem; color: $text-muted; text-transform: uppercase; letter-spacing: 0.04em; }
+    strong { color: $primary-color; }
+    em { font-style: normal; font-size: 0.8rem; color: $text-muted; }
+  }
+}
+// Other tab: Costume Collection and Specialization as two panels like the set bonuses.
+.sim-other {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0.75rem; align-items: start;
+  .sim-set-panel header { justify-content: space-between; align-items: center; }
+  .sim-set-panel header strong { font-size: 1rem; }
+}
+.sim-header-field {
+  display: flex; align-items: center; gap: 0.5rem;
+  span { font-size: 0.8rem; color: $text-muted; }
+}
+.sim-mastery-table {
+  width: 100%; border-collapse: collapse; font-size: 0.9rem;
+  td { padding: 0.3rem 0.5rem 0.3rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { white-space: nowrap; }
+  td:last-child { color: $primary-color; font-variant-numeric: tabular-nums; }
+  input[type="number"] { width: 5rem; padding: 0.4rem 0.5rem; }
+}
+.sim-set-stats {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.15rem 1.25rem; font-size: 0.85rem;
+  div { display: flex; justify-content: space-between; gap: 0.5rem; }
+  strong { font-weight: 500; font-variant-numeric: tabular-nums; }
+}
+.sim-set td { color: $primary-color; }
+.sim-pair { select { min-width: 5.5rem; margin-right: 0.25rem; } select + select { min-width: 3.5rem; } }
+
+.sim-enchant-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.2rem 0.75rem;
+  label { display: flex; gap: 0.35rem; align-items: center; font-size: 0.85rem; }
+}
+
+// Equipment tab: the game's character window; frames from public/sim/slot-frames.png in FRAMES order.
+$rarity: (magic: #9cbc1e, rare: #7480f0, epic: #e8b02a, unique: #a970f2, legend: #e65a80);
+$frames: (normal: 0, magic: 1, rare: 2, epic: 3, unique: 4, legend: 5, orange: 6,
+  card-none: 7, card-c: 8, card-b: 9, card-a: 10, card-s: 11, card-l: 12);
+$frame-count: 13;
+$slot: 58px;
+// Every window view shares one frame size, like the game's fixed window.
+$window-w: 432px;
+$window-h: 680px;
+
+.sim-equip {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: start; margin-bottom: 1rem;
+}
+.sim-window-wrap { display: flex; align-items: flex-start; gap: 0.4rem; min-width: 0; }
+.sim-equip-wide { grid-template-columns: minmax(0, 1fr); .sim-window { flex: 1; } }
+
+// The game's tab rail beside the window.
+.sim-rail {
+  display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.6rem;
+  // Same look as the page's tab pills: dark at rest, gold when active.
+  button {
+    min-width: 6.5rem; padding: 0.5rem 0.75rem; font-family: inherit; font-size: 0.9rem; cursor: pointer;
+    color: $text-light; text-align: center;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid transparent; border-radius: 6px;
+    &:hover { background: rgba(255, 255, 255, 0.1); }
+    &.active { background: $primary-color; color: #1a1a1a; font-weight: 600; }
+  }
+}
+
+.sim-window, .sim-char { width: $window-w; height: $window-h; box-sizing: border-box; flex: none; }
+.sim-window {
+  display: flex; flex-direction: column;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid rgba($primary-color, 0.45); border-radius: 10px;
+  background: linear-gradient(180deg, #23272b 0%, #15181b 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.sim-board-title {
+  text-align: center; padding: 0.35rem; margin-bottom: 0.9rem; border-radius: 6px;
+  background: rgba($primary-color, 0.12); border: 1px solid rgba($primary-color, 0.35);
+  color: $primary-color; font-weight: 600;
+}
+.sim-board { display: grid; gap: 0.5rem; justify-content: center; }
+.sim-heraldry { grid-template-columns: repeat(5, $slot); grid-auto-rows: $slot; }
+// Runes on the game's circle: children are TL, top, TR, left, center, right, BL, bottom, BR.
+$rune-board: 320px;
+.sim-runes {
+  display: block; position: relative; flex: none; width: $rune-board; height: $rune-board; margin: 0 auto;
+  &::before {
+    content: ''; position: absolute; inset: 34px; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.07); background: radial-gradient(circle, rgba(255, 255, 255, 0.04), transparent 70%);
+  }
+  > .sim-slot { position: absolute; transform: translate(-50%, -50%); }
+  $c: $rune-board * 0.5;
+  $positions: (1: (-70px, -70px), 2: (0, -125px), 3: (70px, -70px), 4: (-125px, 0), 5: (0, 0),
+               6: (125px, 0), 7: (-70px, 70px), 8: (0, 125px), 9: (70px, 70px));
+  @each $n, $xy in $positions {
+    > .sim-slot:nth-child(#{$n}) { left: $c + nth($xy, 1); top: $c + nth($xy, 2); }
+  }
+}
+.sim-board-row { display: flex; justify-content: center; gap: 1.5rem; margin-top: 1.25rem; }
+.sim-slot-inert { opacity: 0.3; cursor: default; }
+
+// Card window
+.sim-window-card .sim-char-top { margin-bottom: 0.75rem; }
+// Card tier filter: the site's underline tabs, sized for the window.
+.sim-card-tabs {
+  display: flex; justify-content: center; margin-bottom: 0.6rem; border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  button {
+    padding: 0.45rem 0.8rem; background: transparent; border: none; border-bottom: 3px solid transparent;
+    color: $text-light; cursor: pointer; font-family: inherit; font-size: 0.9rem; font-weight: 500;
+    &:hover { background-color: rgba(255, 255, 255, 0.05); }
+    &.active { color: $primary-color; border-bottom-color: $primary-color; background-color: rgba(244, 196, 48, 0.1); }
+  }
+}
+.sim-card-bulk {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.6rem;
+  span { color: $text-muted; font-size: 0.85rem; margin-right: 0.25rem; }
+}
+.sim-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 88px)); gap: 0.4rem; justify-content: center; }
+.sim-card-cell, .sim-mastery-cell {
+  display: flex; align-items: center; gap: 0.25rem; padding: 0.3rem 0.15rem; min-width: 0;
+  background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px;
+  color: inherit; font-family: inherit; cursor: pointer;
+  &.selected { border-color: $primary-color; box-shadow: 0 0 6px rgba($primary-color, 0.5); }
+  .sim-slot { cursor: pointer; }
+}
+.sim-card-cell { flex-direction: column; }
+.sim-card-name {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.7rem; color: $text-muted;  // rarity color when the card has a grade
+}
+.sim-pager {
+  display: flex; justify-content: center; gap: 0.25rem; margin-top: 0.6rem;
+  button {
+    min-width: 2rem; padding: 0.2rem 0.4rem; background: none; border: 0; cursor: pointer;
+    color: $text-muted; font-family: inherit; font-size: 0.95rem;
+    &.active { color: $primary-color; font-weight: 600; }
+  }
+}
+.sim-mastery {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem;
+  .sim-mastery-cell { padding: 0.35rem 0.5rem; gap: 0.5rem; text-align: left; }
+  strong { display: block; font-size: 0.8rem; font-weight: 500; }
+  small { color: $primary-color; font-size: 0.8rem; }
+}
+.sim-board-totals {
+  flex: 1 1 auto; min-height: 4rem; overflow-y: auto;  // the list length varies; it scrolls inside the frame
+  margin-top: 1.1rem; padding: 0.6rem 0.75rem; border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.85rem;
+  h4 { margin: 0 0 0.35rem; color: $primary-color; font-size: 0.85rem; font-weight: 600; }
+  .sim-totals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; gap: 0 1.25rem; }
+  .sim-totals-grid div { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.1rem 0; min-width: 0; }
+  strong { color: $primary-color; font-weight: 500; font-variant-numeric: tabular-nums; }
+}
+
+.sim-char {
+  display: grid; gap: 0.75rem 1rem;
+  grid-template-columns: minmax(0, 1fr) $slot;
+  grid-template-rows: auto auto 1fr auto;  // accessories stay on the bottom edge
+  grid-template-areas: "name name" "controls controls" "stats gear" "jewelry jewelry";
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid rgba($primary-color, 0.45); border-radius: 10px;
+  background: linear-gradient(180deg, #23272b 0%, #15181b 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+// Costume window: wings, tail and decal in a short column beside the gear, at the bottom.
+.sim-char.has-side {
+  grid-template-columns: minmax(0, 1fr) $slot $slot;
+  column-gap: 0.6rem;
+  grid-template-areas: "name name name" "controls controls controls" "stats gear side" "jewelry jewelry jewelry";
+}
+.sim-char-side { grid-area: side; display: flex; flex-direction: column; gap: 0.35rem; align-self: end; }
+.sim-char-head { grid-area: name; display: flex; flex-direction: column; gap: 0.5rem; }
+.sim-char-top { display: flex; gap: 0.4rem; }
+.sim-char-name {
+  text-align: center; padding: 0.35rem; border-radius: 6px;
+  background: rgba($primary-color, 0.12); border: 1px solid rgba($primary-color, 0.35);
+  color: $primary-color; font-weight: 600;
+}
+.sim-char-stats {
+  grid-area: stats; font-size: 0.85rem;
+  div { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.5rem; padding: 0.05rem 0; }
+  span { color: $text-light; }
+  strong { color: $primary-color; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  h4 {
+    margin: 0.45rem 0 0.15rem; padding-top: 0.4rem; border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: $primary-color; font-size: 0.85rem; font-weight: 600;
+  }
+  // Stats Info and Elemental Attk. Info side by side.
+  .sim-char-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; padding: 0;
+    div { grid-template-columns: minmax(0, 1fr) auto; }
+  }
+}
+.sim-char-gear { grid-area: gear; display: flex; flex-direction: column; gap: 0.35rem; }
+.sim-char-jewelry { grid-area: jewelry; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.sim-char-controls { grid-area: controls; display: flex; gap: 0.4rem; margin-top: -0.35rem; }
+.sim-window-btn {
+  flex: 1; padding: 0.3rem 0.6rem; font-family: inherit; font-size: 0.85rem; cursor: pointer;
+  color: $text-light; border-radius: 6px;
+  background: linear-gradient(180deg, #3a3f2a 0%, #23261a 100%); border: 1px solid rgba($primary-color, 0.35);
+  &.active { color: $primary-color; border-color: $primary-color; box-shadow: 0 0 6px rgba($primary-color, 0.45); }
+}
+.sim-field-value { display: block; padding: 0.35rem 0; font-weight: 500; }
+
+.sim-slot {
+  position: relative; width: $slot; height: $slot; flex: none; padding: 0;
+  display: grid; place-items: center;
+  border: 0; background: transparent;
+  color: $text-muted; font-family: inherit; cursor: pointer;
+  &::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: url('/sim/slot-frames.png') no-repeat; background-size: calc(#{$frame-count} * 100%) 100%;
+  }
+  @each $name, $n in $frames { &.#{$name}::after { background-position: calc(#{$n} * 100% / #{$frame-count - 1}) 0; } }
+  &.selected { filter: drop-shadow(0 0 3px $primary-color) drop-shadow(0 0 6px rgba($primary-color, 0.7)); }
+  &:hover:not(.selected) { filter: brightness(1.2); }
+  b {
+    position: absolute; top: -3px; left: -2px; z-index: 1; font-size: 0.8rem; color: $primary-color;
+    text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000;
+  }
+}
+.sim-icon { width: 44px; height: 44px; background-color: #0d0f11; clip-path: polygon(14% 0, 86% 0, 100% 14%, 100% 86%, 86% 100%, 14% 100%, 0 86%, 0 14%); }
+.sim-slot-empty { font-size: 0.6rem; line-height: 1.1; text-align: center; padding: 0 8px; }
+
+.sim-slot-editor {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $border-radius; padding: 1rem;
+  header {
+    display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem;
+    .sim-slot { cursor: default; &:hover { filter: none; } }
+    div { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+    strong { font-size: 1.05rem; @each $name, $color in $rarity { &.#{$name} { color: $color; } } }
+    span { color: $text-muted; font-size: 0.85rem; }
+  }
+  h4 { margin: 1rem 0 0.5rem; font-size: 0.8rem; color: $text-muted; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+  .sim-line { margin: 0; }
+}
+.sim-editor-fields {
+  display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+  label, .sim-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; > span { font-size: 0.8rem; color: $text-muted; } }
+  select { min-width: 12rem; }
+}
+
+// A row of short fields (rune Type / Level / Rarity) that share the width instead of wrapping.
+.sim-editor-row {
+  flex-wrap: nowrap;
+  > label, > .sim-field { flex: 1 1 0; }
+  select, .sim-picker { min-width: 0; width: 100%; }
+}
+
+// Gear and accessory picker: looks like the site's select, rows carry rarity color and a level badge.
+.sim-picker {
+  position: relative; min-width: 17rem; max-width: 100%;
+  .sim-picker-btn {
+    display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.6rem 2.5rem 0.6rem 0.6rem;
+    border: 1px solid rgba(255, 255, 255, 0.2); border-radius: $border-radius; background-color: rgba(255, 255, 255, 0.05);
+    color: $text-light; font-family: inherit; font-size: 1rem; text-align: left; cursor: pointer;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.87)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1rem;
+  }
+  &.open .sim-picker-btn, .sim-picker-btn:focus-visible { outline: none; border-color: $primary-color; }
+  .sim-picker-list {
+    display: none; position: absolute; z-index: 20; top: calc(100% + 4px); left: 0;
+    min-width: 100%; width: max-content; max-width: min(26rem, calc(100vw - 2rem));
+    max-height: 22rem; overflow-y: auto; margin: 0; padding: 0.3rem; list-style: none;
+    background: #232323; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: $border-radius;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  &.open .sim-picker-list { display: block; }
+  li button {
+    display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.45rem 0.6rem;
+    border: 0; border-radius: 6px; background: none; color: $text-light;
+    font-family: inherit; font-size: 0.95rem; text-align: left; cursor: pointer;
+    &:hover, &:focus-visible { outline: none; background: rgba(255, 255, 255, 0.08); }
+    &.selected { background: rgba(244, 196, 48, 0.12); }
+  }
+}
+.sim-picker-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  @each $name, $color in $rarity { &.#{$name} { color: $color; } }
+}
+.sim-rarity-text, .sim-card-name { @each $name, $color in $rarity { &.#{$name} { color: $color; } } }
+.sim-lv {
+  flex: none; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600;
+  background: rgba(255, 255, 255, 0.1); color: $text-light; font-variant-numeric: tabular-nums;
+}
+
+.sim-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.75rem;
+  label { display: flex; flex-direction: column; gap: 0.3rem; span { font-size: 0.8rem; color: $text-muted; } }
+}
+.sim-line { color: $text-muted; font-size: 0.9rem; }
+
+.sim-toolbar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.sim-tiers {
+  display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;
+  span { color: $text-muted; font-size: 0.85rem; margin-right: 0.25rem; }
+  button {
+    background: rgba(255, 255, 255, 0.06); color: $text-light; border: 1px solid transparent; border-radius: 6px;
+    padding: 0.3rem 0.7rem; font-family: inherit; font-size: 0.85rem; cursor: pointer;
+    &.active { background: $primary-color; color: #1a1a1a; }
+  }
+}
+.sim-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem;
+  .sim-card {
+    display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.5rem; align-items: center;
+    background: rgba(255, 255, 255, 0.04); border-radius: 6px; padding: 0.5rem 0.6rem;
+    span { font-size: 0.85rem; small { color: $text-muted; margin-left: 0.4rem; } }
+    select { min-width: 4.5rem; }
+    em { grid-column: 1 / -1; font-style: normal; font-size: 0.75rem; color: $text-muted; }
+  }
+}
+
+.sim-pending {
+  display: inline-block; vertical-align: middle; margin-left: 0.4rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+  font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: rgba(255, 152, 0, 0.18); color: $warning-color; cursor: help;
+}
+
+.sim-compare-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem;
+  p { margin: 0; color: $text-muted; }
+  div { display: flex; gap: 0.5rem; }
+}
+
+@media (max-width: 768px) {
+  .simulator-page .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  .sim-class-actions { margin-left: 0; }
+}
+@media (max-width: 720px) {
+  .sim-equip { grid-template-columns: minmax(0, 1fr); }
+  .sim-window-wrap { flex-direction: column-reverse; align-items: stretch; }
+  .sim-rail { flex-direction: row; flex-wrap: wrap; padding-top: 0; button { min-width: 0; flex: 1 1 auto; padding: 0.4rem 0.5rem; } }
+  .sim-window, .sim-char { width: 100%; max-width: $window-w; height: auto; }
+  .sim-board-totals { overflow-y: visible; }
+}
+@media (max-width: 420px) {
+  .sim-char { grid-template-columns: minmax(0, 1fr) $slot; padding: 0.75rem; }
+  .sim-char-stats div { grid-template-columns: 6.5rem 1fr; }
+  .sim-char-stats strong { white-space: normal; }
+  .sim-char-stats .sim-char-pair { grid-template-columns: minmax(0, 1fr); }
+  .sim-char.has-side { grid-template-columns: minmax(0, 1fr) $slot $slot; gap: 0.75rem 0.4rem; }
+  .sim-window { padding: 0.75rem 0.5rem; }
+  .sim-heraldry { gap: 0.2rem; }
+  .sim-editor-fields select { min-width: 0; width: 100%; }
+  .sim-editor-row { flex-wrap: wrap; }
+  .sim-editor-fields label { flex: 1 1 100%; }
+}
+
+// Link Meter page
+.link-meter-card {
+  max-width: 480px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $border-radius; padding: 1.25rem;
+  p { margin: 0 0 0.75rem; }
+  .form-actions { margin-top: 0.5rem; }
+}
+.link-code { font-family: monospace; font-size: 1.6rem; letter-spacing: 0.2em; color: $primary-color; }
+p.link-code { margin: 0.5rem 0 1rem; }

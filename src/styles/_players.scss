@@ -2034,3 +2034,11 @@
   }
 }
 
+
+// Characters synced from the meter (Afterlight Sync)
+.synced-tag {
+  display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px;
+  font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: rgba(76, 209, 106, 0.18); color: $success-color; cursor: help;
+}
+.equip-cell.synced-note .equip-cell-value { color: $text-muted; font-size: 0.75rem; }

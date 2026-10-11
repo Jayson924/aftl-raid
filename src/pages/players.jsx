@@ -3,6 +3,7 @@ import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
+import { panelStats, syncedLabel } from '../sim/panel.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
@@ -250,8 +251,9 @@ export const PlayersPage = {
   _buildAdminPillsRowHtml(player) {
     const exclude = this._buildExcludeToggleHtml(player);   // admin-only ('' otherwise)
     const whitelist = this._buildWhitelistToggleHtml(player); // tag for everyone
-    if (!exclude && !whitelist) return '';
-    return `<div class="admin-pills-row">${exclude}${whitelist}</div>`;
+    const synced = player.syncedAt ? `<span class="synced-tag" data-tooltip="${syncedLabel(player.syncedAt)}">Synced</span>` : '';
+    if (!exclude && !whitelist && !synced) return '';
+    return `<div class="admin-pills-row">${exclude}${whitelist}${synced}</div>`;
   },
 
   async render(container) {
@@ -1728,12 +1730,15 @@ export const PlayersPage = {
 
     const stats = player.characterStats || {};
     const statRows = [];
-    if (stats.attackPower) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">ATK</span><span class="equip-cell-value stat-value">${stats.attackPower.toLocaleString()}</span></div>`);
-    if (stats.magicAttack) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MATK</span><span class="equip-cell-value stat-value">${stats.magicAttack.toLocaleString()}</span></div>`);
-    if (stats.finalDamage) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">FD</span><span class="equip-cell-value stat-value">${stats.finalDamage.toLocaleString()}</span></div>`);
-    if (stats.hp) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">HP</span><span class="equip-cell-value stat-value">${stats.hp.toLocaleString()}</span></div>`);
-    if (stats.defense) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">Def</span><span class="equip-cell-value stat-value">${stats.defense.toLocaleString()}</span></div>`);
-    if (stats.magicDefense) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MDef</span><span class="equip-cell-value stat-value">${stats.magicDefense.toLocaleString()}</span></div>`);
+    // A character synced from the meter shows the meter's numbers instead of the typed ones.
+    const synced = player.panel ? panelStats(player.panel) : [];
+    for (const { label, value } of synced) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">${label}</span><span class="equip-cell-value stat-value">${value}</span></div>`);
+    if (!synced.length && stats.attackPower) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">ATK</span><span class="equip-cell-value stat-value">${stats.attackPower.toLocaleString()}</span></div>`);
+    if (!synced.length && stats.magicAttack) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MATK</span><span class="equip-cell-value stat-value">${stats.magicAttack.toLocaleString()}</span></div>`);
+    if (!synced.length && stats.finalDamage) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">FD</span><span class="equip-cell-value stat-value">${stats.finalDamage.toLocaleString()}</span></div>`);
+    if (!synced.length && stats.hp) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">HP</span><span class="equip-cell-value stat-value">${stats.hp.toLocaleString()}</span></div>`);
+    if (!synced.length && stats.defense) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">Def</span><span class="equip-cell-value stat-value">${stats.defense.toLocaleString()}</span></div>`);
+    if (!synced.length && stats.magicDefense) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MDef</span><span class="equip-cell-value stat-value">${stats.magicDefense.toLocaleString()}</span></div>`);
 
     if (!hasEquip && statRows.length === 0) return '';
 
@@ -1762,8 +1767,9 @@ export const PlayersPage = {
         </div>
         ${statRows.length > 0 ? `
           <div class="equip-group-card">
-            <div class="equip-group-title">Stats</div>
+            <div class="equip-group-title">${synced.length ? 'Stats · synced' : 'Stats'}</div>
             ${statRows.join('')}
+            ${synced.length ? `<div class="equip-cell synced-note"><span class="equip-cell-value">${syncedLabel(player.syncedAt)}</span></div>` : ''}
           </div>
         ` : ''}
       </div>
