@@ -2041,4 +2041,7 @@
   font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
   background: rgba(76, 209, 106, 0.18); color: $success-color; cursor: help;
 }
+.synced-tag .synced-age { text-transform: none; font-weight: 500; }
+.synced-tag.stale { background: rgba(255, 255, 255, 0.08); color: $text-muted; }
+.account-name { margin-left: 0.35rem; font-size: 0.75rem; color: $text-muted; }
 .equip-cell.synced-note .equip-cell-value { color: $text-muted; font-size: 0.75rem; }

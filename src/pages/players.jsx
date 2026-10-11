@@ -3,7 +3,7 @@ import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
 import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
-import { panelStats, syncedLabel } from '../sim/panel.js';
+import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
@@ -253,7 +253,8 @@ export const PlayersPage = {
   _buildAdminPillsRowHtml(player) {
     const exclude = this._buildExcludeToggleHtml(player);   // admin-only ('' otherwise)
     const whitelist = this._buildWhitelistToggleHtml(player); // tag for everyone
-    const synced = player.syncedAt ? `<span class="synced-tag" data-tooltip="${syncedLabel(player.syncedAt)}">Synced</span>` : '';
+    const age = syncedAge(player.syncedAt);
+    const synced = age ? `<span class="synced-tag${age.stale ? ' stale' : ''}" data-tooltip="${syncedLabel(player.syncedAt)}">Synced <span class="synced-age">${age.text}</span></span>` : '';
     if (!exclude && !whitelist && !synced) return '';
     return `<div class="admin-pills-row">${exclude}${whitelist}${synced}</div>`;
   },
@@ -516,16 +517,20 @@ export const PlayersPage = {
   // Get a numeric score for equipment for sorting (higher = better)
   _getEquipmentScore(player, type) {
     const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
-    const levelKey = type === 'weapon' ? 'weaponLevel' : 'armorLevel';
     const enhanceKey = type === 'weapon' ? 'weaponEnhance' : 'armorEnhance';
 
     const rarityOrder = { 'legend': 3, 'unique': 2, 'epic': 1, '': 0 };
     const rarity = rarityOrder[player[rarityKey] || ''] || 0;
-    const level = player[levelKey] ? parseInt(player[levelKey]) : 0;
+    const level = parseInt(this._slotLevel(player, type)) || 0;
     const enhance = parseInt(player[enhanceKey] || '0') || 0;
 
     // Weighted: rarity is most important, then level, then enhancement
     return rarity * 10000 + level * 100 + enhance;
+  },
+
+  // Level of the piece the legacy weapon/armor rarity comes from.
+  _slotLevel(player, type) {
+    return player.equipment?.[type === 'weapon' ? 'mainWeapon' : 'helmet']?.level || '';
   },
 
   sortPlayersByRaidPriority(players) {
@@ -895,11 +900,18 @@ export const PlayersPage = {
     return '';
   },
 
+  // The in-game account nickname the sync reported.
+  _accountNameHtml(name) {
+    if (!name) return '';
+    const safe = String(name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return `<span class="account-name">${safe}</span>`;
+  },
+
   _browseAcctBadgeHtml(player) {
     const size = player.discordId ? (this._browseAccountSizes[player.discordId] || 1) : 1;
     if (size <= 1) return '';
     const n = player.accountNumber || 1;
-    return `<span class="acct-badge" data-account="${n}" title="Account ${n}">A${n}</span>`;
+    return `<span class="acct-badge" data-account="${n}" title="Account ${n}">A${n}</span>${this._accountNameHtml(player.accountName)}`;
   },
 
   _renderBrowseGrid(list) {
@@ -984,7 +996,7 @@ export const PlayersPage = {
                   ? `<div class="owner-badge" title="${owner.displayName}"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="owner-avatar" onerror="this.src='/icons/avatar.svg'"><span class="owner-name">${owner.displayName}</span></div>`
                   : '<span class="no-owner">—</span>'}
               </td>
-              <td class="browse-acc-cell" data-label="Acc">${size > 1 ? `<span class="acct-badge" data-account="${n}">A${n}</span>` : '<span class="acct-dash">—</span>'}</td>
+              <td class="browse-acc-cell" data-label="Acc">${size > 1 ? `<span class="acct-badge" data-account="${n}">A${n}</span>` : '<span class="acct-dash">—</span>'}${this._accountNameHtml(player.accountName)}</td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role || ''}</td>
               <td class="gs-cell" data-label="GS"><span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span></td>
               <td class="raids-needed" data-label="Raids Needed">${this.renderRaidBadgesHTML(player, canToggleRaid)}</td>
@@ -1114,13 +1126,12 @@ export const PlayersPage = {
     const formatEquipText = (player, type) => {
       const rarityKey = type === 'weapon' ? 'weapon' : 'armor';
       const enhanceKey = type === 'weapon' ? 'weaponEnhance' : 'armorEnhance';
-      const levelKey = type === 'weapon' ? 'weaponLevel' : 'armorLevel';
       if (!player[rarityKey]) return '-';
       const rarity = EQUIPMENT_RARITIES.find(r => r.value === player[rarityKey]);
       const label = rarity?.label || player[rarityKey];
       const enhance = player[enhanceKey] ? ' +' + player[enhanceKey] : '';
-      const hasLevel = !!player[rarityKey];
-      const level = hasLevel && player[levelKey] ? `Lv${player[levelKey]} ` : '';
+      const slotLevel = this._slotLevel(player, type);
+      const level = slotLevel ? `Lv${slotLevel} ` : '';
       return `${level}${label}${enhance}`;
     };
 
@@ -1623,11 +1634,12 @@ export const PlayersPage = {
       // Render each account group
       sortedAccountNums.forEach((accountNum, index) => {
         const accountPlayers = byAccount[accountNum];
+        const accountName = accountPlayers.find(p => p.accountName)?.accountName;
         // Only show account indicator if there are multiple accounts
         if (sortedAccountNums.length > 1) {
           html += `
             <div class="account-group" data-account="${accountNum}">
-              <div class="account-divider"><span class="account-num" data-account="${accountNum}">${accountNum}</span></div>
+              <div class="account-divider"><span class="account-num" data-account="${accountNum}">${accountNum}</span>${this._accountNameHtml(accountName)}</div>
               ${this.renderCharacterCards(accountPlayers, hasAnyEditableCharacters, userMap)}
             </div>
           `;

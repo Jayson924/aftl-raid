@@ -22,6 +22,18 @@ export function panelStats(panel) {
   return out;
 }
 
+const STALE_DAYS = 14;
+
+// "5m ago", "3h ago", "12d ago"; stale past two weeks.
+export function syncedAge(syncedAt) {
+  const time = new Date(syncedAt).getTime();
+  if (!syncedAt || Number.isNaN(time)) return null;
+  const minutes = Math.max(0, Math.floor((Date.now() - time) / 60000));
+  const days = Math.floor(minutes / 1440);
+  const text = minutes < 60 ? `${minutes}m ago` : minutes < 1440 ? `${Math.floor(minutes / 60)}h ago` : `${days}d ago`;
+  return { text, stale: days > STALE_DAYS };
+}
+
 export function syncedLabel(syncedAt) {
   if (!syncedAt) return '';
   const date = new Date(syncedAt);
