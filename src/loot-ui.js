@@ -331,7 +331,7 @@ export const lootUiMixin = {
       <form class="loot-add-form">
         <input type="text" class="loot-add-item" placeholder="Item name" required>
         ${this.renderHolderSelect(ctx, '', 'loot-add-holder')}
-        <button type="submit" class="btn btn-primary loot-add-btn">Add</button>
+        <button type="submit" class="btn btn-accent loot-add-btn">Add</button>
       </form>
     ` : '';
 

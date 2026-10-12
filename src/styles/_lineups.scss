@@ -1,5 +1,9 @@
 // Lineups Page
 .lineups-page {
+  .lineups-title { margin: 0 0 0.75rem; font-size: 1.6rem; }
+  // Loot Log covers every raid, so it sits apart at the end of the raid tabs.
+  .raid-tabs .tab-loot-log { margin-left: auto; border-left: 1px solid rgba(255, 255, 255, 0.12); }
+
   .page-header-with-presence {
     display: flex;
     align-items: center;

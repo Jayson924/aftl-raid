@@ -12,13 +12,17 @@
 
   // Lineups Page
   .lineups-page {
+    // Five tabs don't fit a phone; the bar scrolls sideways instead.
     .raid-tabs {
       gap: 0.25rem;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
 
     .tab-button {
-      flex: 1;
-      padding: 0.6rem 1rem;
+      flex: none;
+      white-space: nowrap;
+      padding: 0.6rem 0.9rem;
       font-size: 0.9rem;
     }
 

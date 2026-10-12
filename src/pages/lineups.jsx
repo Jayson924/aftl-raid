@@ -79,19 +79,14 @@ export const LineupsPage = {
   async render(container) {
     container.innerHTML = `
       <div class="lineups-page">
-        <div class="page-title-tabs">
-          <h1 class="view-tab ${this.activeSection === 'lineups' ? 'active' : ''}" data-section="lineups">Raid Lineups</h1>
-          <span class="title-divider">/</span>
-          <h1 class="view-tab ${this.activeSection === 'loot-log' ? 'active' : ''}" data-section="loot-log">Loot Log</h1>
+        <h1 class="lineups-title">Lineups</h1>
+        <div class="raid-tabs">
+          ${['BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Unspecified'].map(type =>
+            `<button class="tab-button" data-raid-type="${type}">${type}</button>`).join('')}
+          <button class="tab-button tab-loot-log" data-section="loot-log">Loot Log</button>
         </div>
 
         <div id="lineups-section" class="page-section" ${this.activeSection === 'lineups' ? '' : 'hidden'}>
-          <div class="raid-tabs">
-            <button class="tab-button ${this.currentRaidType === 'BDN Classic' ? 'active' : ''}" data-raid-type="BDN Classic">BDN Classic</button>
-            <button class="tab-button ${this.currentRaidType === 'DDN Hardcore' ? 'active' : ''}" data-raid-type="DDN Hardcore">DDN Hardcore</button>
-            <button class="tab-button ${this.currentRaidType === 'DDN Classic' ? 'active' : ''}" data-raid-type="DDN Classic">DDN Classic</button>
-            <button class="tab-button ${this.currentRaidType === 'Unspecified' ? 'active' : ''}" data-raid-type="Unspecified">Unspecified</button>
-          </div>
           <div class="tab-content-wrapper">
             <div class="showcase-area">
               <div id="showcase-card-container">
@@ -133,15 +128,14 @@ export const LineupsPage = {
               </select>
               <button class="btn btn-secondary loot-log-filter" type="button"></button>
             </div>
-            <p class="loot-log-sub">Loot from cleared raids — finish selling and splitting here. Settled records clear on the next weekly reset.</p>
           </div>
           <div id="loot-log-list"><div class="loot-log-loading">Loading loot records…</div></div>
         </div>
       </div>
     `;
 
-    this.setupSectionTabs();
     this.setupTabHandlers();
+    this.syncTabs();
     this.setupShowcaseSwipeHandlers();
     this.setupCarouselDragScroll();
     this.setupNextWeekToggle();
@@ -157,20 +151,22 @@ export const LineupsPage = {
     });
   },
 
+  // One tab bar: the raid types open Raid Lineups, the last tab opens Loot Log.
   setupTabHandlers() {
-    const tabButtons = document.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => {
+    document.querySelectorAll('.lineups-page .raid-tabs .tab-button').forEach(button => {
       button.addEventListener('click', () => {
-        const raidType = button.dataset.raidType;
-        this.switchRaidType(raidType);
+        if (button.dataset.section) return this.switchSection(button.dataset.section);
+        this.switchSection('lineups');
+        this.switchRaidType(button.dataset.raidType);
       });
     });
   },
 
-  setupSectionTabs() {
-    document.querySelectorAll('.lineups-page .page-title-tabs .view-tab').forEach(btn => {
-      btn.addEventListener('click', () => this.switchSection(btn.dataset.section));
-    });
+  syncTabs() {
+    document.querySelectorAll('.lineups-page .raid-tabs .tab-button').forEach(btn =>
+      btn.classList.toggle('active', btn.dataset.section
+        ? this.activeSection === btn.dataset.section
+        : this.activeSection === 'lineups' && this.currentRaidType === btn.dataset.raidType));
   },
 
   // Toggle between the "Raid Lineups" and "Loot Log" sections of this page.
@@ -178,8 +174,7 @@ export const LineupsPage = {
     if (this.activeSection === section) return;
     this.activeSection = section;
 
-    document.querySelectorAll('.lineups-page .page-title-tabs .view-tab').forEach(btn =>
-      btn.classList.toggle('active', btn.dataset.section === section));
+    this.syncTabs();
     const lineupsEl = document.getElementById('lineups-section');
     const lootEl = document.getElementById('loot-log-section');
     if (lineupsEl) lineupsEl.hidden = section !== 'lineups';
@@ -250,15 +245,7 @@ export const LineupsPage = {
 
     this.currentRaidType = raidType;
 
-    // Update active tab button
-    const tabButtons = document.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => {
-      if (button.dataset.raidType === raidType) {
-        button.classList.add('active');
-      } else {
-        button.classList.remove('active');
-      }
-    });
+    this.syncTabs();
 
     // Reload lineups for new raid type
     this.loadLineups();
@@ -459,7 +446,7 @@ export const LineupsPage = {
           ${isCleared && (lootCount > 0 || canManage) ? `<button class="btn btn-secondary btn-loot-toggle ${lootViewActive ? 'active' : ''}" data-lineup-id="${lineup.id}"><img src="/icons/scales.svg" alt="" class="btn-loot-icon">${lootViewActive ? 'Hide Loot' : `Loot${lootCount > 0 ? ` (${lootCount})` : ''}`}</button>` : ''}
           ${isCleared && canManage && !lineup.isStatic ? `<button class="btn btn-secondary btn-keep-week ${lineup.isNextWeek ? 'active' : ''}" data-lineup-id="${lineup.id}" data-tooltip-fixed="${lineup.isNextWeek ? 'Kept for next week. Click to stop keeping' : 'Keep for next week. Survives the reset, runnable again'}"><img src="/icons/calendarclock.svg" alt="" class="btn-loot-icon">${lineup.isNextWeek ? 'Keeping ✓' : 'Keep'}</button>` : ''}
           ${isCleared && canManage && lootCount > 0 && !lineup.isStatic ? `<button class="btn btn-secondary btn-archive-loot" data-lineup-id="${lineup.id}" data-tooltip-fixed="Move loot to the Loot Log and free the members"><img src="/icons/archive.svg" alt="" class="btn-loot-icon">Archive</button>` : ''}
-          ${canManage && this.currentRaidType !== 'Unspecified' ? `<button class="btn btn-primary btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
+          ${canManage && this.currentRaidType !== 'Unspecified' ? `<button class="btn ${hasPendingChanges && !isCleared ? 'btn-primary' : isCleared ? 'btn-secondary' : 'btn-accent'} btn-cleared ${hasPendingChanges ? 'has-pending' : ''}" data-lineup-id="${lineup.id}">${buttonText}</button>` : ''}
         </div>
         <div class="damage-amp-display">
           <div class="damage-amp-bar physical">
