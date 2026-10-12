@@ -26,6 +26,10 @@ class AuthService {
     return dataService.isPlayer();
   }
 
+  isFriend() {
+    return dataService.isFriend();
+  }
+
   canEditLineups() {
     return dataService.canEditLineups();
   }

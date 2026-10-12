@@ -56,7 +56,7 @@ async function initApp() {
       // Navigate players/admins to lineups, guests stay on current page
       if (localStorage.getItem(LINK_CODE_KEY)) {
         router.navigate('link-meter');
-      } else if (dataService.isPlayer()) {
+      } else if (dataService.isFriend()) {
         router.navigate('lineups');
       } else {
         router.refresh();
@@ -78,14 +78,14 @@ async function initApp() {
   renderNavigation();
 
   // Register routes
-  router.register('lineups', LineupsPage, 'guildmate'); // Guildmates and admins only
+  router.register('lineups', LineupsPage, 'friend'); // Friends (part-time) and guild members
   router.register('characters', PlayersPage); // Public - guests see roster only
   router.register('editor', LineupEditorPage, 'guildmate'); // Guildmates and admins only
   router.register('enhancement', EnhancementPage); // No auth required
-  router.register('simulator', SimulatorPage, 'guildmate'); // Guildmates only while it is tested; make public afterwards
+  router.register('simulator', SimulatorPage); // Public; synced characters and saved builds are guildmate-only
   router.register('link-meter', LinkMeterPage); // Public - signs in first, then approves a meter link code
   router.register('lavish', SpendingGuidePage); // Public - no auth required
-  router.register('my-raids', MyRaidsPage, 'guildmate'); // Guildmates and admins only
+  router.register('my-raids', MyRaidsPage, 'friend'); // Friends get Raids + Profile; Cards/Shopping are guildmate tabs
   // Recruiting is parked — page kept for possible future use, but not routable
   // here. Re-activate by uncommenting this line (and its import above). The
   // standalone recruiting site (recruit.html / vite.config.recruit.js) is a
@@ -123,6 +123,7 @@ function renderNavigation() {
   const isAuthenticated = dataService.isAuthenticated();
   const isAdmin = dataService.isAdmin();
   const isPlayer = dataService.isPlayer();
+  const isFriend = dataService.isFriend();
   const displayName = dataService.getDisplayName();
   const avatarUrl = dataService.getAvatarUrl();
 
@@ -135,7 +136,7 @@ function renderNavigation() {
         <span class="hamburger-line"></span>
       </button>
       <ul class="nav-links" id="nav-links">
-        ${isPlayer ? `
+        ${isFriend ? `
           <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
         ` : ''}
         <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
@@ -144,13 +145,11 @@ function renderNavigation() {
         ` : ''}
         <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
         <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
-        ${isPlayer ? `
-          <li><a href="#" class="nav-link" data-route="simulator">Simulator</a></li>
-          <li><a href="#" class="nav-link" data-route="arena">Arena</a></li>
-        ` : ''}
+        <li><a href="#" class="nav-link" data-route="simulator">Simulator</a></li>
+        ${isPlayer ? `<li><a href="#" class="nav-link" data-route="arena">Arena</a></li>` : ''}
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
-            ${isPlayer ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Characters</a>` : ''}
+            ${isFriend ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Characters</a>` : ''}
             <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
             ${isAdmin ? `<a href="#" class="nav-link" id="admin-btn-mobile">Admin</a>` : ''}
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
@@ -171,7 +170,7 @@ function renderNavigation() {
               <div class="dropdown-header">
                 <span class="dropdown-role">${dataService.getUserRole()}</span>
               </div>
-              ${isPlayer ? `<button class="dropdown-item" id="my-raids-btn">My Characters</button>` : ''}
+              ${isFriend ? `<button class="dropdown-item" id="my-raids-btn">My Characters</button>` : ''}
               <button class="dropdown-item" id="change-name-btn">Change Name</button>
               ${isAdmin ? `<button class="dropdown-item" id="admin-btn">Admin</button>` : ''}
               <button class="dropdown-item" id="logout-btn">Logout</button>

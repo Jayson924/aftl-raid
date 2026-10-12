@@ -12,6 +12,7 @@ import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
 import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
+import { guildLockedPanel } from '../guild-lock.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -64,14 +65,17 @@ export const MyRaidsPage = {
       return;
     }
 
+    // Friends (part-time raiders) see the guild perks dimmed, as a nudge to join.
+    const locked = dataService.isPlayer() ? '' : ' mc-tab-locked';
+
     container.innerHTML = `
       <div class="my-raids-page">
         <div class="mc-header">
           <h1 class="page-title">My Characters</h1>
           <nav class="mc-tabs">
             <button class="mc-tab active" data-tab="raids">Raids</button>
-            <button class="mc-tab" data-tab="cards">Cards</button>
-            <button class="mc-tab" data-tab="shopping">Shopping List</button>
+            <button class="mc-tab${locked}" data-tab="cards">Cards</button>
+            <button class="mc-tab${locked}" data-tab="shopping">Shopping List</button>
             <button class="mc-tab" data-tab="profile">Profile</button>
           </nav>
         </div>
@@ -1633,14 +1637,19 @@ export const MyRaidsPage = {
   async renderShoppingTab() {
     const listEl = document.getElementById('my-shopping-list');
     if (!listEl) return;
+    const preview = !dataService.isPlayer();
+    const players = preview ? this.previewPlayers() : this._myPlayers;
 
-    if (this._myPlayers.length === 0) {
+    if (players.length === 0) {
       listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
       return;
     }
 
-    // Lazy-load shopping items on first view
-    if (!this._shoppingLoaded) {
+    if (preview) {
+      const samples = [['Heraldry: Critical plate', 180000, false], ['Lv50 Unique accessory box', 950000, false], ['Stat reset scroll', 25000, true]];
+      this._shoppingItems = players.flatMap((p, n) => samples.slice(n % 2).map(([item, price, bought], i) => ({ id: `preview-${p.id}-${i}`, playerId: p.id, item, price, bought })));
+    } else if (!this._shoppingLoaded) {
+      // Lazy-load shopping items on first view
       listEl.innerHTML = '<p class="empty-state">Loading…</p>';
       try {
         this._shoppingItems = await dataService.getShoppingList();
@@ -1653,8 +1662,8 @@ export const MyRaidsPage = {
     }
 
     // Shared account → group → ordered-character structure (read-only here)
-    const structure = this.buildAccountStructure(this._myPlayers);
-    listEl.innerHTML = this.renderAccountStructure(structure, {
+    const structure = this.buildAccountStructure(players);
+    const html = this.renderAccountStructure(structure, {
       editable: false,
       containerClass: 'character-cards',
       renderCharacter: (player) => {
@@ -1677,7 +1686,27 @@ export const MyRaidsPage = {
         `;
       }
     });
+    if (preview) {
+      this.renderGuildPreview(listEl, html, 'Shopping List', 'Per-character shopping lists');
+      return;
+    }
+    listEl.innerHTML = html;
     this.bindShoppingHandlers();
+  },
+
+  // Friends see a guild-only tab filled with sample data under a "Guildmates only" panel.
+  renderGuildPreview(listEl, html, title, what) {
+    listEl.innerHTML = `
+      <div class="guild-preview">
+        <div class="guild-preview-content" inert aria-hidden="true">${html}</div>
+        ${guildLockedPanel(title, what)}
+      </div>`;
+  },
+
+  // Up to two of the friend's own characters, or a stand-in when they have none.
+  previewPlayers() {
+    if (this._myPlayers.length) return this._myPlayers.slice(0, 2);
+    return [{ id: 'preview-char', name: 'Your Character', role: 'Saint', accountNumber: 1 }];
   },
 
   shoppingTotalFor(playerId) {
@@ -1854,6 +1883,22 @@ export const MyRaidsPage = {
   async renderCardsTab() {
     const listEl = document.getElementById('my-cards-list');
     if (!listEl) return;
+    if (!dataService.isPlayer()) {
+      // Sample grades on the first page, so the grid shows what a collection looks like.
+      const players = this.previewPlayers();
+      const grades = ['legend', 'unique', 'epic', 'epic', 'rare', 'rare', 'magic', '', ''];
+      this._playerCards = players.flatMap((p, n) => Array.from({ length: CARDS_PER_PAGE }, (_, i) => ({
+        playerId: p.id, slotIndex: i, rarity: grades[(i * 7 + n * 4) % grades.length],
+      })).filter(c => c.rarity));
+      const html = this.renderAccountStructure(this.buildAccountStructure(players), {
+        editable: false,
+        containerClass: 'character-cards cards-grid',
+        hideEmptyGroups: true,
+        renderCharacter: (player) => this.renderCardCharacterBlockHTML(player),
+      });
+      this.renderGuildPreview(listEl, html, 'Card Collection', 'Card collections and the card tracker');
+      return;
+    }
 
     // Characters must be whitelisted (and not excluded) to use the card collection.
     const cardEligiblePlayers = this._myPlayers.filter(p => dataService.isPlayerWhitelisted(p));

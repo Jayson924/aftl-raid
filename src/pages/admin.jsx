@@ -391,11 +391,12 @@ export const AdminPage = {
             <span class="toggle-slider"></span>
             <span class="toggle-label">Exclude</span>
           </label>
-          <select class="admin-role-select" data-discord-id="${discordId}" ${user.discordId === currentUserId || isOtherAdmin(user) ? 'disabled' : ''}>
+          <select class="admin-role-select" data-discord-id="${discordId}" ${user.discordId === currentUserId || user.role === 'admin' ? 'disabled' : ''} title="${user.role === 'admin' ? 'Admin follows Vice Members on Discord' : 'Synced with Discord roles'}">
             <option value="guest" ${user.role === 'guest' ? 'selected' : ''}>Guest</option>
+            <option value="friend" ${user.role === 'friend' ? 'selected' : ''}>Friend (part-time)</option>
             <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>
             <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
-            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+            ${user.role === 'admin' ? '<option value="admin" selected>Admin</option>' : ''}
           </select>
           ${user.role !== 'admin' ? `<button class="btn btn-danger-ghost btn-sm admin-delete-btn" data-discord-id="${discordId}">Delete</button>` : ''}
         </div>
@@ -438,18 +439,14 @@ export const AdminPage = {
         const discordId = e.target.dataset.discordId;
         const newRole = e.target.value;
         const user = this._users.find(u => u.discordId === discordId);
-        if (user.role === 'admin') {
-          const ok = await modal.confirm(`Remove admin from ${escapeHtml(user.displayName)}? They become ${newRole}.`, { title: 'Remove Admin', confirmText: 'Remove admin', danger: true });
-          if (!ok) { e.target.value = user.role; return; }
-        }
         try {
           await dataService.updateUserRole(discordId, newRole);
           user.role = newRole;
-          toast.success(`${user.displayName} is now ${newRole}`);
+          toast.success(`${user.displayName} is now ${newRole} (Discord roles follow shortly)`);
           this._renderUsers();
         } catch (err) {
           console.error('Failed to update role:', err);
-          toast.error('Failed to update role');
+          toast.error(err.message || 'Failed to update role');
           e.target.value = user.role;
         }
       });

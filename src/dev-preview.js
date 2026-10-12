@@ -1,7 +1,7 @@
 // Local-only preview login: see logged-in pages on the dev server without Discord, with every write blocked.
-// Open ?preview=guest, guildmate or admin on localhost; ?preview=off ends it. Inert in production builds.
+// Open ?preview=guest, friend, guildmate or admin on localhost; ?preview=off ends it. Inert in production builds.
 const KEY = 'aftl_dev_preview';
-const ROLES = new Set(['guest', 'guildmate', 'admin', 'editor']);
+const ROLES = new Set(['guest', 'friend', 'guildmate', 'admin', 'editor']);
 const READ_ONLY = 'Dev preview is read-only';
 const LOCAL = import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(location.hostname);
 

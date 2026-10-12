@@ -9,6 +9,7 @@ import { NONE } from '../sim/remote.js';
 import { emptyEngravings, engravingMainOptions, setEngravingRank } from '../sim/engravings.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
+import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import itemIcons from '../data/sim-icons.json' with { type: 'json' };
 import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
 
@@ -290,7 +291,7 @@ export const PlayersPage = {
 
   async render(container) {
     initFixedTooltip();
-    const canViewFull = dataService.isPlayer();
+    const canViewFull = dataService.isFriend();
 
     // Guests can only see roster view
     if (!canViewFull) {
@@ -1086,7 +1087,7 @@ export const PlayersPage = {
     };
 
     // Build tooltip HTML for a list of players, grouped by owner
-    const hideNames = !dataService.isPlayer();
+    const hideNames = !dataService.isFriend();
     const buildTooltipHtml = (clsPlayers) => {
       if (hideNames) {
         // Guests only see gearscore and equipment, no names
@@ -2489,15 +2490,19 @@ export const PlayersPage = {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     const close = () => modalElement.remove();
+    // Toolbox sync (the meter link) is a guildmate perk; friends add by hand.
+    const canSync = dataService.isPlayer();
     const showChoice = () => {
       modalElement.innerHTML = `
         <div class="modal-content modal-add-chooser">
           <h2>Add Character</h2>
-          <button type="button" class="btn btn-primary" id="add-choice-sync">Sync with the toolbox</button>
-          <button type="button" class="btn btn-secondary" id="add-choice-hand">Manual/Screenshot (Old version)</button>
+          ${canSync
+            ? '<button type="button" class="btn btn-primary" id="add-choice-sync">Sync with the toolbox</button>'
+            : `<button type="button" class="btn btn-primary guild-only" disabled>Sync with the toolbox${GUILD_ONLY_TAG}</button>`}
+          <button type="button" class="btn btn-secondary" id="add-choice-hand">Manual/Screenshot${canSync ? ' (Old version)' : ''}</button>
         </div>
       `;
-      modalElement.querySelector('#add-choice-sync').addEventListener('click', showSteps);
+      modalElement.querySelector('#add-choice-sync')?.addEventListener('click', showSteps);
       modalElement.querySelector('#add-choice-hand').addEventListener('click', () => { close(); this.showAddPlayerModal(); });
     };
     const showSteps = () => {

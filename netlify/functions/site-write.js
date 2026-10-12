@@ -7,7 +7,18 @@ import { sbGet, sbPost, sbPatch, sbDelete, sbUpsert, sbRpc, json } from '../lib/
 
 const enc = encodeURIComponent;
 const MAX_BODY = 512 * 1024;
-const ROLES = ['guest', 'guildmate', 'editor', 'admin'];
+const ROLES = ['guest', 'friend', 'guildmate', 'editor', 'admin'];
+// Lowest role per action; unlisted actions check ownership or editor/admin themselves.
+const MIN_ROLE = {
+  'player.add': 'friend', 'player.update': 'friend', 'player.raidCompletion': 'friend',
+  'player.setGroup': 'friend', 'player.saveOrder': 'friend',
+  'raids.add': 'friend', 'raids.update': 'friend', 'raids.step': 'friend', 'raids.delete': 'friend',
+  'groups.add': 'friend', 'groups.rename': 'friend', 'groups.delete': 'friend', 'groups.reorder': 'friend',
+  'cards.set': 'guildmate', 'extras.add': 'guildmate', 'extras.setAmount': 'guildmate',
+  'shopping.add': 'guildmate', 'shopping.update': 'guildmate', 'shopping.delete': 'guildmate',
+  'builds.save': 'guildmate', 'builds.delete': 'guildmate',
+};
+const rank = (role) => ROLES.indexOf(role);
 const COMPLETION_COLUMNS = new Set(['bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
 const RARITIES = new Set(['magic', 'rare', 'epic', 'unique', 'legend']);
 const COMPLETION_BY_RAID = {
@@ -100,6 +111,8 @@ const ACTIONS = {
     if ('role' in fields) {
       if (!ROLES.includes(fields.role)) deny('Unknown role');
       if (target.discord_id === ctx.id) deny('You cannot change your own role');
+      // Admin follows the Vice Members role on Discord; the bot syncs the rest both ways.
+      if (fields.role !== target.role && (fields.role === 'admin' || target.role === 'admin')) deny('Admin is set in Discord (Vice Members)');
     }
     // Another admin can only be changed by the site owner.
     if (target.role === 'admin' && target.discord_id !== ctx.id && ctx.id !== ownerId()) deny('Only the site owner can change another admin');
@@ -446,6 +459,8 @@ export async function handler(event) {
 
   try {
     const ctx = await context(discordId);
+    const need = MIN_ROLE[body.action];
+    if (need && rank(ctx.role) < rank(need)) deny(need === 'friend' ? 'Ask an officer for the Part-time Afterlight role first' : 'Guildmates only');
     return json(200, { ok: true, ...(await action(ctx, body)) });
   } catch (e) {
     if (e instanceof Denied) return json(403, { error: e.message });

@@ -48,6 +48,8 @@ function fixture() {
       { discord_id: 'editor', role: 'editor' },
       { discord_id: 'mate', role: 'guildmate', display_name: 'Mate' },
       { discord_id: 'other', role: 'guildmate' },
+      { discord_id: 'pal', role: 'friend' },
+      { discord_id: 'visitor', role: 'guest' },
     ],
     players: [
       { id: 'p-mate', discord_id: 'mate', name: 'Litten', synced_at: null, role: 'Saint' },
@@ -72,15 +74,15 @@ test('nobody can raise their own role through their profile', async () => {
   assert.equal(mate.display_name, 'New');
 });
 
-test('only admins change users; only the owner changes another admin', async () => {
+test('only admins change users; only the owner edits another admin', async () => {
   let db = fixture(); stubDb(db);
   assert.equal((await parse(call('mate', 'admin.updateUser', { discord_id: 'other', fields: { role: 'admin' } }))).status, 403);
   assert.equal((await parse(call('editor', 'admin.updateUser', { discord_id: 'mate', fields: { role: 'editor' } }))).status, 403);
   assert.equal((await parse(call('admin2', 'admin.updateUser', { discord_id: 'owner', fields: { role: 'guest' } }))).status, 403);
   assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'owner', fields: { role: 'guest' } }))).status, 403);
   assert.equal((await parse(call('admin2', 'admin.updateUser', { discord_id: 'mate', fields: { role: 'editor' } }))).status, 200);
-  assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'admin2', fields: { role: 'guildmate' } }))).status, 200);
-  assert.equal(db.app_users.find((u) => u.discord_id === 'admin2').role, 'guildmate');
+  assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'admin2', fields: { exclude: true } }))).status, 200);
+  assert.equal(db.app_users.find((u) => u.discord_id === 'admin2').exclude, true);
   db = fixture(); stubDb(db);
   assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'mate', fields: { role: 'superuser' } }))).status, 403);
 });
@@ -205,4 +207,37 @@ test('site settings are admin-only', async () => {
   assert.equal((await parse(call('editor', 'config.set', { key: 'power_index_max', value: '1' }))).status, 403);
   assert.equal((await parse(call('owner', 'config.set', { key: 'power_index_max', value: '90000' }))).status, 200);
   assert.deepEqual(db.app_config, [{ key: 'power_index_max', value: '90000' }]);
+});
+
+test('guests cannot add characters; friends can', async () => {
+  const db = fixture(); stubDb(db);
+  assert.equal((await parse(call('visitor', 'player.add', { fields: { name: 'Nope' } }))).status, 403);
+  assert.equal((await parse(call('pal', 'player.add', { fields: { name: 'Pal' } }))).status, 200);
+  assert.ok(db.players.some((p) => p.name === 'Pal' && p.discord_id === 'pal'));
+});
+
+test('friends keep personal raids but not cards, shopping or saved builds', async () => {
+  const db = fixture(); stubDb(db);
+  db.players.push({ id: 'p-pal', discord_id: 'pal', name: 'Pal', synced_at: null });
+  assert.equal((await parse(call('pal', 'raids.add', { player_id: 'p-pal', name: 'Nest', max_clears: 2 }))).status, 200);
+  for (const [action, args] of [['shopping.add', { player_id: 'p-pal', item: 'Plate' }], ['extras.add', { player_id: 'p-pal', card_name: 'X', rarity: 'epic', amount: 1 }], ['builds.save', { name: 'B', build: {} }]]) {
+    const res = await parse(call('pal', action, args));
+    assert.equal(res.status, 403, action);
+    assert.equal(res.error, 'Guildmates only');
+  }
+});
+
+test('admins can set the friend role', async () => {
+  const db = fixture(); stubDb(db);
+  assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'visitor', fields: { role: 'friend' } }))).status, 200);
+  assert.equal(db.app_users.find((u) => u.discord_id === 'visitor').role, 'friend');
+});
+
+test('admin is Discord-only: nobody grants or removes it on the site', async () => {
+  const db = fixture(); stubDb(db);
+  const grant = await parse(call('owner', 'admin.updateUser', { discord_id: 'mate', fields: { role: 'admin' } }));
+  assert.equal(grant.status, 403);
+  assert.equal(grant.error, 'Admin is set in Discord (Vice Members)');
+  assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'admin2', fields: { role: 'guildmate' } }))).status, 403);
+  assert.equal(db.app_users.find((u) => u.discord_id === 'admin2').role, 'admin');
 });

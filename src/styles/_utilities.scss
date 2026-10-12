@@ -225,3 +225,79 @@
     margin: 0.5rem 0;
   }
 }
+
+// Guild-member perks shown to part-time friends: visible but dimmed, with a tag.
+.guild-only {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  transition: opacity 0.15s;
+
+  &:hover { opacity: 0.7; }
+  // Controls inside stay inert; the lock panel or tag explains why.
+  input, select, button:not(.guild-only-open) { pointer-events: none; }
+}
+
+.guild-only-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid rgba($primary-color, 0.5);
+  border-radius: 999px;
+  color: $primary-color;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.guild-locked-panel {
+  max-width: 460px;
+  margin: 2.5rem auto;
+  padding: 1.75rem 1.5rem;
+  border: 1px dashed rgba($primary-color, 0.35);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  text-align: center;
+
+  h3 { margin: 0 0 0.5rem; color: $primary-color; }
+  p { margin: 0.35rem 0; color: rgba(255, 255, 255, 0.7); line-height: 1.5; }
+}
+
+// A guild-only tab shown to friends: sample content, faded, with the lock panel on top.
+.guild-preview {
+  position: relative;
+  max-height: 720px;
+  overflow: hidden;
+
+  .guild-preview-content {
+    opacity: 0.45;
+    filter: blur(1px) grayscale(0.35);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  // Fade the bottom so the cut-off reads as intentional.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 160px;
+    background: linear-gradient(transparent, $background-dark);
+    pointer-events: none;
+  }
+
+  > .guild-locked-panel {
+    position: absolute;
+    top: 7rem;
+    left: 50%;
+    z-index: 2;
+    width: calc(100% - 2rem);
+    margin: 0;
+    transform: translateX(-50%);
+    border-style: solid;
+    background: rgba(20, 20, 22, 0.94);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  }
+}

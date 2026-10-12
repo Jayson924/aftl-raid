@@ -6,6 +6,7 @@ import { initFixedTooltip } from '../fixed-tooltip.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import { dataService } from '../data.js';
+import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import icons from '../data/sim-icons.json' with { type: 'json' };
 import costumeList from '../data/sim-costumes.json' with { type: 'json' };
 
@@ -601,7 +602,18 @@ export const SimulatorPage = {
   },
 
   guildRow() {
-    if (!dataService.isPlayer()) return '';
+    // Everyone else sees the guild tools dimmed: synced characters and saved builds are guild perks.
+    if (!dataService.isPlayer()) {
+      return `
+      <div class="sim-guild-row guild-only">
+        <label><span>My characters (synced from Toolbox)${GUILD_ONLY_TAG}</span>
+          <span class="sim-inline"><select disabled><option>Guildmates sync characters from the Toolbox</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save to character</button></span>
+        </label>
+        <label><span>Saved builds${GUILD_ONLY_TAG}</span>
+          <span class="sim-inline"><select disabled><option>Guildmates can save builds</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save</button></span>
+        </label>
+      </div>`;
+    }
     const { characters, saved, loaded } = this.guild;
     const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
     const characterOptions = characters.map((c) => `<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.role)} · ${when(c.synced_at)}</option>`).join('');

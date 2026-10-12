@@ -1042,6 +1042,11 @@
 .my-raids-page .my-characters-section > .section-header { justify-content: flex-end; border-bottom: 0; padding-bottom: 0; }
 .my-raids-page .character-name-link { cursor: pointer; &:hover { text-decoration: underline; } }
 
+.my-raids-page .mc-tab.mc-tab-locked {
+  opacity: 0.5;
+  &:hover, &.active { opacity: 0.8; }
+}
+
 .my-raids-page .mc-tab {
   background: transparent;
   border: none;

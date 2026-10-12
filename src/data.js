@@ -320,8 +320,14 @@ class DataService {
     return this._userRole === 'admin';
   }
 
+  // Guild members: guildmate, editor or admin.
   isPlayer() {
     return this._userRole === 'guildmate' || this._userRole === 'admin' || this._userRole === 'editor';
+  }
+
+  // Raids with the guild: a part-time "friend" or any guild member.
+  isFriend() {
+    return this._userRole === 'friend' || this.isPlayer();
   }
 
   isGuest() {
@@ -340,7 +346,9 @@ class DataService {
     if (requiredRole === 'admin') {
       return this._userRole === 'admin';
     } else if (requiredRole === 'guildmate') {
-      return this._userRole === 'admin' || this._userRole === 'guildmate' || this._userRole === 'editor';
+      return this.isPlayer();
+    } else if (requiredRole === 'friend') {
+      return this.isFriend();
     }
 
     return false;
