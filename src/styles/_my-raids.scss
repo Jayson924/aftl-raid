@@ -1441,52 +1441,20 @@
 }
 
 .my-raids-page .card-grid {
-  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
+// Level tabs, the paste button (All only) and the Card Stats total.
+.my-raids-page .card-tier-tabs .sim-card-tabs { justify-content: flex-start; }
+.my-raids-page .card-paste-btn.tier-hidden { display: none; }
+.my-raids-page .card-totals .sim-board-totals { margin-top: 0.75rem; overflow: visible; }
+
+// Card cells come from the simulator's styles; unowned cards stay dim.
 .my-raids-page .card-slot {
-  --rarity-color: rgba(255, 255, 255, 0.12);
-  aspect-ratio: 1;
-  border: 2px solid var(--rarity-color);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  position: relative;
-  transition: transform 0.1s, box-shadow 0.15s;
   user-select: none;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0 8px var(--rarity-color);
-  }
-
-  &.has-card {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.2));
-    box-shadow: 0 0 6px var(--rarity-color), inset 0 0 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .card-slot-label {
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.55);
-    text-align: center;
-    padding: 0 4px;
-    line-height: 1.15;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    word-break: break-word;
-  }
-
-  &.has-card .card-slot-label {
-    color: var(--rarity-color);
-    font-weight: 600;
-  }
+  &.no-card .sim-slot { opacity: 0.35; }
+  &:hover { border-color: rgba(255, 255, 255, 0.2); }
 }
 
 // Grid-stack the two sections (Equipped / Extras) so the character block's

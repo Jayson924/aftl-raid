@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import simOptions from '../data/sim/options.json' with { type: 'json' };
@@ -10,6 +10,7 @@ import { emptyEngravings, engravingMainOptions, setEngravingRank } from '../sim/
 import { renderPagination, bindPagination } from '../pagination.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import itemIcons from '../data/sim-icons.json' with { type: 'json' };
+import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
 
 // Gear slots on the character card: site key, simulator slot, short label.
 const CARD_ARMOR = [['helmet', 'Helmet', 'Helm'], ['top', 'Upper', 'Top'], ['bottom', 'Lower', 'Bottom'], ['gloves', 'Gloves', 'Gloves'], ['boots', 'Shoes', 'Boots']];
@@ -21,7 +22,6 @@ const ICON_SPRITE = '/sim/item-icons.webp';
 const ICON_PX = 44;
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
-const CARD_RARITIES_PLAYERS = EQUIPMENT_RARITIES.filter(r => r.value);
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
@@ -125,10 +125,16 @@ export const PlayersPage = {
     return this._charCardView[player.id] || 'stats';
   },
 
+  // Grades by card name: synced characters from their sync, others from hand-kept slots.
+  _cardRarities(player) {
+    const synced = raritiesFromGrades(player.build?.card_grades);
+    if (player.syncedAt && synced.size) return synced;
+    return raritiesFromSlots(this._cardCollection.byPlayerId?.[player.id]);
+  },
+
   _playerHasCards(playerId) {
-    const rarities = this._cardCollection.byPlayerId?.[playerId];
-    if (!rarities) return false;
-    return Object.values(rarities).some(r => !!r);
+    const player = (this._allPlayers || []).find(p => p.id === playerId);
+    return !!player && this._cardRarities(player).size > 0;
   },
 
   _buildCharCardToggleHtml(player) {
@@ -144,37 +150,28 @@ export const PlayersPage = {
     return `<div class="char-card-view-toggle">${tab('stats', 'Stats')}${tab('cards', 'Cards')}</div>`;
   },
 
-  _buildMiniCardGridHtml(playerId, page) {
-    const startIdx = (page - 1) * CARDS_PER_PAGE;
-    const rarities = this._cardCollection.byPlayerId[playerId] || {};
-    let html = '';
-    for (let i = 0; i < CARDS_PER_PAGE; i++) {
-      const slotIndex = startIdx + i;
-      const rarity = rarities[slotIndex] || '';
-      const info = CARD_RARITIES_PLAYERS.find(r => r.value === rarity);
-      const color = info?.color || '';
-      const name = this._cardCollection.names?.[slotIndex] || '';
-      const label = name || `Slot ${slotIndex + 1}`;
-      html += `
-        <div class="char-card-mini-slot ${rarity ? 'has-card' : ''}"
-             style="${color ? `--rarity-color: ${color}` : ''}"
-             title="${label}${rarity ? ` — ${info.label}` : ''}">
-          <span class="char-card-mini-slot-label">${label}</span>
-        </div>
-      `;
-    }
-    return html;
+  _charCardTier(playerId) {
+    return this._charCardTierByPlayer?.[playerId] ?? null;
+  },
+
+  _buildMiniCardGridHtml(player, page) {
+    const rarities = this._cardRarities(player);
+    return cardsForTier(this._charCardTier(player.id))
+      .slice((page - 1) * GAME_CARDS_PER_PAGE, page * GAME_CARDS_PER_PAGE)
+      .map(({ name, index }) => cardCellHtml({ name, index, rarity: rarities.get(name) || '', className: 'char-card-mini-slot' }))
+      .join('');
   },
 
   _buildCharCardCollectionHtml(player) {
-    const page = this._charCardPageByPlayer[player.id] || 1;
-    const pageCount = this._cardCollection.pageCount || DEFAULT_CARD_PAGES;
     if (!this._cardCollection.loaded) {
       return `<div class="char-card-collection"><p class="char-card-collection-loading">Loading cards…</p></div>`;
     }
+    const pageCount = Math.max(1, Math.ceil(cardsForTier(this._charCardTier(player.id)).length / GAME_CARDS_PER_PAGE));
+    const page = Math.min(this._charCardPageByPlayer[player.id] || 1, pageCount);
     return `
       <div class="char-card-collection" data-player-id="${player.id}">
-        <div class="char-card-mini-grid">${this._buildMiniCardGridHtml(player.id, page)}</div>
+        ${tierTabsHtml(this._charCardTier(player.id), `data-player-id="${player.id}"`)}
+        <div class="char-card-mini-grid">${this._buildMiniCardGridHtml(player, page)}</div>
         <div class="char-card-mini-pagination">${renderPagination(page, pageCount)}</div>
       </div>
     `;
@@ -269,10 +266,19 @@ export const PlayersPage = {
   },
 
   _bindCharCardCollectionPagination(rootEl, playerId) {
+    rootEl.querySelectorAll('.char-card-collection [data-card-tier]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._charCardTierByPlayer = this._charCardTierByPlayer || {};
+        this._charCardTierByPlayer[playerId] = btn.dataset.cardTier === 'all' ? null : Number(btn.dataset.cardTier);
+        this._charCardPageByPlayer[playerId] = 1;
+        this._refreshCharCardBody(playerId);
+      });
+    });
     const wrap = rootEl.querySelector('.char-card-mini-pagination .pagination');
     if (!wrap) return;
     const currentPage = this._charCardPageByPlayer[playerId] || 1;
-    const pageCount = this._cardCollection.pageCount || DEFAULT_CARD_PAGES;
+    const pageCount = Math.max(1, Math.ceil(cardsForTier(this._charCardTier(playerId)).length / GAME_CARDS_PER_PAGE));
     bindPagination(wrap, currentPage, pageCount, (newPage) => {
       this._charCardPageByPlayer[playerId] = newPage;
       this._refreshCharCardBody(playerId);

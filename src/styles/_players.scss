@@ -1812,44 +1812,15 @@
 .char-card-mini-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.25rem;
+  gap: 0.3rem;
   max-width: 100%;
 }
 
+// Card cells come from the simulator's styles; display only here.
 .char-card-mini-slot {
-  --rarity-color: rgba(255, 255, 255, 0.1);
-  aspect-ratio: 1;
-  border: 1.5px solid var(--rarity-color);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-  overflow: hidden;
-
-  &.has-card {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.2));
-    box-shadow: 0 0 4px var(--rarity-color), inset 0 0 6px rgba(0, 0, 0, 0.3);
-
-    .char-card-mini-slot-label {
-      color: var(--rarity-color);
-      font-weight: 600;
-    }
-  }
-
-  .char-card-mini-slot-label {
-    font-size: 0.6rem;
-    line-height: 1.1;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.4);
-    word-break: break-word;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-  }
+  cursor: default;
+  .sim-slot { cursor: default; }
+  &.no-card .sim-slot { opacity: 0.35; }
 }
 
 .char-card-mini-pagination {

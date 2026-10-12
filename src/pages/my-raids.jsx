@@ -10,6 +10,9 @@ import {
 import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
 import { syncedLabel } from '../sim/panel.js';
+import { cardCellInner } from '../card-cells.js';
+import { cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
+import { initFixedTooltip } from '../fixed-tooltip.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -50,6 +53,7 @@ export const MyRaidsPage = {
   _shoppingLoaded: false,
   _shoppingTotalAllByPlayer: loadShoppingTotalPrefs(), // { [playerId]: true } — true = include bought; default un-bought only
   _cardsPageByPlayer: {}, // playerId -> current page
+  _cardsTierByPlayer: {}, // playerId -> card level tier, null for all
   _cardNames: {}, // slotIndex -> custom card name (from app_config)
   _cardPageCount: DEFAULT_CARD_PAGES,
   _hoveredPlayerId: null, // tracks which character the mouse is over (for Ctrl+V paste-to-character)
@@ -57,6 +61,7 @@ export const MyRaidsPage = {
   _sectionByPlayer: {}, // playerId -> 'slots' | 'extras' (default 'slots')
 
   async render(container) {
+    initFixedTooltip();
     if (!dataService.isAuthenticated()) {
       container.innerHTML = '<p>Please log in to view your characters.</p>';
       return;
@@ -1985,12 +1990,14 @@ export const MyRaidsPage = {
         </div>
         <div class="card-section-stack" data-player-id="${player.id}">
           <div class="card-section card-section-slots" data-player-id="${player.id}" data-section-active="${showSlots}">
-            <div class="card-grid" data-player-id="${player.id}">
+            <div class="card-tier-tabs" data-player-id="${player.id}">${tierTabsHtml(this._cardsTierByPlayer[player.id], `data-player-id="${player.id}"`)}</div>
+            <div class="card-grid sim-card-grid" data-player-id="${player.id}">
               ${this.renderCardGridHTML(player.id, currentPage)}
             </div>
             <div class="card-pagination-wrap" data-player-id="${player.id}">
-              ${renderPagination(currentPage, this._cardPageCount)}
+              ${renderPagination(currentPage, this.cardPageCount(player.id))}
             </div>
+            <div class="card-totals" data-player-id="${player.id}">${this.cardTotalsFor(player)}</div>
           </div>
           <div class="card-section card-section-extras" data-player-id="${player.id}" data-section-active="${!showSlots}">
             ${this.renderExtrasSectionHTML(player.id)}
@@ -2004,32 +2011,64 @@ export const MyRaidsPage = {
     return this._cardNames?.[slotIndex] || '';
   },
 
-  renderCardGridHTML(playerId, page) {
-    const startIdx = (page - 1) * CARDS_PER_PAGE;
-    const playerCards = this._playerCards.filter(c => c.playerId === playerId);
+  // Grades by card name: from the sync for synced characters, else the hand-kept slots.
+  cardRarities(playerId) {
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (this.cardsSynced(player)) return raritiesFromGrades(player.build.card_grades);
     const byIndex = {};
-    playerCards.forEach(c => { byIndex[c.slotIndex] = c.rarity; });
+    this._playerCards.filter(c => c.playerId === playerId).forEach(c => { byIndex[c.slotIndex] = c.rarity; });
+    return raritiesFromSlots(byIndex);
+  },
 
-    let html = '';
-    for (let i = 0; i < CARDS_PER_PAGE; i++) {
-      const slotIndex = startIdx + i;
-      const rarity = byIndex[slotIndex] || '';
-      const rarityInfo = CARD_RARITIES.find(r => r.value === rarity);
-      const color = rarityInfo?.color || '';
-      const name = this.resolveSlotName(slotIndex);
-      const label = name || `Slot ${slotIndex + 1}`;
-      html += `
-        <div class="card-slot ${rarity ? 'has-card' : ''}"
-             data-player-id="${playerId}"
-             data-slot-index="${slotIndex}"
-             data-rarity="${rarity}"
-             style="${color ? `--rarity-color: ${color}` : ''}"
-             title="${label}${rarity ? ` — ${rarityInfo.label}` : ''}">
-          <span class="card-slot-label">${label}</span>
-        </div>
-      `;
-    }
-    return html;
+  cardPageCount(playerId) {
+    return Math.max(1, Math.ceil(cardsForTier(this._cardsTierByPlayer[playerId] ?? null).length / CARDS_PER_PAGE));
+  },
+
+  cardTotalsFor(player) {
+    return cardTotalsHtml(this.cardRarities(player.id), player.build?.card_bonus_levels);
+  },
+
+  renderCardGridHTML(playerId, page) {
+    const rarities = this.cardRarities(playerId);
+    return cardsForTier(this._cardsTierByPlayer[playerId] ?? null)
+      .slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE)
+      .map(({ name, index }) => cardCellHtml({ tag: 'button', name, index, rarity: rarities.get(name) || '', className: 'card-slot', attrs: `data-player-id="${playerId}"` }))
+      .join('');
+  },
+
+  // Redraw one character's cards (tabs, grid, pager, totals) after a page, tier or grade change.
+  refreshCardSlots(playerId) {
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (!player) return;
+    const tier = this._cardsTierByPlayer[playerId] ?? null;
+    const pages = this.cardPageCount(playerId);
+    const page = Math.min(this._cardsPageByPlayer[playerId] || 1, pages);
+    this._cardsPageByPlayer[playerId] = page;
+    const set = (sel, html) => { const el = document.querySelector(`${sel}[data-player-id="${playerId}"]`); if (el) el.innerHTML = html; };
+    set('.card-tier-tabs', tierTabsHtml(tier, `data-player-id="${playerId}"`));
+    set('.card-grid', this.renderCardGridHTML(playerId, page));
+    set('.card-pagination-wrap', renderPagination(page, pages));
+    set('.card-totals', this.cardTotalsFor(player));
+    // The screenshot reader works on the game's pages, so paste only shows under All.
+    document.querySelectorAll(`.card-paste-btn[data-player-id="${playerId}"]`).forEach(b => {
+      b.classList.toggle('tier-hidden', tier !== null);
+      const label = b.querySelector('span');
+      if (label) label.textContent = `Upload/Paste page ${page}`;
+    });
+    this.bindCardSlotHandlers(playerId);
+    this.bindPlayerPagination(playerId);
+    this.bindTierTabs(playerId);
+  },
+
+  bindTierTabs(playerId) {
+    document.querySelectorAll(`.card-tier-tabs[data-player-id="${playerId}"] [data-card-tier]`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.dataset.cardTier;
+        this._cardsTierByPlayer[playerId] = v === 'all' ? null : Number(v);
+        this._cardsPageByPlayer[playerId] = 1;
+        this.refreshCardSlots(playerId);
+      });
+    });
   },
 
   renderExtrasSectionHTML(playerId) {
@@ -2209,9 +2248,10 @@ export const MyRaidsPage = {
   },
 
   setupCardGridHandlers() {
-    // Pagination per character
+    // Pagination and level tabs per character
     this._myPlayers.forEach(player => {
       this.bindPlayerPagination(player.id);
+      this.bindTierTabs(player.id);
     });
 
     // Paste/upload buttons
@@ -2242,19 +2282,10 @@ export const MyRaidsPage = {
   bindPlayerPagination(playerId) {
     const currentPage = this._cardsPageByPlayer[playerId] || 1;
     const wrap = document.querySelector(`.card-pagination-wrap[data-player-id="${playerId}"] .pagination`);
-    bindPagination(wrap, currentPage, this._cardPageCount, (newPage) => {
+    if (!wrap) return;
+    bindPagination(wrap, currentPage, this.cardPageCount(playerId), (newPage) => {
       this._cardsPageByPlayer[playerId] = newPage;
-      // Re-render grid
-      const grid = document.querySelector(`.card-grid[data-player-id="${playerId}"]`);
-      if (grid) grid.innerHTML = this.renderCardGridHTML(playerId, newPage);
-      // Re-render pagination so the active page updates
-      const pgWrap = document.querySelector(`.card-pagination-wrap[data-player-id="${playerId}"]`);
-      if (pgWrap) pgWrap.innerHTML = renderPagination(newPage, this._cardPageCount);
-      // Update paste button label (only the span — keep the icon)
-      const pasteLabel = document.querySelector(`.card-paste-btn[data-player-id="${playerId}"] span`);
-      if (pasteLabel) pasteLabel.textContent = `Upload/Paste page ${newPage}`;
-      this.bindCardSlotHandlers(playerId);
-      this.bindPlayerPagination(playerId);
+      this.refreshCardSlots(playerId);
     });
   },
 
@@ -2316,13 +2347,15 @@ export const MyRaidsPage = {
   },
 
   repaintSlot(slot, rarity) {
-    const rarityInfo = CARD_RARITIES.find(r => r.value === rarity);
     slot.dataset.rarity = rarity;
     slot.classList.toggle('has-card', !!rarity);
-    slot.style.setProperty('--rarity-color', rarityInfo?.color || '');
-    const slotIndex = parseInt(slot.dataset.slotIndex, 10);
-    const label = this.resolveSlotName(slotIndex) || `Slot ${slotIndex + 1}`;
-    slot.title = `${label}${rarity ? ` — ${rarityInfo.label}` : ''}`;
+    slot.classList.toggle('no-card', !rarity);
+    const name = slot.dataset.cardName;
+    slot.innerHTML = cardCellInner(name, rarity);
+    slot.setAttribute('data-tooltip-fixed', cardTooltip(name, rarity));
+    const player = this._myPlayers.find(p => p.id === slot.dataset.playerId);
+    const totals = document.querySelector(`.card-totals[data-player-id="${slot.dataset.playerId}"]`);
+    if (player && totals) totals.innerHTML = this.cardTotalsFor(player);
   },
 
   // ============================================
@@ -2541,8 +2574,6 @@ export const MyRaidsPage = {
 
     // Re-render this player's grid
     this._cardsPageByPlayer[playerId] = page;
-    const grid = document.querySelector(`.card-grid[data-player-id="${playerId}"]`);
-    if (grid) grid.innerHTML = this.renderCardGridHTML(playerId, page);
-    this.bindCardSlotHandlers(playerId);
+    this.refreshCardSlots(playerId);
   }
 };
