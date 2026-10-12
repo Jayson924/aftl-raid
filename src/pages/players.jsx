@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle, DEFAULT_CARD_PAGES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
 import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import simOptions from '../data/sim/options.json' with { type: 'json' };
@@ -64,8 +64,6 @@ export const PlayersPage = {
     loaded: false,
     loading: null, // promise while a load is in-flight
     byPlayerId: {}, // playerId -> { [slotIndex]: rarity }
-    names: {},     // slotIndex -> custom name
-    pageCount: DEFAULT_CARD_PAGES,
   },
 
   // Class family colors for chart
@@ -199,19 +197,13 @@ export const PlayersPage = {
     }
     this._cardCollection.loading = (async () => {
       try {
-        const [allCards, names, pageCount] = await Promise.all([
-          dataService.getPlayerCards(),
-          dataService.getCardSlotNames(),
-          dataService.getCardPageCount()
-        ]);
+        const allCards = await dataService.getPlayerCards();
         const byPlayerId = {};
         (allCards || []).forEach(c => {
           if (!byPlayerId[c.playerId]) byPlayerId[c.playerId] = {};
           byPlayerId[c.playerId][c.slotIndex] = c.rarity;
         });
         this._cardCollection.byPlayerId = byPlayerId;
-        this._cardCollection.names = names || {};
-        this._cardCollection.pageCount = pageCount || DEFAULT_CARD_PAGES;
         this._cardCollection.loaded = true;
       } catch (err) {
         console.error('Failed to load card collection:', err);

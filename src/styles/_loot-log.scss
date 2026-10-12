@@ -10,14 +10,7 @@
 $loot-gold: rgba(244, 196, 48, 1);
 $loot-green: rgba(76, 209, 106, 1);
 
-// ---- top-level section switcher (Raid Lineups | Loot Log) --------------------
-// The tabs reuse the shared `.page-title-tabs` / `h1.view-tab` component (defined
-// in _players.scss) so they match the Characters page exactly.
 .lineups-page {
-  .page-title-tabs {
-    margin-bottom: 1rem;
-  }
-
   .page-section[hidden] { display: none; }
 }
 

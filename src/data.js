@@ -1969,49 +1969,6 @@ class DataService {
   }
 
   // ============================================
-  // CARD SLOT NAMES + PAGE COUNT (admin-managed)
-  // ============================================
-
-  async getCardSlotNames() {
-    const raw = await this.getAppConfig('card_slot_names');
-    if (!raw) return {};
-    try {
-      return typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch {
-      return {};
-    }
-  }
-
-  async saveCardSlotNames(namesByIndex) {
-    return this.setAppConfig('card_slot_names', JSON.stringify(namesByIndex));
-  }
-
-  async getCardPageCount() {
-    const raw = await this.getAppConfig('card_page_count');
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n > 0 ? n : null; // caller picks default
-  }
-
-  async saveCardPageCount(n) {
-    return this.setAppConfig('card_page_count', String(n));
-  }
-
-  /**
-   * Delete all player_card rows in [startSlotIndex, endSlotIndex).
-   * Used when an admin removes a card page.
-   */
-  async deletePlayerCardsInRange(startSlotIndex, endSlotIndexExclusive) {
-    if (!this._user) throw new Error('Not logged in');
-    const { error } = await supabase
-      .from('player_cards')
-      .delete()
-      .gte('slot_index', startSlotIndex)
-      .lt('slot_index', endSlotIndexExclusive);
-    if (error) throw error;
-    return { success: true };
-  }
-
-  // ============================================
   // PLAYER CARDS (monster card collection)
   // ============================================
 

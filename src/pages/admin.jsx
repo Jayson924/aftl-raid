@@ -1,16 +1,8 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
-import {
-  setPowerIndexMax,
-  POWER_INDEX_MAX_DEFAULT,
-  CARDS_PER_PAGE,
-  DEFAULT_CARD_PAGES,
-  MAX_CARD_PAGES,
-  getClassSpriteStyle
-} from '../constants.js';
-import { fdForPercent } from '../gear-calc.js';
-import { renderPagination, bindPagination } from '../pagination.js';
+import { setPowerIndexMax, POWER_INDEX_MAX_DEFAULT, getClassSpriteStyle, calculateGearscore, getGearscoreTier } from '../constants.js';
+import { renderChipTipBody, initChipTooltip } from '../chip-tooltip.js';
 
 // Escape user-controlled values before interpolating into innerHTML.
 function escapeHtml(str) {
@@ -27,10 +19,6 @@ export const AdminPage = {
   _sortBy: 'date', // 'name' or 'date' — default to date so newly joined users surface at the top
   _sortAsc: false, // date desc = newest first
   _activeTab: 'users',
-  _cardNames: {},        // slotIndex -> name
-  _cardPageCount: DEFAULT_CARD_PAGES,
-  _cardMapPage: 1,       // currently-viewed page in editor
-  _cardMapLoaded: false,
 
   async render(container) {
     if (!dataService.isAdmin()) {
@@ -40,82 +28,52 @@ export const AdminPage = {
 
     container.innerHTML = `
       <div class="admin-page">
-        <h1 class="page-title">Admin</h1>
-        <div class="admin-tabs">
-          <button class="admin-tab active" data-tab="users">Users</button>
-          <button class="admin-tab" data-tab="discord-bot">Discord Bot</button>
-          <button class="admin-tab" data-tab="card-map">Card Map</button>
+        <div class="admin-header">
+          <h1 class="page-title">Admin</h1>
+          <nav class="admin-tabs">
+            <button class="admin-tab active" data-tab="users">Users</button>
+            <button class="admin-tab" data-tab="new-characters">New Characters <span class="admin-pending-count" id="admin-whitelist-count"></span></button>
+            <button class="admin-tab" data-tab="settings">Settings</button>
+          </nav>
         </div>
+
         <div class="admin-tab-content" id="admin-tab-users">
-          <div class="admin-subtabs">
-            <button class="admin-subtab active" data-subtab="users-list">Users</button>
-            <button class="admin-subtab" data-subtab="new-characters">New Characters <span class="admin-pending-count" id="admin-whitelist-count"></span></button>
-          </div>
-          <div class="admin-subtab-content" id="admin-subtab-new-characters" style="display:none">
-            <div class="section" id="admin-whitelist-section">
-              <p class="admin-fd-desc">Characters that haven't been confirmed as in-guild. Mark as in-guild to grant access to in-guild features (or if guild friend, kayo na bahala :) pang incentivise lang naman natin na ipasok mga characters sa guild)</p>
-              <div id="admin-whitelist-list" class="admin-whitelist-list">
-                <p class="loading">Loading...</p>
-              </div>
-            </div>
-          </div>
-          <div class="admin-subtab-content" id="admin-subtab-users-list">
-            <div class="section">
-              <div class="admin-section-header">
-                <h2>Users</h2>
-                <div class="admin-sort-buttons">
-                  <button class="admin-sort-btn" data-sort="name">Name</button>
-                  <button class="admin-sort-btn active" data-sort="date">Date Joined</button>
-                </div>
-              </div>
-              <div id="admin-users-list" class="admin-users-list">
-                <p class="loading">Loading users...</p>
-              </div>
-            </div>
-            <div class="section">
-              <h2>Admins</h2>
-              <div id="admin-admins-list" class="admin-users-list">
-                <p class="loading">Loading admins...</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="admin-tab-content" id="admin-tab-discord-bot" style="display:none">
           <div class="section">
             <div class="admin-section-header">
-              <h2>FD Curve</h2>
+              <h2>Users</h2>
+              <div class="admin-sort-buttons">
+                <button class="admin-sort-btn" data-sort="name">Name</button>
+                <button class="admin-sort-btn active" data-sort="date">Date Joined</button>
+              </div>
             </div>
-            <p class="admin-fd-desc">Raw Final Damage needed for each FD% at Lv70, from the game formula. Used for gearscore.</p>
-            <div id="admin-fd-table" class="admin-fd-table">
+            <div id="admin-users-list" class="admin-users-list">
+              <p class="loading">Loading users...</p>
+            </div>
+          </div>
+          <div class="section">
+            <h2>Admins</h2>
+            <div id="admin-admins-list" class="admin-users-list">
+              <p class="loading">Loading admins...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" id="admin-tab-new-characters" style="display:none">
+          <div class="section" id="admin-whitelist-section">
+            <p class="admin-fd-desc">Characters that haven't been confirmed as in-guild. Mark as in-guild to grant access to in-guild features (or if guild friend, kayo na bahala :) pang incentivise lang naman natin na ipasok mga characters sa guild)</p>
+            <div id="admin-whitelist-list" class="admin-whitelist-list">
               <p class="loading">Loading...</p>
             </div>
           </div>
-          <div class="section">
-            <div class="admin-section-header">
-              <h2>Power Index</h2>
-              <div class="admin-fd-actions">
-                <button class="btn btn-sm btn-primary admin-power-save-btn">Save</button>
-              </div>
-            </div>
-            <p class="admin-fd-desc">Raw power (ATK × FD × crit × element) that counts as 100 on the power index. Set it a little above the strongest character.</p>
-            <div class="form-group">
-              <input type="number" id="admin-power-max" min="1" step="1000" placeholder="${POWER_INDEX_MAX_DEFAULT}" />
-            </div>
-          </div>
         </div>
-        <div class="admin-tab-content" id="admin-tab-card-map" style="display:none">
+
+        <div class="admin-tab-content" id="admin-tab-settings" style="display:none">
           <div class="section">
-            <div class="admin-section-header">
-              <h2>Card Map</h2>
-              <div class="admin-card-map-actions">
-                <button class="btn btn-sm admin-card-remove-page-btn" title="Remove the last page">− Remove Page</button>
-                <button class="btn btn-sm admin-card-add-page-btn" title="Add a new page (up to ${MAX_CARD_PAGES})">+ Add Page</button>
-                <button class="btn btn-sm btn-primary admin-card-save-btn">Save Names</button>
-              </div>
-            </div>
-            <p class="admin-fd-desc"></p>
-            <div id="admin-card-map" class="admin-card-map">
-              <p class="loading">Loading…</p>
+            <h2>Power Index</h2>
+            <p class="admin-fd-desc">Raw power (ATK × FD × crit × element) that counts as 100 on the power index. Set it a little above the strongest character.</p>
+            <div class="admin-power-row">
+              <input type="number" id="admin-power-max" min="1" step="1000" placeholder="${POWER_INDEX_MAX_DEFAULT}" />
+              <button class="btn btn-accent admin-power-save-btn">Save</button>
             </div>
           </div>
         </div>
@@ -130,17 +88,6 @@ export const AdminPage = {
         this._activeTab = tab.dataset.tab;
         document.querySelectorAll('.admin-tab-content').forEach(c => c.style.display = 'none');
         document.getElementById(`admin-tab-${tab.dataset.tab}`).style.display = '';
-        if (tab.dataset.tab === 'card-map') this._loadCardMap();
-      });
-    });
-
-    // Sub-tab listeners (within Users tab)
-    document.querySelectorAll('.admin-subtab').forEach(subtab => {
-      subtab.addEventListener('click', () => {
-        document.querySelectorAll('.admin-subtab').forEach(t => t.classList.remove('active'));
-        subtab.classList.add('active');
-        document.querySelectorAll('.admin-subtab-content').forEach(c => c.style.display = 'none');
-        document.getElementById(`admin-subtab-${subtab.dataset.subtab}`).style.display = '';
       });
     });
 
@@ -163,40 +110,17 @@ export const AdminPage = {
 
     document.querySelector('.admin-power-save-btn').addEventListener('click', () => this._savePowerIndexMax());
 
-    // Card Map actions
-    document.querySelector('.admin-card-add-page-btn').addEventListener('click', () => this._addCardPage());
-    document.querySelector('.admin-card-remove-page-btn').addEventListener('click', () => this._removeCardPage());
-    document.querySelector('.admin-card-save-btn').addEventListener('click', () => this._saveCardMap());
-
     await this._loadUsers();
     await this._loadPlayers();
     this._renderUsers();
-    this._renderFdPreview();
+    initChipTooltip();
     this._loadPowerIndexMax();
     this._loadWhitelistQueue();
   },
 
   // ============================================
-  // FD CURVE (read-only, from the game formula)
+  // POWER INDEX
   // ============================================
-
-  _renderFdPreview() {
-    const container = document.getElementById('admin-fd-table');
-    if (!container) return;
-    const rows = [];
-    for (let pct = 20; pct <= 60; pct += 5) rows.push({ pct, fd: Math.round(fdForPercent(pct)) });
-    container.innerHTML = `
-      <div class="fd-table-grid" style="--fd-rows: ${Math.ceil(rows.length / 3)}">
-        ${rows.map(row => `
-          <div class="fd-table-row">
-            <input type="number" class="fd-input fd-input-pct" value="${row.pct}" readonly tabindex="-1" />
-            <span class="fd-row-separator">%</span>
-            <input type="number" class="fd-input fd-input-fd" value="${row.fd}" readonly tabindex="-1" />
-          </div>
-        `).join('')}
-      </div>
-    `;
-  },
 
   async _loadPowerIndexMax() {
     try {
@@ -282,7 +206,7 @@ export const AdminPage = {
             </div>
           </div>
           <div class="admin-whitelist-actions">
-            <button class="btn btn-sm btn-primary admin-whitelist-approve" data-player-id="${escapeHtml(p.id)}">In-Guild</button>
+            <button class="btn btn-sm btn-accent admin-whitelist-approve" data-player-id="${escapeHtml(p.id)}">In-Guild</button>
             <button class="btn btn-sm btn-secondary admin-whitelist-ignore" data-player-id="${escapeHtml(p.id)}">Dismiss</button>
           </div>
         </div>
@@ -324,162 +248,6 @@ export const AdminPage = {
     });
   },
 
-  // ============================================
-  // CARD MAP
-  // ============================================
-
-  async _loadCardMap() {
-    if (this._cardMapLoaded) {
-      this._renderCardMap();
-      return;
-    }
-    try {
-      const [names, pageCount] = await Promise.all([
-        dataService.getCardSlotNames(),
-        dataService.getCardPageCount()
-      ]);
-      this._cardNames = names || {};
-      this._cardPageCount = pageCount || DEFAULT_CARD_PAGES;
-      this._cardMapLoaded = true;
-    } catch (err) {
-      console.error('Failed to load card map:', err);
-      toast.error('Failed to load card map');
-    }
-    this._renderCardMap();
-  },
-
-  _renderCardMap() {
-    const container = document.getElementById('admin-card-map');
-    if (!container) return;
-
-    const page = this._cardMapPage;
-    const startIdx = (page - 1) * CARDS_PER_PAGE;
-
-    let slotsHtml = '';
-    for (let i = 0; i < CARDS_PER_PAGE; i++) {
-      const slotIndex = startIdx + i;
-      const name = this._cardNames[slotIndex] || '';
-      slotsHtml += `
-        <div class="admin-card-slot" data-slot-index="${slotIndex}">
-          <span class="admin-card-slot-index">#${slotIndex + 1}</span>
-          <input type="text" class="admin-card-slot-input" data-slot-index="${slotIndex}"
-                 value="${escapeHtml(name)}" placeholder="Slot ${slotIndex + 1}" maxlength="40">
-        </div>
-      `;
-    }
-
-    container.innerHTML = `
-      <div class="admin-card-slot-grid">${slotsHtml}</div>
-      <div class="admin-card-pagination">
-        ${renderPagination(page, this._cardPageCount)}
-      </div>
-    `;
-
-    // Page switching — persist current inputs into _cardNames before switching
-    bindPagination(container.querySelector('.pagination'), page, this._cardPageCount, (newPage) => {
-      this._collectCardMapInputs();
-      this._cardMapPage = newPage;
-      this._renderCardMap();
-    });
-
-    // Live-update _cardNames on input so Save captures everything across pages
-    container.querySelectorAll('.admin-card-slot-input').forEach(input => {
-      input.addEventListener('input', () => {
-        const idx = parseInt(input.dataset.slotIndex, 10);
-        const val = input.value.trim();
-        if (val) this._cardNames[idx] = val;
-        else delete this._cardNames[idx];
-      });
-    });
-
-    // Disable remove button when on minimum
-    const removeBtn = document.querySelector('.admin-card-remove-page-btn');
-    if (removeBtn) removeBtn.disabled = this._cardPageCount <= 1;
-    const addBtn = document.querySelector('.admin-card-add-page-btn');
-    if (addBtn) addBtn.disabled = this._cardPageCount >= MAX_CARD_PAGES;
-  },
-
-  _collectCardMapInputs() {
-    document.querySelectorAll('.admin-card-slot-input').forEach(input => {
-      const idx = parseInt(input.dataset.slotIndex, 10);
-      const val = input.value.trim();
-      if (val) this._cardNames[idx] = val;
-      else delete this._cardNames[idx];
-    });
-  },
-
-  async _addCardPage() {
-    if (this._cardPageCount >= MAX_CARD_PAGES) {
-      toast.error(`Maximum ${MAX_CARD_PAGES} pages`);
-      return;
-    }
-    this._collectCardMapInputs();
-    const newCount = this._cardPageCount + 1;
-    try {
-      await dataService.saveCardPageCount(newCount);
-      this._cardPageCount = newCount;
-      this._cardMapPage = newCount; // jump to the new page
-      toast.success(`Page ${newCount} added`);
-      this._renderCardMap();
-    } catch (err) {
-      toast.error(`Failed to add page: ${err.message}`);
-    }
-  },
-
-  async _removeCardPage() {
-    if (this._cardPageCount <= 1) return;
-
-    const pageToRemove = this._cardPageCount;
-    const startIdx = (pageToRemove - 1) * CARDS_PER_PAGE;
-    const endIdx = pageToRemove * CARDS_PER_PAGE;
-
-    const confirmed = await modal.confirm(
-      `Removing page ${pageToRemove} will delete its 16 slot names and every character's rarity data on those slots. This cannot be undone. Continue?`,
-      {
-        title: `Remove Card Page ${pageToRemove}`,
-        confirmText: 'Remove Page',
-        cancelText: 'Cancel',
-        danger: true
-      }
-    );
-    if (!confirmed) return;
-
-    this._collectCardMapInputs();
-
-    // Drop the names for the removed range
-    const newNames = { ...this._cardNames };
-    for (let i = startIdx; i < endIdx; i++) delete newNames[i];
-
-    try {
-      await Promise.all([
-        dataService.deletePlayerCardsInRange(startIdx, endIdx),
-        dataService.saveCardSlotNames(newNames),
-        dataService.saveCardPageCount(pageToRemove - 1)
-      ]);
-      this._cardNames = newNames;
-      this._cardPageCount = pageToRemove - 1;
-      if (this._cardMapPage > this._cardPageCount) this._cardMapPage = this._cardPageCount;
-      toast.success(`Page ${pageToRemove} removed`);
-      this._renderCardMap();
-    } catch (err) {
-      toast.error(`Failed to remove page: ${err.message}`);
-    }
-  },
-
-  async _saveCardMap() {
-    this._collectCardMapInputs();
-    try {
-      await dataService.saveCardSlotNames(this._cardNames);
-      toast.success('Card names saved');
-    } catch (err) {
-      toast.error(`Failed to save: ${err.message}`);
-    }
-  },
-
-  // ============================================
-  // USERS
-  // ============================================
-
   async _loadUsers() {
     this._users = await dataService.getAppUsers();
   },
@@ -502,44 +270,29 @@ export const AdminPage = {
         (a.name || '').localeCompare(b.name || ''));
   },
 
-  // Hover tooltip markup listing a user's characters (class icon + name).
-  // Returns '' when the user has no characters so no empty box shows.
-  _renderCharTooltip(discordId) {
+  // A user's characters as chips: class icon and name; hovering shows class, gear score and gear.
+  _renderCharChips(discordId) {
     const chars = this._charactersForUser(discordId);
-    if (chars.length === 0) return '';
-
-    const renderRow = (c) => {
-      const icon = c.role
-        ? `<span class="admin-char-icon"><div class="class-sprite" style="${getClassSpriteStyle(c.role)}"></div></span>`
-        : '<span class="admin-char-icon"></span>';
-      return `<li class="admin-char-row">${icon}<span class="admin-char-name">${escapeHtml(c.name)}</span></li>`;
-    };
-
-    // Distinct accounts (already sorted by account in _charactersForUser).
-    const accounts = [...new Set(chars.map(c => c.accountNumber || 1))];
-
-    // Group under "Acct N" headers only when the user actually has more than one
-    // account; otherwise keep a clean flat list with no labels.
-    let body;
-    if (accounts.length > 1) {
-      body = accounts.map(acct => {
-        const group = chars.filter(c => (c.accountNumber || 1) === acct);
-        return `
-          <div class="admin-char-acct-group">
-            <div class="admin-char-acct-header">Acct ${acct}</div>
-            <ul class="admin-char-tooltip-list">${group.map(renderRow).join('')}</ul>
-          </div>`;
-      }).join('');
-    } else {
-      body = `<ul class="admin-char-tooltip-list">${chars.map(renderRow).join('')}</ul>`;
-    }
-
-    return `
-      <div class="admin-char-tooltip">
-        <div class="admin-char-tooltip-title">${chars.length} character${chars.length === 1 ? '' : 's'}</div>
-        ${body}
-      </div>
-    `;
+    if (chars.length === 0) return '<p class="admin-user-nochars">No characters</p>';
+    const multiAccount = new Set(chars.map(c => c.accountNumber || 1)).size > 1;
+    return `<div class="admin-char-chips">${chars.map(c => {
+      const gs = calculateGearscore(c);
+      const tier = getGearscoreTier(gs);
+      const acct = multiAccount ? `Acct ${c.accountNumber || 1}` : '';
+      const head = `
+        <div class="chip-tip__head">
+          <strong>${escapeHtml(c.name)}</strong>
+          <span>${escapeHtml(c.role || 'No class')}${acct ? ` · ${acct}` : ''}</span>
+          <span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span>
+        </div>`;
+      const tip = (head + renderChipTipBody(c)).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      return `
+        <span class="admin-char-chip has-chip-tip" data-chip-tip-html="${tip}">
+          <span class="admin-char-icon">${c.role ? `<span class="class-sprite" style="${getClassSpriteStyle(c.role)}"></span>` : ''}</span>
+          <span class="admin-char-name">${escapeHtml(c.name)}</span>
+          ${acct ? `<span class="admin-char-acct">${c.accountNumber}</span>` : ''}
+        </span>`;
+    }).join('')}</div>`;
   },
 
   _sortUsers(users) {
@@ -612,17 +365,16 @@ export const AdminPage = {
 
     const currentUserId = dataService.getUser()?.id;
 
-    const isOtherAdmin = (user) => user.role === 'admin' && user.discordId !== currentUserId;
+    // Other admins are locked, except for the site owner, who can change their role.
+    const isOwner = !!currentUserId && currentUserId === import.meta.env.VITE_OWNER_DISCORD_ID;
+    const isOtherAdmin = (user) => user.role === 'admin' && user.discordId !== currentUserId && !isOwner;
 
     container.innerHTML = users.map(user => {
       const discordId = escapeHtml(user.discordId);
       return `
       <div class="admin-user-row" data-discord-id="${discordId}">
         <div class="admin-user-info">
-          <div class="admin-user-avatar-wrap">
-            <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
-            ${this._renderCharTooltip(user.discordId)}
-          </div>
+          <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
           <div class="admin-user-details">
             <div class="admin-user-name-row">
               <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${discordId}" ${isOtherAdmin(user) ? '' : 'title="Click to edit name"'}>${escapeHtml(user.displayName)}</span>
@@ -632,6 +384,7 @@ export const AdminPage = {
             ${user.createdAt ? `<span class="admin-user-joined">Joined ${this._formatDate(user.createdAt)}</span>` : ''}
           </div>
         </div>
+        ${this._renderCharChips(user.discordId)}
         <div class="admin-user-actions">
           <label class="toggle-switch tooltip-wrap" data-tooltip="Exclude this user's characters from recruiting and dim them in the lineup pool">
             <input type="checkbox" class="admin-exclude-checkbox" data-discord-id="${discordId}" ${user.exclude ? 'checked' : ''} ${isOtherAdmin(user) ? 'disabled' : ''}>
@@ -644,7 +397,7 @@ export const AdminPage = {
             <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
-          ${user.role !== 'admin' ? `<button class="btn btn-danger btn-sm admin-delete-btn" data-discord-id="${discordId}">Delete</button>` : ''}
+          ${user.role !== 'admin' ? `<button class="btn btn-danger-ghost btn-sm admin-delete-btn" data-discord-id="${discordId}">Delete</button>` : ''}
         </div>
         <div class="admin-exclude-fields" data-discord-id="${discordId}" style="display: ${user.exclude ? 'flex' : 'none'};">
           <input type="text" class="admin-exclude-label" data-discord-id="${discordId}" placeholder="Excluded" maxlength="20" value="${escapeHtml(user.excludeLabel || '')}">
@@ -685,6 +438,10 @@ export const AdminPage = {
         const discordId = e.target.dataset.discordId;
         const newRole = e.target.value;
         const user = this._users.find(u => u.discordId === discordId);
+        if (user.role === 'admin') {
+          const ok = await modal.confirm(`Remove admin from ${escapeHtml(user.displayName)}? They become ${newRole}.`, { title: 'Remove Admin', confirmText: 'Remove admin', danger: true });
+          if (!ok) { e.target.value = user.role; return; }
+        }
         try {
           await dataService.updateUserRole(discordId, newRole);
           user.role = newRole;

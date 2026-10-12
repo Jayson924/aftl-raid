@@ -376,12 +376,8 @@ export const EQUIPMENT_RARITIES = [
 // ============================================
 // MONSTER CARDS
 // ============================================
-// In-game card UI: pages of 16 slots (4x4 grid) each. Page count is admin-configurable
-// (stored in app_config key 'card_page_count') and slot names live in 'card_slot_names'.
-// Slot positions are stable across pages, so screenshots map 1:1 to slot indexes.
+// In-game card UI: pages of 16 slots (4x4 grid) each; the card list is the game's (card-collection.js).
 export const CARDS_PER_PAGE = 16;
-export const DEFAULT_CARD_PAGES = 4;
-export const MAX_CARD_PAGES = 16; // matches DB CHECK constraint (slot_index < 256)
 
 // Equipment levels (for epic/unique/legend rarity)
 export const EQUIPMENT_LEVELS = [

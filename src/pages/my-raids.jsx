@@ -4,14 +4,13 @@ import { modal } from '../modal.js';
 import {
   getClassSpriteStyle,
   CARDS_PER_PAGE,
-  DEFAULT_CARD_PAGES,
   EQUIPMENT_RARITIES
 } from '../constants.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
 import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
-import { cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
+import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
@@ -54,8 +53,6 @@ export const MyRaidsPage = {
   _shoppingTotalAllByPlayer: loadShoppingTotalPrefs(), // { [playerId]: true } — true = include bought; default un-bought only
   _cardsPageByPlayer: {}, // playerId -> current page
   _cardsTierByPlayer: {}, // playerId -> card level tier, null for all
-  _cardNames: {}, // slotIndex -> custom card name (from app_config)
-  _cardPageCount: DEFAULT_CARD_PAGES,
   _hoveredPlayerId: null, // tracks which character the mouse is over (for Ctrl+V paste-to-character)
   _extrasByPlayer: {}, // playerId -> [{ id, cardName, rarity, amount }]
   _sectionByPlayer: {}, // playerId -> 'slots' | 'extras' (default 'slots')
@@ -161,8 +158,6 @@ export const MyRaidsPage = {
     this._shoppingItems = [];
     this._shoppingLoaded = false;
     this._cardsPageByPlayer = {};
-    this._cardNames = {};
-    this._cardPageCount = DEFAULT_CARD_PAGES;
     this._hoveredPlayerId = null;
     this._extrasByPlayer = {};
     this._sectionByPlayer = {};
@@ -1878,11 +1873,9 @@ export const MyRaidsPage = {
       try {
         const playerIds = cardEligiblePlayers.map(p => p.id);
         // Scoped to this user's characters — no reason to pull the whole guild's cards.
-        const [allCards, allExtras, names, pageCount] = await Promise.all([
+        const [allCards, allExtras] = await Promise.all([
           dataService.getPlayerCards(playerIds),
-          dataService.getExtraCards(playerIds),
-          dataService.getCardSlotNames(),
-          dataService.getCardPageCount()
+          dataService.getExtraCards(playerIds)
         ]);
         this._playerCards = allCards;
         // Group extras by player and sort
@@ -1897,8 +1890,6 @@ export const MyRaidsPage = {
           return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
         }));
         this._extrasByPlayer = extrasByPlayer;
-        this._cardNames = names || {};
-        this._cardPageCount = pageCount || DEFAULT_CARD_PAGES;
         this._cardsLoaded = true;
       } catch (error) {
         console.error('Error loading cards:', error);
@@ -1977,10 +1968,6 @@ export const MyRaidsPage = {
         </div>
       </div>
     `;
-  },
-
-  resolveSlotName(slotIndex) {
-    return this._cardNames?.[slotIndex] || '';
   },
 
   // Grades by card name: from the sync for synced characters, else the hand-kept slots.
@@ -2067,15 +2054,15 @@ export const MyRaidsPage = {
       }).join('')}</div>`;
     }
 
-    // Add form: name select from Card Map, rarity, amount
-    const uniqueNames = [...new Set(Object.values(this._cardNames || {}).map(n => (n || '').trim()).filter(Boolean))].sort();
+    // Add form: name select from the game's card list, rarity, amount
+    const uniqueNames = [...new Set(GAME_CARDS)].sort();
     const nameOptions = uniqueNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
     const rarityOptions = CARD_RARITIES.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
 
     const formHtml = `
       <form class="card-extras-form" data-action="extra-add" data-player-id="${playerId}">
         <select class="extras-name-select" required ${uniqueNames.length === 0 ? 'disabled' : ''}>
-          <option value="">${uniqueNames.length === 0 ? 'No cards in Card Map yet' : 'Pick a card…'}</option>
+          <option value="">${uniqueNames.length === 0 ? 'No cards' : 'Pick a card…'}</option>
           ${nameOptions}
         </select>
         <select class="extras-rarity-select" required>${rarityOptions}</select>

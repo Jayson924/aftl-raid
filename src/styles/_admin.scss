@@ -1,13 +1,15 @@
 .admin-page {
-  max-width: 700px;
+  max-width: 1200px;
   margin: 0 auto;
 
-  .page-title {
-    margin: 0 0 1.5rem 0;
-    font-size: 1.5rem;
-    color: $primary-color;
-    text-shadow: 0 0 12px rgba(244, 196, 48, 0.3);
+  // Title with the tabs beside it, as on the other pages.
+  .admin-header {
+    display: flex; align-items: flex-end; gap: 1.5rem; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1.25rem;
+    .page-title { margin: 0 0 0.6rem; color: $text-light; text-shadow: none; font-size: 1.6rem; }
   }
+
+  .section + .section { margin-top: 1.75rem; }
 
   .section {
     h2 {
@@ -69,22 +71,77 @@
   }
 }
 
+.admin-users-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+
+  > .loading, > .empty-state { grid-column: 1 / -1; }
+}
+
 .admin-user-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-  padding: 0.75rem 1rem;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: $border-radius;
-  margin-bottom: 0.5rem;
-  transition: background 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.06);
+// A user's characters: class icon and name; details on hover.
+.admin-char-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-char-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.15rem 0.5rem 0.15rem 0.2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+  color: $text-light;
+  cursor: default;
+
+  &:hover { border-color: rgba($primary-color, 0.5); }
+
+  .admin-char-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 23px;
+    overflow: hidden;
+
+    // The 44x46 sprite at half size keeps its frame.
+    .class-sprite { display: block; transform: scale(0.5); transform-origin: top left; }
   }
+
+  .admin-char-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .admin-char-acct {
+    font-size: 0.65rem;
+    color: $text-muted;
+    &::before { content: 'A'; }
+  }
+}
+
+.admin-user-nochars { margin: 0; font-size: 0.8rem; color: $text-muted; }
+
+// Head of the character hover card (the tooltip lives on body).
+.chip-tip__head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 0.75rem;
+  margin-bottom: 0.5rem;
+  strong { grid-column: 1; }
+  span:not(.gs-inline) { grid-column: 1; font-size: 0.8rem; color: $text-muted; }
+  .gs-inline { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 }
 
 .admin-user-info {
@@ -99,114 +156,6 @@
   height: 36px;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-// Avatar wrapper hosts the character-list tooltip
-.admin-user-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-  display: inline-flex;
-
-  // Hint that there's something to hover when the user has characters
-  &:has(.admin-char-tooltip) {
-    cursor: help;
-
-    .admin-user-avatar {
-      transition: box-shadow 0.15s ease;
-    }
-
-    &:hover .admin-user-avatar {
-      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
-    }
-  }
-
-  &:hover .admin-char-tooltip {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-  }
-}
-
-.admin-char-tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 50;
-  min-width: 180px;
-  max-width: 260px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 0.5rem;
-  background: rgba(20, 20, 22, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-4px);
-  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
-  pointer-events: none;
-
-  .admin-char-tooltip-title {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: rgba(255, 255, 255, 0.45);
-    padding: 0 0.15rem 0.4rem;
-  }
-
-  .admin-char-tooltip-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-
-  .admin-char-row {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.2rem 0.15rem;
-    font-size: 0.82rem;
-    color: $text-light;
-  }
-
-  .admin-char-icon {
-    flex-shrink: 0;
-    width: 22px;
-    height: 23px;
-
-    // Scale the full 44x46 sprite down to fit (no crop — keeps the diamond frame)
-    .class-sprite {
-      transform: scale(0.5);
-      transform-origin: top left;
-    }
-  }
-
-  .admin-char-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  // Per-account grouping (only rendered when a user has multiple accounts)
-  .admin-char-acct-group + .admin-char-acct-group {
-    margin-top: 0.3rem;
-    padding-top: 0.3rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .admin-char-acct-header {
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: rgba(255, 255, 255, 0.4);
-    padding: 0.15rem 0.15rem 0.2rem;
-  }
 }
 
 .admin-user-details {
@@ -288,7 +237,10 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-shrink: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+
+  .admin-role-select { margin-left: auto; }
 }
 
 .admin-exclude-fields {
@@ -358,77 +310,27 @@
   font-size: 0.8rem;
 }
 
-// Tabs (matches .raid-tabs / .tab-button in lineups)
 .admin-tabs {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  gap: 1.25rem;
+  margin-bottom: -1px;
 }
 
 .admin-tab {
-  padding: 0.75rem 1.5rem;
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: $text-light;
-  cursor: pointer;
-  transition: $transition;
-  font-size: 1rem;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.55rem 0.1rem;
+  color: rgba(255, 255, 255, 0.55);
+  font: inherit;
   font-weight: 500;
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-  }
-
-  &.active {
-    color: $primary-color;
-    border-bottom-color: $primary-color;
-    background-color: rgba(244, 196, 48, 0.1);
-  }
-}
-
-// Sub-tabs (within the Users tab — pill style, lighter than top tabs)
-.admin-subtabs {
-  display: flex;
-  gap: 0.4rem;
-  margin-bottom: 1.25rem;
-}
-
-.admin-subtab {
-  padding: 0.4rem 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  color: $text-muted;
   cursor: pointer;
-  transition: all 0.15s ease;
-  font-size: 0.85rem;
-  font-weight: 500;
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: $text-light;
-  }
-
-  &.active {
-    background: rgba($primary-color, 0.15);
-    border-color: rgba($primary-color, 0.4);
-    color: $primary-color;
-  }
-
-  .admin-pending-count {
-    color: #ff9800;
-    margin-left: 0.25rem;
-    font-weight: 600;
-  }
-
-  &.active .admin-pending-count {
-    color: inherit;
-  }
+  &:hover { color: rgba(255, 255, 255, 0.85); }
+  &.active { color: $primary-color; border-bottom-color: $primary-color; }
 }
 
-// FD Table Section
 .admin-fd-desc {
   font-size: 0.85rem;
   color: $text-muted;
@@ -436,113 +338,19 @@
   line-height: 1.5;
 }
 
-.admin-fd-actions {
+.admin-power-row {
   display: flex;
   gap: 0.5rem;
-}
+  max-width: 360px;
 
-.admin-fd-table {
-  max-height: 500px;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: $border-radius;
-  padding: 0.5rem;
-}
-
-.fd-table-grid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(var(--fd-rows), auto);
-  grid-template-columns: auto auto auto;
-  gap: 0.2rem 1.5rem;
-  justify-content: start;
-}
-
-.fd-table-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: $border-radius;
-  transition: background 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.04);
-
-    .fd-row-delete {
-      opacity: 1;
-    }
-  }
-}
-
-// Hide number input spinners
-.fd-input::-webkit-outer-spin-button,
-.fd-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.fd-input[type="number"] {
-  -moz-appearance: textfield;
-}
-
-.fd-input {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: $text-light;
-  padding: 0.2rem 0.3rem;
-  font-size: 0.85rem;
-  font-family: inherit;
-  transition: border-color 0.15s ease;
-
-  &:hover {
-    border-color: rgba(255, 255, 255, 0.15);
-  }
-
-  &:focus {
-    outline: none;
-    border-color: $primary-color;
+  input {
+    flex: 1;
+    padding: 0.45rem 0.65rem;
+    border-radius: $border-radius;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     background: rgba(255, 255, 255, 0.05);
-  }
-}
-
-.fd-input-pct {
-  width: 50px;
-  text-align: right;
-  padding-right: 0.1rem;
-}
-
-.fd-input-fd {
-  width: 70px;
-}
-
-.fd-row-separator {
-  color: $text-muted;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin-left: -0.3rem;
-}
-
-.fd-row-delete {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: $text-muted;
-  font-size: 1.2rem;
-  cursor: pointer;
-  border-radius: $border-radius;
-  opacity: 0;
-  transition: $transition;
-
-  &:hover {
-    color: $danger-color;
-    background: rgba($danger-color, 0.15);
+    color: $text-light;
+    font: inherit;
   }
 }
 
@@ -558,11 +366,8 @@
 
 .admin-page .admin-whitelist-list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.4rem;
-  max-height: 340px;
-  overflow-y: auto;
-  padding-right: 0.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.5rem;
 
   .empty-state {
     grid-column: 1 / -1;
@@ -626,94 +431,8 @@
   text-overflow: ellipsis;
 }
 
-// ============================================
-// CARD MAP TAB
-// Written as top-level rules with parent selectors to avoid nesting drift.
-// ============================================
-.admin-page .admin-card-map-actions {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.admin-page .admin-card-pagination {
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
-}
-
-.admin-page .admin-card-slot-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-  max-width: 720px;
-}
-
-.admin-page .admin-card-slot {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-}
-
-.admin-page .admin-card-slot-index {
-  font-size: 0.7rem;
-  color: $text-muted;
-  font-weight: 500;
-}
-
-.admin-page .admin-card-slot-input {
-  width: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-  color: $text-light;
-  font-size: 0.8rem;
-  padding: 0.3rem 0.4rem;
-  font-family: inherit;
-
-  &:focus {
-    outline: none;
-    border-color: $primary-color;
-    box-shadow: 0 0 6px rgba(244, 196, 48, 0.25);
-  }
-}
-
-.admin-page .admin-card-add-page-btn:disabled,
-.admin-page .admin-card-remove-page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 // Mobile responsive
 @media (max-width: 600px) {
-  .admin-user-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .admin-user-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
-  .fd-row-delete {
-    opacity: 1;
-  }
-
-  .fd-table-grid {
-    grid-template-columns: auto auto;
-    grid-auto-flow: column;
-  }
-
-  .admin-page .admin-card-slot-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .admin-page .admin-whitelist-list {
     grid-template-columns: 1fr;
   }

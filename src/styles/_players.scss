@@ -1,34 +1,3 @@
-// Page title with tab switching — shared by the Characters and Lineups pages so
-// their title tabs (font, sizing, dimmed/active states) look identical.
-.page-title-tabs {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-
-  h1.view-tab {
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: rgba(255, 255, 255, 0.25);
-    margin: 0;
-
-    &:hover {
-      color: rgba(255, 255, 255, 0.5);
-    }
-
-    &.active {
-      color: $text-light;
-      cursor: default;
-    }
-  }
-
-  .title-divider {
-    color: rgba(255, 255, 255, 0.15);
-    font-size: 1.5rem;
-    font-weight: 300;
-    user-select: none;
-  }
-}
-
 // Characters page: title with tabs, then one toolbar for search and class chips.
 .players-page {
   .page-header { align-items: flex-end; gap: 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1rem; flex-wrap: wrap; }
