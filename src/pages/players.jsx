@@ -2704,35 +2704,37 @@ export const PlayersPage = {
     const cardCount = (b.card_grades || []).filter((c) => c?.grade && c.grade !== NONE).length;
     const title = b.title || NONE;
     const titles = [NONE, ...L.titles, ...(title !== NONE && !L.titles.includes(title) ? [title] : [])];
-    const mastery = Object.keys(simOptions.defaults.build1.card_bonus_levels).map((key) => `
-      <label class="override-mastery-cell"><span>${esc(key)}</span>${num(`data-mastery="${esc(key)}"`, b.card_bonus_levels?.[key], L.limits.card_bonus_level)}</label>`).join('');
-    const passives = this._overridePassives(b, player.role).map(({ skill, level, max }) => `
-      <tr><td>${esc(skill)}</td><td>${num(`data-passive="${esc(skill)}"`, level, [0, max])}</td></tr>`).join('');
-    const engravings = this._overrideEngravings(b).map((item) => `
-      <tr data-engraving="${esc(item.slot)}">
-        <td>${esc(item.slot)}</td>
-        <td><select data-engraving-grade>${opts(L.engraving.grades, item.grade)}</select></td>
-        <td><select data-engraving-rank ${item.grade === NONE ? 'disabled' : ''}>${opts(engravingMainOptions(item), item.value_rank)}</select></td>
-      </tr>`).join('');
+    const masteryKeys = Object.keys(simOptions.defaults.build1.card_bonus_levels);
+    const masterySet = masteryKeys.filter((key) => Number(b.card_bonus_levels?.[key]) > 0).length;
+    const mastery = masteryKeys.map((key) => `
+      <label class="ov-tile"><span>${esc(key)}</span>${num(`data-mastery="${esc(key)}"`, b.card_bonus_levels?.[key], L.limits.card_bonus_level)}</label>`).join('');
+    const passiveList = this._overridePassives(b, player.role);
+    const passives = passiveList.map(({ skill, level, max }) => `
+      <label class="ov-row"><span>${esc(skill)}</span>${num(`data-passive="${esc(skill)}"`, level, [0, max])}</label>`).join('');
+    const engravingList = this._overrideEngravings(b);
+    const engraved = engravingList.filter((item) => item.grade !== NONE).length;
+    const engravings = engravingList.map((item) => `
+      <div class="ov-engraving${item.grade === NONE ? ' empty' : ''}" data-engraving="${esc(item.slot)}">
+        <span>${esc(item.slot)}</span>
+        <select data-engraving-grade>${opts(L.engraving.grades, item.grade)}</select>
+        <select data-engraving-rank ${item.grade === NONE ? 'disabled' : ''}>${opts(engravingMainOptions(item), item.value_rank)}</select>
+      </div>`).join('');
+    const tabs = [
+      ['general', 'General', `<label class="ov-field"><span>Title</span><select id="override-title">${opts(titles, title)}</select></label>
+        <label class="ov-field ov-narrow"><span>Collection level</span>${num('id="override-collection"', b.collection_level, L.limits.collection_level)}</label>
+        <div class="ov-cards"><span>Cards</span><span class="ov-meta">${cardCount} registered</span>
+          ${cardCount ? '<button type="button" class="btn btn-danger-ghost" id="override-clear-cards">Clear cards</button>' : ''}</div>`],
+      ['mastery', `<span class="ov-long">Card mastery</span><span class="ov-short">Mastery</span> <span class="ov-count">${masterySet}/${masteryKeys.length}</span>`, `<div class="ov-grid ov-mastery">${mastery}</div>`],
+      passives && ['passives', `Passives <span class="ov-count">${passiveList.length}</span>`, `<div class="ov-grid ov-pairs">${passives}</div>`],
+      ['engravings', `Engravings <span class="ov-count">${engraved}/${engravingList.length}</span>`, `<div class="ov-grid ov-pairs">${engravings}</div><p class="ov-note">Extras are set in the simulator.</p>`],
+    ].filter(Boolean);
 
     return `
-      <div class="modal-overrides">
-        <h3>Not from the sync</h3>
-        <div class="override-row">
-          <div class="form-group"><label for="override-title">Title:</label><select id="override-title">${opts(titles, title)}</select></div>
-          <div class="form-group"><label for="override-collection">Collection level:</label>${num('id="override-collection"', b.collection_level, L.limits.collection_level)}</div>
-        </div>
-        <div class="form-group"><label>Card mastery:</label><div class="override-mastery">${mastery}</div></div>
-        <div class="form-group override-cards"><label>Cards:</label>
-          <span>${cardCount} registered</span>
-          ${cardCount ? '<button type="button" class="btn btn-secondary" id="override-clear-cards">Clear cards</button>' : ''}
-        </div>
-        ${passives ? `<div class="form-group"><label>Passives:</label><table class="override-table"><tbody>${passives}</tbody></table></div>` : ''}
-        <div class="form-group"><label>Engravings:</label>
-          <table class="override-table"><tbody>${engravings}</tbody></table>
-          <span class="override-muted">Extras in the simulator</span>
-        </div>
-      </div>`;
+      <section class="modal-overrides">
+        <header class="ov-title"><h3>Set by hand</h3><span>The meter doesn't send these</span></header>
+        <nav class="ov-tabs" role="tablist">${tabs.map(([key, label], i) => `<button type="button" role="tab" class="ov-tab${i ? '' : ' active'}" data-ov-tab="${key}">${label}</button>`).join('')}</nav>
+        ${tabs.map(([key, , body], i) => `<div class="ov-panel ov-panel-${key}" data-ov-panel="${key}" ${i ? 'hidden' : ''}>${body}</div>`).join('')}
+      </section>`;
   },
 
   // The class's passive skills at their current level; the sync sends them at their top level.
@@ -2749,12 +2751,17 @@ export const PlayersPage = {
   },
 
   _setupOverrides(modalElement) {
+    modalElement.querySelectorAll('[data-ov-tab]').forEach((tab) => tab.addEventListener('click', () => {
+      modalElement.querySelectorAll('[data-ov-tab]').forEach((t) => t.classList.toggle('active', t === tab));
+      modalElement.querySelectorAll('[data-ov-panel]').forEach((panel) => { panel.hidden = panel.dataset.ovPanel !== tab.dataset.ovTab; });
+    }));
     modalElement.querySelectorAll('[data-engraving-grade]').forEach((select) => select.addEventListener('change', () => {
       const row = select.closest('[data-engraving]');
       const rank = row.querySelector('[data-engraving-rank]');
       const options = engravingMainOptions({ slot: row.dataset.engraving, grade: select.value });
       rank.innerHTML = options.map((v) => `<option value="${v}">${v}</option>`).join('');
       rank.disabled = select.value === NONE;
+      row.classList.toggle('empty', select.value === NONE);
     }));
   },
 
