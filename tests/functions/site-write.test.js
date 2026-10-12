@@ -199,3 +199,10 @@ test('a gold share is marked by its owner, its pilot or an editor, nobody else',
   assert.equal((await parse(call('editor', 'payouts.unmark', { lineup_id: 'L1', member_name: 'Keeper' }))).status, 200);
   assert.equal(db.lineup_payouts.length, 1);
 });
+
+test('site settings are admin-only', async () => {
+  const db = fixture(); db.app_config = [{ key: 'power_index_max', value: '100000' }]; stubDb(db);
+  assert.equal((await parse(call('editor', 'config.set', { key: 'power_index_max', value: '1' }))).status, 403);
+  assert.equal((await parse(call('owner', 'config.set', { key: 'power_index_max', value: '90000' }))).status, 200);
+  assert.deepEqual(db.app_config, [{ key: 'power_index_max', value: '90000' }]);
+});

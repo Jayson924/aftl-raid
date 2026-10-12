@@ -404,6 +404,15 @@ const ACTIONS = {
     return { data: row };
   },
 
+  // ---- site settings (admins) ----
+  async 'config.set'(ctx, a) {
+    ctx.requireAdmin();
+    const key = String(a.key || '').trim();
+    if (!key) deny('A setting name is required');
+    await sbUpsert('app_config', { key, value: a.value }, 'key');
+    return {};
+  },
+
   // ---- simulator builds ----
   async 'builds.save'(ctx, a) {
     const row = { discord_id: ctx.id, name: String(a.name || '').trim(), build: a.build || {} };

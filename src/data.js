@@ -1209,14 +1209,7 @@ class DataService {
   }
 
   async saveSpendingConfig(config) {
-    const { error } = await supabase
-      .from('app_config')
-      .upsert({
-        key: 'spending_config',
-        value: config
-      });
-
-    if (error) throw error;
+    await this._write('config.set', { key: 'spending_config', value: config });
     return { success: true };
   }
 
@@ -1232,11 +1225,7 @@ class DataService {
   }
 
   async setAppConfig(key, value) {
-    const { error } = await supabase
-      .from('app_config')
-      .upsert({ key, value });
-
-    if (error) throw error;
+    await this._write('config.set', { key, value });
     return { success: true };
   }
 
