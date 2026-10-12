@@ -176,9 +176,15 @@ function setPath(obj, path, value) {
 function buffRows(build, raw) {
   const keys = L.buffs?.[build.second_job] || [];
   const given = Array.isArray(raw) ? raw : L.passives?.[build.second_job] || [];
+  // A name without a key is the meter's passive; a self buff of the same name stays off (as on the server).
+  const keyOf = (b) => {
+    if (b?.key) return b.key;
+    const named = keys.filter((k) => options.buffs?.[k]?.skill === b?.skill);
+    return named.find((k) => options.buffs[k].category === 'Passive') ?? named[0];
+  };
   const level = (key) => {
     const facts = options.buffs?.[key] || {};
-    const hit = given.find((b) => b && (b.key === key || (b.skill === facts.skill && !b.key)));
+    const hit = given.find((b) => b && keyOf(b) === key);
     return Math.max(0, Math.min(facts.max_level || 0, Number(hit?.level) || 0));
   };
   return keys.map((key) => ({ key, skill: options.buffs?.[key]?.skill || key, level: level(key) }));

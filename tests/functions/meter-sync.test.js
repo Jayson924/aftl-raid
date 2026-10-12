@@ -387,3 +387,18 @@ test('the role column uses the site spelling of the class', async () => {
   assert.equal(db.players[0].role, 'Moon Lord');
   assert.equal(db.players[0].build.second_job, 'Moonlord');
 });
+
+test('a saved self buff that shares a passive name is not kept as the passive', async () => {
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    players: [{ id: 'p1', name: 'Clone', discord_id: 'g1', role: 'Abyss Walker', build: { ...syncedBuild, card_grades: [] } }],
+  };
+  stubDb(db);
+  const buffs = [
+    { key: 'Self buff|Abyss Walker|Increased Abyss Chakra', skill: 'Increased Abyss Chakra', level: 1 },
+    { key: 'Passive|Abyss Walker|Increased Abyss Chakra', skill: 'Increased Abyss Chakra', level: 0 },
+  ];
+  const saved = parse(await characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', build: { buffs } })));
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.overrides.passives, [{ skill: 'Increased Abyss Chakra', level: 0 }]);
+});

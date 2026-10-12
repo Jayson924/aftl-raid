@@ -71,3 +71,14 @@ test('per-item helpers add up to the equipment column', () => {
   const breakdown = calc.setBonusBreakdown(build.equipment, build.jewelry, build.first_job, build.second_job);
   assert.ok(breakdown.some((s) => s.scope === 'equipment' && s.count === 7));
 });
+
+test('a buff named without a key is the passive, not a self buff of the same name', () => {
+  const build = { ...tables.defaults.build1, first_job: 'Bringer', second_job: 'Abyss Walker' };
+  const buffed = (buffs) => new Map(calc.calculate({ ...build, buffs }).rows.map((r) => [r.attr, r.buffed]));
+  const none = buffed([]);
+  const named = buffed([{ skill: 'Increased Abyss Chakra', level: 1 }]);
+  assert.equal(named.get('Dark attack %'), (none.get('Dark attack %') || 0) + 10);
+  assert.equal(named.get('PATK min'), none.get('PATK min'));
+  const self = buffed([{ key: 'Self buff|Abyss Walker|Increased Abyss Chakra', skill: 'Increased Abyss Chakra', level: 1 }]);
+  assert.ok(self.get('PATK min') > none.get('PATK min'));
+});

@@ -114,6 +114,13 @@ export function getDisplayAttr(bucket, attr) {
 
 const optionKeys = (value) => OPTION_ALIASES[norm(value)] ?? [norm(value)];
 
+// The meter names buffs without a key and sends only passives, so a self buff sharing the
+// name (Abyss Walker's Increased Abyss Chakra) must not win.
+export function buffKeyByName(rows, keys, skill) {
+  const named = keys.filter((k) => rows[k] && (k === skill || rows[k].skill === skill));
+  return named.find((k) => rows[k].category === 'Passive') ?? named[0];
+}
+
 function truncateFixed(bucket) {
   for (const attr of Object.keys(bucket)) if (!isPercent(attr)) bucket[attr] = trunc(bucket[attr]);
 }
@@ -516,8 +523,8 @@ class BuildCalculator {
       const level = num(item?.level);
       if (!skill || skill === NONE || level <= 0) continue;
       const key = (item?.key && rows[item.key] ? item.key : null)
-        ?? keys.find((k) => rows[k] && (k === skill || rows[k].skill === skill))
-        ?? Object.keys(rows).find((k) => k === skill || rows[k].skill === skill);
+        ?? buffKeyByName(rows, keys, skill)
+        ?? buffKeyByName(rows, Object.keys(rows), skill);
       if (!key) continue;
       const slot = rows[key].exclusive_group || key;
       const current = chosen.get(slot);

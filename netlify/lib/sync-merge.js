@@ -6,7 +6,12 @@ import { getTables } from './sim/tables.js';
 // Passive levels are, since the game never sends skill levels.
 export const OVERRIDE_FIELDS = ['title', 'card_bonus_levels', 'collection_level', 'engravings', 'passives'];
 
-const isPassive = (skill) => Object.values(getTables().buffs || {}).some((b) => b.category === 'Passive' && b.skill === skill);
+// A keyed row is judged by its key: a self buff can share a passive's name.
+const isPassive = (b) => {
+  const rows = getTables().buffs || {};
+  if (b.key) return rows[b.key]?.category === 'Passive';
+  return Object.values(rows).some((r) => r.category === 'Passive' && r.skill === b.skill);
+};
 
 // The hand-set fields of a build, as the simulator saves them.
 export function pickOverrides(build) {
@@ -18,7 +23,7 @@ export function pickOverrides(build) {
   if (Array.isArray(build.engravings)) out.engravings = build.engravings;
   // Level 0 is kept: it turns a passive off.
   if (Array.isArray(build.buffs)) {
-    const passives = build.buffs.filter((b) => b && isPassive(b.skill)).map((b) => ({ skill: b.skill, level: Math.max(0, Number(b.level) || 0) }));
+    const passives = build.buffs.filter((b) => b && isPassive(b)).map((b) => ({ skill: b.skill, level: Math.max(0, Number(b.level) || 0) }));
     if (passives.length) out.passives = passives;
   }
   return out;
