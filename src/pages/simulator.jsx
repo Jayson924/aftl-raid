@@ -57,6 +57,18 @@ const SUMMARY_METRICS = [
   ['final_percent', 'Final dmg %'], ['crit_percent', 'Crit %'], ['crit_damage_percent', 'Crit dmg %'],
 ];
 // Hover text for summary labels: [heading, lines].
+const MP_REGEN_TIP = 'Will not match the game; part of MP recovery is not modeled yet';
+// Full Stats groups, like the game window; each stat is followed by its % rows.
+const STAT_GROUPS = [
+  { title: 'Basic', attrs: ['HP', 'HP %', 'MP', 'MP %', 'MP regen', 'MP regen %', 'Move speed %'] },
+  { title: 'Stats', attrs: ['STR', 'STR %', 'AGI', 'AGI %', 'INT', 'INT %', 'VIT', 'VIT %'] },
+  { title: 'Attack', attrs: ['PATK min', 'PATK max', 'PATK %', 'PATK min %', 'PATK max %', 'MATK min', 'MATK max', 'MATK %', 'MATK min %', 'MATK max %',
+    'Final damage', 'Final damage %', 'Crit', 'Crit %', 'Crit damage', 'Crit damage %', 'Paralyze', 'Paralyze %', 'Stun', 'Stun %'] },
+  { title: 'Defense', attrs: ['DEF', 'DEF %', 'DEF rate %', 'MDEF', 'MDEF %', 'MDEF rate %', 'Crit resist', 'Crit resist %',
+    'Paralyze resist', 'Paralyze resist %', 'Stun resist', 'Stun resist %'] },
+  { title: 'Element', attrs: ['Fire attack %', 'Water attack %', 'Light attack %', 'Dark attack %', 'Fire resist %', 'Water resist %', 'Light resist %', 'Dark resist %'] },
+];
+const ELEMENTS_SHOWN = [['Fire', 'Fire'], ['Water', 'Ice'], ['Light', 'Light'], ['Dark', 'Dark']];
 const METRIC_TIPS = {
   effective_panel: ['Site score, not in game', 'Attack × Final dmg × Crit\nAgainst the boss crit resist'],
 };
@@ -288,6 +300,7 @@ export const SimulatorPage = {
   tab: 'sets',
   view: 'general',
   costumeMode: 'fashion',
+  statsBreakdown: false,
   // Slot open in the editor, per window (data path of the clicked slot, or 'title').
   slots: { general: 'equipment.0', fashion: 'fashion.0', engraving: 'engravings.0', heraldry: 'glyph_a.0', rune: 'core_rune', card: 'card_grades.0' },
   cardTier: null,
@@ -481,6 +494,7 @@ export const SimulatorPage = {
     if (action === 'slot') { this.slots[this.slotKey] = value; this.renderPanel(); return; }
     if (action === 'view') { this.view = value; this.renderPanel(); return; }
     if (action === 'costume-mode') { this.costumeMode = value; this.renderPanel(); return; }
+    if (action === 'stats-breakdown') { this.statsBreakdown = !this.statsBreakdown; this.renderPanel(); return; }
     if (action === 'card-tier') { this.cardTier = value === 'all' ? null : Number(value); this.cardPage = 0; this.renderPanel(); return; }
     if (action === 'card-tab') { this.cardTab = value; this.renderPanel(); return; }
     if (action === 'card-page') { this.cardPage = Number(value); this.renderPanel(); return; }
@@ -588,19 +602,19 @@ export const SimulatorPage = {
     const savedOptions = saved.map((b) => `<option value="${esc(b.id)}" ${b.id === this.savedIds[this.active] ? 'selected' : ''}>${esc(b.name)} · ${when(b.updated_at)}</option>`).join('');
     return `
       <div class="sim-guild-row">
-        <label><span>My characters</span>
+        <label><span>My characters (synced from Toolbox)</span>
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
-            <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
-            <button class="btn btn-secondary" data-action="save-character" title="Keeps this build's title, card mastery, collection level, engravings and passive levels on the character across syncs">Save to character</button>
+            <button class="sim-btn" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
+            <button class="sim-btn sim-btn-accent" data-action="save-character" data-tooltip-fixed="Keeps this build's title, card mastery, collection level, engravings and passive levels on the character across syncs">Save to character</button>
           </span>
         </label>
         <label><span>Saved builds</span>
           <span class="sim-inline">
             <select data-guild="saved" ${saved.length ? '' : 'disabled'}>${savedOptions || `<option value="">${loaded ? 'No saved builds' : 'Loading'}</option>`}</select>
-            <button class="btn btn-secondary" data-action="load-saved" ${saved.length ? '' : 'disabled'}>Load</button>
-            <button class="btn btn-secondary" data-action="save-build">Save</button>
-            <button class="btn btn-secondary" data-action="delete-saved" ${saved.length ? '' : 'disabled'}>Delete</button>
+            <button class="sim-btn" data-action="load-saved" ${saved.length ? '' : 'disabled'}>Load</button>
+            <button class="sim-btn sim-btn-accent" data-action="save-build">Save</button>
+            <button class="sim-btn sim-btn-danger" data-action="delete-saved" ${saved.length ? '' : 'disabled'}>Delete</button>
           </span>
         </label>
       </div>`;
@@ -654,10 +668,12 @@ export const SimulatorPage = {
         <label><span>Specialization</span>${select('second_job', seconds, b.second_job)}</label>
         <label><span>Boss crit resist</span>${number('crit_resist_value', b.crit_resist_value, L.limits.crit_resist)}</label>
         <div class="sim-class-actions">
-          <button class="btn btn-secondary" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to Build ${this.active === 'A' ? 'B' : 'A'}</button>
-          <button class="btn btn-secondary" data-action="export">Copy JSON</button>
-          <button class="btn btn-secondary" data-action="import">Paste JSON</button>
-          <button class="btn btn-secondary" data-action="reset">Reset</button>
+          <div class="sim-btn-group">
+            <button class="sim-btn" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to Build ${this.active === 'A' ? 'B' : 'A'}</button>
+            <button class="sim-btn" data-action="export">Copy JSON</button>
+            <button class="sim-btn" data-action="import">Paste JSON</button>
+          </div>
+          <button class="sim-btn sim-btn-danger" data-action="reset">Reset</button>
         </div>
       </div>
       ${this.guildRow()}`;
@@ -793,7 +809,7 @@ export const SimulatorPage = {
     const pct = (attr) => Number(rows.find((r) => r.attr === attr)?.buffed || 0).toFixed(2);  // the game shows "6.00"
     const line = (label, value) => `<div><span>${label}</span><strong>${value}</strong></div>`;
     return `
-      ${line('Class', esc(this.build.second_job))}${line('HP', v('HP'))}${line('MP', v('MP'))}${line('MP Recovery', `<span data-tooltip-fixed="Will not match the game; part of MP recovery is not modeled yet">${v('MP regen')}</span>`)}
+      ${line('Class', esc(this.build.second_job))}${line('HP', v('HP'))}${line('MP', v('MP'))}${line('MP Recovery', `<span data-tooltip-fixed="${MP_REGEN_TIP}">${v('MP regen')}</span>`)}
       <h4>Special Attk. Info</h4>
       ${line('Critical', v('Crit'))}${line('Critical Damage', v('Crit damage'))}${line('Final Damage', v('Final damage'))}
       <h4>Basic Info</h4>
@@ -1253,8 +1269,63 @@ export const SimulatorPage = {
 
   renderStats() {
     const { rows } = this.results[this.active];
-    const body = rows.map((r) => `<tr><td>${esc(statLabel(r.attr))}</td>${RESULT_COLUMNS.map(([key]) => `<td>${r.attr.endsWith('%') ? fmt(r[key], 2) : fmt(r[key])}</td>`).join('')}<td>${r.percent === null ? '' : `${fmt(r.percent, 3)}%`}</td></tr>`).join('');
-    return `<div class="sim-table-scroll"><table class="sim-table sim-numbers"><thead><tr><th>Stat</th>${RESULT_COLUMNS.map(([, label]) => `<th>${label}</th>`).join('')}<th>Rate</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    const toggle = `<div class="sim-fs-bar"><button class="sim-btn${this.statsBreakdown ? ' sim-btn-accent' : ''}" data-action="stats-breakdown">${this.statsBreakdown ? 'Hide breakdown' : 'Show breakdown'}</button></div>`;
+    return toggle + (this.statsBreakdown ? this.statsBreakdownTable(rows) : this.statsGroups(rows));
+  },
+
+  // Grouped like the game window: one row per stat, its % bonus or rate on the right.
+  statsGroups(rows) {
+    const by = new Map(rows.map((r) => [r.attr, r]));
+    const value = (attr) => by.get(attr)?.buffed;
+    const num = (v) => fmt(Math.round(Number(v) || 0));
+    const pct = (v) => (v ? `${fmt(v, 2)}%` : '');
+    const rate = (v) => (v ? `${fmt(v, 1)}%` : '');
+    const bonus = (attr) => (value(`${attr} %`) ? `+${fmt(value(`${attr} %`), 2)}%` : '');
+    const line = (label, shown, side = '', tip = '') => `<div class="sim-fs-row"><span>${esc(label)}</span><strong${tip ? ` data-tooltip-fixed="${esc(tip)}"` : ''}>${shown}</strong><em>${side}</em></div>`;
+    const range = (attr) => `${num(value(`${attr} min`))} – ${num(value(`${attr} max`))}`;
+    const used = new Set(STAT_GROUPS.flatMap((g) => g.attrs));
+    const element = (kind) => ELEMENTS_SHOWN.map(([key, label]) => [label, value(`${key} ${kind} %`)]).filter(([, v]) => v);
+    const cards = {
+      Basic: [line('HP', num(value('HP')), bonus('HP')), line('MP', num(value('MP')), bonus('MP')),
+        by.has('MP regen') ? line('MP recovery', num(value('MP regen')), '', MP_REGEN_TIP) : '', value('Move speed %') ? line('Move speed', pct(value('Move speed %'))) : ''],
+      Stats: ['STR', 'AGI', 'INT', 'VIT'].map((a) => line(a, num(value(a)), bonus(a))),
+      // Two inner columns each: main stats left, the rest right.
+      Attack: [[line('PATK', range('PATK'), bonus('PATK')), line('MATK', range('MATK'), bonus('MATK')),
+        line('Final damage', num(value('Final damage')), rate(by.get('Final damage')?.percent)),
+        line('Critical', num(value('Crit')), rate(by.get('Crit')?.percent)),
+        line('Crit damage', num(value('Crit damage')), by.get('Crit damage')?.percent != null ? rate(200 + by.get('Crit damage').percent) : '')],
+      ['Paralyze', 'Stun'].filter((a) => value(a)).map((a) => line(a, num(value(a)), bonus(a)))],
+      Defense: [[line('DEF', num(value('DEF')), rate(value('DEF rate %'))), line('MDEF', num(value('MDEF')), rate(value('MDEF rate %')))],
+        ['Crit resist', 'Paralyze resist', 'Stun resist'].filter((a) => value(a)).map((a) => line(a, num(value(a)), bonus(a)))],
+      Element: [element('attack').map(([l, v]) => line(`${l} attack`, pct(v))), element('resist').map(([l, v]) => line(`${l} resist`, pct(v)))],
+    };
+    const other = rows.filter((r) => !used.has(r.attr) && r.buffed);
+    if (other.length) cards.Other = other.map((r) => line(statLabel(r.attr), r.attr.endsWith('%') ? pct(r.buffed) : num(r.buffed)));
+    const card = (title) => {
+      const body = cards[title] || [];
+      if (!body.flat().join('')) return '';
+      const split = Array.isArray(body[0]);
+      const inner = split ? `<div class="sim-fs-cols">${body.map((col) => `<div>${col.join('')}</div>`).join('')}</div>` : body.join('');
+      return `<section class="sim-fs-card${split ? ' wide' : ''}"><h4>${title}</h4>${inner}</section>`;
+    };
+    return `<div class="sim-fs-grid">${card('Basic')}${card('Stats')}${card('Attack')}${card('Defense')}${card('Element')}${card('Other')}</div>`;
+  },
+
+  // Every row by source, grouped as above; blank zeros, one Total tinted where conversion or buffs moved it.
+  statsBreakdownTable(rows) {
+    const by = new Map(rows.map((r) => [r.attr, r]));
+    const sources = RESULT_COLUMNS.filter(([key]) => !['actual', 'converted', 'buffed'].includes(key));
+    const cell = (r, key) => (r[key] ? (r.attr.endsWith('%') ? fmt(r[key], 2) : fmt(Math.round(r[key]))) : '');
+    const used = new Set();
+    const groupRows = [...STAT_GROUPS.map((g) => [g.title, g.attrs.filter((a) => by.has(a) && !used.has(a) && used.add(a))]),
+      ['Other', rows.map((r) => r.attr).filter((a) => !used.has(a))]];
+    const body = groupRows.filter(([, attrs]) => attrs.length).map(([title, attrs]) => `<tr class="sim-fs-group"><td colspan="${sources.length + 3}">${title}</td></tr>` + attrs.map((attr) => {
+      const r = by.get(attr);
+      const changed = Math.abs((r.buffed || 0) - (r.actual || 0)) > 1e-9;
+      const tip = changed ? `Stats ${cell(r, 'actual') || 0} → Converted ${cell(r, 'converted') || 0} → Buffed ${cell(r, 'buffed') || 0}` : '';
+      return `<tr><td>${esc(statLabel(attr))}</td>${sources.map(([key]) => `<td>${cell(r, key)}</td>`).join('')}<td class="sim-fs-total${changed ? ' changed' : ''}"${tip ? ` data-tooltip-fixed="${esc(tip)}"` : ''}>${cell(r, 'buffed') || 0}</td><td>${r.percent == null ? '' : `${fmt(r.percent, 2)}%`}</td></tr>`;
+    }).join('')).join('');
+    return `<div class="sim-table-scroll"><table class="sim-table sim-numbers sim-fs-breakdown"><thead><tr><th>Stat</th>${sources.map(([, label]) => `<th>${label}</th>`).join('')}<th>Total</th><th>Rate</th></tr></thead><tbody>${body}</tbody></table></div>`;
   },
 
   renderCompare() {
@@ -1273,7 +1344,7 @@ export const SimulatorPage = {
     }).join('');
     return `
       <div class="sim-compare-head"><p>Build A: ${esc(this.builds.A.second_job)} · Build B: ${esc(this.builds.B.second_job)}. Positive values mean Build B is higher.</p>
-        <div><button class="btn btn-secondary" data-action="copy" data-value="A>B">Copy A to B</button><button class="btn btn-secondary" data-action="copy" data-value="B>A">Copy B to A</button></div></div>
+        <div class="sim-btn-group"><button class="sim-btn" data-action="copy" data-value="A>B">Copy A to B</button><button class="sim-btn" data-action="copy" data-value="B>A">Copy B to A</button></div></div>
       <div class="sim-metrics">${metrics}</div>
       <div class="sim-table-scroll"><table class="sim-table sim-numbers"><thead><tr><th>Stat</th><th>Build A</th><th>Build B</th><th>Difference</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   },
