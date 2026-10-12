@@ -476,18 +476,25 @@ export const AdminPage = {
           [c.characterGroups, 'character group'], [c.lineupSlots, 'lineup slot']
         ].filter(([n]) => n > 0).map(([n, label]) => `<span class="admin-delete-item">${n} ${label}${n === 1 ? '' : 's'}</span>`).join('');
         const name = user.displayName;
-        const typed = await modal.prompt(`
+        const summary = `
           <span class="admin-delete-summary">
             Deletes <strong>${escapeHtml(name)}</strong>${preview.characters.length ? ` (${preview.characters.map(escapeHtml).join(', ')})` : ''} and:
           </span>
           ${lines ? `<span class="admin-delete-list">${lines}</span>` : '<span class="admin-delete-summary">Nothing else is linked to them.</span>'}
           ${preview.lineups.length ? `<span class="admin-delete-summary">Lineups losing a slot: ${preview.lineups.map(escapeHtml).join(', ')}</span>` : ''}
-          <span class="admin-delete-summary">Loot history is kept. This cannot be undone. Type the name to confirm.</span>
-        `, { title: 'Delete User', okText: 'Delete', placeholder: name, danger: true });
-        if (typed === null) return;
-        if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) {
-          toast.error('The name did not match; nothing was deleted');
-          return;
+          <span class="admin-delete-summary">Loot history is kept. This cannot be undone.</span>`;
+        // The site owner confirms with one click; other admins type the name.
+        if (dataService.getUser()?.id === import.meta.env.VITE_OWNER_DISCORD_ID) {
+          if (!await modal.confirm(summary, { title: 'Delete User', confirmText: 'Delete', danger: true })) return;
+        } else {
+          const typed = await modal.prompt(`${summary}
+            <span class="admin-delete-summary">Type the name to confirm.</span>
+          `, { title: 'Delete User', okText: 'Delete', placeholder: name, danger: true });
+          if (typed === null) return;
+          if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) {
+            toast.error('The name did not match; nothing was deleted');
+            return;
+          }
         }
 
         try {
