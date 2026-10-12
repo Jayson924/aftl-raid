@@ -1,6 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
+import { initFixedTooltip } from '../fixed-tooltip.js';
 
 export const SpendingGuidePage = {
   config: {
@@ -21,104 +22,84 @@ export const SpendingGuidePage = {
     container.innerHTML = `
       <div class="spending-guide-page">
         <div class="page-header">
-          <h1>Spending Guide</h1>
-          <p class="page-subtitle">Is Lavish the answer?</p>
+          <h1>Gold/Lavish</h1>
         </div>
 
-        <div class="calculator-section">
-          <div class="form-group">
-            <label for="target-gold">Target Gold Amount:</label>
-            <input type="number" id="target-gold" placeholder="e.g. 50000" min="1" value="40000">
-          </div>
-        </div>
-
-        <div id="results" class="results-section">
-          <h2></h2>
-
-          <div class="results-row">
-            <div class="result-card cash-shop">
-              <h3>Cash Shop (Lavish)</h3>
-              <div class="result-details">
-                <p><strong>Lavish needed:</strong> <span id="lavish-count">-</span></p>
-                <p><strong>Cash points needed:</strong> <span id="cash-points">-</span></p>
-                <p><strong>USD cost:</strong> <span id="cash-shop-usd">-</span></p>
-                <p class="note">* Includes 10% trading house cut</p>
-              </div>
+        <div class="sg-layout">
+          <section class="sg-panel sg-inputs">
+            <div class="form-group">
+              <label for="target-gold">Target Gold</label>
+              <input type="number" id="target-gold" placeholder="e.g. 50000" min="1" value="40000">
             </div>
 
-            <div class="result-card player-trade">
-              <h3>Player Trade</h3>
-              <div class="result-details">
-                <p><strong>USD equivalent:</strong> <span id="player-usd">-</span></p>
-                <p><strong>AUD equivalent:</strong> <span id="player-aud">-</span></p>
-                <p><strong>PHP cost:</strong> <span id="player-php">-</span></p>
-                <p><strong>IDR cost:</strong> <span id="player-idr">-</span></p>
-              </div>
-            </div>
-          </div>
+            <div id="rates-loading" class="loading">Loading rates...</div>
 
-          <div class="result-card comparison">
-            <h3>Comparison</h3>
-            <p id="recommendation">-</p>
-          </div>
-        </div>
-
-        <div class="rates-section">
-          <h2>Current Rates</h2>
-
-          <div id="rates-loading" class="loading">Loading rates...</div>
-
-          <div id="rates-form" style="display: none;">
-            <div class="rates-grid">
-              <div class="rate-group">
-                <h4>Cash Shop</h4>
-                <div class="form-group">
-                  <label>Lavish selling price:</label>
-                  <div class="input-with-unit">
-                    <span class="unit-prefix">1 Lavish =</span>
-                    <input type="number" id="rate-gold-per-lavish" min="1">
-                    <span class="unit-suffix">gold</span>
-                  </div>
+            <div id="rates-form" style="display: none;">
+              <h3 class="sg-group-title">Cash Shop</h3>
+              <div class="form-group">
+                <label for="rate-gold-per-lavish">Lavish selling price</label>
+                <div class="input-with-unit">
+                  <span class="unit-prefix">1 Lavish =</span>
+                  <input type="number" id="rate-gold-per-lavish" min="1">
+                  <span class="unit-suffix">gold</span>
                 </div>
               </div>
 
-              <div class="rate-group">
-                <h4>Player Trade</h4>
-                <div class="form-group">
-                  <label>Gold rate:</label>
-                  <div class="input-with-unit">
-                    <span class="unit-prefix" id="gold-rate-prefix">1 Gold =</span>
-                    <input type="number" id="rate-gold-price" min="0.001" step="0.001">
-                    <select id="rate-gold-currency">
-                      <option value="PHP">PHP</option>
-                      <option value="USD">USD</option>
-                      <option value="AUD">AUD</option>
-                      <option value="IDR">IDR</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-group" id="exchange-rate-group">
-                  <label>Exchange rate:</label>
-                  <div class="input-with-unit">
-                    <span class="unit-prefix">$1 =</span>
-                    <input type="number" id="rate-exchange" min="0.01" step="0.01">
-                    <span class="unit-suffix" id="exchange-rate-suffix">PHP</span>
-                    <button type="button" id="refresh-rate-btn" class="btn-icon" title="Fetch current rate">🔄</button>
-                  </div>
+              <h3 class="sg-group-title">Player Trade</h3>
+              <div class="form-group">
+                <label for="rate-gold-price">Gold rate</label>
+                <div class="input-with-unit">
+                  <span class="unit-prefix" id="gold-rate-prefix">1 Gold =</span>
+                  <input type="number" id="rate-gold-price" min="0.001" step="0.001">
+                  <select id="rate-gold-currency">
+                    <option value="PHP">PHP</option>
+                    <option value="USD">USD</option>
+                    <option value="AUD">AUD</option>
+                    <option value="IDR">IDR</option>
+                  </select>
                 </div>
               </div>
+              <div class="form-group" id="exchange-rate-group">
+                <label for="rate-exchange">Exchange rate</label>
+                <div class="input-with-unit">
+                  <span class="unit-prefix">$1 =</span>
+                  <input type="number" id="rate-exchange" min="0.01" step="0.01">
+                  <span class="unit-suffix" id="exchange-rate-suffix">PHP</span>
+                  <button type="button" id="refresh-rate-btn" class="btn btn-secondary sg-refresh" data-tooltip-fixed="Fetch the current exchange rate">Refresh</button>
+                </div>
+              </div>
+
+              ${authService.isAdmin() ? '<button id="save-rates-btn" class="btn btn-accent">Save Rates</button>' : ''}
             </div>
 
-            ${authService.isAdmin() ? '<button id="save-rates-btn" class="btn btn-secondary">Save Rates</button>' : ''}
-          </div>
+            <div id="rates-error" class="error" style="display: none;">
+              Failed to load rates. <button id="retry-load-btn" class="btn btn-secondary">Retry</button>
+            </div>
+          </section>
 
-          <div id="rates-error" class="error" style="display: none;">
-            Failed to load rates. <button id="retry-load-btn" class="btn btn-secondary">Retry</button>
-          </div>
+          <section id="results" class="sg-panel sg-results">
+            <div class="sg-verdict" id="recommendation">-</div>
+            <div class="sg-compare">
+              <div class="sg-col cash-shop">
+                <h3>Cash Shop</h3>
+                <div class="sg-row"><span>Lavish needed</span><span id="lavish-count">-</span></div>
+                <div class="sg-row"><span>Cash points</span><span id="cash-points">-</span></div>
+                <div class="sg-row sg-total"><span data-tooltip-fixed="Includes the 10% trading house cut">USD cost</span><span id="cash-shop-usd">-</span></div>
+              </div>
+              <div class="sg-col player-trade">
+                <h3>Player Trade</h3>
+                <div class="sg-row"><span>PHP</span><span id="player-php">-</span></div>
+                <div class="sg-row"><span>AUD</span><span id="player-aud">-</span></div>
+                <div class="sg-row"><span>IDR</span><span id="player-idr">-</span></div>
+                <div class="sg-row sg-total"><span>USD cost</span><span id="player-usd">-</span></div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     `;
 
+    initFixedTooltip();
     this.bindEvents();
     await this.loadConfig();
   },
@@ -141,7 +122,7 @@ export const SpendingGuidePage = {
     });
 
     document.getElementById('refresh-rate-btn').addEventListener('click', () => {
-      this.fetchExchangeRate();
+      this.fetchExchangeRate({ announce: true });
     });
 
     // Recalculate when currency changes and update labels
@@ -366,17 +347,17 @@ export const SpendingGuidePage = {
     if (cashShopUsd < playerUsd) {
       recommendation.innerHTML = `<span class="better-deal cash">Cash Shop is cheaper</span> by <strong>$${savings.toFixed(2)}</strong>`;
     } else if (playerUsd < cashShopUsd) {
-      let note = '';
-      if (savings < 33) {
-        note = '<p class="note">* The difference is LOW, selling lavish is preferable depending on your transaction fees</p>';
-      }
-      recommendation.innerHTML = `<span class="better-deal player">Player Trade is cheaper</span> by <strong>$${savings.toFixed(2)}</strong>${note}`;
+      const close = savings < 33
+        ? ' <span class="sg-close" data-tooltip-fixed="A small difference: selling Lavish may still win,\ndepending on your transaction fees.">Close call</span>'
+        : '';
+      recommendation.innerHTML = `<span class="better-deal player">Player Trade is cheaper</span> by <strong>$${savings.toFixed(2)}</strong>${close}`;
     } else {
       recommendation.innerHTML = `Both options cost the same!`;
     }
   },
 
-  async fetchExchangeRate() {
+  // Runs on every load; only a click on Refresh shows the toast.
+  async fetchExchangeRate({ announce = false } = {}) {
     const btn = document.getElementById('refresh-rate-btn');
     const input = document.getElementById('rate-exchange');
     const currency = document.getElementById('rate-gold-currency').value;
@@ -408,13 +389,13 @@ export const SpendingGuidePage = {
 
       this.calculate();
 
-      toast.success(`Rates updated: $1 = ₱${phpRate.toFixed(2)} / A$${audRate.toFixed(2)} / Rp${idrRate.toLocaleString()}`);
+      if (announce) toast.success(`Rates updated: $1 = ₱${phpRate.toFixed(2)} / A$${audRate.toFixed(2)} / Rp${idrRate.toLocaleString()}`);
     } catch (error) {
       console.error('Failed to fetch exchange rate:', error);
       toast.error('Failed to fetch exchange rate');
     } finally {
       btn.disabled = false;
-      btn.textContent = '🔄';
+      btn.textContent = 'Refresh';
     }
   }
 };
