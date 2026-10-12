@@ -484,16 +484,23 @@
       gap: 1rem;
     }
 
-    .lineup-info {
-      flex-direction: column;
-      align-items: stretch;
+    // Ticket and pilot buttons get their own line instead of covering the gear.
+    .lineup-slots .slot .slot-content .slot-toggles {
+      position: static;
+      justify-content: flex-end;
+      margin-top: 0.35rem;
+    }
 
-      .form-group {
-        &:first-child,
-        &:not(:first-child) {
-          flex: 1;
-        }
-      }
+    .lineup-slots-header {
+      flex-wrap: wrap;
+
+      .btn-tool { white-space: nowrap; }
+    }
+
+    .lineup-info .lineup-info-row {
+      flex-wrap: wrap;
+
+      .form-group { flex: 1 1 100%; }
     }
 
     .editor-main {
@@ -545,13 +552,6 @@
 
     .lineup-actions {
       gap: 0.5rem;
-
-      .lineup-actions-primary,
-      .lineup-actions-secondary {
-        .action-side {
-          flex: 1;
-        }
-      }
     }
 
     .available-players {

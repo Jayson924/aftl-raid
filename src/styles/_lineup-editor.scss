@@ -23,20 +23,9 @@
       margin: 0;
     }
 
-    .whos-around-btn {
-      background: none;
-      border: 1px solid rgba($primary-color, 0.3);
-      color: $primary-color;
+    .btn-tool {
       font-size: 0.8rem;
       padding: 0.3rem 0.75rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border-radius: $border-radius;
-
-      &:hover {
-        background-color: rgba($primary-color, 0.1);
-        border-color: rgba($primary-color, 0.6);
-      }
     }
   }
 
@@ -47,35 +36,36 @@
     max-width: 100%;
   }
 
+  // Lineup details: one panel above the slots.
   .lineup-info {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding: 0.9rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
 
-    .lineup-info-left {
+    .lineup-info-row {
       display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-
-      .lineup-info-row {
-        display: flex;
-        gap: 0.75rem;
-        align-items: flex-end;
-      }
-
-      .lineup-toggles {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-      }
+      gap: 0.75rem;
+      align-items: flex-end;
     }
 
-    .lineup-info-right {
+    .lineup-toggles {
       display: flex;
-      flex-direction: column;
       gap: 0.5rem;
+      flex-shrink: 0;
+    }
 
+    label { font-size: 0.85rem; color: $text-muted; }
+    select, input[type="text"], .raid-time-box { height: 40px; box-sizing: border-box; }
+
+    & {
       .lineup-time-group {
+        flex: 0 0 15rem;
+
         .raid-time-box {
           display: flex;
           align-items: center;
@@ -156,7 +146,8 @@
 
         textarea {
           width: 100%;
-          min-height: 60px;
+          min-height: 38px;
+          padding: 0.5rem 0.75rem;
           resize: vertical;
 
           &::placeholder {
@@ -238,9 +229,12 @@
 
   .editor-main {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
     gap: 1.5rem;
     min-width: 0;
+
+    // Two-column character cards need room; below this the list goes under the lineup.
+    @media (max-width: 1200px) { grid-template-columns: minmax(0, 1fr); }
 
     > * {
       min-width: 0;
@@ -473,60 +467,18 @@
       }
     }
 
+    // Save and Cleared on the left, slot tools on the right.
     .lineup-actions {
       display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-      margin-top: 1rem;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
 
-      .actions-divider {
-        width: 1px;
-        height: 1rem;
-        background-color: rgba(255, 255, 255, 0.15);
-        margin: 0 0.75rem;
-      }
-
-      .lineup-actions-primary,
-      .lineup-actions-secondary {
+      .lineup-actions-end {
         display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 1.2rem;
-
-        .action-side {
-          flex: 1;
-          display: flex;
-          align-items: center;
-
-          &:first-child {
-            justify-content: flex-end;
-          }
-
-          &:last-child {
-            justify-content: flex-start;
-          }
-
-          > * {
-            flex-shrink: 0;
-          }
-        }
-      }
-
-      .btn-ghost {
-        background: none;
-        border: none;
-        color: $text-muted;
-        font-size: 0.8rem;
-        padding: 0.3rem 0.75rem;
-        cursor: pointer;
-        transition: $transition;
-        border-radius: $border-radius;
-
-        &:hover {
-          color: $text-light;
-          background-color: rgba(255, 255, 255, 0.08);
-        }
+        gap: 0.5rem;
+        margin-left: auto;
       }
 
       .toggle-cleared {
@@ -868,44 +820,19 @@
       }
     }
 
-    .layout-toggle-btn {
-      flex-shrink: 0;
-      width: 32px;
-      height: 32px;
-      padding: 0;
+    // Hide toggles, Min GS and Available share one panel.
+    .player-filters {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      padding: 0.6rem 0.75rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: $border-radius;
-      color: rgba(255, 255, 255, 0.75);
-      cursor: pointer;
-      transition: $transition;
 
-      &:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: $primary-color;
-        color: $primary-color;
-      }
-
-      .layout-toggle-icon {
-        display: block;
-        width: 16px;
-        height: 14px;
-        background-image: linear-gradient(currentColor, currentColor),
-                          linear-gradient(currentColor, currentColor);
-        background-repeat: no-repeat;
-        background-position: 0 0, 0 100%;
-        background-size: 100% 5px, 100% 5px;
-
-        &.is-cols-2 {
-          background-image: linear-gradient(currentColor, currentColor),
-                            linear-gradient(currentColor, currentColor);
-          background-position: 0 0, 100% 0;
-          background-size: 45% 100%, 45% 100%;
-        }
-      }
+      .player-filter-checkboxes { justify-content: flex-start; margin: 0; }
+      .gs-filter, .time-filter { margin: 0; padding: 0; background: none; border: 0; }
     }
 
     .player-filter {
@@ -1074,7 +1001,7 @@
         font-variant-numeric: tabular-nums;
         color: rgba(255, 255, 255, 0.55);
 
-        &.is-active { color: #de435f; }
+        &.is-active { color: $primary-color; }
       }
 
       &__clear {
@@ -1087,7 +1014,7 @@
         padding: 0 0.25rem;
         border-radius: 4px;
 
-        &:hover { color: #de435f; background: rgba(255, 255, 255, 0.06); }
+        &:hover { color: $primary-color; background: rgba(255, 255, 255, 0.06); }
       }
 
       &__slider {
@@ -1112,7 +1039,7 @@
         top: 50%;
         height: 6px;
         transform: translateY(-50%);
-        background: #de435f;
+        background: $primary-color;
         border-radius: 3px;
         pointer-events: none;
       }
@@ -1146,7 +1073,7 @@
           height: 16px;
           border-radius: 50%;
           background: #fff;
-          border: 2px solid #de435f;
+          border: 2px solid $primary-color;
           cursor: grab;
           box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
           pointer-events: auto;
@@ -1160,7 +1087,7 @@
           height: 16px;
           border-radius: 50%;
           background: #fff;
-          border: 2px solid #de435f;
+          border: 2px solid $primary-color;
           cursor: grab;
           box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
           pointer-events: auto;

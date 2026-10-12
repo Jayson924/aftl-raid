@@ -37,7 +37,6 @@ export const LineupEditorPage = {
   // Time-of-day filter (minutes from midnight, viewer's local TZ). null = inactive.
   timeFilterFrom: null,
   timeFilterTo: null,
-  playerListLayout: 1, // 1 = single column, 2 = two columns
   showCarouselLineups: true,
   showCarouselNextWeek: false,
   lineupSubscription: null, // Supabase realtime subscription
@@ -74,8 +73,6 @@ export const LineupEditorPage = {
     this.gearscoreMin = 0;
     this.timeFilterFrom = null;
     this.timeFilterTo = null;
-    const savedCols = parseInt(localStorage.getItem('lineup-editor-player-cols'), 10);
-    this.playerListLayout = savedCols === 2 ? 2 : 1;
     this.viewingUsers = [];
 
     container.innerHTML = `
@@ -85,62 +82,62 @@ export const LineupEditorPage = {
         </div>
 
         <div class="editor-container">
-          <div class="lineup-info">
-            <div class="lineup-info-left">
-              <div class="lineup-info-row">
-                <div class="form-group raid-type-group">
-                  <label for="raid-type">Raid Type:</label>
-                  <select id="raid-type">
-                    <option value="BDN Classic">BDN Classic</option>
-                    <option value="DDN Hardcore">DDN Hardcore</option>
-                    <option value="DDN Classic">DDN Classic</option>
-                    <option value="Unspecified">Unspecified</option>
-                  </select>
-                </div>
-                <div class="form-group lineup-name-group">
-                  <label for="lineup-name">Lineup Name:</label>
-                  <input type="text" id="lineup-name" placeholder="Enter lineup name...">
-                </div>
-              </div>
-              <div class="lineup-toggles">
-                <label class="static-toggle-label" title="A permanent lineup keeps the same members every week (not deleted by the weekly cleanup). Raid clear status still resets weekly.">
-                  <input type="checkbox" id="static-toggle">
-                  <img src="/icons/group.svg" class="static-toggle-icon" alt="">
-                  <span>Permanent</span>
-                </label>
-                <label class="next-week-toggle-label">
-                  <input type="checkbox" id="next-week-toggle">
-                  <span>Next Week</span>
-                </label>
-              </div>
-            </div>
-            <div class="lineup-info-right">
-              <div class="form-group lineup-time-group">
-                <label>Scheduled Time:</label>
-                <div class="raid-time-box" id="raid-time-box">
-                  <img src="/icons/calendarclock.svg" alt="" class="raid-time-box-icon">
-                  <span class="raid-time-value" id="raid-time-display">Click to set time</span>
-                  <button type="button" class="raid-time-clear" id="raid-time-clear" title="Clear time">×</button>
-                </div>
-              </div>
-              <div class="form-group lineup-notes-group">
-                <label for="lineup-notes">Notes:</label>
-                <textarea id="lineup-notes" placeholder="Add notes for this lineup..." rows="2"></textarea>
-              </div>
-            </div>
-          </div>
-
           <div class="editor-main">
             <div class="lineup-slots">
+              <div class="lineup-info">
+                <div class="lineup-info-row">
+                  <div class="form-group raid-type-group">
+                    <label for="raid-type">Raid Type</label>
+                    <select id="raid-type">
+                      <option value="BDN Classic">BDN Classic</option>
+                      <option value="DDN Hardcore">DDN Hardcore</option>
+                      <option value="DDN Classic">DDN Classic</option>
+                      <option value="Unspecified">Unspecified</option>
+                    </select>
+                  </div>
+                  <div class="form-group lineup-name-group">
+                    <label for="lineup-name">Lineup Name</label>
+                    <input type="text" id="lineup-name" placeholder="Enter lineup name...">
+                  </div>
+                  <div class="form-group lineup-time-group">
+                    <label>Scheduled Time</label>
+                    <div class="raid-time-box" id="raid-time-box">
+                      <img src="/icons/calendarclock.svg" alt="" class="raid-time-box-icon">
+                      <span class="raid-time-value" id="raid-time-display">Click to set time</span>
+                      <button type="button" class="raid-time-clear" id="raid-time-clear" data-tooltip-fixed="Clear time" aria-label="Clear time">×</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="lineup-info-row">
+                  <div class="form-group lineup-notes-group">
+                    <label for="lineup-notes">Notes</label>
+                    <textarea id="lineup-notes" placeholder="Add notes for this lineup..." rows="1"></textarea>
+                  </div>
+                  <div class="lineup-toggles">
+                    <label class="static-toggle-label" data-tooltip-fixed="Keeps the same members every week.
+Raid clear status still resets weekly.">
+                      <input type="checkbox" id="static-toggle">
+                      <img src="/icons/group.svg" class="static-toggle-icon" alt="">
+                      <span>Permanent</span>
+                    </label>
+                    <label class="next-week-toggle-label">
+                      <input type="checkbox" id="next-week-toggle">
+                      <span>Next Week</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
               <div class="lineup-slots-header">
                 <div class="lineup-slots-header-left">
                   <h3>Lineup</h3>
-                  <button id="generate-lineup-btn" class="btn btn-ghost whos-around-btn">Generate Lineup</button>
-                  <button id="scan-lineup-btn" class="btn btn-ghost whos-around-btn">Lineup Screenshot</button>
+                  <span class="btn-group">
+                    <button id="generate-lineup-btn" class="btn btn-secondary btn-tool">Generate Lineup</button>
+                    <button id="scan-lineup-btn" class="btn btn-secondary btn-tool">Lineup Screenshot</button>
+                  </span>
                 </div>
                 <div class="lineup-slots-header-right">
                   <div id="presence-indicator" class="presence-indicator"></div>
-                  ${canEdit ? `<button id="discord-thread-btn" class="btn btn-ghost whos-around-btn" title="Save the lineup and create a Discord thread">Create Discord Thread</button>` : ''}
+                  ${canEdit ? `<button id="discord-thread-btn" class="btn btn-secondary btn-tool" data-tooltip-fixed="Save the lineup and create a Discord thread">Create Discord Thread</button>` : ''}
                 </div>
               </div>
               <div class="damage-amp-display">
@@ -176,26 +173,15 @@ export const LineupEditorPage = {
                 `).join('')}
               </div>
               <div class="lineup-actions">
-                <div class="lineup-actions-primary">
-                  ${canEdit ? `<span class="action-side">
-                    <button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
-                  </span>
-                  <span class="action-side">
-                    <label class="toggle-cleared">
-                      <input type="checkbox" id="cleared-toggle">
-                      <span>Cleared</span>
-                    </label>
-                  </span>` : ''}
-                </div>
-                <div class="lineup-actions-secondary">
-                  <span class="action-side">
-                    <button id="clear-slots-btn" class="btn btn-ghost">Clear Slots</button>
-                  </span>
-                  <span class="actions-divider"></span>
-                  <span class="action-side">
-                    <button id="new-lineup-btn" class="btn btn-ghost">New Lineup</button>
-                  </span>
-                </div>
+                ${canEdit ? `<button id="save-lineup-btn" class="btn btn-primary">Save Lineup</button>
+                <label class="toggle-cleared">
+                  <input type="checkbox" id="cleared-toggle">
+                  <span>Cleared</span>
+                </label>` : ''}
+                <span class="lineup-actions-end">
+                  <button id="clear-slots-btn" class="btn btn-danger-ghost">Clear Slots</button>
+                  <button id="new-lineup-btn" class="btn btn-secondary">New Lineup</button>
+                </span>
               </div>
               <div class="existing-lineups-section">
                 <div class="carousel-tabs">
@@ -214,23 +200,21 @@ export const LineupEditorPage = {
 
             <div class="available-players">
               <div class="available-players-header">
-                <h3>Available Characters <span style="font-size: 0.85rem; color: #888; font-weight: normal;">(Drag & drop, double click, click slots)</span></h3>
-                <button type="button" id="layout-toggle-btn" class="layout-toggle-btn" title="Toggle column layout" aria-label="Toggle column layout">
-                  <span class="layout-toggle-icon ${this.playerListLayout === 2 ? 'is-cols-2' : 'is-cols-1'}"></span>
-                </button>
+                <h3>Available Characters</h3>
               </div>
               <div class="player-filter">
                 <input type="text" id="player-search" placeholder="Search characters or owners...">
               </div>
               <div class="class-family-filter">
                 ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
-                  <button class="class-family-btn" data-family="${key}" title="${family.name}">
+                  <button class="class-family-btn" data-family="${key}" data-tooltip-fixed="${family.name}">
                     <div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div>
                   </button>
                 `).join('')}
               </div>
               <div class="specialization-filter" id="specialization-filter"></div>
               <div class="final-class-filter" id="final-class-filter"></div>
+              <div class="player-filters">
               <div class="player-filter-checkboxes">
                 <label class="hide-cleared-filter">
                   <input type="checkbox" id="hide-cleared-checkbox">
@@ -250,7 +234,7 @@ export const LineupEditorPage = {
                 <div class="time-filter__top">
                   <span class="time-filter__label">Available</span>
                   <span class="time-filter__readout" id="time-filter-readout">Any time</span>
-                  <button type="button" class="time-filter__clear" id="time-filter-clear" title="Clear time filter" aria-label="Clear time filter">×</button>
+                  <button type="button" class="time-filter__clear" id="time-filter-clear" data-tooltip-fixed="Clear time filter" aria-label="Clear time filter">×</button>
                 </div>
                 <div class="time-filter__slider">
                   <div class="time-filter__track"></div>
@@ -260,7 +244,8 @@ export const LineupEditorPage = {
                   <input type="range" id="time-filter-to" class="time-filter__input time-filter__input--to" min="0" max="1440" step="30" value="1440">
                 </div>
               </div>
-              <div id="available-players-list" class="players-list${this.playerListLayout === 2 ? ' players-list--cols-2' : ''}">
+              </div>
+              <div id="available-players-list" class="players-list players-list--cols-2">
                 <div class="loading">Loading players...</div>
               </div>
             </div>
@@ -443,23 +428,6 @@ export const LineupEditorPage = {
     });
 
     this.setupTimeFilter();
-
-    const layoutToggleBtn = document.getElementById('layout-toggle-btn');
-    if (layoutToggleBtn) {
-      layoutToggleBtn.addEventListener('click', () => {
-        this.playerListLayout = this.playerListLayout === 2 ? 1 : 2;
-        localStorage.setItem('lineup-editor-player-cols', String(this.playerListLayout));
-        const listEl = document.getElementById('available-players-list');
-        if (listEl) listEl.classList.toggle('players-list--cols-2', this.playerListLayout === 2);
-        const iconEl = layoutToggleBtn.querySelector('.layout-toggle-icon');
-        if (iconEl) {
-          iconEl.classList.toggle('is-cols-2', this.playerListLayout === 2);
-          iconEl.classList.toggle('is-cols-1', this.playerListLayout === 1);
-        }
-        // Re-render so the rarity labels switch between full / abbreviated.
-        this.renderAvailablePlayers();
-      });
-    }
 
     // Class family filter buttons
     document.querySelectorAll('.class-family-btn').forEach(btn => {
@@ -953,7 +921,7 @@ export const LineupEditorPage = {
               ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
             </div>
             <div class="player-role">${player.role}</div>
-            ${formatPlayerEquipmentHtml(player, 'player-equipment', { abbreviateRarity: this.playerListLayout === 2 })}
+            ${formatPlayerEquipmentHtml(player, 'player-equipment', { abbreviateRarity: true })}
           </div>
           <div class="player-card-badges">
             ${isInLineup ? '<span class="in-lineup-badge">Added</span>' : ''}
@@ -2332,7 +2300,7 @@ export const LineupEditorPage = {
         </div>
         ${pilotDisplay}
         <div class="player-role">${player.role}</div>
-        ${formatPlayerEquipmentHtml(player, 'player-equipment-compact')}
+        ${formatPlayerEquipmentHtml(player, 'player-equipment-compact', { abbreviateRarity: true })}
       </div>
       <div class="slot-toggles">
         ${showTicketToggle ? `
@@ -2876,13 +2844,13 @@ export const LineupEditorPage = {
     if (threadId) {
       btn.disabled = false;
       btn.textContent = 'Open Discord Thread';
-      btn.title = 'Open the Discord thread for this lineup';
+      btn.dataset.tooltipFixed = 'Open the Discord thread for this lineup';
       return;
     }
 
     btn.disabled = false;
     btn.textContent = 'Create Discord Thread';
-    btn.title = id
+    btn.dataset.tooltipFixed = id
       ? 'Create a Discord thread and ping the lineup'
       : 'Save the lineup and create a Discord thread';
   },
