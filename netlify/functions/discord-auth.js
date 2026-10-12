@@ -5,6 +5,24 @@
  * Only requests 'identify' scope - no email access.
  */
 import { signSession } from '../lib/session.js';
+import { sbGet, sbPost, sbPatch } from '../lib/db.js';
+
+// The browser cannot write app_users, so login creates the row (as a guest) or refreshes
+// the Discord username and avatar. A failure here must not block the login itself.
+async function saveUser(user) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return;
+  try {
+    const id = encodeURIComponent(user.id);
+    const rows = await sbGet('app_users', `discord_id=eq.${id}&select=discord_id`);
+    if (rows.length) {
+      await sbPatch('app_users', `discord_id=eq.${id}`, { username: user.username, avatar_url: user.avatar });
+    } else {
+      await sbPost('app_users', { discord_id: user.id, username: user.username, display_name: user.displayName, avatar_url: user.avatar, role: 'guest' });
+    }
+  } catch (e) {
+    console.error('Could not save the user at login:', e);
+  }
+}
 
 export async function handler(event) {
   const headers = {
@@ -93,6 +111,8 @@ export async function handler(event) {
         ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
         : null
     };
+
+    await saveUser(user);
 
     // The session proves this user to functions that need to know who is calling (meter-token).
     const session = process.env.SESSION_SECRET ? signSession(user.id, process.env.SESSION_SECRET) : null;

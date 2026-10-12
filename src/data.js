@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { usesTickets } from './constants.js';
 import { guardClient, previewRole, previewDiscordId } from './dev-preview.js';
+import { toast } from './toast.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -116,6 +117,23 @@ class DataService {
     return localStorage.getItem(SESSION_TOKEN_KEY);
   }
 
+  // Saves go through the site-write function; the browser itself can only read.
+  async _write(action, args = {}) {
+    const response = await fetch('/.netlify/functions/site-write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: this.getSessionToken(), action, ...args }),
+    });
+    const result = await response.json().catch(() => ({}));
+    // Sessions last 30 days; an expired one signs out so the page stops offering edits.
+    if (response.status === 401 && this._user) {
+      toast.error('Your login expired. Log in again to save changes.');
+      await this.signOut();
+    }
+    if (!response.ok) throw new Error(result.error || 'Could not save');
+    return result;
+  }
+
   /**
    * Load existing session from localStorage
    */
@@ -169,24 +187,8 @@ class DataService {
       .single();
 
     if (error && error.code === 'PGRST116') {
-      // User doesn't exist, create them
-      const { data: newUser, error: insertError } = await supabase
-        .from('app_users')
-        .insert({
-          discord_id: this._user.id,
-          username: this._user.username,
-          display_name: this._user.displayName,
-          avatar_url: this._user.avatar,
-          role: 'guest'
-        })
-        .select('role, display_name')
-        .single();
-
-      if (insertError) {
-        console.error('Failed to create user:', insertError);
-      }
-
-      this._userRole = newUser?.role || 'guest';
+      // Not created yet (discord-auth creates users at login): treat as a new guest.
+      this._userRole = 'guest';
       this._customDisplayName = null; // New user, no custom name yet
       this._myAvailability = { availableFrom: null, logOffTime: null, timezone: null, anytime: false };
       return;
@@ -209,20 +211,12 @@ class DataService {
     }
 
     // Sync avatar: if session has no avatar but DB does, use DB value
-    // (covers case where user set avatar on Discord and logged in from another device)
+    // (covers case where user set avatar on Discord and logged in from another device).
+    // discord-auth refreshes the stored username and avatar at each login.
     if (!this._user.avatar && data?.avatar_url) {
       this._user.avatar = data.avatar_url;
       localStorage.setItem(SESSION_KEY, JSON.stringify(this._user));
     }
-
-    // Update avatar and username in DB in case they changed on Discord
-    await supabase
-      .from('app_users')
-      .update({
-        username: this._user.username,
-        avatar_url: this._user.avatar
-      })
-      .eq('discord_id', this._user.id);
   }
 
   /**
@@ -272,12 +266,7 @@ class DataService {
       throw new Error('Display name cannot be empty');
     }
 
-    const { error } = await supabase
-      .from('app_users')
-      .update({ display_name: trimmedName })
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('user.updateSelf', { fields: { display_name: trimmedName } });
 
     this._customDisplayName = trimmedName !== this._user.displayName ? trimmedName : null;
     return { success: true };
@@ -302,12 +291,7 @@ class DataService {
       available_anytime: anytime === true
     };
 
-    const { error } = await supabase
-      .from('app_users')
-      .update(update)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('user.updateSelf', { fields: update });
 
     this._myAvailability = {
       availableFrom: update.available_from,
@@ -468,19 +452,12 @@ class DataService {
 
   async saveBuild(name, build, id = null) {
     if (!this._user) throw new Error('Log in first');
-    const row = { discord_id: this._user.id, name, build };
-    const query = id
-      ? supabase.from('saved_builds').update(row).eq('id', id).eq('discord_id', this._user.id)
-      : supabase.from('saved_builds').insert(row);
-    const { data, error } = await query.select('id, name, build, updated_at').single();
-    if (error) throw error;
-    return data;
+    return (await this._write('builds.save', { id, name, build })).data;
   }
 
   async deleteSavedBuild(id) {
     if (!this._user) throw new Error('Log in first');
-    const { error } = await supabase.from('saved_builds').delete().eq('id', id).eq('discord_id', this._user.id);
-    if (error) throw error;
+    await this._write('builds.delete', { id });
   }
 
   /**
@@ -548,16 +525,10 @@ class DataService {
   async updateUserExclude(discordId, exclude, { label, reason } = {}) {
     if (!this.isAdmin()) throw new Error('Only admins can update user exclude flag');
 
-    const update = { exclude: !!exclude };
-    if (label !== undefined) update.exclude_label = label?.trim() || null;
-    if (reason !== undefined) update.exclude_reason = reason?.trim() || null;
-
-    const { error } = await supabase
-      .from('app_users')
-      .update(update)
-      .eq('discord_id', discordId);
-
-    if (error) throw error;
+    const fields = { exclude: !!exclude };
+    if (label !== undefined) fields.exclude_label = label?.trim() || null;
+    if (reason !== undefined) fields.exclude_reason = reason?.trim() || null;
+    await this._write('admin.updateUser', { discord_id: discordId, fields });
     return { success: true };
   }
 
@@ -566,13 +537,7 @@ class DataService {
    */
   async updateUserRole(discordId, newRole) {
     if (!this.isAdmin()) throw new Error('Only admins can update roles');
-
-    const { error } = await supabase
-      .from('app_users')
-      .update({ role: newRole })
-      .eq('discord_id', discordId);
-
-    if (error) throw error;
+    await this._write('admin.updateUser', { discord_id: discordId, fields: { role: newRole } });
     return { success: true };
   }
 
@@ -604,13 +569,7 @@ class DataService {
    */
   async adminUpdateDisplayName(discordId, newName) {
     if (!this.isAdmin()) throw new Error('Only admins can update other users');
-
-    const { error } = await supabase
-      .from('app_users')
-      .update({ display_name: newName })
-      .eq('discord_id', discordId);
-
-    if (error) throw error;
+    await this._write('admin.updateUser', { discord_id: discordId, fields: { display_name: newName } });
     return { success: true };
   }
 
@@ -621,18 +580,12 @@ class DataService {
     if (!this.isAdmin()) {
       throw new Error('Only admins can assign character owners');
     }
-
-    const { error } = await supabase
-      .from('players')
-      .update({ discord_id: discordId })
-      .eq('id', playerId);
-
-    if (error) throw error;
+    await this._write('player.adminFlags', { id: playerId, fields: { discord_id: discordId } });
     return { success: true };
   }
 
   async addPlayer(player) {
-    const insertData = {
+    const fields = {
       name: player.name || '',
       role: player.role || '',
       notes: player.notes || '',
@@ -653,78 +606,47 @@ class DataService {
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
       exclude_label: player.excludeLabel?.trim() || null,
-      exclude_reason: player.excludeReason?.trim() || null,
-      // Auto-assign to the logged-in user
-      discord_id: this._user?.id || null
+      exclude_reason: player.excludeReason?.trim() || null
     };
-
-    const { data, error } = await supabase
-      .from('players')
-      .insert(insertData)
-      .select()
-      .single();
-
-    if (error) throw error;
+    // The server makes the logged-in user the owner.
+    const { data } = await this._write('player.add', { fields });
     return { success: true, data };
   }
 
-  async updatePlayer(player, oldName) {
-    // Find by old name if provided, otherwise use id or current name
+  async updatePlayer(player) {
+    // The server keeps class, gear and stats of a synced character.
     const fields = {
       name: player.name || '',
       notes: player.notes || '',
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
       exclude_label: player.excludeLabel?.trim() || null,
-      exclude_reason: player.excludeReason?.trim() || null
+      exclude_reason: player.excludeReason?.trim() || null,
+      role: player.role || '',
+      // Legacy fields
+      weapon: player.weapon || '',
+      weapon_enhance: player.weaponEnhance || '',
+      suffix1: player.suffix1 || '',
+      suffix2: player.suffix2 || '',
+      armor: player.armor || '',
+      armor_enhance: player.armorEnhance || '',
+      // New jsonb columns
+      equipment: player.equipment || {},
+      character_stats: player.characterStats || {}
     };
-    // The sync owns class, gear and stats of a synced character.
-    if (!player.syncedAt) {
-      Object.assign(fields, {
-        role: player.role || '',
-        // Legacy fields
-        weapon: player.weapon || '',
-        weapon_enhance: player.weaponEnhance || '',
-        suffix1: player.suffix1 || '',
-        suffix2: player.suffix2 || '',
-        armor: player.armor || '',
-        armor_enhance: player.armorEnhance || '',
-        // New jsonb columns
-        equipment: player.equipment || {},
-        character_stats: player.characterStats || {}
-      });
-    }
-    let query = supabase.from('players').update(fields);
-
-    if (player.id) {
-      query = query.eq('id', player.id);
-    } else {
-      query = query.eq('name', oldName || player.name);
-    }
-
-    const { error } = await query;
-
-    if (error) throw error;
+    await this._write('player.update', { id: player.id, fields });
     return { success: true };
   }
 
   async togglePlayerExclude(playerId, exclude) {
     if (!this.isAdmin()) throw new Error('Only admins can toggle exclude');
-    const { error } = await supabase
-      .from('players')
-      .update({ exclude: !!exclude })
-      .eq('id', playerId);
-    if (error) throw error;
+    await this._write('player.adminFlags', { id: playerId, fields: { exclude: !!exclude } });
     return { success: true };
   }
 
   async togglePlayerWhitelist(playerId, whitelisted) {
     if (!this.isAdmin()) throw new Error('Only admins can toggle whitelist');
-    const { error } = await supabase
-      .from('players')
-      .update({ whitelisted: !!whitelisted })
-      .eq('id', playerId);
-    if (error) throw error;
+    await this._write('player.adminFlags', { id: playerId, fields: { whitelisted: !!whitelisted } });
     return { success: true };
   }
 
@@ -732,21 +654,12 @@ class DataService {
   // whitelisting or excluding it — just clears it from the list.
   async dismissPlayerReview(playerId) {
     if (!this.isAdmin()) throw new Error('Only admins can dismiss reviews');
-    const { error } = await supabase
-      .from('players')
-      .update({ whitelist_ignored: true })
-      .eq('id', playerId);
-    if (error) throw error;
+    await this._write('player.adminFlags', { id: playerId, fields: { whitelist_ignored: true } });
     return { success: true };
   }
 
-  async deletePlayer(playerName) {
-    const { error } = await supabase
-      .from('players')
-      .delete()
-      .eq('name', playerName);
-
-    if (error) throw error;
+  async deletePlayer(playerId) {
+    await this._write('player.delete', { id: playerId });
     return { success: true };
   }
 
@@ -1499,26 +1412,13 @@ class DataService {
   // Sets or clears one raid's entry in players.tickets_used (see add-classic-tickets.sql).
   async setTicketsUsed(playerNames, raidType, used) {
     if (!usesTickets(raidType) || playerNames.length === 0) return;
-    const { error } = await supabase.rpc('set_ticket_used', {
-      p_names: playerNames,
-      p_raid: raidType,
-      p_used: used
-    });
-    if (error) throw error;
+    await this._write('players.ticketUsed', { names: playerNames, raid: raidType, used });
   }
 
   async markPlayersCompleted(playerNames, raidType, ticketPlayerNames = []) {
     const column = raidTypeToCompletionColumn(raidType);
     if (!column) return { success: true };
-    const now = new Date().toISOString();
-
-    // Update completion timestamp
-    const { error } = await supabase
-      .from('players')
-      .update({ [column]: now })
-      .in('name', playerNames);
-
-    if (error) throw error;
+    await this._write('players.lineupCompletion', { names: playerNames, column, completed: true });
     await this.setTicketsUsed(ticketPlayerNames, raidType, true);
     return { success: true };
   }
@@ -1526,14 +1426,7 @@ class DataService {
   async unmarkPlayersCompleted(playerNames, raidType, excludeLineupName, ticketPlayerNames = []) {
     const column = raidTypeToCompletionColumn(raidType);
     if (!column) return { success: true };
-
-    // Clear completion timestamp
-    const { error } = await supabase
-      .from('players')
-      .update({ [column]: null })
-      .in('name', playerNames);
-
-    if (error) throw error;
+    await this._write('players.lineupCompletion', { names: playerNames, column, completed: false });
     await this.setTicketsUsed(ticketPlayerNames, raidType, false);
     return { success: true };
   }
@@ -1547,15 +1440,7 @@ class DataService {
   async togglePlayerRaidCompletion(playerId, raidType, completed) {
     const column = raidTypeToCompletionColumn(raidType);
     if (!column) return { success: true };
-    const value = completed ? new Date().toISOString() : null;
-
-    const { error } = await supabase
-      .from('players')
-      .update({ [column]: value })
-      .eq('id', playerId);
-
-    if (error) throw error;
-
+    await this._write('player.raidCompletion', { id: playerId, column, completed: !!completed });
     return { success: true };
   }
 
@@ -1641,105 +1526,36 @@ class DataService {
 
   async addPersonalRaid(playerId, name, maxClears = 1) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { data: existing } = await supabase
-      .from('personal_raids')
-      .select('sort_order')
-      .eq('player_id', playerId)
-      .order('sort_order', { ascending: false })
-      .limit(1);
-
-    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
-
-    const { data, error } = await supabase
-      .from('personal_raids')
-      .insert({
-        discord_id: this._user.id,
-        player_id: playerId,
-        name,
-        max_clears: maxClears,
-        current_clears: 0,
-        sort_order: nextOrder
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+    const { data } = await this._write('raids.add', { player_id: playerId, name, max_clears: maxClears });
     return { success: true, data };
   }
 
   async updatePersonalRaid(raidId, updates) {
     if (!this._user) throw new Error('Not logged in');
 
-    const updateData = {};
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.maxClears !== undefined) updateData.max_clears = updates.maxClears;
-    if (updates.currentClears !== undefined) updateData.current_clears = updates.currentClears;
-    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
-
-    const { error } = await supabase
-      .from('personal_raids')
-      .update(updateData)
-      .eq('id', raidId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    const fields = {};
+    if (updates.name !== undefined) fields.name = updates.name;
+    if (updates.maxClears !== undefined) fields.max_clears = updates.maxClears;
+    if (updates.currentClears !== undefined) fields.current_clears = updates.currentClears;
+    if (updates.sortOrder !== undefined) fields.sort_order = updates.sortOrder;
+    await this._write('raids.update', { id: raidId, fields });
     return { success: true };
   }
 
   async deletePersonalRaid(raidId) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { error } = await supabase
-      .from('personal_raids')
-      .delete()
-      .eq('id', raidId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('raids.delete', { id: raidId });
     return { success: true };
   }
 
   async incrementPersonalRaid(raidId) {
-    const { data, error: fetchError } = await supabase
-      .from('personal_raids')
-      .select('current_clears, max_clears')
-      .eq('id', raidId)
-      .single();
-
-    if (fetchError) throw fetchError;
-    if (data.current_clears >= data.max_clears) {
-      throw new Error('Already at max clears');
-    }
-
-    const { error } = await supabase
-      .from('personal_raids')
-      .update({ current_clears: data.current_clears + 1 })
-      .eq('id', raidId);
-
-    if (error) throw error;
-    return { success: true, newClears: data.current_clears + 1 };
+    const { newClears } = await this._write('raids.step', { id: raidId, delta: 1 });
+    return { success: true, newClears };
   }
 
   async decrementPersonalRaid(raidId) {
-    const { data, error: fetchError } = await supabase
-      .from('personal_raids')
-      .select('current_clears')
-      .eq('id', raidId)
-      .single();
-
-    if (fetchError) throw fetchError;
-    if (data.current_clears <= 0) {
-      throw new Error('Already at zero');
-    }
-
-    const { error } = await supabase
-      .from('personal_raids')
-      .update({ current_clears: data.current_clears - 1 })
-      .eq('id', raidId);
-
-    if (error) throw error;
-    return { success: true, newClears: data.current_clears - 1 };
+    const { newClears } = await this._write('raids.step', { id: raidId, delta: -1 });
+    return { success: true, newClears };
   }
 
   // ============================================
@@ -1773,29 +1589,7 @@ class DataService {
 
   async addCharacterGroup(accountNumber, name) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { data: existing } = await supabase
-      .from('character_groups')
-      .select('sort_order')
-      .eq('discord_id', this._user.id)
-      .eq('account_number', accountNumber)
-      .order('sort_order', { ascending: false })
-      .limit(1);
-
-    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
-
-    const { data, error } = await supabase
-      .from('character_groups')
-      .insert({
-        discord_id: this._user.id,
-        account_number: accountNumber,
-        name,
-        sort_order: nextOrder
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+    const { data } = await this._write('groups.add', { account_number: accountNumber, name });
     return {
       id: data.id,
       discordId: data.discord_id,
@@ -1807,55 +1601,26 @@ class DataService {
 
   async renameCharacterGroup(groupId, name) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { error } = await supabase
-      .from('character_groups')
-      .update({ name })
-      .eq('id', groupId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('groups.rename', { id: groupId, name });
     return { success: true };
   }
 
   async deleteCharacterGroup(groupId) {
     if (!this._user) throw new Error('Not logged in');
-
     // Members' group_id is cleared automatically (ON DELETE SET NULL).
-    const { error } = await supabase
-      .from('character_groups')
-      .delete()
-      .eq('id', groupId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('groups.delete', { id: groupId });
     return { success: true };
   }
 
   async reorderCharacterGroups(orderedGroupIds) {
     if (!this._user) throw new Error('Not logged in');
-
-    for (let i = 0; i < orderedGroupIds.length; i++) {
-      const { error } = await supabase
-        .from('character_groups')
-        .update({ sort_order: i })
-        .eq('id', orderedGroupIds[i])
-        .eq('discord_id', this._user.id);
-      if (error) throw error;
-    }
+    await this._write('groups.reorder', { ids: orderedGroupIds });
     return { success: true };
   }
 
   async setCharacterGroup(playerId, groupId) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { error } = await supabase
-      .from('players')
-      .update({ group_id: groupId })
-      .eq('id', playerId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('player.setGroup', { id: playerId, group_id: groupId });
     return { success: true };
   }
 
@@ -1865,15 +1630,7 @@ class DataService {
    */
   async saveCharacterOrder(entries) {
     if (!this._user) throw new Error('Not logged in');
-
-    for (const e of entries) {
-      const { error } = await supabase
-        .from('players')
-        .update({ group_id: e.groupId ?? null, sort_order: e.sortOrder })
-        .eq('id', e.id)
-        .eq('discord_id', this._user.id);
-      if (error) throw error;
-    }
+    await this._write('player.saveOrder', { entries: entries.map(e => ({ id: e.id, group_id: e.groupId ?? null, sort_order: e.sortOrder })) });
     return { success: true };
   }
 
@@ -1909,62 +1666,25 @@ class DataService {
 
   async addShoppingItem(playerId, item, price = 0) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { data: existing } = await supabase
-      .from('shopping_list')
-      .select('sort_order')
-      .eq('player_id', playerId)
-      .order('sort_order', { ascending: false })
-      .limit(1);
-
-    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
-
-    const { data, error } = await supabase
-      .from('shopping_list')
-      .insert({
-        discord_id: this._user.id,
-        player_id: playerId,
-        item,
-        bought: false,
-        price: Number(price) || 0,
-        sort_order: nextOrder
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+    const { data } = await this._write('shopping.add', { player_id: playerId, item, price });
     return { success: true, data };
   }
 
   async updateShoppingItem(itemId, updates) {
     if (!this._user) throw new Error('Not logged in');
 
-    const updateData = {};
-    if (updates.item !== undefined) updateData.item = updates.item;
-    if (updates.bought !== undefined) updateData.bought = updates.bought;
-    if (updates.price !== undefined) updateData.price = Number(updates.price) || 0;
-    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
-
-    const { error } = await supabase
-      .from('shopping_list')
-      .update(updateData)
-      .eq('id', itemId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    const fields = {};
+    if (updates.item !== undefined) fields.item = updates.item;
+    if (updates.bought !== undefined) fields.bought = updates.bought;
+    if (updates.price !== undefined) fields.price = Number(updates.price) || 0;
+    if (updates.sortOrder !== undefined) fields.sort_order = updates.sortOrder;
+    await this._write('shopping.update', { id: itemId, fields });
     return { success: true };
   }
 
   async deleteShoppingItem(itemId) {
     if (!this._user) throw new Error('Not logged in');
-
-    const { error } = await supabase
-      .from('shopping_list')
-      .delete()
-      .eq('id', itemId)
-      .eq('discord_id', this._user.id);
-
-    if (error) throw error;
+    await this._write('shopping.delete', { id: itemId });
     return { success: true };
   }
 
@@ -2030,55 +1750,20 @@ class DataService {
 
   async setPlayerCard(playerId, slotIndex, rarity) {
     if (!this._user) throw new Error('Not logged in');
-    if (!rarity) {
-      return this.removePlayerCard(playerId, slotIndex);
-    }
-    const { error } = await supabase
-      .from('player_cards')
-      .upsert(
-        { player_id: playerId, slot_index: slotIndex, rarity },
-        { onConflict: 'player_id,slot_index' }
-      );
-    if (error) throw error;
+    await this._write('cards.set', { player_id: playerId, entries: [{ slot_index: slotIndex, rarity: rarity || null }] });
     return { success: true };
   }
 
   async removePlayerCard(playerId, slotIndex) {
     if (!this._user) throw new Error('Not logged in');
-    const { error } = await supabase
-      .from('player_cards')
-      .delete()
-      .eq('player_id', playerId)
-      .eq('slot_index', slotIndex);
-    if (error) throw error;
+    await this._write('cards.set', { player_id: playerId, entries: [{ slot_index: slotIndex, rarity: null }] });
     return { success: true };
   }
 
   async bulkSetPlayerCards(playerId, entries) {
     if (!this._user) throw new Error('Not logged in');
     if (!entries?.length) return { success: true };
-
-    const toUpsert = entries.filter(e => e.rarity).map(e => ({
-      player_id: playerId,
-      slot_index: e.slotIndex,
-      rarity: e.rarity
-    }));
-    const toDelete = entries.filter(e => !e.rarity).map(e => e.slotIndex);
-
-    if (toUpsert.length) {
-      const { error } = await supabase
-        .from('player_cards')
-        .upsert(toUpsert, { onConflict: 'player_id,slot_index' });
-      if (error) throw error;
-    }
-    if (toDelete.length) {
-      const { error } = await supabase
-        .from('player_cards')
-        .delete()
-        .eq('player_id', playerId)
-        .in('slot_index', toDelete);
-      if (error) throw error;
-    }
+    await this._write('cards.set', { player_id: playerId, entries: entries.map(e => ({ slot_index: e.slotIndex, rarity: e.rarity || null })) });
     return { success: true };
   }
 
@@ -2111,52 +1796,19 @@ class DataService {
     if (!this._user) throw new Error('Not logged in');
     if (!playerId || !cardName || !rarity) throw new Error('Missing fields');
     if (!Number.isFinite(amount) || amount < 1) throw new Error('Amount must be at least 1');
-
-    const { data: existing } = await supabase
-      .from('player_extra_cards')
-      .select('id, amount')
-      .eq('player_id', playerId)
-      .eq('card_name', cardName)
-      .eq('rarity', rarity)
-      .maybeSingle();
-
-    if (existing) {
-      const newAmount = existing.amount + amount;
-      const { error } = await supabase
-        .from('player_extra_cards')
-        .update({ amount: newAmount })
-        .eq('id', existing.id);
-      if (error) throw error;
-      return { success: true, id: existing.id, amount: newAmount };
-    }
-
-    const { data, error } = await supabase
-      .from('player_extra_cards')
-      .insert({ player_id: playerId, card_name: cardName, rarity, amount })
-      .select()
-      .single();
-    if (error) throw error;
-    return { success: true, id: data.id, amount: data.amount };
+    const { id, amount: total } = await this._write('extras.add', { player_id: playerId, card_name: cardName, rarity, amount });
+    return { success: true, id, amount: total };
   }
 
   async setExtraCardAmount(extraId, amount) {
     if (!this._user) throw new Error('Not logged in');
-    if (amount <= 0) return this.removeExtraCard(extraId);
-    const { error } = await supabase
-      .from('player_extra_cards')
-      .update({ amount })
-      .eq('id', extraId);
-    if (error) throw error;
+    await this._write('extras.setAmount', { id: extraId, amount });
     return { success: true };
   }
 
   async removeExtraCard(extraId) {
     if (!this._user) throw new Error('Not logged in');
-    const { error } = await supabase
-      .from('player_extra_cards')
-      .delete()
-      .eq('id', extraId);
-    if (error) throw error;
+    await this._write('extras.setAmount', { id: extraId, amount: 0 });
     return { success: true };
   }
 

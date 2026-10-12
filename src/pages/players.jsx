@@ -2977,7 +2977,7 @@ export const PlayersPage = {
         if (!confirmed) return;
 
         try {
-          await dataService.deletePlayer(player.name);
+          await dataService.deletePlayer(player.id);
           document.body.removeChild(modalElement);
           toast.success(`${player.name} deleted! Wala na!!`);
           this.loadPlayers();
