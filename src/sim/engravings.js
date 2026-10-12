@@ -4,6 +4,9 @@ import { NONE } from './remote.js';
 
 const L = options.lists;
 
+// The game shows engravings by rarity; the tables store the letter grade.
+export const ENGRAVING_RARITY = { B: 'Rare', A: 'Epic', S: 'Unique', L: 'Legend' };
+
 export const optionNumber = (text) => { const m = String(text ?? '').match(/-?\d+(?:\.\d+)?/g); return m ? Number(m.at(-1)) : 0; };
 
 export function emptyEngravings() {

@@ -639,7 +639,7 @@
   }
 
   .ov-engraving {
-    display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 0.3rem; padding: 0.4rem 0.45rem;
+    display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); gap: 0.3rem; padding: 0.4rem 0.45rem;
     border-radius: 6px; background: rgba(0, 0, 0, 0.2);
     > span { grid-column: 1 / -1; font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); }
     select { width: 100%; }
@@ -663,7 +663,7 @@
   .modal-overrides .ov-tab { padding: 0.55rem 0.35rem; font-size: 0.78rem; }
   .modal-overrides .ov-count, .modal-overrides .ov-long { display: none; }
   .modal-overrides .ov-short { display: inline; }
-  .modal-overrides .ov-engraving { grid-template-columns: minmax(0, 1fr) 4.75rem 5.5rem; align-items: center; > span { grid-column: auto; } }
+  .modal-overrides .ov-engraving { grid-template-columns: minmax(0, 1fr) 5.75rem 5.5rem; align-items: center; > span { grid-column: auto; } }
 }
 
 .class-picker.locked {

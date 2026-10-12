@@ -1,7 +1,7 @@
 // Character simulator: the meter's Build page on the site; builds A and B live in localStorage.
 import options from '../data/sim/options.json' with { type: 'json' };
 import { createRemoteCalculator, NONE } from '../sim/remote.js';
-import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, engravingSecondaryOptions, setEngravingRank } from '../sim/engravings.js';
+import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, engravingSecondaryOptions, setEngravingRank, ENGRAVING_RARITY } from '../sim/engravings.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
@@ -280,7 +280,6 @@ function costumeRarity(item) {
   return RANK_RARITY[entry?.[3]] || 'normal';
 }
 // Engraving grades B/A/S/L are Rare/Epic/Unique/Legend; builds keep the letters.
-const ENGRAVING_RARITY = { B: 'Rare', A: 'Epic', S: 'Unique', L: 'Legend' };
 const ENGRAVING_MAIN_STAT = { 'Armor DEF/MDEF': 'DEF/MDEF', 'Weapon PATK/MATK': 'ATK', 'Accessory HP': 'HP', '3-piece Crit': 'Crit' };
 function engravingRarity(grade, text = grade) {
   const name = ENGRAVING_RARITY[grade];

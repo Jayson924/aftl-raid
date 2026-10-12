@@ -6,7 +6,7 @@ import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import simOptions from '../data/sim/options.json' with { type: 'json' };
 import { NONE } from '../sim/remote.js';
-import { emptyEngravings, engravingMainOptions, setEngravingRank } from '../sim/engravings.js';
+import { emptyEngravings, engravingMainOptions, setEngravingRank, ENGRAVING_RARITY } from '../sim/engravings.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { GUILD_ONLY_TAG } from '../guild-lock.js';
@@ -2698,7 +2698,7 @@ export const PlayersPage = {
     const b = player.build || {};
     const L = simOptions.lists;
     const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    const opts = (list, current) => list.map((v) => `<option value="${esc(v)}" ${v === current ? 'selected' : ''}>${esc(v)}</option>`).join('');
+    const opts = (list, current, label = (v) => v) => list.map((v) => `<option value="${esc(v)}" ${v === current ? 'selected' : ''}>${esc(label(v))}</option>`).join('');
     const num = (attrs, value, [min, max]) => `<input type="number" ${attrs} min="${min}" max="${max}" step="1" value="${Number(value) || 0}">`;
 
     const cardCount = (b.card_grades || []).filter((c) => c?.grade && c.grade !== NONE).length;
@@ -2716,7 +2716,7 @@ export const PlayersPage = {
     const engravings = engravingList.map((item) => `
       <div class="ov-engraving${item.grade === NONE ? ' empty' : ''}" data-engraving="${esc(item.slot)}">
         <span>${esc(item.slot)}</span>
-        <select data-engraving-grade>${opts(L.engraving.grades, item.grade)}</select>
+        <select data-engraving-grade>${opts(L.engraving.grades, item.grade, (g) => ENGRAVING_RARITY[g] || g)}</select>
         <select data-engraving-rank ${item.grade === NONE ? 'disabled' : ''}>${opts(engravingMainOptions(item), item.value_rank)}</select>
       </div>`).join('');
     const tabs = [
@@ -2726,7 +2726,7 @@ export const PlayersPage = {
           ${cardCount ? '<button type="button" class="btn btn-danger-ghost" id="override-clear-cards">Clear cards</button>' : ''}</div>`],
       ['mastery', `<span class="ov-long">Card mastery</span><span class="ov-short">Mastery</span> <span class="ov-count">${masterySet}/${masteryKeys.length}</span>`, `<div class="ov-grid ov-mastery">${mastery}</div>`],
       passives && ['passives', `Passives <span class="ov-count">${passiveList.length}</span>`, `<div class="ov-grid ov-pairs">${passives}</div>`],
-      ['engravings', `Engravings <span class="ov-count">${engraved}/${engravingList.length}</span>`, `<div class="ov-grid ov-pairs">${engravings}</div><p class="ov-note">Extras are set in the simulator.</p>`],
+      ['engravings', `Engravings <span class="ov-count">${engraved}/${engravingList.length}</span>`, `<div class="ov-grid ov-pairs">${engravings}</div><p class="ov-note">Pick the rarity shown in game (Rare, Epic, Unique, Legend), not a letter grade. Extras are set in the simulator.</p>`],
     ].filter(Boolean);
 
     return `
