@@ -718,3 +718,8 @@
     grid-template-columns: 1fr;
   }
 }
+
+// Delete-user dialog (the modal sits on body, outside .admin-page).
+.admin-delete-summary { display: block; margin-bottom: 0.5rem; text-align: left; }
+.admin-delete-list { display: block; margin: 0 0 0.6rem 1rem; text-align: left; }
+.admin-delete-item { display: block; line-height: 1.5; &::before { content: "\2022  "; color: $text-muted; } }

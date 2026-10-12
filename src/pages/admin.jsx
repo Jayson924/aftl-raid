@@ -703,21 +703,44 @@ export const AdminPage = {
       btn.addEventListener('click', async () => {
         const discordId = btn.dataset.discordId;
         const user = this._users.find(u => u.discordId === discordId);
-        const confirmed = await modal.confirm(`Delete user "${user.displayName}"? This also deletes all of their characters and cannot be undone.`, {
-          title: 'Delete User',
-          confirmText: 'Delete',
-          danger: true
-        });
-        if (!confirmed) return;
+        let preview;
+        try {
+          preview = await dataService.previewUserDelete(discordId);
+        } catch (err) {
+          toast.error(err.message);
+          return;
+        }
+
+        // Show exactly what goes, then make the admin type the name.
+        const c = preview.counts;
+        const lines = [
+          [c.characters, 'character'], [c.cards, 'card'], [c.personalRaids, 'personal raid'],
+          [c.shoppingList, 'shopping-list item'], [c.savedBuilds, 'saved build'], [c.meterLinks, 'meter link'],
+          [c.characterGroups, 'character group'], [c.lineupSlots, 'lineup slot']
+        ].filter(([n]) => n > 0).map(([n, label]) => `<span class="admin-delete-item">${n} ${label}${n === 1 ? '' : 's'}</span>`).join('');
+        const name = user.displayName;
+        const typed = await modal.prompt(`
+          <span class="admin-delete-summary">
+            Deletes <strong>${escapeHtml(name)}</strong>${preview.characters.length ? ` (${preview.characters.map(escapeHtml).join(', ')})` : ''} and:
+          </span>
+          ${lines ? `<span class="admin-delete-list">${lines}</span>` : '<span class="admin-delete-summary">Nothing else is linked to them.</span>'}
+          ${preview.lineups.length ? `<span class="admin-delete-summary">Lineups losing a slot: ${preview.lineups.map(escapeHtml).join(', ')}</span>` : ''}
+          <span class="admin-delete-summary">Loot history is kept. This cannot be undone. Type the name to confirm.</span>
+        `, { title: 'Delete User', okText: 'Delete', placeholder: name, danger: true });
+        if (typed === null) return;
+        if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) {
+          toast.error('The name did not match; nothing was deleted');
+          return;
+        }
 
         try {
           await dataService.deleteAppUser(discordId);
-          toast.success(`Deleted ${user.displayName}`);
+          toast.success(`Deleted ${name}`);
           this._users = this._users.filter(u => u.discordId !== discordId);
           this._renderUsers();
         } catch (err) {
           console.error('Failed to delete user:', err);
-          toast.error('Failed to delete user');
+          toast.error(err.message || 'Failed to delete user');
         }
       });
     });

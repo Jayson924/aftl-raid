@@ -72,7 +72,8 @@ class ModalService {
         cancelText = 'Cancel',
         placeholder = '',
         defaultValue = '',
-        required = true
+        required = true,
+        danger = false
       } = options;
 
       const modalEl = document.createElement('div');
@@ -83,7 +84,7 @@ class ModalService {
           <p class="confirmation-message">${message}</p>
           <input type="text" class="prompt-input" id="prompt-input" placeholder="${placeholder}" value="${defaultValue.replace(/"/g, '&quot;')}">
           <div class="form-actions">
-            <button type="button" class="btn btn-primary" id="ok-btn">${okText}</button>
+            <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="ok-btn">${okText}</button>
             <button type="button" class="btn btn-secondary" id="cancel-btn">${cancelText}</button>
           </div>
         </div>
