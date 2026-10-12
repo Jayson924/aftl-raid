@@ -121,67 +121,111 @@
     .enhancement-controls {
       display: flex;
       flex-direction: column;
-      gap: 0.9rem;
+      gap: 1rem;
       width: 100%;
-    }
 
-    // Toggles as one row of pills.
-    .enhancement-toggles {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.5rem;
+      .enhancement-toggles {
+        display: flex;
+        gap: 0.75rem;
 
-      .protection-toggle {
-        display: inline-flex;
+        .protection-toggle {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          cursor: pointer;
+          padding: 0.75rem;
+          background-color: rgba(255, 255, 255, 0.05);
+          border-radius: $border-radius;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: $transition;
+          justify-content: center;
+
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+          }
+
+          input[type="checkbox"] {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            accent-color: $primary-color;
+          }
+
+          span {
+            font-size: 0.95rem;
+            font-weight: 500;
+          }
+        }
+      }
+
+      .enhance-row {
+        display: flex;
         align-items: center;
-        gap: 0.45rem;
-        padding: 0.4rem 0.8rem;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background-color: rgba(0, 0, 0, 0.35);
-        font-size: 0.85rem;
-        cursor: pointer;
-        user-select: none;
+        gap: 1rem;
+        width: 100%;
 
-        &:hover { border-color: rgba(255, 255, 255, 0.3); }
+        .loading-toggle {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.4rem;
+          cursor: pointer;
+          padding: 0.5rem;
+          background-color: rgba(255, 255, 255, 0.05);
+          border-radius: $border-radius;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: $transition;
 
-        input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: $primary-color; cursor: pointer; }
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+          }
 
-        &:has(input:checked) {
-          border-color: rgba($primary-color, 0.6);
-          background-color: rgba($primary-color, 0.12);
-          color: $primary-color;
+          input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: $primary-color;
+            margin: 0;
+          }
+
+          .progressbar-icon {
+            width: 24px;
+            height: 24px;
+            fill: rgba(255, 255, 255, 0.87);
+          }
+        }
+
+        #enhance-btn {
+          flex: 1;
+          font-size: 1.2rem;
+          padding: 1rem 2rem;
+
+          &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+          }
+        }
+
+        #auto-enhance-btn {
+          &.auto-active {
+            background-color: rgba(244, 196, 48, 0.2);
+            border-color: $primary-color;
+            color: $primary-color;
+            box-shadow: 0 0 15px rgba(244, 196, 48, 0.5);
+            animation: pulse-glow 1.5s ease-in-out infinite;
+          }
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 10px rgba(244, 196, 48, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(244, 196, 48, 0.7);
+          }
         }
       }
-    }
-
-    .enhance-row {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      width: 100%;
-
-      #enhance-btn {
-        flex: 1;
-        font-size: 1.15rem;
-        padding: 0.85rem 1.5rem;
-
-        &:disabled { opacity: 0.4; cursor: not-allowed; }
-      }
-
-      #auto-enhance-btn {
-        padding: 0.85rem 1.25rem;
-
-        &.auto-active {
-          background-color: rgba(244, 196, 48, 0.2);
-          border-color: $primary-color;
-          color: $primary-color;
-          animation: pulse-glow 1.5s ease-in-out infinite;
-        }
-      }
-
-      #reset-btn { padding: 0.85rem 1rem; }
     }
   }
 

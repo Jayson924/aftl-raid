@@ -25,23 +25,32 @@ function checkpointFloor(level) {
   return level >= 9 ? 9 : level >= 6 ? 6 : 0;
 }
 
-// A failure breaks the item (break % of failures, unless protected) or drops it a random
-// minDown..maxDown levels, stopping at the checkpoint; a drop of 0 keeps the level.
+// What a non-breaking failure does at each attempt (+N), from the guild's rate table: the share
+// that drops a level and how far. The client's own drop ranges are looser than what players see.
+const FAILURE_DROPS = {
+  8: { share: 0.5, levels: 1 },
+  9: { share: 0.5, levels: 2 },
+  11: { share: 1, levels: 1 },
+  12: { share: 1, levels: 2 },
+  13: { share: 1, levels: 2 },
+  14: { share: 1, levels: 2 },
+  15: { share: 1, levels: 2 }
+};
+
+// A failure breaks the item (break % of failures, unless protected), else drops or keeps the level.
 function gearRates(key, protect) {
   return gearCurve(key).map((step, i) => {
     const failure = 100 - step.success;
     const destruction = protect ? 0 : failure * step.break / 100;
-    const canDrop = i > checkpointFloor(i);
-    const keepShare = !canDrop ? 1 : step.minDown === 0 ? 1 / (step.maxDown - step.minDown + 1) : 0;
+    const drop = FAILURE_DROPS[i + 1] || { share: 0, levels: 0 };
     return {
       level: i + 1,
       success: step.success,
       failure,
       destruction,
-      downgrade: (failure - destruction) * (1 - keepShare),
-      disappear: (failure - destruction) * keepShare,
-      minDown: step.minDown,
-      maxDown: step.maxDown
+      downgrade: (failure - destruction) * drop.share,
+      disappear: (failure - destruction) * (1 - drop.share),
+      downgradeLevel: drop.levels
     };
   });
 }
@@ -246,18 +255,21 @@ export const EnhancementPage = {
                     </label>
                     <label class="protection-toggle">
                       <input type="checkbox" id="event-boost-toggle" ${this.useEventBoost ? 'checked' : ''}>
-                      <span>Event Boost +30%</span>
-                    </label>
-                    <label class="protection-toggle">
-                      <input type="checkbox" id="loading-bar-toggle" ${this.useLoadingBar ? 'checked' : ''}>
-                      <span>Loading Bar</span>
+                      <span>Event Boost (+30%)</span>
                     </label>
                   </div>
                   <div class="enhance-row">
                     <button id="enhance-btn" class="btn btn-primary" ${this.isAutoEnhancing ? 'disabled' : ''}>Enhance!</button>
                     <button id="auto-enhance-btn" class="btn btn-secondary ${this.isAutoEnhancing ? 'auto-active' : ''}">${this.isAutoEnhancing ? 'Stop' : 'Auto'}</button>
-                    <button id="reset-btn" class="btn btn-danger-ghost">Reset</button>
+                    <label class="loading-toggle">
+                      <input type="checkbox" id="loading-bar-toggle" ${this.useLoadingBar ? 'checked' : ''}>
+                      <svg class="progressbar-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M28,21H4a2.0021,2.0021,0,0,1-2-2V13a2.0021,2.0021,0,0,1,2-2H28a2.0021,2.0021,0,0,1,2,2v6A2.0021,2.0021,0,0,1,28,21ZM4,13v6H28V13Z"/>
+                        <rect x="6" y="15" width="14" height="2"/>
+                      </svg>
+                    </label>
                   </div>
+                  <button id="reset-btn" class="btn btn-secondary">Reset</button>
                 </div>
               </div>
             </div>
@@ -775,7 +787,8 @@ export const EnhancementPage = {
           toast.error('Enhancement failed! Item destroyed!');
         }
       } else {
-        const drop = currentRates.minDown + Math.floor(Math.random() * (currentRates.maxDown - currentRates.minDown + 1));
+        const keep = Math.random() * (currentRates.downgrade + currentRates.disappear) >= currentRates.downgrade;
+        const drop = keep ? 0 : currentRates.downgradeLevel;
         const newLevel = Math.max(checkpointFloor(this.currentLevel), this.currentLevel - drop);
         if (newLevel < this.currentLevel) {
           if (!this.isAutoEnhancing) {
