@@ -7,6 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { usesTickets } from './constants.js';
+import { guardClient, previewRole, previewDiscordId } from './dev-preview.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -15,7 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
 }
 
-const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+const supabase = guardClient(createClient(supabaseUrl || '', supabaseAnonKey || ''));
 
 // Map a raid_type string to the players-table completion column it tracks.
 // Returns null for raid types that don't track weekly completion.
@@ -119,6 +120,13 @@ class DataService {
    * Load existing session from localStorage
    */
   async loadSession() {
+    if (previewRole && previewDiscordId) {
+      // Local dev preview: your own account, the chosen role, no session token.
+      this._user = { id: previewDiscordId, username: 'dev-preview', displayName: 'Dev preview', avatar: null };
+      await this._loadOrCreateUser();
+      this._userRole = previewRole;
+      return this._user;
+    }
     const stored = localStorage.getItem(SESSION_KEY);
     if (stored) {
       try {
@@ -193,6 +201,12 @@ class DataService {
       timezone: data?.availability_timezone || null,
       anytime: data?.available_anytime === true
     };
+
+    // The dev preview has no real Discord session to save or sync.
+    if (previewRole) {
+      this._user.avatar = data?.avatar_url || null;
+      return;
+    }
 
     // Sync avatar: if session has no avatar but DB does, use DB value
     // (covers case where user set avatar on Discord and logged in from another device)

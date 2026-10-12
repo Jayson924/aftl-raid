@@ -1,10 +1,11 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { createClient } from '@supabase/supabase-js';
+import { guardClient } from '../dev-preview.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+const supabase = guardClient(createClient(supabaseUrl || '', supabaseAnonKey || ''));
 
 const PORTRAIT_WIDTH = 300;
 const PORTRAIT_HEIGHT = 400;

@@ -1,3 +1,4 @@
+import './dev-preview.js' // first: blocks writes before anything else runs in a local preview
 import './styles/style.scss'
 import { router } from './router.js'
 import { LineupsPage } from './pages/lineups.jsx'
@@ -127,7 +128,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span style="font-size: 0.5em; color: #888; font-weight: normal;">v3.0.00</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span class="app-version">v3.0.00</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>

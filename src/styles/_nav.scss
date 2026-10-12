@@ -1,4 +1,6 @@
 // Navigation — Glassmorphism style
+// Below this width the menu folds into the hamburger; above it every item fits on one line.
+$nav-collapse: 1100px;
 .main-nav {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
@@ -25,6 +27,11 @@
     font-weight: 600;
     letter-spacing: -0.02em;
     text-shadow: 0 0 20px rgba(244, 196, 48, 0.3);
+    white-space: nowrap;
+    line-height: 1.15;
+
+    // Version as a small line under the title.
+    .app-version { display: block; font-size: 0.7rem; color: #888; font-weight: 400; letter-spacing: 0; text-shadow: none; }
   }
 
   .nav-links {
@@ -45,6 +52,7 @@
     font-size: 0.9rem;
     font-weight: 500;
     position: relative;
+    white-space: nowrap;
 
     &:hover {
       color: rgba(255, 255, 255, 0.9);
@@ -228,4 +236,110 @@
   .nav-auth-mobile {
     display: none;
   }
+}
+
+// Medium screens: tighter spacing so the full menu fits without wrapping.
+@media (max-width: 1300px) {
+  .main-nav {
+    padding: 0.75rem 1.25rem;
+    .nav-container { gap: 1rem; }
+    .app-title { font-size: 1.15rem; }
+    .nav-link { padding: 0.4rem 0.6rem; }
+  }
+}
+
+@media (max-width: $nav-collapse) {
+  .main-nav {
+    padding: 0.75rem 1rem;
+
+    .nav-container {
+      display: flex;
+      flex-direction: row;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .app-title {
+      font-size: 1rem;
+      margin: 0;
+      white-space: nowrap;
+      flex: 1;
+
+      .app-version { font-size: 0.65rem; }
+    }
+
+    // Show hamburger on mobile
+    .hamburger-btn {
+      display: flex;
+    }
+
+    // Hide desktop nav actions on mobile
+    .nav-actions {
+      display: none;
+    }
+
+    // Mobile nav links - dropdown menu
+    .nav-links {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: -1rem;
+      right: -1rem;
+      flex-direction: column;
+      gap: 0;
+      background: rgba(20, 20, 20, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.5rem 0;
+      z-index: 1000;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+      &.open {
+        display: flex;
+      }
+
+      li {
+        list-style: none;
+      }
+    }
+
+    .nav-link {
+      display: block;
+      padding: 0.85rem 1.5rem;
+      text-align: left;
+      font-size: 1rem;
+      white-space: nowrap;
+      border-radius: 0;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      // Mobile: glass highlight style
+      &.active {
+        color: $primary-color;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        border-left: 2px solid rgba(244, 196, 48, 0.4);
+        border-radius: 0;
+
+        // Remove desktop underline
+        &::after {
+          display: none;
+        }
+      }
+    }
+
+    // Show mobile auth link
+    .nav-auth-mobile {
+      display: block;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+    }
+  }
+
 }
