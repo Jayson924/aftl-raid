@@ -605,16 +605,16 @@ export const SimulatorPage = {
         <label><span>My characters (synced from Toolbox)</span>
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
-            <button class="sim-btn" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
-            <button class="sim-btn sim-btn-accent" data-action="save-character" data-tooltip-fixed="Keeps this build's title, card mastery, collection level, engravings and passive levels on the character across syncs">Save to character</button>
+            <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
+            <button class="btn btn-accent" data-action="save-character" data-tooltip-fixed="Keeps this build's title, card mastery, collection level, engravings and passive levels on the character across syncs">Save to character</button>
           </span>
         </label>
         <label><span>Saved builds</span>
           <span class="sim-inline">
             <select data-guild="saved" ${saved.length ? '' : 'disabled'}>${savedOptions || `<option value="">${loaded ? 'No saved builds' : 'Loading'}</option>`}</select>
-            <button class="sim-btn" data-action="load-saved" ${saved.length ? '' : 'disabled'}>Load</button>
-            <button class="sim-btn sim-btn-accent" data-action="save-build">Save</button>
-            <button class="sim-btn sim-btn-danger" data-action="delete-saved" ${saved.length ? '' : 'disabled'}>Delete</button>
+            <button class="btn btn-secondary" data-action="load-saved" ${saved.length ? '' : 'disabled'}>Load</button>
+            <button class="btn btn-accent" data-action="save-build">Save</button>
+            <button class="btn btn-danger-ghost" data-action="delete-saved" ${saved.length ? '' : 'disabled'}>Delete</button>
           </span>
         </label>
       </div>`;
@@ -668,12 +668,12 @@ export const SimulatorPage = {
         <label><span>Specialization</span>${select('second_job', seconds, b.second_job)}</label>
         <label><span>Boss crit resist</span>${number('crit_resist_value', b.crit_resist_value, L.limits.crit_resist)}</label>
         <div class="sim-class-actions">
-          <div class="sim-btn-group">
-            <button class="sim-btn" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to Build ${this.active === 'A' ? 'B' : 'A'}</button>
-            <button class="sim-btn" data-action="export">Copy JSON</button>
-            <button class="sim-btn" data-action="import">Paste JSON</button>
+          <div class="btn-group">
+            <button class="btn btn-secondary" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to Build ${this.active === 'A' ? 'B' : 'A'}</button>
+            <button class="btn btn-secondary" data-action="export">Copy JSON</button>
+            <button class="btn btn-secondary" data-action="import">Paste JSON</button>
           </div>
-          <button class="sim-btn sim-btn-danger" data-action="reset">Reset</button>
+          <button class="btn btn-danger-ghost" data-action="reset">Reset</button>
         </div>
       </div>
       ${this.guildRow()}`;
@@ -1269,7 +1269,7 @@ export const SimulatorPage = {
 
   renderStats() {
     const { rows } = this.results[this.active];
-    const toggle = `<div class="sim-fs-bar"><button class="sim-btn${this.statsBreakdown ? ' sim-btn-accent' : ''}" data-action="stats-breakdown">${this.statsBreakdown ? 'Hide breakdown' : 'Show breakdown'}</button></div>`;
+    const toggle = `<div class="sim-fs-bar"><button class="btn ${this.statsBreakdown ? 'btn-accent' : 'btn-secondary'}" data-action="stats-breakdown">${this.statsBreakdown ? 'Hide breakdown' : 'Show breakdown'}</button></div>`;
     return toggle + (this.statsBreakdown ? this.statsBreakdownTable(rows) : this.statsGroups(rows));
   },
 
@@ -1344,7 +1344,7 @@ export const SimulatorPage = {
     }).join('');
     return `
       <div class="sim-compare-head"><p>Build A: ${esc(this.builds.A.second_job)} · Build B: ${esc(this.builds.B.second_job)}. Positive values mean Build B is higher.</p>
-        <div class="sim-btn-group"><button class="sim-btn" data-action="copy" data-value="A>B">Copy A to B</button><button class="sim-btn" data-action="copy" data-value="B>A">Copy B to A</button></div></div>
+        <div class="btn-group"><button class="btn btn-secondary" data-action="copy" data-value="A>B">Copy A to B</button><button class="btn btn-secondary" data-action="copy" data-value="B>A">Copy B to A</button></div></div>
       <div class="sim-metrics">${metrics}</div>
       <div class="sim-table-scroll"><table class="sim-table sim-numbers"><thead><tr><th>Stat</th><th>Build A</th><th>Build B</th><th>Difference</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   },

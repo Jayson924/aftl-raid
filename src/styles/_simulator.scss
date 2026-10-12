@@ -4,7 +4,7 @@ $control-h: 2.6rem;  // toolbar buttons, dropdowns and inputs share one height
   .page-subtitle { margin: 0.25rem 0 0; color: $text-muted; }
   h2 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
   // Site buttons with lighter text; the em padding keeps them as tall as the fields beside them.
-  .sim-class-actions, .sim-guild-row, .sim-card-bulk, .sim-compare-head {
+  .sim-card-bulk {
     .btn { font-size: 0.9rem; padding: 0.7em 1.2em; white-space: nowrap; }
   }
 
@@ -85,21 +85,8 @@ $control-h: 2.6rem;  // toolbar buttons, dropdowns and inputs share one height
 .sim-inline { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .sim-class-row, .sim-guild-row { select, input[type="number"] { height: $control-h; box-sizing: border-box; } }
 
-// Toolbar buttons: quiet outline by default; gold for the main action, red text for destructive ones.
-.sim-btn {
-  height: $control-h; padding: 0 1rem; flex: none; border-radius: $border-radius; cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04); color: $text-light;
-  font-family: inherit; font-size: 0.9rem; font-weight: 500; white-space: nowrap;
-  &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }
-  &:disabled { opacity: 0.45; cursor: default; }
-}
-.sim-btn-accent { border-color: rgba($primary-color, 0.6); color: $primary-color; background: rgba($primary-color, 0.06);
-  &:hover:not(:disabled) { background: rgba($primary-color, 0.16); border-color: $primary-color; } }
-.sim-btn-danger { border-color: transparent; background: transparent; color: lighten($danger-color, 10%);
-  &:hover:not(:disabled) { background: rgba($danger-color, 0.12); border-color: rgba($danger-color, 0.4); } }
-// Joined buttons that read as one tool.
-.sim-btn-group { display: inline-flex;
-  .sim-btn { border-radius: 0; margin-left: -1px; &:first-child { border-radius: $border-radius 0 0 $border-radius; margin-left: 0; } &:last-child { border-radius: 0 $border-radius $border-radius 0; } } }
+// Toolbar buttons line up with the dropdowns beside them.
+.sim-class-row, .sim-guild-row, .sim-fs-bar, .sim-compare-head { .btn { height: $control-h; padding: 0 1rem; flex: none; font-size: 0.9rem; white-space: nowrap; } }
 
 .sim-table-scroll { overflow-x: auto; }
 .sim-table {
@@ -475,7 +462,7 @@ $rune-board: 320px;
 .sim-compare-head {
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem;
   p { margin: 0; color: $text-muted; }
-  > div:not(.sim-btn-group) { display: flex; gap: 0.5rem; }
+  > div:not(.btn-group) { display: flex; gap: 0.5rem; }
 }
 
 @media (max-width: 768px) {

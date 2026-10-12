@@ -12,6 +12,8 @@
   &:hover {
     opacity: 0.9;
   }
+
+  &:disabled { opacity: 0.45; cursor: default; }
 }
 
 .btn-primary {
@@ -28,8 +30,37 @@
 }
 
 .btn-secondary {
-  background-color: $secondary-color;
-  color: white;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: $text-light;
+
+  &:hover:not(:disabled) { opacity: 1; background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }
+}
+
+// The main action in a group, quieter than btn-primary.
+.btn-accent {
+  background: rgba($primary-color, 0.06);
+  border-color: rgba($primary-color, 0.6);
+  color: $primary-color;
+
+  &:hover:not(:disabled) { opacity: 1; background: rgba($primary-color, 0.16); border-color: $primary-color; }
+}
+
+// Destructive actions in toolbars; confirm dialogs keep btn-danger.
+.btn-danger-ghost {
+  background: transparent;
+  color: lighten($danger-color, 10%);
+
+  &:hover:not(:disabled) { opacity: 1; background: rgba($danger-color, 0.12); border-color: rgba($danger-color, 0.4); }
+}
+
+// Buttons joined into one tool.
+.btn-group {
+  display: inline-flex;
+
+  .btn { border-radius: 0; margin-left: -1px; }
+  .btn:first-child { border-radius: $border-radius 0 0 $border-radius; margin-left: 0; }
+  .btn:last-child { border-radius: 0 $border-radius $border-radius 0; }
 }
 
 .btn-danger {
