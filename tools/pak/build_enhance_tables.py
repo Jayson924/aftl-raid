@@ -92,7 +92,9 @@ def main() -> None:
     slots: dict[str, dict] = {}
     used: dict[int, int] = {}
     variants = []
-    for (level, slot), counter in sorted(per_slot.items()):
+    # Equipment-window order: weapons, then head to feet.
+    order = list(SLOT_LABELS)
+    for (level, slot), counter in sorted(per_slot.items(), key=lambda kv: (kv[0][0], order.index(kv[0][1]))):
         idx, n = counter.most_common(1)[0]
         used.setdefault(idx, len(used))
         slots[f"{level}:{slot}"] = {"label": SLOT_LABELS.get(slot, slot), "curve": used[idx]}

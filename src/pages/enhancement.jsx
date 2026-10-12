@@ -1,5 +1,6 @@
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
+import { initFixedTooltip } from '../fixed-tooltip.js';
 import ENHANCE from '../data/enhance-tables.js';
 
 // Import images
@@ -11,7 +12,6 @@ import lotusMarshImg from '../images/lotus marsh.webp';
 import prairieTownImg from '../images/prairie town.webp';
 import colosseumImg from '../images/colosseum.png';
 import crosshairIcon from '../icons/crosshair.svg';
-import progressbarIcon from '../icons/progressbar.svg';
 
 // Rates, gold and materials per gear slot come from the game client (tools/pak/build_enhance_tables.py).
 const DEFAULT_GEAR = '70:mainWeapon';
@@ -20,13 +20,19 @@ function gearCurve(key) {
   return ENHANCE.curves[(ENHANCE.slots[key] || ENHANCE.slots[DEFAULT_GEAR]).curve];
 }
 
+// +6 and +9 are checkpoints: once reached, a failed attempt never drops below them.
+function checkpointFloor(level) {
+  return level >= 9 ? 9 : level >= 6 ? 6 : 0;
+}
+
 // A failure breaks the item (break % of failures, unless protected) or drops it a random
-// minDown..maxDown levels; a drop of 0 keeps the level.
+// minDown..maxDown levels, stopping at the checkpoint; a drop of 0 keeps the level.
 function gearRates(key, protect) {
   return gearCurve(key).map((step, i) => {
     const failure = 100 - step.success;
     const destruction = protect ? 0 : failure * step.break / 100;
-    const keepShare = step.minDown === 0 ? 1 / (step.maxDown - step.minDown + 1) : 0;
+    const canDrop = i > checkpointFloor(i);
+    const keepShare = !canDrop ? 1 : step.minDown === 0 ? 1 / (step.maxDown - step.minDown + 1) : 0;
     return {
       level: i + 1,
       success: step.success,
@@ -78,12 +84,6 @@ export const EnhancementPage = {
   essenceOfLifePrice: 0, // Gold price per Essence of Life
   polishedDiamondPrice: 0, // Gold price per Polished Diamond
   protectionJellyPrice: 0, // Gold price per Protection Jelly
-  showMaterialCosts: { // Individual toggles for each material cost
-    essenceOfLife: false,
-    diamond: false,
-    protectionJelly: false
-  },
-  showMaterialCostTab: false, // Whether Material Cost tab is active
 
   // Lv50/60 gear takes Polished Diamonds, Lv70 takes Flawless.
   diamondName() {
@@ -194,26 +194,16 @@ export const EnhancementPage = {
     container.innerHTML = `
       <div class="enhancement-page">
         <div class="page-header">
-          <h1>Enhancement Simulator</h1>
+          <h1>Enhancement</h1>
         </div>
 
         <div class="enhancement-container">
           <div class="enhancement-main">
             <div class="blacksmith-section" style="background-image: url('${BACKGROUNDS[this.selectedBackground].path}');">
-              <div class="background-selector">
-                <select id="background-select" class="background-dropdown">
-                  ${BACKGROUNDS.map((bg, index) => `
-                    <option value="${index}" ${index === this.selectedBackground ? 'selected' : ''}>
-                      ${bg.name}
-                    </option>
-                  `).join('')}
-                </select>
-              </div>
-              <img src="${berlinImg}" alt="Blacksmith" class="blacksmith-image" onerror="this.style.display='none'">
-              <div class="enhancement-display">
-                <div class="current-level">
-                  <span class="level-label">Gear:</span>
-                  <select id="gear-select" class="level-dropdown">
+              <div class="enh-setup">
+                <label class="enh-field">
+                  <span>Gear</span>
+                  <select id="gear-select">
                     ${[...ENHANCE.meta.levels].reverse().map(lv => `
                       <optgroup label="Level ${lv}">
                         ${Object.entries(ENHANCE.slots).filter(([key]) => key.startsWith(`${lv}:`)).map(([key, slot]) => `
@@ -222,9 +212,20 @@ export const EnhancementPage = {
                       </optgroup>
                     `).join('')}
                   </select>
-                </div>
+                </label>
+                <label class="enh-field">
+                  <span>Background</span>
+                  <select id="background-select">
+                    ${BACKGROUNDS.map((bg, index) => `
+                      <option value="${index}" ${index === this.selectedBackground ? 'selected' : ''}>${bg.name}</option>
+                    `).join('')}
+                  </select>
+                </label>
+              </div>
+              <img src="${berlinImg}" alt="Blacksmith" class="blacksmith-image" onerror="this.style.display='none'">
+              <div class="enhancement-display">
                 <div class="current-level">
-                  <span class="level-label">Current Level:</span>
+                  <span class="level-label">Current Level</span>
                   <select id="level-dropdown" class="level-dropdown">
                     <option value="${this.currentLevel}" selected>+${this.currentLevel}</option>
                     <option disabled>──────</option>
@@ -245,121 +246,47 @@ export const EnhancementPage = {
                     </label>
                     <label class="protection-toggle">
                       <input type="checkbox" id="event-boost-toggle" ${this.useEventBoost ? 'checked' : ''}>
-                      <span>Event Boost (+30%)</span>
+                      <span>Event Boost +30%</span>
+                    </label>
+                    <label class="protection-toggle">
+                      <input type="checkbox" id="loading-bar-toggle" ${this.useLoadingBar ? 'checked' : ''}>
+                      <span>Loading Bar</span>
                     </label>
                   </div>
                   <div class="enhance-row">
                     <button id="enhance-btn" class="btn btn-primary" ${this.isAutoEnhancing ? 'disabled' : ''}>Enhance!</button>
                     <button id="auto-enhance-btn" class="btn btn-secondary ${this.isAutoEnhancing ? 'auto-active' : ''}">${this.isAutoEnhancing ? 'Stop' : 'Auto'}</button>
-                    <label class="loading-toggle">
-                      <input type="checkbox" id="loading-bar-toggle" ${this.useLoadingBar ? 'checked' : ''}>
-                      <svg class="progressbar-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M28,21H4a2.0021,2.0021,0,0,1-2-2V13a2.0021,2.0021,0,0,1,2-2H28a2.0021,2.0021,0,0,1,2,2v6A2.0021,2.0021,0,0,1,28,21ZM4,13v6H28V13Z"/>
-                        <rect x="6" y="15" width="14" height="2"/>
-                      </svg>
-                    </label>
-                  </div>
-                  <button id="reset-btn" class="btn btn-secondary">Reset</button>
-                </div>
-                <div class="stats">
-                  <div class="stat-item">
-                    <span class="stat-label">Attempts:</span>
-                    <span class="stat-value">${this.formatNumber(this.attempts)}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Successes:</span>
-                    <span class="stat-value success">${this.formatNumber(this.successes)}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Failures:</span>
-                    <span class="stat-value failure">${this.formatNumber(this.failures)}</span>
+                    <button id="reset-btn" class="btn btn-danger-ghost">Reset</button>
                   </div>
                 </div>
-                ${this.highestLevel >= 7 ? `
-                  <div class="highest-level-section">
-                    <h3>Highest Level Reached: <span class="highest-value">+${this.highestLevel}</span></h3>
-                    ${this.renderMilestones()}
-                  </div>
-                ` : ''}
-                ${this.attempts > 0 ? `
-                  <div class="materials-tracker">
-                    <div class="materials-header">
-                      <h3>Total Materials Used</h3>
-                      <div class="toggle-section">
-                        <label class="material-cost-toggle">
-                          <input type="checkbox" id="material-cost-toggle" ${
-                            this.showMaterialCosts.essenceOfLife &&
-                            this.showMaterialCosts.diamond &&
-                            this.showMaterialCosts.protectionJelly ? 'checked' : ''
-                          }>
-                          <span>Show Material Cost</span>
-                        </label>
-                        <p class="material-cost-hint">Or click each material</p>
-                      </div>
-                    </div>
-                    <div class="materials-list">
-                      <div class="material-item clickable ${this.showMaterialCosts.essenceOfLife ? 'show-cost' : ''}" data-material="essenceOfLife">
-                        <span class="material-count">${this.formatNumber(this.materialsUsed.essenceOfLife)}</span>
-                        <span class="material-name">Essence of Life</span>
-                        ${this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0 ? `
-                          <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
-                        ` : ''}
-                      </div>
-                      <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
-                        <span class="material-count">${this.formatNumber(this.materialsUsed.diamond)}</span>
-                        <span class="material-name">${this.diamondName()}</span>
-                        ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
-                          <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
-                        ` : ''}
-                      </div>
-                      <div class="material-item clickable ${this.showMaterialCosts.protectionJelly ? 'show-cost' : ''}" data-material="protectionJelly">
-                        <span class="material-count">${this.formatNumber(this.materialsUsed.protectionJelly)}</span>
-                        <span class="material-name">Protection Jelly</span>
-                        ${this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0 ? `
-                          <span class="material-cost">${this.formatGold(this.materialsUsed.protectionJelly * this.protectionJellyPrice)}</span>
-                        ` : ''}
-                      </div>
-                    </div>
-                    <div class="gold-section">
-                      <div class="material-item gold-item">
-                        <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
-                        <span class="material-name">Gold</span>
-                      </div>
-                      ${(this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0) ||
-                        (this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0) ||
-                        (this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0) ? `
-                        <div class="material-item gold-item total-cost">
-                          <span class="material-count">${this.formatGold(
-                            this.materialsUsed.gold +
-                            (this.showMaterialCosts.essenceOfLife ? this.materialsUsed.essenceOfLife * this.essenceOfLifePrice : 0) +
-                            (this.showMaterialCosts.diamond ? this.materialsUsed.diamond * this.polishedDiamondPrice : 0) +
-                            (this.showMaterialCosts.protectionJelly ? this.materialsUsed.protectionJelly * this.protectionJellyPrice : 0)
-                          )}</span>
-                          <span class="material-name">Total Cost</span>
-                        </div>
-                      ` : ''}
-                    </div>
-                  </div>
-                ` : ''}
               </div>
             </div>
 
-            <div class="rates-section">
-              <h3>Enhancement Rates</h3>
-              <div class="rates-tabs">
-                <button class="rates-tab ${!this.useProtection && !this.showMaterialCostTab ? 'active' : ''}" data-tab="no-protection">
-                  No Protection
-                </button>
-                <button class="rates-tab ${this.useProtection && !this.showMaterialCostTab ? 'active' : ''}" data-tab="with-protection">
-                  With Protection
-                </button>
-                <button class="rates-tab ${this.showMaterialCostTab ? 'active' : ''}" data-tab="material-cost">
-                  Material Cost
-                </button>
-              </div>
-              <div class="rates-table-container">
-                ${this.showMaterialCostTab ? this.renderMaterialCostTab() : this.renderRatesTable()}
-              </div>
+            <div class="enh-side">
+              <section class="enh-panel enh-session">
+                <h3>Session</h3>
+                <div id="enh-session-body">${this.renderSessionBody()}</div>
+                <div class="enh-prices">
+                  <span class="enh-prices-label">Price each</span>
+                  ${this.priceFields().map(([id, label, price]) => `
+                    <label class="enh-price">
+                      <span>${label}</span>
+                      <input type="number" id="${id}" min="0" step="0.01" value="${price || ''}" placeholder="0">
+                    </label>
+                  `).join('')}
+                </div>
+                <div id="enh-milestones">${this.renderMilestones()}</div>
+              </section>
+
+              <section class="enh-panel rates-section">
+                <div class="enh-panel-head">
+                  <h3>Rates</h3>
+                  <span class="enh-rates-mode" id="enh-rates-mode">${this.ratesModeText()}</span>
+                </div>
+                <div class="rates-table-container">
+                  ${this.renderRatesTable()}
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -369,64 +296,52 @@ export const EnhancementPage = {
     this.attachEventListeners();
   },
 
+  // Material lines for one level's totals, with gold costs where a price is set.
+  materialLines(m) {
+    const lines = [];
+    const priced = this.materials(m);
+    priced.forEach(({ label, count, cost }) => {
+      if (count > 0) lines.push(`${label}: ${this.formatNumber(count)}${cost > 0 ? ` (${this.formatGold(cost)})` : ''}`);
+    });
+    lines.push(`Gold: ${this.formatGold(m.gold)}`);
+    const extra = priced.reduce((t, x) => t + x.cost, 0);
+    if (extra > 0) lines.push(`Total: ${this.formatGold(m.gold + extra)}`);
+    return lines.join('\n');
+  },
+
   renderMilestones() {
     const milestones = Object.keys(this.milestoneAttempts)
       .map(level => parseInt(level))
       .filter(level => level >= 7) // Only show levels 7 and above
       .sort((a, b) => a - b);
 
-    if (milestones.length === 0) {
+    if (this.highestLevel < 7 || milestones.length === 0) {
       return '';
     }
 
     return `
-      <div class="milestones-list">
-        ${milestones.map(level => {
-          const prevLevel = level - 1;
-          const firstTimeAttempts = this.milestoneAttempts[level];
-          const totalAttempts = this.totalLevelAttempts[prevLevel] || 0;
-          const materials = this.materialsPerLevel[prevLevel];
-          const hasTooltip = materials && (materials.essenceOfLife > 0 || materials.diamond > 0 || materials.protectionJelly > 0 || materials.gold > 0);
-
-          return `
-            <div class="milestone-item ${hasTooltip ? 'has-tooltip' : ''}">
-              <span class="milestone-level">+${prevLevel} → +${level}</span>
-              <span class="milestone-attempts">${firstTimeAttempts} ${firstTimeAttempts === 1 ? 'tap' : 'taps'}</span>
-              <span class="milestone-total">(${totalAttempts} total)</span>
-              ${hasTooltip ? `
-                <div class="milestone-tooltip">
-                  <div class="tooltip-title">Total Materials Used</div>
-                  <div class="tooltip-item">Essence of Life: ${materials.essenceOfLife}${
-                    this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0
-                      ? ` (${this.formatGold(materials.essenceOfLife * this.essenceOfLifePrice)})`
-                      : ''
-                  }</div>
-                  ${materials.diamond > 0 ? `<div class="tooltip-item">${this.diamondName()}: ${materials.diamond}${
-                    this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0
-                      ? ` (${this.formatGold(materials.diamond * this.polishedDiamondPrice)})`
-                      : ''
-                  }</div>` : ''}
-                  ${materials.protectionJelly > 0 ? `<div class="tooltip-item">Protection Jelly: ${materials.protectionJelly}${
-                    this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0
-                      ? ` (${this.formatGold(materials.protectionJelly * this.protectionJellyPrice)})`
-                      : ''
-                  }</div>` : ''}
-                  <div class="tooltip-item">Gold: ${this.formatGold(materials.gold)}</div>
-                  ${(this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0) ||
-                    (this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0) ||
-                    (this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0) ? `
-                    <div class="tooltip-item tooltip-total">Total Cost: ${this.formatGold(
-                      materials.gold +
-                      (this.showMaterialCosts.essenceOfLife ? materials.essenceOfLife * this.essenceOfLifePrice : 0) +
-                      (this.showMaterialCosts.diamond ? materials.diamond * this.polishedDiamondPrice : 0) +
-                      (this.showMaterialCosts.protectionJelly ? materials.protectionJelly * this.protectionJellyPrice : 0)
-                    )}</div>
-                  ` : ''}
-                </div>
-              ` : ''}
-            </div>
-          `;
-        }).join('')}
+      <div class="enh-milestones">
+        <div class="enh-milestones-head">
+          <h4>Highest Level</h4>
+          <span class="highest-value">+${this.highestLevel}</span>
+        </div>
+        <table class="enh-table">
+          <thead><tr><th>Step</th><th>Taps to first</th><th>Taps total</th></tr></thead>
+          <tbody>
+            ${milestones.map(level => {
+              const prevLevel = level - 1;
+              const materials = this.materialsPerLevel[prevLevel];
+              const tip = materials ? `data-tooltip-head="Materials used" data-tooltip-fixed="${this.materialLines(materials)}"` : '';
+              return `
+                <tr ${tip}>
+                  <td class="enh-step">+${prevLevel} → +${level}</td>
+                  <td>${this.formatNumber(this.milestoneAttempts[level])}</td>
+                  <td>${this.formatNumber(this.totalLevelAttempts[prevLevel] || 0)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   },
@@ -486,45 +401,57 @@ export const EnhancementPage = {
     `;
   },
 
-  renderMaterialCostTab() {
+  priceFields() {
+    return [
+      ['essence-price', 'Essence of Life', this.essenceOfLifePrice],
+      ['diamond-price', this.diamondName(), this.polishedDiamondPrice],
+      ['jelly-price', 'Protection Jelly', this.protectionJellyPrice]
+    ];
+  },
+
+  materials(m) {
+    return [
+      { label: 'Essence of Life', count: m.essenceOfLife, cost: m.essenceOfLife * this.essenceOfLifePrice },
+      { label: this.diamondName(), count: m.diamond, cost: m.diamond * this.polishedDiamondPrice },
+      { label: 'Protection Jelly', count: m.protectionJelly, cost: m.protectionJelly * this.protectionJellyPrice }
+    ];
+  },
+
+  ratesModeText() {
+    return [this.useProtection ? 'With Enhancement Jelly' : 'No protection', this.useEventBoost ? 'Event Boost' : '']
+      .filter(Boolean).join(' · ');
+  },
+
+  // Attempts and the materials spent so far; costs appear once a price is set.
+  renderSessionBody() {
+    const used = this.materials(this.materialsUsed);
+    const extra = used.reduce((t, x) => t + x.cost, 0);
     return `
-      <div class="material-cost-tab">
-        <p class="material-cost-description">How much each material costs:</p>
-        <div class="material-cost-inputs">
-          <div class="form-group">
-            <label for="essence-price">Essence of Life:</label>
-            <input
-              type="number"
-              id="essence-price"
-              min="0"
-              step="0.01"
-              value="${this.essenceOfLifePrice}"
-              placeholder="0.00"
-            >
+      <div class="enh-stats">
+        <div><span class="stat-value">${this.formatNumber(this.attempts)}</span><span class="stat-label">Attempts</span></div>
+        <div><span class="stat-value success">${this.formatNumber(this.successes)}</span><span class="stat-label">Successes</span></div>
+        <div><span class="stat-value failure">${this.formatNumber(this.failures)}</span><span class="stat-label">Failures</span></div>
+      </div>
+      <div class="enh-rows">
+        ${used.map(({ label, count, cost }) => `
+          <div class="enh-row">
+            <span>${label}</span>
+            <span class="enh-count">${this.formatNumber(count)}</span>
+            <span class="enh-cost">${cost > 0 ? this.formatGold(cost) : ''}</span>
           </div>
-          <div class="form-group">
-            <label for="diamond-price">${this.diamondName()}:</label>
-            <input
-              type="number"
-              id="diamond-price"
-              min="0"
-              step="0.01"
-              value="${this.polishedDiamondPrice}"
-              placeholder="0.00"
-            >
-          </div>
-          <div class="form-group">
-            <label for="jelly-price">Protection Jelly:</label>
-            <input
-              type="number"
-              id="jelly-price"
-              min="0"
-              step="0.01"
-              value="${this.protectionJellyPrice}"
-              placeholder="0.00"
-            >
-          </div>
+        `).join('')}
+        <div class="enh-row">
+          <span>Gold</span>
+          <span class="enh-count"></span>
+          <span class="enh-cost">${this.formatGold(this.materialsUsed.gold)}</span>
         </div>
+        ${extra > 0 ? `
+          <div class="enh-row enh-total">
+            <span>Total</span>
+            <span class="enh-count"></span>
+            <span class="enh-cost">${this.formatGold(this.materialsUsed.gold + extra)}</span>
+          </div>
+        ` : ''}
       </div>
     `;
   },
@@ -584,29 +511,26 @@ export const EnhancementPage = {
       this.render(document.querySelector('#app'));
     });
 
-    document.querySelectorAll('.rates-tab').forEach(tab => {
-      tab.addEventListener('click', (e) => {
-        const tabType = e.target.dataset.tab;
+    // Add click handlers for rates table rows to set goal
+    this.bindRateRows();
 
-        if (tabType === 'material-cost') {
-          this.showMaterialCostTab = true;
-        } else {
-          this.showMaterialCostTab = false;
-          const useProtection = tabType === 'with-protection';
-          this.useProtection = useProtection;
-          document.getElementById('protection-toggle').checked = useProtection;
-        }
-
-        this.updateRatesTable();
-
-        document.querySelectorAll('.rates-tab').forEach(t => t.classList.remove('active'));
-        e.target.classList.add('active');
+    // Prices sit outside the re-rendered session body, so typing keeps focus.
+    this.priceFields().forEach(([id]) => {
+      document.getElementById(id)?.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value) || 0;
+        if (id === 'essence-price') this.essenceOfLifePrice = value;
+        else if (id === 'diamond-price') this.polishedDiamondPrice = value;
+        else this.protectionJellyPrice = value;
+        this.updateMaterialsDisplay();
       });
     });
 
-    // Add click handlers for rates table rows to set goal
+    initFixedTooltip();
+  },
+
+  bindRateRows() {
     document.querySelectorAll('.rates-table tbody tr').forEach(row => {
-      row.addEventListener('click', (e) => {
+      row.addEventListener('click', () => {
         // Prevent changing goal while auto-enhancing
         if (this.isAutoEnhancing) {
           return;
@@ -615,66 +539,10 @@ export const EnhancementPage = {
         const level = parseInt(row.dataset.level);
 
         // Toggle goal: if clicking the same level, remove goal
-        if (this.goalLevel === level) {
-          this.goalLevel = null;
-        } else {
-          this.goalLevel = level;
-        }
+        this.goalLevel = this.goalLevel === level ? null : level;
         this.updateRatesTable();
       });
     });
-
-    // Add click handlers for milestone items with tooltips (for mobile)
-    document.querySelectorAll('.milestone-item.has-tooltip').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Remove active class from all other items
-        document.querySelectorAll('.milestone-item.has-tooltip').forEach(otherItem => {
-          if (otherItem !== item) {
-            otherItem.classList.remove('tooltip-visible');
-          }
-        });
-        // Toggle active class on clicked item
-        item.classList.toggle('tooltip-visible');
-      });
-    });
-
-    // Close tooltips when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.milestone-item.has-tooltip')) {
-        document.querySelectorAll('.milestone-item.has-tooltip').forEach(item => {
-          item.classList.remove('tooltip-visible');
-        });
-      }
-    });
-
-    // Material cost toggle checkbox - toggle all at once
-    const materialCostToggle = document.getElementById('material-cost-toggle');
-    if (materialCostToggle) {
-      materialCostToggle.addEventListener('change', (e) => {
-        const checked = e.target.checked;
-        this.showMaterialCosts.essenceOfLife = checked;
-        this.showMaterialCosts.diamond = checked;
-        this.showMaterialCosts.protectionJelly = checked;
-        this.render(document.querySelector('#app'));
-      });
-    }
-
-    // Material item click handlers for toggling cost display
-    document.querySelectorAll('.material-item.clickable').forEach(item => {
-      item.addEventListener('click', (e) => {
-        const material = item.dataset.material;
-        if (material) {
-          this.showMaterialCosts[material] = !this.showMaterialCosts[material];
-          this.render(document.querySelector('#app'));
-        }
-      });
-    });
-
-    // Attach material price input listeners if Material Cost tab is active
-    if (this.showMaterialCostTab) {
-      this.updateMaterialPrices();
-    }
 
     // Set up drag and drop for rates table
     this.setupDragAndDropTableRows();
@@ -774,140 +642,11 @@ export const EnhancementPage = {
     this.render(document.querySelector('#app'));
   },
 
-  updateMaterialPrices() {
-    const essenceInput = document.getElementById('essence-price');
-    const diamondInput = document.getElementById('diamond-price');
-    const jellyInput = document.getElementById('jelly-price');
-
-    if (essenceInput) {
-      essenceInput.addEventListener('input', (e) => {
-        this.essenceOfLifePrice = parseFloat(e.target.value) || 0;
-        // Update materials display if any cost is being shown
-        if (Object.values(this.showMaterialCosts).some(show => show)) {
-          this.updateMaterialsDisplay();
-        }
-      });
-    }
-
-    if (diamondInput) {
-      diamondInput.addEventListener('input', (e) => {
-        this.polishedDiamondPrice = parseFloat(e.target.value) || 0;
-        // Update materials display if any cost is being shown
-        if (Object.values(this.showMaterialCosts).some(show => show)) {
-          this.updateMaterialsDisplay();
-        }
-      });
-    }
-
-    if (jellyInput) {
-      jellyInput.addEventListener('input', (e) => {
-        this.protectionJellyPrice = parseFloat(e.target.value) || 0;
-        // Update materials display if any cost is being shown
-        if (Object.values(this.showMaterialCosts).some(show => show)) {
-          this.updateMaterialsDisplay();
-        }
-      });
-    }
-  },
-
   updateMaterialsDisplay() {
-    if (this.attempts === 0) return;
-
-    // Update the materials tracker display without full re-render
-    let materialsTracker = document.querySelector('.materials-tracker');
-    if (!materialsTracker) {
-      // Create it — insert after highest-level-section or after .stats
-      const anchor = document.querySelector('.highest-level-section') || document.querySelector('.stats');
-      if (anchor) {
-        materialsTracker = document.createElement('div');
-        materialsTracker.className = 'materials-tracker';
-        anchor.after(materialsTracker);
-      }
-    }
-    if (materialsTracker) {
-      const materialsHtml = `
-        <div class="materials-header">
-          <h3>Total Materials Used</h3>
-          <div class="toggle-section">
-            <label class="material-cost-toggle">
-              <input type="checkbox" id="material-cost-toggle" ${
-                this.showMaterialCosts.essenceOfLife &&
-                this.showMaterialCosts.diamond &&
-                this.showMaterialCosts.protectionJelly ? 'checked' : ''
-              }>
-              <span>Show Material Cost</span>
-            </label>
-            <p class="material-cost-hint">Or click each material</p>
-          </div>
-        </div>
-        <div class="materials-list">
-          <div class="material-item clickable ${this.showMaterialCosts.essenceOfLife ? 'show-cost' : ''}" data-material="essenceOfLife">
-            <span class="material-count">${this.materialsUsed.essenceOfLife}</span>
-            <span class="material-name">Essence of Life</span>
-            ${this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0 ? `
-              <span class="material-cost">${this.formatGold(this.materialsUsed.essenceOfLife * this.essenceOfLifePrice)}</span>
-            ` : ''}
-          </div>
-          <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
-            <span class="material-count">${this.materialsUsed.diamond}</span>
-            <span class="material-name">${this.diamondName()}</span>
-            ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
-              <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
-            ` : ''}
-          </div>
-          <div class="material-item clickable ${this.showMaterialCosts.protectionJelly ? 'show-cost' : ''}" data-material="protectionJelly">
-            <span class="material-count">${this.materialsUsed.protectionJelly}</span>
-            <span class="material-name">Protection Jelly</span>
-            ${this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0 ? `
-              <span class="material-cost">${this.formatGold(this.materialsUsed.protectionJelly * this.protectionJellyPrice)}</span>
-            ` : ''}
-          </div>
-        </div>
-        <div class="gold-section">
-          <div class="material-item gold-item">
-            <span class="material-count">${this.formatGold(this.materialsUsed.gold)}</span>
-            <span class="material-name">Gold</span>
-          </div>
-          ${(this.showMaterialCosts.essenceOfLife && this.essenceOfLifePrice > 0) ||
-            (this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0) ||
-            (this.showMaterialCosts.protectionJelly && this.protectionJellyPrice > 0) ? `
-            <div class="material-item gold-item total-cost">
-              <span class="material-count">${this.formatGold(
-                this.materialsUsed.gold +
-                (this.showMaterialCosts.essenceOfLife ? this.materialsUsed.essenceOfLife * this.essenceOfLifePrice : 0) +
-                (this.showMaterialCosts.diamond ? this.materialsUsed.diamond * this.polishedDiamondPrice : 0) +
-                (this.showMaterialCosts.protectionJelly ? this.materialsUsed.protectionJelly * this.protectionJellyPrice : 0)
-              )}</span>
-              <span class="material-name">Total Cost</span>
-            </div>
-          ` : ''}
-        </div>
-      `;
-      materialsTracker.innerHTML = materialsHtml;
-
-      // Re-attach checkbox listener
-      const materialCostToggle = document.getElementById('material-cost-toggle');
-      if (materialCostToggle) {
-        materialCostToggle.addEventListener('change', (e) => {
-          const checked = e.target.checked;
-          this.showMaterialCosts.essenceOfLife = checked;
-          this.showMaterialCosts.diamond = checked;
-          this.showMaterialCosts.protectionJelly = checked;
-          this.render(document.querySelector('#app'));
-        });
-      }
-
-      // Re-attach click listeners
-      document.querySelectorAll('.material-item.clickable').forEach(item => {
-        item.addEventListener('click', (e) => {
-          const material = item.dataset.material;
-          if (material) {
-            this.showMaterialCosts[material] = !this.showMaterialCosts[material];
-            this.render(document.querySelector('#app'));
-          }
-        });
-      });
-    }
+    const body = document.getElementById('enh-session-body');
+    if (body) body.innerHTML = this.renderSessionBody();
+    const milestones = document.getElementById('enh-milestones');
+    if (milestones) milestones.innerHTML = this.renderMilestones();
   },
 
   async attemptEnhancement() {
@@ -1037,8 +776,8 @@ export const EnhancementPage = {
         }
       } else {
         const drop = currentRates.minDown + Math.floor(Math.random() * (currentRates.maxDown - currentRates.minDown + 1));
-        if (drop > 0) {
-          const newLevel = Math.max(0, this.currentLevel - drop);
+        const newLevel = Math.max(checkpointFloor(this.currentLevel), this.currentLevel - drop);
+        if (newLevel < this.currentLevel) {
           if (!this.isAutoEnhancing) {
             toast.error(`Enhancement failed! Item downgraded from +${this.currentLevel} to +${newLevel}`);
           }
@@ -1184,37 +923,11 @@ export const EnhancementPage = {
   },
 
   updateStatsDisplay() {
-    // Update just the stats without full re-render
+    // Update just the session numbers without a full re-render
     const levelDropdown = document.getElementById('level-dropdown');
     if (levelDropdown) {
       levelDropdown.options[0].text = `+${this.currentLevel}`;
       levelDropdown.options[0].value = this.currentLevel;
-    }
-
-    const statValues = document.querySelectorAll('.stat-value');
-    if (statValues.length >= 3) {
-      statValues[0].textContent = this.formatNumber(this.attempts);
-      statValues[1].textContent = this.formatNumber(this.successes);
-      statValues[2].textContent = this.formatNumber(this.failures);
-    }
-
-    // Update or inject highest level section
-    if (this.highestLevel >= 7) {
-      let highestSection = document.querySelector('.highest-level-section');
-      if (!highestSection) {
-        const statsDiv = document.querySelector('.stats');
-        if (statsDiv) {
-          highestSection = document.createElement('div');
-          highestSection.className = 'highest-level-section';
-          statsDiv.after(highestSection);
-        }
-      }
-      if (highestSection) {
-        highestSection.innerHTML = `
-          <h3>Highest Level Reached: <span class="highest-value">+${this.highestLevel}</span></h3>
-          ${this.renderMilestones()}
-        `;
-      }
     }
 
     this.updateMaterialsDisplay();
@@ -1223,35 +936,10 @@ export const EnhancementPage = {
   updateRatesTable() {
     const tableContainer = document.querySelector('.rates-table-container');
     if (tableContainer) {
-      tableContainer.innerHTML = this.showMaterialCostTab ? this.renderMaterialCostTab() : this.renderRatesTable();
-
-      if (this.showMaterialCostTab) {
-        // Attach listeners for material price inputs
-        this.updateMaterialPrices();
-      } else {
-        // Re-attach click handlers for rates table rows to set goal
-        document.querySelectorAll('.rates-table tbody tr').forEach(row => {
-          row.addEventListener('click', (e) => {
-            // Prevent changing goal while auto-enhancing
-            if (this.isAutoEnhancing) {
-              return;
-            }
-
-            const level = parseInt(row.dataset.level);
-
-            // Toggle goal: if clicking the same level, remove goal
-            if (this.goalLevel === level) {
-              this.goalLevel = null;
-            } else {
-              this.goalLevel = level;
-            }
-            this.updateRatesTable();
-          });
-        });
-
-        // Set up drag and drop for rates table
-        this.setupDragAndDropTableRows();
-      }
+      tableContainer.innerHTML = this.renderRatesTable();
+      this.bindRateRows();
     }
+    const mode = document.getElementById('enh-rates-mode');
+    if (mode) mode.textContent = this.ratesModeText();
   }
 };
