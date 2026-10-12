@@ -888,31 +888,26 @@ export const PlayersPage = {
           const iconStyle = getClassSpriteStyle(player.role);
           const owner = player.discordId ? this._browseUserMap[player.discordId] : null;
 
+          const age = syncedAge(player.syncedAt);
+          const pills = [this._buildExcludeToggleHtml(player), this._buildWhitelistToggleHtml(player)].join('');
           return `
-            <div class="char-card browse-card ${this._browseFlagClass(player)}" data-player-id="${player.id}">
-              <div class="char-card-header">
-                <div class="char-card-identity">
-                  ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
-                  <div class="char-card-name-block">
-                    <span class="char-card-name ${canEdit ? 'editable' : ''}">
-                      ${canEdit
-                        ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
-                        : player.name}
-                    </span>
-                    <span class="char-card-class">${player.role || ''} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
-                  </div>
+            <div class="char-card cc cc-compact browse-card ${this._browseFlagClass(player)}" data-player-id="${player.id}">
+              <div class="cc-top">
+                ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
+                <div class="cc-id">
+                  <span class="cc-name">${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}</span>` : player.name}</span>
+                  <span class="cc-class">${player.role || ''}${age ? ` <span class="synced-tag${age.stale ? ' stale' : ''}" data-tooltip-fixed="${syncedLabel(player.syncedAt)}">Synced <span class="synced-age">${age.text}</span></span>` : ''}</span>
                 </div>
-                <div class="char-card-badges">
-                  ${this.renderRaidBadgesHTML(player, canToggleRaid)}
-                </div>
+                <span class="cc-gs" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>
               </div>
-              <div class="browse-card-footer">
+              <div class="cc-raids"><div class="char-card-badges">${this.renderRaidBadgesHTML(player, canToggleRaid)}</div></div>
+              <div class="cc-foot">
                 ${owner
-                  ? `<div class="char-card-owner"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="char-card-owner-avatar" onerror="this.src='/icons/avatar.svg'"><span>${owner.displayName}</span></div>`
-                  : `<div class="char-card-owner no-owner">Unassigned</div>`}
-                ${this._browseAcctBadgeHtml(player)}
+                  ? `<span class="cc-owner"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="char-card-owner-avatar" onerror="this.src='/icons/avatar.svg'"><span>${owner.displayName}</span>${this._browseAcctBadgeHtml(player)}</span>`
+                  : `<span class="cc-owner cc-muted">Unassigned</span>`}
+                ${pills ? `<span class="cc-pills">${pills}</span>` : ''}
+                ${canEdit ? `<button type="button" class="btn btn-secondary cc-edit" data-player-id="${player.id}">Edit</button>` : ''}
               </div>
-              ${this._buildAdminPillsRowHtml(player)}
             </div>`;
         }).join('')}
       </div>
@@ -950,7 +945,7 @@ export const PlayersPage = {
             <tr class="${this._browseFlagClass(player)}" data-player-id="${player.id}">
               <td class="player-name ${canEdit ? 'editable' : ''}" data-label="Name">
                 ${canEdit
-                  ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
+                  ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}</span>`
                   : player.name}
                 ${this._buildAdminPillsRowHtml(player)}
               </td>
@@ -1173,20 +1168,20 @@ export const PlayersPage = {
 
     listElement.innerHTML = `
       <div class="roster-view">
-        <div class="roster-summary">
-          <div class="roster-stat ${hideNames ? '' : 'roster-stat-tip'}">
+        <div class="roster-summary roster-tiles">
+          <div class="roster-stat roster-tile ${hideNames ? '' : 'roster-stat-tip'}">
             <span class="roster-stat-value">${totalPlayers}</span>
             <span class="roster-stat-label">Characters</span>
             ${hideNames ? '' : `<div class="roster-tooltip">${totalOwners} player${totalOwners !== 1 ? 's' : ''}</div>`}
           </div>
-          <div class="roster-stat">
+          <div class="roster-stat roster-tile">
             <span class="roster-stat-value" style="color: ${avgTier.color}" data-tooltip="Gearscore">${avgGearscore}</span>
             <span class="roster-stat-label">Avg Gearscore</span>
           </div>
-        </div>
-        <div class="roster-gs-slider">
-          <label>Min Gearscore: <span id="gs-slider-value" style="color: ${getGearscoreTier(minGs).color}">${minGs}</span></label>
-          <input type="range" id="gs-slider" min="0" max="100" value="${minGs}" />
+          <div class="roster-gs-slider roster-tile">
+            <label>Min Gearscore <span id="gs-slider-value" style="color: ${getGearscoreTier(minGs).color}">${minGs}</span></label>
+            <input type="range" id="gs-slider" min="0" max="100" value="${minGs}" />
+          </div>
         </div>
         <div class="roster-content">
           <div class="roster-chart-container">
@@ -1201,6 +1196,7 @@ export const PlayersPage = {
           </div>
           <div class="roster-breakdown">
             <h3>Class Breakdown</h3>
+            <div class="rc-head"><span>Specialization</span><span>Players</span><span>Avg GS</span></div>
             ${Object.entries(CLASS_FAMILIES).map(([key, family]) => {
               const count = familyCounts[key];
               const classes = familyPlayers[key];
@@ -1213,14 +1209,14 @@ export const PlayersPage = {
                     <span class="roster-family-count">${count}</span>
                   </div>
                   ${Object.keys(classes).length > 0 ? `
-                    <div class="roster-class-list">
+                    <div class="roster-class-list rc-table">
                       ${Object.entries(classes).map(([cls, cnt]) => {
                         const clsPlayers = familyPlayersList[key][cls] || [];
                         const clsAvgGs = clsPlayers.length > 0
                           ? Math.round(clsPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / clsPlayers.length)
                           : 0;
                         const clsTier = getGearscoreTier(clsAvgGs);
-                        return `<span class="roster-class-item">${cls} <span class="roster-class-count">×${cnt}</span> <span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};" data-tooltip="Gearscore">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></span>`;
+                        return `<div class="roster-class-item roster-class-row"><span class="rc-name">${cls}</span><span class="rc-count">${cnt}</span><span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></div>`;
                       }).join('')}
                     </div>
                   ` : ''}
