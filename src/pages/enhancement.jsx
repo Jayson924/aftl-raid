@@ -1,5 +1,6 @@
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
+import ENHANCE from '../data/enhance-tables.js';
 
 // Import images
 import berlinImg from '../images/berlin.webp';
@@ -12,61 +13,32 @@ import colosseumImg from '../images/colosseum.png';
 import crosshairIcon from '../icons/crosshair.svg';
 import progressbarIcon from '../icons/progressbar.svg';
 
-// Materials cost for enhancements (gold values include silver and copper converted to decimal)
-const MATERIALS_COST = {
-  0: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 3.464 },
-  1: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 4.33 },
-  2: { essenceOfLife: 1, diamond: 0, protectionJelly: 0, gold: 5.196 },
-  3: { essenceOfLife: 2, diamond: 0, protectionJelly: 0, gold: 6.62 },
-  4: { essenceOfLife: 2, diamond: 0, protectionJelly: 0, gold: 6.928 },
-  5: { essenceOfLife: 2, diamond: 0, protectionJelly: 0, gold: 7.794 },
-  6: { essenceOfLife: 3, diamond: 1, protectionJelly: 12, gold: 8.66 },
-  7: { essenceOfLife: 3, diamond: 1, protectionJelly: 12, gold: 9.526 },
-  8: { essenceOfLife: 3, diamond: 1, protectionJelly: 12, gold: 10.392 },
-  9: { essenceOfLife: 4, diamond: 2, protectionJelly: 18, gold: 17.32 },
-  10: { essenceOfLife: 4, diamond: 2, protectionJelly: 18, gold: 27.712 },
-  11: { essenceOfLife: 4, diamond: 2, protectionJelly: 18, gold: 41.568 },
-  12: { essenceOfLife: 5, diamond: 3, protectionJelly: 18, gold: 69.28 },
-  13: { essenceOfLife: 5, diamond: 3, protectionJelly: 18, gold: 103.92 }
-};
+// Rates, gold and materials per gear slot come from the game client (tools/pak/build_enhance_tables.py).
+const DEFAULT_GEAR = '70:mainWeapon';
 
-// Enhancement rates data from the game
-const ENHANCEMENT_RATES = {
-  noProtection: [
-    { level: 1, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 2, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 3, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 4, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 5, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 6, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 7, success: 45, failure: 55, destruction: 25, downgrade: 0, disappear: 75, downgradeLevel: 0 },
-    { level: 8, success: 40, failure: 60, destruction: 25, downgrade: 37.5, disappear: 37.5, downgradeLevel: 1 },
-    { level: 9, success: 35, failure: 65, destruction: 25, downgrade: 37.5, disappear: 37.5, downgradeLevel: 2 },
-    { level: 10, success: 30, failure: 70, destruction: 25, downgrade: 0, disappear: 75, downgradeLevel: 0 },
-    { level: 11, success: 25, failure: 75, destruction: 25, downgrade: 75, disappear: 0, downgradeLevel: 1 },
-    { level: 12, success: 20, failure: 80, destruction: 25, downgrade: 75, disappear: 0, downgradeLevel: 2 },
-    { level: 13, success: 15, failure: 85, destruction: 25, downgrade: 75, disappear: 0, downgradeLevel: 2 },
-    { level: 14, success: 5, failure: 95, destruction: 25, downgrade: 75, disappear: 0, downgradeLevel: 2 },
-    { level: 15, success: 1, failure: 99, destruction: 25, downgrade: 75, disappear: 0, downgradeLevel: 2 }
-  ],
-  withProtection: [
-    { level: 1, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 2, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 3, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 4, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 5, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 6, success: 100, failure: 0, destruction: 0, downgrade: 0, disappear: 0, downgradeLevel: 0 },
-    { level: 7, success: 45, failure: 55, destruction: 0, downgrade: 0, disappear: 100, downgradeLevel: 0 },
-    { level: 8, success: 40, failure: 60, destruction: 0, downgrade: 50, disappear: 50, downgradeLevel: 1 },
-    { level: 9, success: 35, failure: 65, destruction: 0, downgrade: 50, disappear: 50, downgradeLevel: 2 },
-    { level: 10, success: 30, failure: 70, destruction: 0, downgrade: 0, disappear: 100, downgradeLevel: 0 },
-    { level: 11, success: 25, failure: 75, destruction: 0, downgrade: 100, disappear: 0, downgradeLevel: 1 },
-    { level: 12, success: 20, failure: 80, destruction: 0, downgrade: 100, disappear: 0, downgradeLevel: 2 },
-    { level: 13, success: 15, failure: 85, destruction: 0, downgrade: 100, disappear: 0, downgradeLevel: 2 },
-    { level: 14, success: 5, failure: 95, destruction: 0, downgrade: 100, disappear: 0, downgradeLevel: 2 },
-    { level: 15, success: 1, failure: 99, destruction: 0, downgrade: 100, disappear: 0, downgradeLevel: 2 }
-  ]
-};
+function gearCurve(key) {
+  return ENHANCE.curves[(ENHANCE.slots[key] || ENHANCE.slots[DEFAULT_GEAR]).curve];
+}
+
+// A failure breaks the item (break % of failures, unless protected) or drops it a random
+// minDown..maxDown levels; a drop of 0 keeps the level.
+function gearRates(key, protect) {
+  return gearCurve(key).map((step, i) => {
+    const failure = 100 - step.success;
+    const destruction = protect ? 0 : failure * step.break / 100;
+    const keepShare = step.minDown === 0 ? 1 / (step.maxDown - step.minDown + 1) : 0;
+    return {
+      level: i + 1,
+      success: step.success,
+      failure,
+      destruction,
+      downgrade: (failure - destruction) * (1 - keepShare),
+      disappear: (failure - destruction) * keepShare,
+      minDown: step.minDown,
+      maxDown: step.maxDown
+    };
+  });
+}
 
 // Available backgrounds
 const BACKGROUNDS = [
@@ -101,6 +73,7 @@ export const EnhancementPage = {
   },
   materialsPerLevel: {}, // Track materials used per level { 0: { essenceOfLife: 0, diamond: 0, protectionJelly: 0, gold: 0 }, ... }
   selectedBackground: 0, // Index of selected background
+  selectedGear: DEFAULT_GEAR, // enhance-tables slot key, level:slot
   goalLevel: null, // Target enhancement level
   essenceOfLifePrice: 0, // Gold price per Essence of Life
   polishedDiamondPrice: 0, // Gold price per Polished Diamond
@@ -111,6 +84,11 @@ export const EnhancementPage = {
     protectionJelly: false
   },
   showMaterialCostTab: false, // Whether Material Cost tab is active
+
+  // Lv50/60 gear takes Polished Diamonds, Lv70 takes Flawless.
+  diamondName() {
+    return ENHANCE.diamonds[this.selectedGear.split(':')[0]] || 'Diamond';
+  },
 
   formatNumber(num) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -234,6 +212,18 @@ export const EnhancementPage = {
               <img src="${berlinImg}" alt="Blacksmith" class="blacksmith-image" onerror="this.style.display='none'">
               <div class="enhancement-display">
                 <div class="current-level">
+                  <span class="level-label">Gear:</span>
+                  <select id="gear-select" class="level-dropdown">
+                    ${[...ENHANCE.meta.levels].reverse().map(lv => `
+                      <optgroup label="Level ${lv}">
+                        ${Object.entries(ENHANCE.slots).filter(([key]) => key.startsWith(`${lv}:`)).map(([key, slot]) => `
+                          <option value="${key}" ${key === this.selectedGear ? 'selected' : ''}>${slot.label}</option>
+                        `).join('')}
+                      </optgroup>
+                    `).join('')}
+                  </select>
+                </div>
+                <div class="current-level">
                   <span class="level-label">Current Level:</span>
                   <select id="level-dropdown" class="level-dropdown">
                     <option value="${this.currentLevel}" selected>+${this.currentLevel}</option>
@@ -317,7 +307,7 @@ export const EnhancementPage = {
                       </div>
                       <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
                         <span class="material-count">${this.formatNumber(this.materialsUsed.diamond)}</span>
-                        <span class="material-name">Polished Diamond</span>
+                        <span class="material-name">${this.diamondName()}</span>
                         ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
                           <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
                         ` : ''}
@@ -411,7 +401,7 @@ export const EnhancementPage = {
                       ? ` (${this.formatGold(materials.essenceOfLife * this.essenceOfLifePrice)})`
                       : ''
                   }</div>
-                  ${materials.diamond > 0 ? `<div class="tooltip-item">Polished Diamond: ${materials.diamond}${
+                  ${materials.diamond > 0 ? `<div class="tooltip-item">${this.diamondName()}: ${materials.diamond}${
                     this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0
                       ? ` (${this.formatGold(materials.diamond * this.polishedDiamondPrice)})`
                       : ''
@@ -442,11 +432,12 @@ export const EnhancementPage = {
   },
 
   renderRatesTable() {
-    const baseRates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
+    const baseRates = gearRates(this.selectedGear, this.useProtection);
 
     const formatRate = (value) => {
-      if (value <= 0) return '-';
-      return Number.isInteger(value) ? value + '%' : value.toFixed(1) + '%';
+      const v = Math.round(value * 10) / 10;
+      if (v <= 0) return '-';
+      return Number.isInteger(v) ? v + '%' : v.toFixed(1) + '%';
     };
 
     return `
@@ -464,6 +455,8 @@ export const EnhancementPage = {
         <tbody>
           ${baseRates.map(baseRate => {
             const rate = this.getEffectiveRate(baseRate);
+            // Break, drop and keep columns read as shares of a failure, as in-game.
+            const ofFailure = (v) => rate.failure > 0 ? v / rate.failure * 100 : 0;
             const isCurrent = this.currentLevel === rate.level - 1;
             const isGoal = this.goalLevel === rate.level;
             const classes = [];
@@ -482,9 +475,9 @@ export const EnhancementPage = {
                 </td>
                 <td class="success-rate">${formatRate(rate.success)}</td>
                 <td class="failure-rate">${formatRate(rate.failure)}</td>
-                <td class="destruction-rate">${formatRate(rate.destruction)}</td>
-                <td class="downgrade-rate">${formatRate(rate.downgrade)}</td>
-                <td class="disappear-rate">${formatRate(rate.disappear)}</td>
+                <td class="destruction-rate">${formatRate(ofFailure(rate.destruction))}</td>
+                <td class="downgrade-rate">${formatRate(ofFailure(rate.downgrade))}</td>
+                <td class="disappear-rate">${formatRate(ofFailure(rate.disappear))}</td>
               </tr>
             `;
           }).join('')}
@@ -510,7 +503,7 @@ export const EnhancementPage = {
             >
           </div>
           <div class="form-group">
-            <label for="diamond-price">Polished Diamond:</label>
+            <label for="diamond-price">${this.diamondName()}:</label>
             <input
               type="number"
               id="diamond-price"
@@ -578,6 +571,12 @@ export const EnhancementPage = {
         // Reset dropdown to "Choose..." after selection
         e.target.value = '';
       }
+    });
+
+    // Costs differ per slot, so a new gear choice starts a fresh session.
+    document.getElementById('gear-select').addEventListener('change', (e) => {
+      this.selectedGear = e.target.value;
+      this.reset();
     });
 
     document.getElementById('background-select').addEventListener('change', (e) => {
@@ -851,7 +850,7 @@ export const EnhancementPage = {
           </div>
           <div class="material-item clickable ${this.showMaterialCosts.diamond ? 'show-cost' : ''}" data-material="diamond">
             <span class="material-count">${this.materialsUsed.diamond}</span>
-            <span class="material-name">Polished Diamond</span>
+            <span class="material-name">${this.diamondName()}</span>
             ${this.showMaterialCosts.diamond && this.polishedDiamondPrice > 0 ? `
               <span class="material-cost">${this.formatGold(this.materialsUsed.diamond * this.polishedDiamondPrice)}</span>
             ` : ''}
@@ -941,8 +940,7 @@ export const EnhancementPage = {
       }
     }
 
-    const rates = this.useProtection ? ENHANCEMENT_RATES.withProtection : ENHANCEMENT_RATES.noProtection;
-    const currentRates = this.getEffectiveRate(rates[this.currentLevel]);
+    const currentRates = this.getEffectiveRate(gearRates(this.selectedGear, this.useProtection)[this.currentLevel]);
 
     // Store current level before incrementing attempts
     const levelBeforeAttempt = this.currentLevel;
@@ -956,8 +954,15 @@ export const EnhancementPage = {
     this.totalLevelAttempts[levelBeforeAttempt]++;
 
     // Track materials used for all levels
-    if (MATERIALS_COST[levelBeforeAttempt]) {
-      const cost = MATERIALS_COST[levelBeforeAttempt];
+    const step = gearCurve(this.selectedGear)[levelBeforeAttempt];
+    if (step) {
+      // Jellies are only spent when protection is on.
+      const cost = {
+        essenceOfLife: step.essence,
+        diamond: step.diamond,
+        protectionJelly: this.useProtection ? step.jelly : 0,
+        gold: step.copper / 10000
+      };
       const goldCost = this.useGoldenGoose ? cost.gold * 0.5 : cost.gold;
 
       // Track total materials
@@ -1025,21 +1030,20 @@ export const EnhancementPage = {
       const failureRates = currentRates.failure;
 
       const destructionChance = (currentRates.destruction / failureRates) * 100;
-      const downgradeChance = destructionChance + (currentRates.downgrade / failureRates) * 100;
-
       if (failureRoll < destructionChance) {
         this.currentLevel = 0;
         if (!this.isAutoEnhancing) {
           toast.error('Enhancement failed! Item destroyed!');
         }
-      } else if (failureRoll < downgradeChance) {
-        const newLevel = Math.max(0, this.currentLevel - currentRates.downgradeLevel);
-        if (!this.isAutoEnhancing) {
-          toast.error(`Enhancement failed! Item downgraded from +${this.currentLevel} to +${newLevel}`);
-        }
-        this.currentLevel = newLevel;
       } else {
-        if (!this.isAutoEnhancing) {
+        const drop = currentRates.minDown + Math.floor(Math.random() * (currentRates.maxDown - currentRates.minDown + 1));
+        if (drop > 0) {
+          const newLevel = Math.max(0, this.currentLevel - drop);
+          if (!this.isAutoEnhancing) {
+            toast.error(`Enhancement failed! Item downgraded from +${this.currentLevel} to +${newLevel}`);
+          }
+          this.currentLevel = newLevel;
+        } else if (!this.isAutoEnhancing) {
           toast.info('Enhancement failed! Materials disappeared (no change)');
         }
       }
