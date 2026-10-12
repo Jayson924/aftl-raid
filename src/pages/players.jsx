@@ -1,13 +1,24 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle, CARDS_PER_PAGE, DEFAULT_CARD_PAGES } from '../constants.js';
 import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import simOptions from '../data/sim/options.json' with { type: 'json' };
 import { NONE } from '../sim/remote.js';
 import { emptyEngravings, engravingMainOptions, setEngravingRank } from '../sim/engravings.js';
 import { renderPagination, bindPagination } from '../pagination.js';
+import { initFixedTooltip } from '../fixed-tooltip.js';
+import itemIcons from '../data/sim-icons.json' with { type: 'json' };
+
+// Gear slots on the character card: site key, simulator slot, short label.
+const CARD_ARMOR = [['helmet', 'Helmet', 'Helm'], ['top', 'Upper', 'Top'], ['bottom', 'Lower', 'Bottom'], ['gloves', 'Gloves', 'Gloves'], ['boots', 'Shoes', 'Boots']];
+const CARD_WEAPONS = [['mainWeapon', 'Main weapon', 'Main'], ['subWeapon', 'Secondary weapon', 'Sub']];
+const CARD_JEWELRY = [['necklace', 'Necklace', 'Neck'], ['earring', 'Earring', 'Ear'], ['ring1', 'Ring 1', 'Ring'], ['ring2', 'Ring 2', 'Ring']];
+// Site class names that the simulator tables spell differently.
+const SIM_JOB_NAMES = { 'Moon Lord': 'Moonlord' };
+const ICON_SPRITE = '/sim/item-icons.webp';
+const ICON_PX = 44;
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
 const CARD_RARITIES_PLAYERS = EQUIPMENT_RARITIES.filter(r => r.value);
@@ -105,6 +116,11 @@ export const PlayersPage = {
   // CHARACTER CARD: STATS / CARDS VIEW TOGGLE
   // ============================================
 
+  // Guild members and above see card collections.
+  _canSeeCards() {
+    return dataService.isPlayer();
+  },
+
   _charViewFor(player) {
     return this._charCardView[player.id] || 'stats';
   },
@@ -118,6 +134,7 @@ export const PlayersPage = {
   _buildCharCardToggleHtml(player) {
     // Only whitelisted, non-excluded characters can show a card collection,
     // and only if they actually have at least one card recorded.
+    if (!this._canSeeCards()) return '';
     if (!dataService.isPlayerWhitelisted(player)) return '';
     if (!this._playerHasCards(player.id)) return '';
     const view = this._charViewFor(player);
@@ -161,6 +178,13 @@ export const PlayersPage = {
         <div class="char-card-mini-pagination">${renderPagination(page, pageCount)}</div>
       </div>
     `;
+  },
+
+  _ccBodyHtml(player) {
+    if (this._charViewFor(player) === 'cards' && this._canSeeCards() && dataService.isPlayerWhitelisted(player)) {
+      return this._buildCharCardCollectionHtml(player);
+    }
+    return `${this._cardSlotsHtml(player)}${this._cardStatsHtml(player)}`;
   },
 
   _buildCharCardBodyHtml(player, detailHtml) {
@@ -229,6 +253,12 @@ export const PlayersPage = {
       card.querySelectorAll('[data-action="char-view"]').forEach(b => {
         b.classList.toggle('active', b.dataset.view === this._charViewFor(player));
       });
+      const ccBody = card.querySelector('.cc-body');
+      if (ccBody) {
+        ccBody.innerHTML = this._ccBodyHtml(player);
+        this._bindCharCardCollectionPagination(card, playerId);
+        return;
+      }
       const body = card.querySelector('.char-card-body');
       if (body) {
         const detailHtml = this._buildEquipDetailHtml(player);
@@ -261,6 +291,7 @@ export const PlayersPage = {
   },
 
   async render(container) {
+    initFixedTooltip();
     const canViewFull = dataService.isPlayer();
 
     // Guests can only see roster view
@@ -271,17 +302,13 @@ export const PlayersPage = {
     container.innerHTML = `
       <div class="players-page">
         <div class="page-header">
-          <div class="page-title-tabs">
-            ${canViewFull ? `
-              <h1 class="view-tab ${this._viewMode === 'characters' ? 'active' : ''}" data-view="characters">Characters</h1>
-              <span class="title-divider">/</span>
-              <h1 class="view-tab ${this._viewMode === 'browse' ? 'active' : ''}" data-view="browse">Browse</h1>
-              <span class="title-divider">/</span>
-              <h1 class="view-tab ${this._viewMode === 'roster' ? 'active' : ''}" data-view="roster">Roster</h1>
-            ` : `
-              <h1 class="view-tab active">Roster</h1>
-            `}
-          </div>
+          <h1 class="players-title">Characters</h1>
+          ${canViewFull ? `
+            <nav class="players-tabs">
+              ${[['characters', 'Characters'], ['browse', 'Browse'], ['roster', 'Roster']].map(([view, label]) =>
+                `<button type="button" class="view-tab ${this._viewMode === view ? 'active' : ''}" data-view="${view}">${label}</button>`).join('')}
+            </nav>
+          ` : ''}
           ${canViewFull ? `
             <div class="page-header-actions">
               <!-- Flat view disabled for now - grouped view is the only option
@@ -417,6 +444,39 @@ export const PlayersPage = {
     return this._allPlayers.filter(p => spec.classes.includes(p.role)).length;
   },
 
+  // Class filter and search for Characters and Browse; Browse adds sort and grid/table.
+  renderToolbar(browse) {
+    const browseControls = browse ? `
+      <div class="browse-controls-right">
+        <label class="browse-sort-label">Sort
+          <select id="browse-sort" class="browse-sort-select">
+            ${[['owner', 'Owner'], ['gs', 'Gearscore'], ['name', 'Name'], ['class', 'Class']].map(([v, l]) => `<option value="${v}" ${this._browseSort === v ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </label>
+        <div class="browse-display-toggle">
+          <button type="button" data-display="grid" class="${this._browseDisplay === 'grid' ? 'active' : ''}" data-tooltip="Grid view">▦</button>
+          <button type="button" data-display="table" class="${this._browseDisplay === 'table' ? 'active' : ''}" data-tooltip="Table view">▤</button>
+        </div>
+      </div>` : '';
+    // The class icon filter (with its specialization row) sits above the search row.
+    return `
+      ${this.renderClassFamilyFilter()}
+      <div class="players-toolbar">
+        <input type="text" id="browse-search" class="browse-search players-search" placeholder="Search name, owner, or class…" autocomplete="off">
+        ${browseControls}
+      </div>`;
+  },
+
+  // Characters matching the search box (name, owner or class).
+  _searchFilter(players, userMap) {
+    const q = (this._browseSearch || '').trim().toLowerCase();
+    if (!q) return players;
+    return players.filter((p) => {
+      const ownerName = (p.discordId ? userMap?.[p.discordId]?.displayName : '') || '';
+      return (p.name || '').toLowerCase().includes(q) || ownerName.toLowerCase().includes(q) || (p.role || '').toLowerCase().includes(q);
+    });
+  },
+
   // Render class family filter HTML
   renderClassFamilyFilter() {
     const totalCount = this._allPlayers?.length || 0;
@@ -476,7 +536,12 @@ export const PlayersPage = {
       btn.addEventListener('click', () => {
         const family = btn.dataset.family;
 
-        if (this._expandedClassFamily === family) {
+        if (!family) {
+          // The All chip clears the class filter.
+          this._expandedClassFamily = null;
+          this._selectedClassFamily = null;
+          this._selectedSpecialization = null;
+        } else if (this._expandedClassFamily === family) {
           // Clicking expanded family again - collapse and clear
           this._expandedClassFamily = null;
           this._selectedClassFamily = null;
@@ -631,14 +696,6 @@ export const PlayersPage = {
       //   this.renderFlatView(listElement, players, userMap, hasAnyEditableCharacters);
       // }
 
-      // Add event listeners for clickable player names
-      document.querySelectorAll('.player-name-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-          const playerId = link.dataset.playerId;
-          this.showEditPlayerModal(players.find(p => p.id === playerId));
-        });
-      });
-
       // Add event listeners for raid priority filter (multi-select)
       document.querySelectorAll('.raid-priority-filter .filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -646,76 +703,6 @@ export const PlayersPage = {
           if (!filter) return;
           this._raidPriorityFilter[filter] = !this._raidPriorityFilter[filter];
           this.loadPlayers();
-        });
-      });
-
-      // Admin inline exclude toggles
-      document.querySelectorAll('.exclude-pill[data-action="toggle-exclude"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const playerId = btn.dataset.playerId;
-          const newExclude = btn.dataset.exclude !== 'true';
-          try {
-            btn.disabled = true;
-            await dataService.togglePlayerExclude(playerId, newExclude);
-            const player = players.find(p => p.id === playerId);
-            if (player) player.exclude = newExclude;
-            btn.dataset.exclude = String(newExclude);
-            btn.classList.toggle('is-on', newExclude);
-            btn.textContent = newExclude ? 'Excluded' : 'Exclude';
-            btn.setAttribute('data-tooltip', newExclude ? 'Click to include' : 'Click to exclude from recruiting');
-            toast.success(newExclude ? `${player?.name || 'Character'} excluded` : `${player?.name || 'Character'} included`);
-          } catch (err) {
-            toast.error(`Failed: ${err.message}`);
-          } finally {
-            btn.disabled = false;
-          }
-        });
-      });
-
-      // Admin inline whitelist toggles
-      document.querySelectorAll('.whitelist-pill[data-action="toggle-whitelist"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const playerId = btn.dataset.playerId;
-          const newWhitelisted = btn.dataset.whitelisted !== 'true';
-          try {
-            btn.disabled = true;
-            await dataService.togglePlayerWhitelist(playerId, newWhitelisted);
-            const player = players.find(p => p.id === playerId);
-            if (player) player.whitelisted = newWhitelisted;
-            btn.dataset.whitelisted = String(newWhitelisted);
-            btn.classList.toggle('is-on', newWhitelisted);
-            btn.textContent = newWhitelisted ? 'In Guild' : 'Not Whitelisted';
-            btn.setAttribute('data-tooltip', newWhitelisted ? 'Click to remove guild access' : 'Click to whitelist (grant guild access)');
-            toast.success(newWhitelisted ? `${player?.name || 'Character'} whitelisted` : `${player?.name || 'Character'} removed from whitelist`);
-          } catch (err) {
-            toast.error(`Failed: ${err.message}`);
-          } finally {
-            btn.disabled = false;
-          }
-        });
-      });
-
-      // Add event listeners for raid badge toggles
-      document.querySelectorAll('.raid-badge.clickable').forEach(badge => {
-        badge.addEventListener('click', async (e) => {
-          const playerId = badge.dataset.playerId;
-          const raidType = badge.dataset.raidType;
-          const isCurrentlyCompleted = badge.dataset.completed === 'true';
-
-          // Toggle to opposite state
-          const newCompleted = !isCurrentlyCompleted;
-
-          try {
-            badge.style.opacity = '0.5';
-            await dataService.togglePlayerRaidCompletion(playerId, raidType, newCompleted);
-            toast.success(`${raidType} ${newCompleted ? 'marked as done' : 'marked as not done'}`);
-            this.loadPlayers(); // Refresh the list
-          } catch (error) {
-            toast.error(`Failed to update: ${error.message}`);
-            badge.style.opacity = '';
-          }
         });
       });
 
@@ -737,9 +724,6 @@ export const PlayersPage = {
           row.classList.toggle('expanded', isOpen);
         });
       });
-
-      // Add event listeners for class family filter
-      this.attachClassFilterListeners();
 
       // Add click listeners for sortable column headers
       document.querySelectorAll('.sortable-header').forEach(header => {
@@ -773,26 +757,7 @@ export const PlayersPage = {
     Object.entries(acctSets).forEach(([id, set]) => { this._browseAccountSizes[id] = set.size; });
 
     listElement.innerHTML = `
-      ${this.renderClassFamilyFilter()}
-      <div class="browse-controls">
-        <div class="browse-search-wrap">
-          <input type="text" id="browse-search" class="browse-search" placeholder="Search name, owner, or class…" autocomplete="off">
-        </div>
-        <div class="browse-controls-right">
-          <label class="browse-sort-label">Sort
-            <select id="browse-sort" class="browse-sort-select">
-              <option value="owner" ${this._browseSort === 'owner' ? 'selected' : ''}>Owner</option>
-              <option value="gs" ${this._browseSort === 'gs' ? 'selected' : ''}>Gearscore</option>
-              <option value="name" ${this._browseSort === 'name' ? 'selected' : ''}>Name</option>
-              <option value="class" ${this._browseSort === 'class' ? 'selected' : ''}>Class</option>
-            </select>
-          </label>
-          <div class="browse-display-toggle">
-            <button type="button" data-display="grid" class="${this._browseDisplay === 'grid' ? 'active' : ''}" title="Grid view">▦</button>
-            <button type="button" data-display="table" class="${this._browseDisplay === 'table' ? 'active' : ''}" title="Table view">▤</button>
-          </div>
-        </div>
-      </div>
+      ${this.renderToolbar(true)}
       <div id="browse-results" class="browse-results"></div>
     `;
 
@@ -836,16 +801,7 @@ export const PlayersPage = {
   _browseFilterSort(players) {
     let list = this.filterPlayersByClass(players);
 
-    const q = this._browseSearch.trim().toLowerCase();
-    if (q) {
-      list = list.filter(p => {
-        const owner = p.discordId ? this._browseUserMap[p.discordId] : null;
-        const ownerName = owner?.displayName || '';
-        return (p.name || '').toLowerCase().includes(q)
-          || ownerName.toLowerCase().includes(q)
-          || (p.role || '').toLowerCase().includes(q);
-      });
-    }
+    list = this._searchFilter(list, this._browseUserMap);
 
     return this._sortBrowsePlayers(list);
   },
@@ -1010,7 +966,7 @@ export const PlayersPage = {
 
   _attachBrowseResultListeners(rootEl) {
     // Edit on name click
-    rootEl.querySelectorAll('.player-name-link').forEach(link => {
+    rootEl.querySelectorAll('.player-name-link, .cc-edit').forEach(link => {
       link.addEventListener('click', (e) => {
         e.stopPropagation();
         const playerId = link.dataset.playerId;
@@ -1539,66 +1495,53 @@ export const PlayersPage = {
   },
 
   renderGroupedView(listElement, players, userMap, hasAnyEditableCharacters) {
-    // Filter by class first
-    const filteredPlayers = this.filterPlayersByClass(players);
-
-    // Group filtered players by owner
-    const groupedByOwner = {};
-    const unassigned = [];
-
-    filteredPlayers.forEach(player => {
-      if (player.discordId) {
-        if (!groupedByOwner[player.discordId]) {
-          groupedByOwner[player.discordId] = [];
-        }
-        groupedByOwner[player.discordId].push(player);
-      } else {
-        unassigned.push(player);
-      }
+    this._groupArgs = { players, userMap, hasAnyEditableCharacters };
+    listElement.innerHTML = `${this.renderToolbar(false)}<div id="owner-groups-wrap"></div>`;
+    const search = document.getElementById('browse-search');
+    search.value = this._browseSearch || '';
+    search.addEventListener('input', () => {
+      this._browseSearch = search.value;
+      this._renderOwnerGroups();
     });
-
-    // Sort owners by display name
-    const sortedOwnerIds = Object.keys(groupedByOwner).sort((a, b) => {
-      const ownerA = userMap[a]?.displayName || '';
-      const ownerB = userMap[b]?.displayName || '';
-      return ownerA.localeCompare(ownerB);
-    });
-
-    // Build grouped HTML with filters at top
-    let html = `
-      ${this.renderClassFamilyFilter()}
-      <div class="owner-groups">`;
-
-    // Render each owner group
-    sortedOwnerIds.forEach(ownerId => {
-      const owner = userMap[ownerId];
-      const ownerPlayers = groupedByOwner[ownerId];
-      const isCollapsed = !this._expandedOwners.has(ownerId);
-
-      html += this.renderOwnerGroup(owner, ownerPlayers, ownerId, isCollapsed, hasAnyEditableCharacters, userMap);
-    });
-
-    // Render unassigned group
-    if (unassigned.length > 0) {
-      const isCollapsed = !this._expandedOwners.has('unassigned');
-      html += this.renderOwnerGroup(null, unassigned, 'unassigned', isCollapsed, hasAnyEditableCharacters, userMap);
+    this.attachClassFilterListeners();
+    this._renderOwnerGroups();
+    if (this._canSeeCards() && !this._cardCollection.loaded) {
+      this._ensureCardCollectionLoaded().then(() => this._renderOwnerGroups());
     }
+  },
 
-    html += '</div>'; // Close owner-groups
-    listElement.innerHTML = html;
+  // Owner groups only, so the search box keeps focus while typing.
+  _renderOwnerGroups() {
+    const wrap = document.getElementById('owner-groups-wrap');
+    if (!wrap || !this._groupArgs) return;
+    const { players, userMap, hasAnyEditableCharacters } = this._groupArgs;
+    const searching = !!(this._browseSearch || '').trim();
+    const filtered = this._searchFilter(this.filterPlayersByClass(players), userMap);
 
-    // Add event listeners for collapse toggles
-    document.querySelectorAll('.owner-group-header').forEach(header => {
-      header.addEventListener('click', (e) => {
+    const byOwner = {};
+    const unassigned = [];
+    for (const player of filtered) {
+      if (player.discordId) (byOwner[player.discordId] = byOwner[player.discordId] || []).push(player);
+      else unassigned.push(player);
+    }
+    const ownerIds = Object.keys(byOwner).sort((a, b) => (userMap[a]?.displayName || '').localeCompare(userMap[b]?.displayName || ''));
+    // A search opens every owner with a match.
+    const collapsed = (id) => !searching && !this._expandedOwners.has(id);
+    let html = ownerIds.map((id) => this.renderOwnerGroup(userMap[id], byOwner[id], id, collapsed(id), hasAnyEditableCharacters, userMap)).join('');
+    if (unassigned.length) html += this.renderOwnerGroup(null, unassigned, 'unassigned', collapsed('unassigned'), hasAnyEditableCharacters, userMap);
+    wrap.innerHTML = `<div class="owner-groups">${html || '<p class="players-empty">No characters match.</p>'}</div>`;
+
+    wrap.querySelectorAll('.owner-group-header').forEach((header) => {
+      header.addEventListener('click', () => {
         const ownerId = header.dataset.ownerId;
-        if (this._expandedOwners.has(ownerId)) {
-          this._expandedOwners.delete(ownerId);
-        } else {
-          this._expandedOwners.add(ownerId);
-        }
-        this.loadPlayers();
+        if (this._expandedOwners.has(ownerId)) this._expandedOwners.delete(ownerId);
+        else this._expandedOwners.add(ownerId);
+        this._renderOwnerGroups();
       });
     });
+    this._attachBrowseResultListeners(wrap);
+    this._bindCharCardToggles(wrap);
+    wrap.querySelectorAll('.cc .char-card-collection').forEach((el) => this._bindCharCardCollectionPagination(el.closest('.cc'), el.dataset.playerId));
   },
 
   renderOwnerGroup(owner, players, ownerId, isCollapsed, hasAnyEditableCharacters, userMap) {
@@ -1625,7 +1568,8 @@ export const PlayersPage = {
           <span class="collapse-icon">${isCollapsed ? '>' : 'v'}</span>
           ${ownerAvatar}
           <span class="owner-group-name">${ownerName}</span>
-          <span class="owner-group-count">(${players.length} character${players.length !== 1 ? 's' : ''})</span>
+          <span class="owner-group-count">${players.length} character${players.length !== 1 ? 's' : ''}</span>
+          <span class="owner-group-best">Best GS ${Math.max(0, ...players.map((p) => calculateGearscore(p)))}</span>
         </div>
     `;
 
@@ -1842,6 +1786,70 @@ export const PlayersPage = {
     `;
   },
 
+  // Gear as the simulator's framed slots: armor on one row, weapons and jewelry on the next.
+  // Synced characters show their real items; typed ones show an icon only when one item fits.
+  _cardSlotsHtml(player) {
+    const equip = player.equipment || {};
+    const job = player.build?.second_job || SIM_JOB_NAMES[player.role] || player.role;
+    const chain = simOptions.job_map[job];
+    const jobs = [job, chain?.first_job, chain?.base_class].filter(Boolean);
+    const lvOf = (p) => (['70', '60', '40'].includes(String(p.level)) ? String(p.level) : '50');
+    const gearLevel = (name) => jobs.map((j) => simOptions.gear[j]?.[name]?.level).find(Boolean);
+    const jewelKind = (slot) => (slot.startsWith('Ring') ? 'Ring' : slot);
+
+    const itemName = (simSlot, piece, jewel) => {
+      const synced = (jewel ? player.build?.jewelry : player.build?.equipment)?.find((x) => x.slot === simSlot)?.name;
+      if (synced && synced !== NONE) return synced;
+      const rarity = EQUIPMENT_RARITIES.find((r) => r.value === piece.rarity)?.label;
+      const want = `Lv${lvOf(piece)} ${rarity}`;
+      const fits = jewel
+        ? (simOptions.lists.jewelry[jewelKind(simSlot)] || []).filter((n) => simOptions.accessories[jewelKind(simSlot)]?.[n]?.level === want)
+        : (simOptions.lists.equipment[job]?.[simSlot] || []).filter((n) => gearLevel(n) === want);
+      return fits.length === 1 ? fits[0] : '';
+    };
+    const iconCell = (name, jewel) => (jewel ? itemIcons.items.Jewelry?.[name] : jobs.map((j) => itemIcons.items[j]?.[name]).find((c) => c !== undefined));
+    const sprite = (cell) => {
+      const { cols } = itemIcons;
+      return `<i class="sim-icon" style="background-image:url(${ICON_SPRITE});background-size:${cols * ICON_PX}px auto;background-position:-${(cell % cols) * ICON_PX}px -${Math.floor(cell / cols) * ICON_PX}px"></i>`;
+    };
+
+    const tile = ([key, simSlot, short], jewel = false) => {
+      const piece = equip[key];
+      if (!piece?.rarity) return `<span class="sim-slot normal cc-slot" data-tooltip-fixed="${simSlot}: empty"><span class="sim-slot-empty">${short}</span></span>`;
+      const r = EQUIPMENT_RARITIES.find((x) => x.value === piece.rarity);
+      const name = itemName(simSlot, piece, jewel);
+      const cell = name ? iconCell(name, jewel) : undefined;
+      const enh = !jewel && piece.enhancement ? `+${piece.enhancement}` : '';
+      const tip = `${simSlot} · Lv${lvOf(piece)} ${r?.label || piece.rarity}${enh ? ` ${enh}` : ''}${name ? `\n${name}` : ''}`;
+      const inner = cell !== undefined ? sprite(cell) : `<span class="sim-slot-empty">${short}</span>`;
+      return `<span class="sim-slot ${piece.rarity} cc-slot" data-tooltip-fixed="${tip.replace(/"/g, '&quot;')}">${inner}${enh ? `<b>${enh}</b>` : ''}</span>`;
+    };
+    const suffixes = [player.suffix1, player.suffix2].filter(Boolean).map((v) => WEAPON_SUFFIXES.find((x) => x.value === v)?.label || v).join(' · ');
+    return `<div class="cc-slots">
+      <div class="cc-slot-row">${CARD_ARMOR.map((x) => tile(x)).join('')}</div>
+      <div class="cc-slot-row">${CARD_WEAPONS.map((x) => tile(x)).join('')}<span class="cc-slot-gap"></span>${CARD_JEWELRY.map((x) => tile(x, true)).join('')}</div>
+      ${suffixes ? `<div class="cc-suffixes">${suffixes}</div>` : ''}
+    </div>`;
+  },
+
+  // The same twelve stats on every card, three rows of four; blank when none recorded.
+  _cardStatsHtml(player) {
+    const s = player.characterStats || {};
+    const n = (v) => (Number(v) ? Math.round(Number(v)).toLocaleString('en-US') : '—');
+    const pct = (v) => (Number(v) ? `${Number(v).toFixed(1).replace(/\.0$/, '')}%` : '—');
+    const fd = Number(s.finalDamage) ? `${n(s.finalDamage)} <span class="cc-muted">${pct(fdToPercent(Number(s.finalDamage)))}</span>` : '—';
+    // Raw crit values exist only in a synced character's panel; typed ones have just the %.
+    const raw = (attr) => (player.panel?.rows || []).find((r) => r.attr === attr)?.buffed;
+    const withPct = (value, percent) => (Number(value) && Number(percent) ? `${n(value)} <span class="cc-muted">${pct(percent)}</span>` : pct(percent));
+    const cell = ([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`;
+    const rows = [
+      [['PATK', n(s.attackPower)], ['MATK', n(s.magicAttack)], ['DEF', n(s.defense)], ['MDEF', n(s.magicDefense)]],
+      [['FD', fd], ['Crit', withPct(raw('Crit'), s.criticalRate)], ['Crit dmg', withPct(raw('Crit damage'), s.criticalDamage)], ['HP', n(s.hp)]],
+      [['Fire', pct(s.fireAttack)], ['Ice', pct(s.iceAttack)], ['Light', pct(s.lightAttack)], ['Dark', pct(s.darkAttack)]],
+    ];
+    return `<div class="cc-stats">${rows.flat().map(cell).join('')}</div>`;
+  },
+
   renderCharacterCards(players, hasAnyEditableCharacters, userMap) {
     const sortedPlayers = this.sortPlayersByRaidPriority(players);
 
@@ -1854,29 +1862,30 @@ export const PlayersPage = {
           const canToggleRaid = canEdit || dataService.isAdmin();
           const iconStyle = getClassSpriteStyle(player.role);
 
-          const detailHtml = this._buildEquipDetailHtml(player);
+          const age = syncedAge(player.syncedAt);
+          const syncedTip = [syncedLabel(player.syncedAt), player.build ? this._overridesSummary(player.build) : ''].filter(Boolean).join('\n');
+          const pills = [this._buildExcludeToggleHtml(player), this._buildWhitelistToggleHtml(player)].join('');
 
           return `
-            <div class="char-card" data-player-id="${player.id}">
-              <div class="char-card-header">
-                <div class="char-card-identity">
-                  ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
-                  <div class="char-card-name-block">
-                    <span class="char-card-name ${canEdit ? 'editable' : ''}">
-                      ${canEdit
-                        ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>`
-                        : player.name}
-                    </span>
-                    <span class="char-card-class">${player.role} <span class="char-card-gs" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span></span>
-                    ${this._buildAdminPillsRowHtml(player)}
-                  </div>
+            <div class="char-card cc" data-player-id="${player.id}">
+              <div class="cc-top">
+                ${iconStyle ? `<div class="char-card-icon-wrap"><div class="class-sprite char-card-icon" style="${iconStyle}"></div></div>` : ''}
+                <div class="cc-id">
+                  <span class="cc-name">${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}</span>` : player.name}</span>
+                  <span class="cc-class">${player.role}${age ? ` <span class="synced-tag${age.stale ? ' stale' : ''}" data-tooltip-fixed="${syncedTip.replace(/"/g, '&quot;')}">Synced <span class="synced-age">${age.text}</span></span>` : ''}</span>
                 </div>
-                <div class="char-card-badges">
-                  ${this.renderRaidBadgesHTML(player, canToggleRaid)}
-                </div>
+                <span class="cc-gs" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>
               </div>
-              ${detailHtml}
-              ${player.notes ? `<div class="char-card-notes">${player.notes}</div>` : ''}
+              <div class="cc-raids">
+                <div class="char-card-badges">${this.renderRaidBadgesHTML(player, canToggleRaid)}</div>
+                ${this._buildCharCardToggleHtml(player)}
+              </div>
+              <div class="cc-body">${this._ccBodyHtml(player)}</div>
+              <div class="cc-foot">
+                <span class="cc-notes"${player.notes ? ` data-tooltip-fixed="${String(player.notes).replace(/"/g, '&quot;')}"` : ''}>${player.notes || ''}</span>
+                ${pills ? `<span class="cc-pills">${pills}</span>` : ''}
+                ${canEdit ? `<button type="button" class="btn btn-secondary cc-edit" data-player-id="${player.id}">Edit</button>` : ''}
+              </div>
             </div>`;
         }).join('')}
       </div>
