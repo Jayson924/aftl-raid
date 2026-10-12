@@ -1024,12 +1024,23 @@
 // MY CHARACTERS — TABS (Raids / Cards)
 // Written as top-level rules with parent selectors to avoid nesting drift.
 // ============================================
+// Title with the tabs beside it, as on the Characters page.
+.my-raids-page .mc-header {
+  display: flex; align-items: flex-end; gap: 1.5rem; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1.25rem;
+  .page-title { margin: 0 0 0.6rem; color: $text-light; text-shadow: none; font-size: 1.6rem; }
+}
+
 .my-raids-page .mc-tabs {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.25rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: -1px;
 }
+
+.my-raids-page .mc-profile { display: flex; flex-direction: column; gap: 1rem; }
+// Raids: only the action buttons above the list, right-aligned.
+.my-raids-page .my-characters-section > .section-header { justify-content: flex-end; border-bottom: 0; padding-bottom: 0; }
+.my-raids-page .character-name-link { cursor: pointer; &:hover { text-decoration: underline; } }
 
 .my-raids-page .mc-tab {
   background: transparent;

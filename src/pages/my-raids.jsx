@@ -69,13 +69,41 @@ export const MyRaidsPage = {
 
     container.innerHTML = `
       <div class="my-raids-page">
-        <h1 class="page-title">My Characters</h1>
+        <div class="mc-header">
+          <h1 class="page-title">My Characters</h1>
+          <nav class="mc-tabs">
+            <button class="mc-tab active" data-tab="raids">Raids</button>
+            <button class="mc-tab" data-tab="cards">Cards</button>
+            <button class="mc-tab" data-tab="shopping">Shopping List</button>
+            <button class="mc-tab" data-tab="profile">Profile</button>
+          </nav>
+        </div>
 
+        <div class="section my-characters-section" data-tab-panel="raids">
+          <div class="section-header">
+            <div class="section-header-actions">
+              <button class="btn btn-danger-ghost" id="delete-raid-all-btn">Delete All Raids</button>
+              <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
+              <button class="btn btn-primary" id="add-character-btn">+ Add Character</button>
+            </div>
+          </div>
+          <div id="my-characters-list" class="two-columns"></div>
+        </div>
+
+        <div class="section my-cards-section" data-tab-panel="cards" style="display:none">
+          <div id="my-cards-list"></div>
+        </div>
+
+        <div class="section my-shopping-section" data-tab-panel="shopping" style="display:none">
+          <div id="my-shopping-list"></div>
+        </div>
+
+        <div class="mc-profile" data-tab-panel="profile" style="display:none">
         <div class="section display-name-section">
           <h2>Display Name</h2>
           <div class="display-name-form">
             <input type="text" id="display-name-input" value="" maxlength="32" placeholder="Enter your display name">
-            <button class="btn btn-primary" id="save-name-btn">Save</button>
+            <button class="btn btn-accent" id="save-name-btn">Save</button>
           </div>
         </div>
 
@@ -98,45 +126,11 @@ export const MyRaidsPage = {
             </label>
             <div class="availability-actions">
               <button class="btn btn-secondary" id="clear-availability-btn">Clear</button>
-              <button class="btn btn-primary" id="save-availability-btn">Save</button>
+              <button class="btn btn-accent" id="save-availability-btn">Save</button>
             </div>
           </div>
         </div>
 
-        <div class="mc-tabs">
-          <button class="mc-tab active" data-tab="raids">Raids</button>
-          <button class="mc-tab" data-tab="cards">Cards</button>
-          <button class="mc-tab" data-tab="shopping">Shopping List</button>
-        </div>
-
-        <div class="section my-characters-section" data-tab-panel="raids">
-          <div class="section-header">
-            <h2>Raids
-              <button class="btn btn-icon-toggle" id="toggle-columns-btn" title="Toggle two-column layout">
-                <img class="col-icon" src="/icons/onecolumn.svg" alt="Toggle columns">
-              </button>
-            </h2>
-            <div class="section-header-actions">
-              <button class="btn btn-danger-outline" id="delete-raid-all-btn">Delete All Raids</button>
-              <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
-              <button class="btn btn-primary" id="add-character-btn">+ Add Character</button>
-            </div>
-          </div>
-          <div id="my-characters-list"></div>
-        </div>
-
-        <div class="section my-cards-section" data-tab-panel="cards" style="display:none">
-          <div class="section-header">
-            <h2>Card Collection</h2>
-          </div>
-          <div id="my-cards-list"></div>
-        </div>
-
-        <div class="section my-shopping-section" data-tab-panel="shopping" style="display:none">
-          <div class="section-header">
-            <h2>Shopping List</h2>
-          </div>
-          <div id="my-shopping-list"></div>
         </div>
       </div>
     `;
@@ -149,7 +143,6 @@ export const MyRaidsPage = {
     this.setupAddCharacterHandler();
     this.setupAddRaidToAllHandler();
     this.setupDeleteAllRaidsHandler();
-    this.setupColumnToggle();
     this.setupTabHandlers();
     await this.loadMyCharacters();
   },
@@ -398,11 +391,11 @@ export const MyRaidsPage = {
         return `
           <div class="character-block" data-player-id="${player.id}" data-group-id="${player.groupId || ''}" data-account="${player.accountNumber || 1}">
             <div class="character-card">
-              <span class="char-drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>
+              <span class="char-drag-handle" data-tooltip-fixed="Drag to reorder" aria-hidden="true">⠿</span>
               <div class="character-info">
                 ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
                 <div>
-                  <span class="character-name-link" data-player-id="${player.id}">${player.name}<span class="edit-icon">✎</span></span>
+                  <span class="character-name-link" data-player-id="${player.id}">${player.name}</span>
                   <span class="character-class">${player.role}</span>
                 </div>
               </div>
@@ -537,14 +530,14 @@ export const MyRaidsPage = {
 
     if (showHeader) {
       html += `<div class="character-group-header">`;
-      html += `<span class="character-group-name"${editable && !isUngrouped ? ` data-group-id="${groupId}" title="Rename group"` : ''}>${escapeHtml(name || 'Ungrouped')}</span>`;
+      html += `<span class="character-group-name"${editable && !isUngrouped ? ` data-group-id="${groupId}" data-tooltip-fixed="Rename group"` : ''}>${escapeHtml(name || 'Ungrouped')}</span>`;
       html += `<span class="character-group-count">${players.length}</span>`;
       if (editable && !isUngrouped) {
         html += `<span class="character-group-controls">
-          <button class="group-move-up" data-group-id="${groupId}" title="Move group up">↑</button>
-          <button class="group-move-down" data-group-id="${groupId}" title="Move group down">↓</button>
-          <button class="group-rename" data-group-id="${groupId}" title="Rename group">✎</button>
-          <button class="group-delete" data-group-id="${groupId}" title="Delete group">×</button>
+          <button class="group-move-up" data-group-id="${groupId}" data-tooltip-fixed="Move group up">↑</button>
+          <button class="group-move-down" data-group-id="${groupId}" data-tooltip-fixed="Move group down">↓</button>
+          <button class="group-rename" data-group-id="${groupId}" data-tooltip-fixed="Rename group">✎</button>
+          <button class="group-delete" data-group-id="${groupId}" data-tooltip-fixed="Delete group">×</button>
         </span>`;
       }
       html += `</div>`;
@@ -580,8 +573,8 @@ export const MyRaidsPage = {
       .join('');
     return `
       <div class="char-move-controls">
-        <button class="char-move-up" data-player-id="${player.id}" title="Move up">↑</button>
-        <button class="char-move-down" data-player-id="${player.id}" title="Move down">↓</button>
+        <button class="char-move-up" data-player-id="${player.id}" data-tooltip-fixed="Move up">↑</button>
+        <button class="char-move-down" data-player-id="${player.id}" data-tooltip-fixed="Move down">↓</button>
         <label class="char-group-select-label">
           <span>Group</span>
           <select class="char-group-select" data-player-id="${player.id}">${options}</select>
@@ -1000,27 +993,6 @@ export const MyRaidsPage = {
     });
   },
 
-  setupColumnToggle() {
-    const btn = document.getElementById('toggle-columns-btn');
-    const icon = btn.querySelector('.col-icon');
-    const stored = localStorage.getItem('myRaidsTwoColumns');
-    const isTwoCol = stored === null ? true : stored === 'true';
-    if (isTwoCol) {
-      document.getElementById('my-characters-list')?.classList.add('two-columns');
-      btn.classList.add('active');
-      icon.src = '/icons/twocolumns.svg';
-    }
-
-    btn.addEventListener('click', () => {
-      const list = document.getElementById('my-characters-list');
-      if (!list) return;
-      const nowTwo = list.classList.toggle('two-columns');
-      btn.classList.toggle('active', nowTwo);
-      icon.src = nowTwo ? '/icons/twocolumns.svg' : '/icons/onecolumn.svg';
-      localStorage.setItem('myRaidsTwoColumns', nowTwo);
-    });
-  },
-
   // ============================================
   // ADD RAID TO ALL CHARACTERS
   // ============================================
@@ -1224,7 +1196,7 @@ export const MyRaidsPage = {
               <button class="btn-counter btn-decrement" data-raid-id="${raid.id}" ${raid.currentClears <= 0 ? 'disabled' : ''}>-</button>
               <button class="btn-counter btn-increment" data-raid-id="${raid.id}" ${isComplete ? 'disabled' : ''}>+</button>
             </div>
-            <button class="btn-icon raid-delete-btn" data-raid-id="${raid.id}" title="Delete">&times;</button>
+            <button class="btn-icon raid-delete-btn" data-raid-id="${raid.id}" data-tooltip-fixed="Delete">&times;</button>
           </div>
         `;
       });
@@ -1728,10 +1700,10 @@ export const MyRaidsPage = {
       items.forEach(item => {
         html += `
           <div class="shopping-item ${item.bought ? 'bought' : ''}" data-item-id="${item.id}">
-            <button class="shopping-check" data-item-id="${item.id}" title="${item.bought ? 'Mark as not bought' : 'Mark as bought'}">${item.bought ? '✓' : ''}</button>
+            <button class="shopping-check" data-item-id="${item.id}" data-tooltip-fixed="${item.bought ? 'Mark as not bought' : 'Mark as bought'}">${item.bought ? '✓' : ''}</button>
             <span class="shopping-item-text">${escapeHtml(item.item)}</span>
-            <input type="number" class="shopping-price-input" data-item-id="${item.id}" value="${item.price || ''}" min="0" step="any" placeholder="0" title="Price">
-            <button class="shopping-delete-btn" data-item-id="${item.id}" title="Delete">&times;</button>
+            <input type="number" class="shopping-price-input" data-item-id="${item.id}" value="${item.price || ''}" min="0" step="any" placeholder="0" data-tooltip-fixed="Price">
+            <button class="shopping-delete-btn" data-item-id="${item.id}" data-tooltip-fixed="Delete">&times;</button>
           </div>
         `;
       });
@@ -1749,7 +1721,7 @@ export const MyRaidsPage = {
       const total = this.shoppingTotalFor(playerId);
       html += `
         <div class="shopping-total-row">
-          <label class="shopping-total-toggle" title="Include items already marked as bought in this total">
+          <label class="shopping-total-toggle" data-tooltip-fixed="Include items already marked as bought in this total">
             <input type="checkbox" class="shopping-total-all" data-player-id="${playerId}" ${includeBought ? 'checked' : ''}>
             <span>Include bought</span>
           </label>
@@ -1974,7 +1946,7 @@ export const MyRaidsPage = {
           </div>
           <div class="card-character-actions">
             ${synced ? `<span class="card-synced-note" data-tooltip="Re-sync from the toolbox to change equipped cards">${syncedLabel(player.syncedAt)}</span>` : `
-            <button class="card-paste-btn" data-player-id="${player.id}" title="Upload or paste a screenshot for the current page" ${showSlots ? '' : 'style="display:none"'}>
+            <button class="card-paste-btn" data-player-id="${player.id}" data-tooltip-fixed="Upload or paste a screenshot for the current page" ${showSlots ? '' : 'style="display:none"'}>
               <svg class="card-paste-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
@@ -2082,14 +2054,14 @@ export const MyRaidsPage = {
         const color = info?.color || '';
         return `
           <div class="card-extra-row" data-extra-id="${e.id}">
-            <span class="extra-rarity-dot" style="color:${color};background:${color}" title="${info?.label || e.rarity}"></span>
+            <span class="extra-rarity-dot" style="color:${color};background:${color}" data-tooltip-fixed="${info?.label || e.rarity}"></span>
             <span class="extra-card-name">${e.cardName}</span>
             <span class="extra-amount-controls">
               <button class="extra-amount-btn" data-action="extra-dec" data-extra-id="${e.id}">−</button>
               <span class="extra-amount">×${e.amount}</span>
               <button class="extra-amount-btn" data-action="extra-inc" data-extra-id="${e.id}">+</button>
             </span>
-            <button class="extra-delete-btn" data-action="extra-delete" data-extra-id="${e.id}" title="Remove">×</button>
+            <button class="extra-delete-btn" data-action="extra-delete" data-extra-id="${e.id}" data-tooltip-fixed="Remove">×</button>
           </div>
         `;
       }).join('')}</div>`;
