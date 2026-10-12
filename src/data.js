@@ -29,6 +29,16 @@ function raidTypeToCompletionColumn(raidType) {
   return null;
 }
 
+const lootFromRow = (data) => ({
+  id: data.id,
+  item: data.item,
+  sold: data.sold === true,
+  price: Number(data.price) || 0,
+  sortOrder: data.sort_order ?? 0,
+  heldBy: data.held_by || '',
+  source: data.source || 'web'
+});
+
 // Discord OAuth configuration
 const DISCORD_CLIENT_ID = import.meta.env.VITE_DISCORD_CLIENT_ID;
 const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize';
@@ -777,9 +787,7 @@ class DataService {
   }
 
   async _saveLineup(lineup, isUpdate) {
-    let lineupId = lineup.id;
-
-    const lineupData = {
+    const fields = {
       name: lineup.name,
       raid_type: lineup.raidType,
       status: lineup.status || 'draft',
@@ -789,136 +797,30 @@ class DataService {
       notes: lineup.notes || '',
       raid_time: lineup.raidTime || null
     };
-
-    let savedLineup, error;
-
-    if (isUpdate && lineupId) {
-      // Update existing lineup by ID
-      ({ data: savedLineup, error } = await supabase
-        .from('lineups')
-        .update(lineupData)
-        .eq('id', lineupId)
-        .select()
-        .single());
-    } else {
-      // Insert new lineup
-      ({ data: savedLineup, error } = await supabase
-        .from('lineups')
-        .insert(lineupData)
-        .select()
-        .single());
-    }
-
-    if (error) throw error;
-
-    // Delete existing lineup_players
-    await supabase
-      .from('lineup_players')
-      .delete()
-      .eq('lineup_id', savedLineup.id);
-
-    // Insert new lineup_players
-    const lineupPlayers = (lineup.players || [])
-      .map((name, idx) => {
-        if (!name) return null;
-        return {
-          lineup_id: savedLineup.id,
-          player_name: name,
-          slot_position: idx + 1,
-          uses_ticket: lineup.ticketPlayers?.[idx] || false,
-          pilot_name: lineup.pilotPlayers?.[idx] || null
-        };
-      })
-      .filter(Boolean);
-
-    if (lineupPlayers.length > 0) {
-      const { error: lpError } = await supabase
-        .from('lineup_players')
-        .insert(lineupPlayers);
-
-      if (lpError) throw lpError;
-    }
-
-    return { success: true, data: savedLineup };
+    const slots = (lineup.players || []).map((name, idx) => name ? {
+      player_name: name,
+      slot_position: idx + 1,
+      uses_ticket: lineup.ticketPlayers?.[idx] || false,
+      pilot_name: lineup.pilotPlayers?.[idx] || null
+    } : null).filter(Boolean);
+    const { data } = await this._write('lineups.save', { id: isUpdate ? lineup.id : null, fields, slots });
+    return { success: true, data };
   }
 
   async deleteLineup(lineupId) {
-    const { error } = await supabase
-      .from('lineups')
-      .delete()
-      .eq('id', lineupId);
-
-    if (error) throw error;
+    await this._write('lineups.delete', { id: lineupId });
     return { success: true };
   }
 
   async updateLineupRaidType(lineupId, raidType) {
-    const { error } = await supabase
-      .from('lineups')
-      .update({ raid_type: raidType })
-      .eq('id', lineupId);
-
-    if (error) throw error;
+    await this._write('lineups.update', { id: lineupId, fields: { raid_type: raidType } });
     return { success: true };
   }
 
+  // The server flips the lineup and marks its members (and ticket runs) to match.
   async toggleLineupCompleted(lineupId) {
-    // Get current state with full lineup data
-    const { data: lineup } = await supabase
-      .from('lineups')
-      .select(`
-        id, completed, raid_type,
-        lineup_players (
-          player_name,
-          uses_ticket
-        )
-      `)
-      .eq('id', lineupId)
-      .single();
-
-    if (!lineup) throw new Error('Lineup not found');
-
-    const newCompleted = !lineup.completed;
-
-    // Toggle lineup completed status
-    const { error } = await supabase
-      .from('lineups')
-      .update({ completed: newCompleted })
-      .eq('id', lineup.id);
-
-    if (error) throw error;
-
-    // Handle player completion based on lineup completion status
-    // Skip for Unspecified and 4-man raid types - no weekly HC/CL completion tracking
-    if (lineup.raid_type !== 'Unspecified' && lineup.raid_type !== '4-man' && lineup.lineup_players && lineup.lineup_players.length > 0) {
-      const playerNames = lineup.lineup_players
-        .map(lp => lp.player_name)
-        .filter(name => name && name.trim() !== '');
-
-      const ticketPlayerNames = lineup.lineup_players
-        .filter(lp => lp.uses_ticket && lp.player_name)
-        .map(lp => lp.player_name);
-
-      if (newCompleted) {
-        // Mark all players as completed
-        if (playerNames.length > 0) {
-          await this.markPlayersCompleted(playerNames, lineup.raid_type, ticketPlayerNames);
-        }
-      } else {
-        // When unclearing, only unmark non-ticket players
-        // (non-ticket players can only be in one lineup per raid type)
-        // Ticket players are left alone - they may have completed in another lineup
-        const nonTicketPlayerNames = lineup.lineup_players
-          .filter(lp => !lp.uses_ticket && lp.player_name && lp.player_name.trim() !== '')
-          .map(lp => lp.player_name);
-
-        if (nonTicketPlayerNames.length > 0) {
-          await this.unmarkPlayersCompleted(nonTicketPlayerNames, lineup.raid_type, null, []);
-        }
-      }
-    }
-
-    return { success: true, completed: newCompleted };
+    const { completed } = await this._write('lineups.toggleCompleted', { id: lineupId });
+    return { success: true, completed };
   }
 
   /**
@@ -930,13 +832,7 @@ class DataService {
   async setLineupNextWeek(lineupId, value) {
     if (!this.canEditLineups()) throw new Error('You do not have permission to edit lineups');
     if (!lineupId) throw new Error('lineupId is required');
-
-    const { error } = await supabase
-      .from('lineups')
-      .update({ is_template: !!value })
-      .eq('id', lineupId);
-
-    if (error) throw error;
+    await this._write('lineups.update', { id: lineupId, fields: { is_template: !!value } });
     return { success: true, isNextWeek: !!value };
   }
 
@@ -979,50 +875,14 @@ class DataService {
   // loot record (see loot-records.sql). Exactly one is set.
   async _insertLoot(parent, item, heldBy = '') {
     if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
-    const col = parent.recordId ? 'record_id' : 'lineup_id';
     const parentId = parent.recordId || parent.lineupId;
     if (!parentId) throw new Error('a lineupId or recordId is required');
-
     const trimmed = (item || '').trim();
     if (!trimmed) throw new Error('Item name cannot be empty');
-
-    // Append after the current last entry for this parent
-    const { data: existing } = await supabase
-      .from('lineup_loot')
-      .select('sort_order')
-      .eq(col, parentId)
-      .order('sort_order', { ascending: false })
-      .limit(1);
-
-    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
-
-    const row = {
-      item: trimmed,
-      sold: false,
-      price: 0,
-      sort_order: nextOrder,
-      held_by: (heldBy || '').trim() || null,
-      source: 'web',
-      created_by: this._user?.id || null
-    };
-    row[col] = parentId;
-
-    const { data, error } = await supabase
-      .from('lineup_loot')
-      .insert(row)
-      .select('id, item, sold, price, sort_order, held_by, source')
-      .single();
-
-    if (error) throw error;
-    return {
-      id: data.id,
-      item: data.item,
-      sold: data.sold === true,
-      price: Number(data.price) || 0,
-      sortOrder: data.sort_order ?? 0,
-      heldBy: data.held_by || '',
-      source: data.source || 'web'
-    };
+    const { data } = await this._write('loot.add', {
+      lineup_id: parent.lineupId || null, record_id: parent.recordId || null, item: trimmed, held_by: heldBy
+    });
+    return lootFromRow(data);
   }
 
   async addLineupLoot(lineupId, item, heldBy = '') {
@@ -1040,44 +900,28 @@ class DataService {
     if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
     if (!lootId) throw new Error('lootId is required');
 
-    const updateData = {};
+    const fields = {};
     if (updates.item !== undefined) {
       const trimmed = (updates.item || '').trim();
       if (!trimmed) throw new Error('Item name cannot be empty');
-      updateData.item = trimmed;
+      fields.item = trimmed;
     }
     if (updates.sold !== undefined) {
-      updateData.sold = !!updates.sold;
+      fields.sold = !!updates.sold;
       // Reverting to unsold clears the price unless one is explicitly provided
-      if (!updates.sold && updates.price === undefined) updateData.price = 0;
+      if (!updates.sold && updates.price === undefined) fields.price = 0;
     }
-    if (updates.price !== undefined) {
-      updateData.price = Math.max(0, Math.round(Number(updates.price) || 0));
-    }
-    if (updates.heldBy !== undefined) {
-      updateData.held_by = (updates.heldBy || '').trim() || null;
-    }
-    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
-
-    const { error } = await supabase
-      .from('lineup_loot')
-      .update(updateData)
-      .eq('id', lootId);
-
-    if (error) throw error;
+    if (updates.price !== undefined) fields.price = updates.price;
+    if (updates.heldBy !== undefined) fields.held_by = (updates.heldBy || '').trim() || null;
+    if (updates.sortOrder !== undefined) fields.sort_order = updates.sortOrder;
+    await this._write('loot.update', { id: lootId, fields });
     return { success: true };
   }
 
   async deleteLineupLoot(lootId) {
     if (!this.canEditLineups()) throw new Error('You do not have permission to edit loot');
     if (!lootId) throw new Error('lootId is required');
-
-    const { error } = await supabase
-      .from('lineup_loot')
-      .delete()
-      .eq('id', lootId);
-
-    if (error) throw error;
+    await this._write('loot.delete', { id: lootId });
     return { success: true };
   }
 
@@ -1110,104 +954,17 @@ class DataService {
     }));
   }
 
-  /**
-   * A member may mark a share received when they OWN the character or are its
-   * PILOT (the person who actually ran it); editors/admins may mark anyone.
-   * `ownerDiscordId` is the Discord id owning `memberName` (from the roster);
-   * pass null for guests/unowned. Both paths are verified server-side (players
-   * ownership / the stored pilot name vs the caller's app_users names) so
-   * neither can be spoofed. `parent` = { lineupId } | { recordId }.
-   */
-  async _canMarkShare(parent, memberName, ownerDiscordId) {
-    if (this.canEditLineups()) return true;
-    const me = this._user?.id;
-    if (!me) return false;
-
-    // Trust, but verify: the character must actually be owned by the caller.
-    if (ownerDiscordId && ownerDiscordId === me) {
-      const { data } = await supabase
-        .from('players')
-        .select('discord_id')
-        .eq('name', memberName)
-        .limit(1);
-      if (data?.[0]?.discord_id === me) return true;
-    }
-
-    // Pilot path: the slot's stored pilot name must resolve to the caller
-    // (same display_name/username convention the Discord bot uses).
-    let pilotName = null;
-    if (parent?.recordId) {
-      const { data } = await supabase
-        .from('loot_records')
-        .select('pilots')
-        .eq('id', parent.recordId)
-        .maybeSingle();
-      pilotName = ((data?.pilots || {})[memberName] || '').trim() || null;
-    } else if (parent?.lineupId) {
-      const { data } = await supabase
-        .from('lineup_players')
-        .select('pilot_name')
-        .eq('lineup_id', parent.lineupId)
-        .eq('player_name', memberName)
-        .limit(1);
-      pilotName = (data?.[0]?.pilot_name || '').trim() || null;
-    }
-    if (!pilotName) return false;
-
-    const { data: meRow } = await supabase
-      .from('app_users')
-      .select('display_name, username')
-      .eq('discord_id', me)
-      .maybeSingle();
-    const p = pilotName.toLowerCase();
-    return p === (meRow?.display_name || '').trim().toLowerCase()
-        || p === (meRow?.username || '').trim().toLowerCase();
-  }
-
-  // `parent` is { lineupId } for a live lineup or { recordId } for an archived
-  // loot record. The unique index used as the upsert arbiter differs accordingly.
+  // `parent` is { lineupId } for a live lineup or { recordId } for an archived loot record.
+  // The server checks the caller owns or piloted the member, or is an editor.
   async _markShare(parent, memberName, ownerDiscordId = null, amount = 0) {
-    const col = parent.recordId ? 'record_id' : 'lineup_id';
-    const parentId = parent.recordId || parent.lineupId;
-    if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
-    if (!(await this._canMarkShare(parent, memberName, ownerDiscordId))) {
-      throw new Error('You can only mark your own share received');
-    }
-
-    const row = {
-      member_name: memberName,
-      discord_id: ownerDiscordId || null,
-      source: 'web',
-      created_by: this._user?.id || null,
-      received_at: new Date().toISOString(),
-      // How much this member has now withdrawn — the current per-person payout.
-      amount: Math.max(0, Math.round(Number(amount) || 0))
-    };
-    row[col] = parentId;
-
-    const { error } = await supabase
-      .from('lineup_payouts')
-      .upsert(row, { onConflict: `${col},member_name` });
-
-    if (error) throw error;
+    if (!(parent.recordId || parent.lineupId) || !memberName) throw new Error('a lineupId or recordId and memberName are required');
+    await this._write('payouts.mark', { lineup_id: parent.lineupId || null, record_id: parent.recordId || null, member_name: memberName, amount });
     return { success: true };
   }
 
   async _unmarkShare(parent, memberName, ownerDiscordId = null) {
-    const col = parent.recordId ? 'record_id' : 'lineup_id';
-    const parentId = parent.recordId || parent.lineupId;
-    if (!parentId || !memberName) throw new Error('a lineupId or recordId and memberName are required');
-    if (!(await this._canMarkShare(parent, memberName, ownerDiscordId))) {
-      throw new Error('You can only mark your own share received');
-    }
-
-    const { error } = await supabase
-      .from('lineup_payouts')
-      .delete()
-      .eq(col, parentId)
-      .eq('member_name', memberName);
-
-    if (error) throw error;
+    if (!(parent.recordId || parent.lineupId) || !memberName) throw new Error('a lineupId or recordId and memberName are required');
+    await this._write('payouts.unmark', { lineup_id: parent.lineupId || null, record_id: parent.recordId || null, member_name: memberName });
     return { success: true };
   }
 
@@ -1240,12 +997,7 @@ class DataService {
   async archiveLineupLoot(lineupId) {
     if (!this.canEditLineups()) throw new Error('You do not have permission to archive loot');
     if (!lineupId) throw new Error('lineupId is required');
-
-    const { data, error } = await supabase
-      .rpc('archive_lineup_to_loot_record', { p_lineup_id: lineupId });
-
-    if (error) throw error;
-    return data; // new loot_records.id
+    return (await this._write('records.archive', { lineup_id: lineupId })).id; // new loot_records.id
   }
 
   /**
@@ -1328,13 +1080,7 @@ class DataService {
   async deleteLootRecord(recordId) {
     if (!this.canEditLineups()) throw new Error('You do not have permission to delete loot records');
     if (!recordId) throw new Error('recordId is required');
-
-    const { error } = await supabase
-      .from('loot_records')
-      .delete()
-      .eq('id', recordId);
-
-    if (error) throw error;
+    await this._write('records.delete', { id: recordId });
     return { success: true };
   }
 
@@ -1872,21 +1618,7 @@ class DataService {
   async requestDiscordThread(lineupId, channelId = '1496954808324587680') {
     if (!this.canEditLineups()) throw new Error('You do not have permission to create Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
-
-    const { data, error } = await supabase
-      .from('thread_requests')
-      .insert({
-        lineup_id: lineupId,
-        channel_id: channelId,
-        requested_by: this._user?.id || null,
-        status: 'pending',
-        action: 'create'
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return (await this._write('threads.request', { lineup_id: lineupId, kind: 'create', channel_id: channelId })).data;
   }
 
   /**
@@ -1899,21 +1631,7 @@ class DataService {
   async requestDiscordThreadUpdate(lineupId) {
     if (!this.canEditLineups()) throw new Error('You do not have permission to update Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
-
-    const { data, error } = await supabase
-      .from('thread_requests')
-      .insert({
-        lineup_id: lineupId,
-        channel_id: '',
-        requested_by: this._user?.id || null,
-        status: 'pending',
-        action: 'update'
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return (await this._write('threads.request', { lineup_id: lineupId, kind: 'update' })).data;
   }
 
   /**
@@ -1927,21 +1645,7 @@ class DataService {
   async requestDiscordThreadClear(lineupId) {
     if (!this.canEditLineups()) throw new Error('You do not have permission to clear Discord threads');
     if (!lineupId) throw new Error('lineupId is required');
-
-    const { data, error } = await supabase
-      .from('thread_requests')
-      .insert({
-        lineup_id: lineupId,
-        channel_id: '',
-        requested_by: this._user?.id || null,
-        status: 'pending',
-        action: 'clear'
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return (await this._write('threads.request', { lineup_id: lineupId, kind: 'clear' })).data;
   }
 
   /**

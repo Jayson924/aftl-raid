@@ -144,3 +144,58 @@ test('no session, a bad session or an unknown action is refused', async () => {
   assert.equal((await parse(handler({ httpMethod: 'POST', body: JSON.stringify({ session: 'v1.mate.9999999999999.bad', action: 'user.updateSelf' }) }))).status, 401);
   assert.equal((await parse(call('mate', 'players.dropTable'))).status, 400);
 });
+
+function lineupFixture() {
+  const db = fixture();
+  db.lineups = [{ id: 'L1', name: 'BDN 1', raid_type: 'BDN Classic', completed: false }];
+  db.lineup_players = [
+    { id: 's1', lineup_id: 'L1', player_name: 'Litten', uses_ticket: false, pilot_name: null },
+    { id: 's2', lineup_id: 'L1', player_name: 'Keeper', uses_ticket: true, pilot_name: 'Mate' },
+  ];
+  db.lineup_loot = []; db.lineup_payouts = []; db.loot_records = []; db.thread_requests = [];
+  return db;
+}
+
+test('lineups, loot, records and thread requests need an editor', async () => {
+  const db = lineupFixture(); stubDb(db);
+  for (const [action, args] of [
+    ['lineups.save', { fields: { name: 'x' }, slots: [] }], ['lineups.delete', { id: 'L1' }],
+    ['lineups.update', { id: 'L1', fields: { raid_type: 'DDN Classic' } }], ['lineups.toggleCompleted', { id: 'L1' }],
+    ['loot.add', { lineup_id: 'L1', item: 'Orb' }], ['loot.delete', { id: 'x' }],
+    ['records.delete', { id: 'r' }], ['threads.request', { lineup_id: 'L1', kind: 'create' }],
+  ]) {
+    assert.equal((await parse(call('mate', action, args))).status, 403, action);
+  }
+  const saved = await parse(call('editor', 'lineups.save', { id: 'L1', fields: { name: 'Renamed' }, slots: [{ player_name: 'Keeper', slot_position: 1 }] }));
+  assert.equal(saved.data.name, 'Renamed');
+  assert.deepEqual(db.lineup_players.map((s) => s.player_name), ['Keeper']);
+  const loot = await parse(call('editor', 'loot.add', { lineup_id: 'L1', item: ' Orb ' }));
+  assert.equal(loot.data.item, 'Orb');
+  assert.equal(loot.data.created_by, 'editor');
+});
+
+test('clearing a lineup marks its members and ticket runs', async () => {
+  const db = lineupFixture(); const rpcs = stubDb(db);
+  const res = await parse(call('editor', 'lineups.toggleCompleted', { id: 'L1' }));
+  assert.equal(res.completed, true);
+  assert.ok(db.players.find((p) => p.name === 'Litten').bdn_classic_completed);
+  assert.ok(db.players.find((p) => p.name === 'Keeper').bdn_classic_completed);
+  assert.deepEqual(rpcs, [{ fn: 'set_ticket_used', body: { p_raid: 'BDN Classic', p_used: true, p_names: ['Keeper'] } }]);
+  // Un-clearing leaves the ticket runner marked.
+  await parse(call('editor', 'lineups.toggleCompleted', { id: 'L1' }));
+  assert.equal(db.players.find((p) => p.name === 'Litten').bdn_classic_completed, null);
+  assert.ok(db.players.find((p) => p.name === 'Keeper').bdn_classic_completed);
+});
+
+test('a gold share is marked by its owner, its pilot or an editor, nobody else', async () => {
+  const db = lineupFixture(); stubDb(db);
+  db.app_users.push({ discord_id: 'stranger', role: 'guildmate', display_name: 'Nobody' });
+  assert.equal((await parse(call('stranger', 'payouts.mark', { lineup_id: 'L1', member_name: 'Litten', amount: 10 }))).status, 403);
+  assert.equal((await parse(call('mate', 'payouts.mark', { lineup_id: 'L1', member_name: 'Litten', amount: 10 }))).status, 200);
+  // Mate pilots Keeper (owned by "other").
+  assert.equal((await parse(call('mate', 'payouts.mark', { lineup_id: 'L1', member_name: 'Keeper', amount: 10 }))).status, 200);
+  assert.deepEqual(db.lineup_payouts.map((p) => [p.member_name, p.discord_id]), [['Litten', 'mate'], ['Keeper', 'other']]);
+  assert.equal((await parse(call('stranger', 'payouts.unmark', { lineup_id: 'L1', member_name: 'Keeper' }))).status, 403);
+  assert.equal((await parse(call('editor', 'payouts.unmark', { lineup_id: 'L1', member_name: 'Keeper' }))).status, 200);
+  assert.equal(db.lineup_payouts.length, 1);
+});

@@ -10,6 +10,10 @@ const MAX_BODY = 512 * 1024;
 const ROLES = ['guest', 'guildmate', 'editor', 'admin'];
 const COMPLETION_COLUMNS = new Set(['bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
 const RARITIES = new Set(['magic', 'rare', 'epic', 'unique', 'legend']);
+const COMPLETION_BY_RAID = {
+  'DDN Hardcore': 'ddn_hardcore_completed', 'DDN Classic': 'ddn_classic_completed',
+  'DDN Normal': 'ddn_normal_completed', 'BDN Classic': 'bdn_classic_completed',
+};
 
 // Character fields a form may set; the gear set only while the character is not synced.
 const PLAYER_FIELDS = ['name', 'notes', 'account_number', 'exclude', 'exclude_label', 'exclude_reason'];
@@ -51,6 +55,31 @@ async function context(discordId) {
     },
   };
   return ctx;
+}
+
+// Who may mark a member's gold share: editors, the character's owner, or its pilot
+// (the slot's pilot name matches the caller's display name or username).
+async function shareTarget(ctx, a) {
+  const col = a.record_id ? 'record_id' : 'lineup_id';
+  const parentId = a.record_id || a.lineup_id;
+  const member = String(a.member_name || '');
+  if (!parentId || !member) deny('A lineup or loot record and a member are required');
+  const owner = await one('players', `name=eq.${enc(member)}&select=discord_id&limit=1`);
+  const ownerId = owner?.discord_id || null;
+  if (ctx.isEditor || ownerId === ctx.id) return { col, parentId, ownerId };
+  let pilot = '';
+  if (a.record_id) {
+    const rec = await one('loot_records', `id=eq.${enc(parentId)}&select=pilots`);
+    pilot = String((rec?.pilots || {})[member] || '');
+  } else {
+    const slot = await one('lineup_players', `lineup_id=eq.${enc(parentId)}&player_name=eq.${enc(member)}&select=pilot_name&limit=1`);
+    pilot = String(slot?.pilot_name || '');
+  }
+  pilot = pilot.trim().toLowerCase();
+  const me = await one('app_users', `discord_id=eq.${enc(ctx.id)}&select=display_name,username`);
+  const mine = [me?.display_name, me?.username].map((n) => String(n || '').trim().toLowerCase());
+  if (!pilot || !mine.includes(pilot)) deny('You can only mark your own share received');
+  return { col, parentId, ownerId };
 }
 
 const ACTIONS = {
@@ -249,6 +278,130 @@ const ACTIONS = {
     for (const id of ids) await ctx.own('character_groups', id);
     for (let i = 0; i < ids.length; i++) await sbPatch('character_groups', `id=eq.${enc(ids[i])}`, { sort_order: i });
     return {};
+  },
+
+  // ---- lineups (editors and admins) ----
+  async 'lineups.save'(ctx, a) {
+    ctx.requireEditor();
+    const fields = pick(a.fields, ['name', 'raid_type', 'status', 'completed', 'is_template', 'is_static', 'notes', 'raid_time']);
+    let saved;
+    if (a.id) {
+      [saved] = await sbPatch('lineups', `id=eq.${enc(a.id)}`, fields);
+      if (!saved) deny('No such lineup');
+    } else {
+      [saved] = await sbPost('lineups', fields);
+    }
+    await sbDelete('lineup_players', `lineup_id=eq.${enc(saved.id)}`);
+    const slots = [].concat(a.slots || []).filter((s) => s && s.player_name).map((s) => ({
+      lineup_id: saved.id,
+      player_name: String(s.player_name),
+      slot_position: Number(s.slot_position),
+      uses_ticket: !!s.uses_ticket,
+      pilot_name: s.pilot_name || null,
+    }));
+    if (slots.length) await sbPost('lineup_players', slots);
+    return { data: saved };
+  },
+  async 'lineups.update'(ctx, a) {
+    ctx.requireEditor();
+    await sbPatch('lineups', `id=eq.${enc(a.id)}`, pick(a.fields, ['raid_type', 'is_template']));
+    return {};
+  },
+  async 'lineups.delete'(ctx, a) {
+    ctx.requireEditor();
+    await sbDelete('lineups', `id=eq.${enc(a.id)}`);
+    return {};
+  },
+  // Clear or un-clear a lineup, marking its members (and ticket runs) to match.
+  async 'lineups.toggleCompleted'(ctx, a) {
+    ctx.requireEditor();
+    const lineup = await one('lineups', `id=eq.${enc(a.id)}&select=id,completed,raid_type`);
+    if (!lineup) deny('No such lineup');
+    const completed = !lineup.completed;
+    await sbPatch('lineups', `id=eq.${enc(lineup.id)}`, { completed });
+    const column = COMPLETION_BY_RAID[lineup.raid_type];
+    if (column) {
+      const slots = (await sbGet('lineup_players', `lineup_id=eq.${enc(lineup.id)}&select=player_name,uses_ticket`))
+        .filter((s) => (s.player_name || '').trim());
+      // Un-clearing leaves ticket runs alone: they may have cleared in another lineup.
+      const names = slots.filter((s) => completed || !s.uses_ticket).map((s) => s.player_name);
+      const value = completed ? new Date().toISOString() : null;
+      for (const name of names) await sbPatch('players', `name=eq.${enc(name)}`, { [column]: value });
+      const tickets = slots.filter((s) => s.uses_ticket).map((s) => s.player_name);
+      if (completed && tickets.length && / Classic$/.test(lineup.raid_type || '')) {
+        await sbRpc('set_ticket_used', { p_raid: lineup.raid_type, p_used: true, p_names: tickets });
+      }
+    }
+    return { completed };
+  },
+
+  // ---- loot (editors and admins) ----
+  async 'loot.add'(ctx, a) {
+    ctx.requireEditor();
+    const col = a.record_id ? 'record_id' : 'lineup_id';
+    const parentId = a.record_id || a.lineup_id;
+    if (!parentId) deny('A lineup or loot record is required');
+    const item = String(a.item || '').trim();
+    if (!item) deny('Item name cannot be empty');
+    const last = await one('lineup_loot', `${col}=eq.${enc(parentId)}&select=sort_order&order=sort_order.desc&limit=1`);
+    const [row] = await sbPost('lineup_loot', {
+      [col]: parentId, item, sold: false, price: 0, sort_order: (last?.sort_order ?? -1) + 1,
+      held_by: String(a.held_by || '').trim() || null, source: 'web', created_by: ctx.id,
+    });
+    return { data: row };
+  },
+  async 'loot.update'(ctx, a) {
+    ctx.requireEditor();
+    const fields = pick(a.fields, ['item', 'sold', 'price', 'held_by', 'sort_order']);
+    if ('item' in fields && !String(fields.item || '').trim()) deny('Item name cannot be empty');
+    if ('price' in fields) fields.price = Math.max(0, Math.round(Number(fields.price) || 0));
+    await sbPatch('lineup_loot', `id=eq.${enc(a.id)}`, fields);
+    return {};
+  },
+  async 'loot.delete'(ctx, a) {
+    ctx.requireEditor();
+    await sbDelete('lineup_loot', `id=eq.${enc(a.id)}`);
+    return {};
+  },
+
+  // ---- gold shares: the member's owner or pilot, or an editor ----
+  async 'payouts.mark'(ctx, a) {
+    const share = await shareTarget(ctx, a);
+    const row = {
+      [share.col]: share.parentId, member_name: a.member_name, discord_id: share.ownerId,
+      source: 'web', created_by: ctx.id, received_at: new Date().toISOString(),
+      amount: Math.max(0, Math.round(Number(a.amount) || 0)),
+    };
+    await sbUpsert('lineup_payouts', row, `${share.col},member_name`);
+    return {};
+  },
+  async 'payouts.unmark'(ctx, a) {
+    const share = await shareTarget(ctx, a);
+    await sbDelete('lineup_payouts', `${share.col}=eq.${enc(share.parentId)}&member_name=eq.${enc(a.member_name)}`);
+    return {};
+  },
+
+  // ---- loot records (editors and admins) ----
+  async 'records.archive'(ctx, a) {
+    ctx.requireEditor();
+    const id = await sbRpc('archive_lineup_to_loot_record', { p_lineup_id: a.lineup_id });
+    return { id };
+  },
+  async 'records.delete'(ctx, a) {
+    ctx.requireEditor();
+    await sbDelete('loot_records', `id=eq.${enc(a.id)}`);
+    return {};
+  },
+
+  // ---- Discord thread requests for the bot (editors and admins) ----
+  async 'threads.request'(ctx, a) {
+    ctx.requireEditor();
+    if (!['create', 'update', 'clear'].includes(a.kind)) deny('Unknown thread request');
+    const [row] = await sbPost('thread_requests', {
+      lineup_id: a.lineup_id, channel_id: a.kind === 'create' ? String(a.channel_id || '') : '',
+      requested_by: ctx.id, status: 'pending', action: a.kind,
+    });
+    return { data: row };
   },
 
   // ---- simulator builds ----
