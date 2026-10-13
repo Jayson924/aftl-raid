@@ -225,10 +225,36 @@ function normalizeBuild(raw) {
 function loadBuilds() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (saved?.A && saved?.B) return { A: normalizeBuild(saved.A), B: normalizeBuild(saved.B), characterIds: saved.characterIds || { A: null, B: null } };
+    if (saved?.A && saved?.B) {
+      return {
+        A: normalizeBuild(saved.A), B: normalizeBuild(saved.B),
+        characterIds: saved.characterIds || { A: null, B: null },
+        characterSyncs: saved.characterSyncs || { A: null, B: null },
+      };
+    }
   } catch (e) { /* fall through to defaults */ }
   return { A: normalizeBuild(options.defaults.build1), B: normalizeBuild(options.defaults.build1) };
 }
+
+// Fields set on the site, not sent by the game; a new sync keeps the page's values.
+const SITE_SET_FIELDS = ['title', 'card_bonus_levels', 'collection_level', 'engravings', 'buffs', 'crit_resist_value'];
+const sortedKeys = (_, value) => (value && typeof value === 'object' && !Array.isArray(value)
+  ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+  : value);
+
+// The part of a build the game sends, to tell a build edited on the site from one left as synced.
+function gameSentPart(build) {
+  const out = normalizeBuild(build);
+  for (const field of SITE_SET_FIELDS) delete out[field];
+  return JSON.stringify(out, sortedKeys);
+}
+
+function siteSetPart(build) {
+  const out = normalizeBuild(build);
+  return JSON.stringify(Object.fromEntries(SITE_SET_FIELDS.map((field) => [field, out[field]])), sortedKeys);
+}
+
+const syncRecord = (row, build) => ({ syncedAt: row.synced_at, gear: gameSentPart(build), site: siteSetPart(build) });
 
 // ---- option lists ---------------------------------------------------------------------
 
@@ -319,6 +345,8 @@ export const SimulatorPage = {
   savedIds: { A: null, B: null },
   // The synced character each build slot was loaded from, for Save to character.
   characterIds: { A: null, B: null },
+  // Per slot: the sync it was loaded from and its game-sent part then, to auto-load newer syncs.
+  characterSyncs: { A: null, B: null },
 
   get build() { return this.builds[this.active]; },
   get slotKey() { return this.view === 'costume' ? this.costumeMode : this.view; },
@@ -328,7 +356,9 @@ export const SimulatorPage = {
     if (!this.builds) {
       this.builds = loadBuilds();
       this.characterIds = this.builds.characterIds || { A: null, B: null };
+      this.characterSyncs = this.builds.characterSyncs || { A: null, B: null };
       delete this.builds.characterIds;
+      delete this.builds.characterSyncs;
     }
     initFixedTooltip();
     container.innerHTML = `
@@ -349,17 +379,62 @@ export const SimulatorPage = {
     this.recalculate();
     this.renderTabs();
     this.renderPanel();
-    if (dataService.isPlayer() && !this.guild.loaded) void this.loadGuild();
+    if (dataService.isPlayer() && !this.onReturn) {
+      // Back from the game: pick up any sync made meanwhile.
+      this.onReturn = () => { if (document.visibilityState === 'visible') void this.loadGuild(); };
+      document.addEventListener('visibilitychange', this.onReturn);
+      void this.loadGuild();
+    }
   },
 
   async loadGuild() {
     const [characters, saved] = await Promise.all([dataService.getMySyncedCharacters(), dataService.getSavedBuilds()]);
     this.guild = { characters, saved, loaded: true };
-    if (this.container) this.renderPanel();
+    const updated = await this.followSyncs();
+    if (!this.container) return;
+    if (updated) { this.recalculate(); this.render(this.container); } else this.renderPanel();
+  },
+
+  // A slot loaded from a character takes its newer syncs; hand-set fields edited here stay and are saved
+  // to the character. A slot whose gear was edited on the site is left alone.
+  async followSyncs() {
+    let updated = false;
+    for (const slot of ['A', 'B']) {
+      const row = this.guild.characters.find((c) => c.id === this.characterIds[slot]);
+      if (!row) continue;
+      const record = this.characterSyncs[slot];
+      if (!record) { this.characterSyncs[slot] = syncRecord(row, this.builds[slot]); continue; }
+      if (!row.synced_at || row.synced_at === record.syncedAt) continue;
+      if (gameSentPart(this.builds[slot]) !== record.gear) {
+        toast.info(`${row.name} has a new sync; Load it into Build ${slot} to replace your gear edits`);
+        record.syncedAt = row.synced_at;
+        continue;
+      }
+      let next = normalizeBuild(row.build);
+      if (record.site && siteSetPart(this.builds[slot]) !== record.site) {
+        const kept = Object.fromEntries(SITE_SET_FIELDS.map((field) => [field, this.builds[slot][field]]));
+        next = normalizeBuild({ ...row.build, ...kept });
+        try {
+          await dataService.saveCharacterOverrides(row.id, next);
+        } catch (err) {
+          toast.error(err.message || 'Could not save to the character');
+        }
+      }
+      this.builds[slot] = next;
+      this.characterSyncs[slot] = syncRecord(row, next);
+      updated = true;
+      toast.success(`${row.name}'s new sync loaded into Build ${slot}`);
+    }
+    this.save();
+    return updated;
   },
 
   destroy() {
     this.container = null;
+    if (this.onReturn) {
+      document.removeEventListener('visibilitychange', this.onReturn);
+      this.onReturn = null;
+    }
     if (this.closePickers) {
       document.removeEventListener('click', this.closePickers);
       document.removeEventListener('keydown', this.closePickers);
@@ -390,7 +465,7 @@ export const SimulatorPage = {
   },
 
   save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...this.builds, characterIds: this.characterIds })); } catch (e) { /* storage may be unavailable */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...this.builds, characterIds: this.characterIds, characterSyncs: this.characterSyncs })); } catch (e) { /* storage may be unavailable */ }
   },
 
   recalculate() {
@@ -513,12 +588,14 @@ export const SimulatorPage = {
       const [from, to] = value.split('>');
       this.builds[to] = clone(this.builds[from]);
       this.characterIds[to] = this.characterIds[from];
+      this.characterSyncs[to] = this.characterSyncs[from] && { ...this.characterSyncs[from] };
       this.recalculate(); this.renderPanel();
       toast.success(`Build ${from} copied to Build ${to}`); return;
     }
     if (action === 'save-character') { void this.saveCharacter(); return; }
     if (action === 'reset') {
       this.characterIds[this.active] = null;
+      this.characterSyncs[this.active] = null;
       this.builds[this.active] = normalizeBuild(options.defaults.build1);
       this.recalculate(); this.render(this.container); return;
     }
@@ -533,6 +610,7 @@ export const SimulatorPage = {
       this.builds[this.active] = normalizeBuild(row.build);
       this.savedIds[this.active] = null;
       this.characterIds[this.active] = row.id;
+      this.characterSyncs[this.active] = syncRecord(row, this.builds[this.active]);
       this.recalculate(); this.render(this.container);
       toast.success(`${row.name} loaded into Build ${this.active}`); return;
     }
@@ -543,6 +621,7 @@ export const SimulatorPage = {
       this.builds[this.active] = normalizeBuild(row.build);
       this.savedIds[this.active] = row.id;
       this.characterIds[this.active] = null;
+      this.characterSyncs[this.active] = null;
       this.recalculate(); this.render(this.container);
       toast.success(`${row.name} loaded into Build ${this.active}`); return;
     }
@@ -551,7 +630,12 @@ export const SimulatorPage = {
     if (action === 'import') {
       const text = window.prompt('Paste a build JSON');
       if (!text) return;
-      try { this.builds[this.active] = normalizeBuild(JSON.parse(text)); this.recalculate(); this.render(this.container); }
+      try {
+        this.builds[this.active] = normalizeBuild(JSON.parse(text));
+        this.characterIds[this.active] = null;
+        this.characterSyncs[this.active] = null;
+        this.recalculate(); this.render(this.container);
+      }
       catch (e) { toast.error('That is not a build JSON'); }
     }
   },
@@ -578,6 +662,7 @@ export const SimulatorPage = {
     if (!row) { toast.warning('Load one of your synced characters first'); return; }
     try {
       await dataService.saveCharacterOverrides(row.id, this.build);
+      if (this.characterSyncs[this.active]) this.characterSyncs[this.active].site = siteSetPart(this.build);
       await this.loadGuild();
       toast.success(`Saved to ${row.name}: title, card mastery, collection, engravings and passive levels`);
     } catch (err) {
@@ -615,7 +700,8 @@ export const SimulatorPage = {
     }
     const { characters, saved, loaded } = this.guild;
     const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
-    const characterOptions = characters.map((c) => `<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.role)} · ${when(c.synced_at)}</option>`).join('');
+    const synced = (iso) => (iso ? `${when(iso)}, ${new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '');
+    const characterOptions = characters.map((c) => `<option value="${esc(c.id)}" ${c.id === this.characterIds[this.active] ? 'selected' : ''}>${esc(c.name)} · ${esc(c.role)} · ${synced(c.synced_at)}</option>`).join('');
     const savedOptions = saved.map((b) => `<option value="${esc(b.id)}" ${b.id === this.savedIds[this.active] ? 'selected' : ''}>${esc(b.name)} · ${when(b.updated_at)}</option>`).join('');
     return `
       <div class="sim-guild-row">
