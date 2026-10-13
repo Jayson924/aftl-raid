@@ -402,3 +402,33 @@ test('a saved self buff that shares a passive name is not kept as the passive', 
   assert.equal(saved.status, 200);
   assert.deepEqual(saved.overrides.passives, [{ skill: 'Increased Abyss Chakra', level: 0 }]);
 });
+
+test('the synced guild sets the in-guild flag; a blank or missing guild leaves it alone', async () => {
+  const token = 'meter-token-value';
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p-left', name: 'Leaver', discord_id: 'g1', whitelisted: true }, { id: 'p-old', name: 'Oldtool', discord_id: 'g1', whitelisted: true }],
+  };
+  stubDb(db);
+  const sync = (name, guild) => characterSync(post({ character: { name, job: 'Elestra', ...(guild === undefined ? {} : { guild }) }, build: {} }, { 'x-meter-token': token }));
+  const row = (name) => db.players.find((p) => p.name === name);
+
+  await sync('Member', ' AfterLight ');
+  assert.equal(row('Member').whitelisted, true);
+  assert.equal(row('Member').whitelist_ignored, undefined);
+
+  await sync('Outsider', 'Other Guild');
+  assert.equal(row('Outsider').whitelisted, false);
+  assert.equal(row('Outsider').whitelist_ignored, true);
+
+  await sync('Leaver', 'New Home');
+  assert.equal(row('Leaver').whitelisted, false);
+  assert.equal(row('Leaver').whitelist_ignored, undefined);
+
+  await sync('Oldtool', '');
+  assert.equal(row('Oldtool').whitelisted, true);
+
+  await sync('Oldtool');
+  assert.equal(row('Oldtool').whitelisted, true);
+});

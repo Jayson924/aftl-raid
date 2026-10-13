@@ -7,6 +7,7 @@ import { applyOverrides, calculatePanel, gradedCards } from '../lib/sync-merge.j
 const MAX_BODY = 512 * 1024;
 // The toolbox's class names where the site's CLASSES spell them differently.
 const SITE_CLASS_NAMES = { Moonlord: 'Moon Lord' };
+const GUILD = 'afterlight';
 
 export async function handler(event) {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: json(204, {}).headers };
@@ -53,6 +54,9 @@ export async function handler(event) {
       ...(Array.isArray(cleared) && incoming.length && !resent ? { overrides: Object.fromEntries(Object.entries(prior.overrides).filter(([k]) => k !== 'cleared_cards')) } : {}),
       ...deriveColumns(build, panel, job),
     };
+    // The game's guild decides the in-guild flag; a blank one (no guild, or the login was missed) leaves it alone.
+    const guild = String(body.character?.guild || '').trim().toLowerCase();
+    if (guild) fields.whitelisted = guild === GUILD;
     const accountName = String(body.character?.account || '').trim().slice(0, 40);
     if (accountName) {
       fields.account_name = accountName;
@@ -61,7 +65,8 @@ export async function handler(event) {
     }
     let playerId; let created = false;
     if (!existing.length) {
-      const rows = await sbPost('players', { name, ...fields });
+      // An outsider is already answered, so the bot's in-guild review skips it.
+      const rows = await sbPost('players', { name, ...fields, ...(fields.whitelisted === false ? { whitelist_ignored: true } : {}) });
       playerId = rows[0]?.id; created = true;
     } else if (!existing[0].discord_id || existing[0].discord_id === discordId) {
       await sbPatch('players', `id=eq.${existing[0].id}`, fields);
