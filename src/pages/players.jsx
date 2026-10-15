@@ -2693,7 +2693,7 @@ export const PlayersPage = {
     });
   },
 
-  // Hand-set fields of a synced character (the meter never sends them); buffs stay on the simulator.
+  // Hand-set fields of a synced character; buffs stay on the simulator.
   _overridesHtml(player) {
     const b = player.build || {};
     const L = simOptions.lists;
@@ -2731,7 +2731,9 @@ export const PlayersPage = {
 
     return `
       <section class="modal-overrides">
-        <header class="ov-title"><h3>Set by hand</h3><span>The meter doesn't send these</span></header>
+        <header class="ov-title"><h3>Set by hand</h3>
+          <label class="toggle-switch"><input type="checkbox" id="override-hand-set-wins" ${player.handSetWins ? 'checked' : ''}><span class="toggle-slider"></span><span class="toggle-label">Hand-set beats game</span></label>
+        </header>
         <nav class="ov-tabs" role="tablist">${tabs.map(([key, label], i) => `<button type="button" role="tab" class="ov-tab${i ? '' : ' active'}" data-ov-tab="${key}">${label}</button>`).join('')}</nav>
         ${tabs.map(([key, , body], i) => `<div class="ov-panel ov-panel-${key}" data-ov-panel="${key}" ${i ? 'hidden' : ''}>${body}</div>`).join('')}
       </section>`;
@@ -2960,7 +2962,7 @@ export const PlayersPage = {
         if (isAdmin && newOwnerId !== player.discordId) {
           await dataService.assignCharacterOwner(player.id, newOwnerId || null);
         }
-        if (synced) await dataService.saveCharacterOverrides(player.id, this._readOverrides(modalElement, player));
+        if (synced) await dataService.saveCharacterOverrides(player.id, this._readOverrides(modalElement, player), modalElement.querySelector('#override-hand-set-wins').checked);
 
         document.body.removeChild(modalElement);
         toast.success(`Character "${name}" updated successfully!`);

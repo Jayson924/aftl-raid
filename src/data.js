@@ -388,6 +388,7 @@ class DataService {
         build: p.build || null,
         panel: p.panel || null,
         syncedAt: p.synced_at || null,
+        handSetWins: !!p.overrides?.hand_set_wins,
         // Legacy fields (derived from equipment for backward compat)
         weapon: mainWeapon.rarity || p.weapon || '',
         weaponEnhance: mainWeapon.enhancement != null ? String(mainWeapon.enhancement) : (p.weapon_enhance || ''),
@@ -419,7 +420,7 @@ class DataService {
     if (!this._user) return [];
     const { data, error } = await supabase
       .from('players')
-      .select('id, name, role, build, panel, synced_at')
+      .select('id, name, role, build, panel, synced_at, overrides')
       .eq('discord_id', this._user.id)
       .not('build', 'is', null)
       .order('synced_at', { ascending: false });
@@ -431,11 +432,11 @@ class DataService {
   }
 
   // Save a synced character's hand-set fields (title, card mastery, collection, engravings, buffs).
-  async saveCharacterOverrides(playerId, build) {
+  async saveCharacterOverrides(playerId, build, handSetWins) {
     const response = await fetch('/.netlify/functions/character-overrides', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session: this.getSessionToken(), player_id: playerId, build }),
+      body: JSON.stringify({ session: this.getSessionToken(), player_id: playerId, build, hand_set_wins: handSetWins }),
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Could not save to the character');

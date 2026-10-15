@@ -396,7 +396,7 @@ export const SimulatorPage = {
   },
 
   // A slot loaded from a character takes its newer syncs; hand-set fields edited here stay and are saved
-  // to the character. A slot whose gear was edited on the site is left alone.
+  // to the character, except those the game just sent. A slot whose gear was edited on the site is left alone.
   async followSyncs() {
     let updated = false;
     for (const slot of ['A', 'B']) {
@@ -412,7 +412,8 @@ export const SimulatorPage = {
       }
       let next = normalizeBuild(row.build);
       if (record.site && siteSetPart(this.builds[slot]) !== record.site) {
-        const kept = Object.fromEntries(SITE_SET_FIELDS.map((field) => [field, this.builds[slot][field]]));
+        const fromGame = row.overrides?.hand_set_wins ? [] : (row.build.game_fields || []);
+        const kept = Object.fromEntries(SITE_SET_FIELDS.filter((field) => !fromGame.includes(field)).map((field) => [field, this.builds[slot][field]]));
         next = normalizeBuild({ ...row.build, ...kept });
         try {
           await dataService.saveCharacterOverrides(row.id, next);
@@ -654,8 +655,8 @@ export const SimulatorPage = {
     }
   },
 
-  // Title, card mastery, collection level, engravings and passive levels go onto the character; the meter
-  // never sends them, so the sync keeps them on top of every later build.
+  // Title, card mastery, collection level, engravings and passive levels go onto the character; later syncs
+  // keep them on top except where the game sent its own value and the character's hand-set toggle is off.
   async saveCharacter() {
     const id = this.characterIds[this.active];
     const row = this.guild.characters.find((c) => c.id === id);

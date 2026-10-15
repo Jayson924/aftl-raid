@@ -1,4 +1,4 @@
-// POST {session, player_id, build}: saves the hand-set fields of a synced character and recalculates its panel.
+// POST {session, player_id, build, hand_set_wins?}: saves the hand-set fields of a synced character and recalculates its panel.
 // POST {session, player_id, clear_cards: true}: empties its cards; syncs resending those same cards are ignored.
 import { verifySession } from '../lib/session.js';
 import { sbGet, sbPatch, sbDelete, userRecord, PLAYER_ROLES, json } from '../lib/db.js';
@@ -31,7 +31,7 @@ export async function handler(event) {
     if (!player.build) return json(409, { error: 'This character has never been synced' });
 
     // Merge: a partial save (the players-page modal) keeps fields saved from the simulator.
-    const stored = Object.fromEntries(Object.entries(player.overrides || {}).filter(([k]) => [...OVERRIDE_FIELDS, 'cleared_cards'].includes(k)));
+    const stored = Object.fromEntries(Object.entries(player.overrides || {}).filter(([k]) => [...OVERRIDE_FIELDS, 'cleared_cards', 'hand_set_wins'].includes(k)));
     let overrides; let build;
     if (clearCards) {
       const cleared = gradedCards(player.build.card_grades);
@@ -39,7 +39,7 @@ export async function handler(event) {
       build = { ...player.build, card_grades: (player.build.card_grades || []).map((c) => ({ ...c, grade: 'None' })) };
       await sbDelete('player_cards', `player_id=eq.${encodeURIComponent(playerId)}`);
     } else {
-      overrides = { ...stored, ...pickOverrides(body.build) };
+      overrides = { ...stored, ...pickOverrides(body.build), ...(typeof body.hand_set_wins === 'boolean' ? { hand_set_wins: body.hand_set_wins } : {}) };
       build = applyOverrides(player.build, overrides);
     }
     const panel = calculatePanel(build);

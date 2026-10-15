@@ -5,6 +5,8 @@ import { getTables } from './sim/tables.js';
 // Party and self buffs are not here: the character's panel must match the game's window.
 // Passive levels are, since the game never sends skill levels.
 export const OVERRIDE_FIELDS = ['title', 'card_bonus_levels', 'collection_level', 'engravings', 'passives'];
+// Fields the meter can read from the game; there the game's value wins unless the character's hand_set_wins is on.
+export const GAME_FIELDS = ['title', 'card_bonus_levels', 'collection_level', 'engravings'];
 
 // A keyed row is judged by its key: a self buff can share a passive's name.
 const isPassive = (b) => {
@@ -29,12 +31,13 @@ export function pickOverrides(build) {
   return out;
 }
 
-// The synced build with the stored overrides on top; the sync never sends these fields itself.
+// The synced build with the stored overrides on top of every field the game did not send.
 export function applyOverrides(build, overrides) {
   const out = { ...(build || {}) };
   if (!overrides || typeof overrides !== 'object') return out;
+  const fromGame = overrides.hand_set_wins ? [] : (out.game_fields || []);
   for (const field of OVERRIDE_FIELDS) {
-    if (field === 'passives' || overrides[field] === undefined || overrides[field] === null) continue;
+    if (field === 'passives' || fromGame.includes(field) || overrides[field] === undefined || overrides[field] === null) continue;
     out[field] = overrides[field];
   }
   if (Array.isArray(overrides.passives)) {

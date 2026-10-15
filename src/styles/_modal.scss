@@ -571,12 +571,12 @@
   overflow: hidden;
 
   .ov-title {
-    display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
     padding: 0.65rem 0.85rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(244, 196, 48, 0.05);
     h3 { margin: 0; font-size: 0.95rem; color: $primary-color; }
-    span { color: $text-muted; font-size: 0.75rem; }
+    .toggle-label { color: $text-muted; font-size: 0.75rem; }
   }
 
   .ov-tabs {

@@ -104,7 +104,7 @@ test('character-sync creates, updates, and refuses another user\'s character', a
   const row = db.players.find((p) => p.name === 'Swipe');
   assert.equal(row.discord_id, 'g1');
   assert.equal(row.role, 'Elestra');
-  assert.deepEqual(row.build, { second_job: 'Elestra' });
+  assert.deepEqual(row.build, { second_job: 'Elestra', game_fields: [] });
   assert.ok(row.synced_at);
   assert.ok(db.meter_tokens[0].last_used_at);
 
@@ -273,6 +273,39 @@ test('overrides set on the site survive a sync and recalculate the panel', async
   assert.notEqual(db.players[0].panel.summary.HP, 1);
 });
 
+
+test('fields the game sent beat hand-set ones unless the character keeps hand-set values', async () => {
+  const token = 'meter-token-value';
+  const base = { ...syncedBuild, card_grades: [], buffs: [] };
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [{ id: 'p1', name: 'Swipe', discord_id: 'g1', role: 'Elestra', build: base, overrides: { title: 'Song of Wind', collection_level: 12 } }],
+  };
+  stubDb(db);
+  const sync = (gameFields) => characterSync(post({
+    character: { name: 'Swipe', job: 'Elestra', game_fields: gameFields },
+    build: { ...base, title: 'Desert Resource · Explorer', collection_level: 30 },
+  }, { 'x-meter-token': token }));
+
+  assert.equal(parse(await sync(['title', 'collection_level', 'bogus'])).status, 200);
+  assert.deepEqual(db.players[0].build.game_fields, ['title', 'collection_level']);
+  assert.equal(db.players[0].build.title, 'Desert Resource · Explorer');
+  assert.equal(db.players[0].build.collection_level, 30);
+
+  // An older meter sends no game fields; the hand-set values apply as before.
+  await sync(undefined);
+  assert.equal(db.players[0].build.title, 'Song of Wind');
+
+  // The toggle makes hand-set values win, and later partial saves keep it.
+  const save = (body) => characterOverrides(post({ session: signSession('g1', 'test-secret'), player_id: 'p1', ...body }));
+  assert.equal(parse(await save({ build: {}, hand_set_wins: true })).status, 200);
+  await save({ build: { collection_level: 12 } });
+  assert.equal(db.players[0].overrides.hand_set_wins, true);
+  await sync(['title', 'collection_level']);
+  assert.equal(db.players[0].build.title, 'Song of Wind');
+  assert.equal(db.players[0].build.collection_level, 12);
+});
 
 test('a partial override save keeps fields saved earlier', async () => {
   const base = { ...syncedBuild, card_grades: [], buffs: [] };

@@ -2,7 +2,7 @@
 import { sha256 } from '../lib/session.js';
 import { sbGet, sbPost, sbPatch, sbDelete, userRole, PLAYER_ROLES, json } from '../lib/db.js';
 import { deriveColumns, deriveCardRows } from '../lib/sync-derive.js';
-import { applyOverrides, calculatePanel, gradedCards } from '../lib/sync-merge.js';
+import { applyOverrides, calculatePanel, gradedCards, GAME_FIELDS } from '../lib/sync-merge.js';
 
 const MAX_BODY = 512 * 1024;
 // The toolbox's class names where the site's CLASSES spell them differently.
@@ -40,12 +40,17 @@ export async function handler(event) {
     if (prior?.synced_at && prior.role && prior.role !== siteRole && SITE_CLASS_NAMES[prior.role] !== siteRole && body.character?.name_source === 'typed') {
       return json(422, { error: `${name} is a ${prior.role} on Afterlight, but this ${siteRole} build has a typed name. Check the name on the sync screen.` });
     }
-    // Values set on the site stay on top of every sync; the panel is then the site's own calculation.
+    // Values set on the site stay on top of every field the game did not send; the panel is then the site's own calculation.
     // Cards cleared on the site stay cleared while the toolbox resends that same remembered set.
     const cleared = prior?.overrides?.cleared_cards;
     const incoming = gradedCards(body.build.card_grades);
     const resent = Array.isArray(cleared) && incoming.length && incoming.join() === cleared.join();
-    const synced = resent ? { ...body.build, card_grades: (body.build.card_grades || []).map((c) => ({ ...c, grade: 'None' })) } : body.build;
+    const gameFields = (Array.isArray(body.character?.game_fields) ? body.character.game_fields : []).filter((f) => GAME_FIELDS.includes(f));
+    const synced = {
+      ...body.build,
+      game_fields: gameFields,
+      ...(resent ? { card_grades: (body.build.card_grades || []).map((c) => ({ ...c, grade: 'None' })) } : {}),
+    };
     const build = applyOverrides(withStoredCards(synced, prior?.build), prior?.overrides);
     const panel = calculatePanel(build) || body.panel || null;
     const fields = {
