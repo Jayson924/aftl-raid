@@ -129,7 +129,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span class="app-version">v3.0.01</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span class="app-version">v3.0.02</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
