@@ -434,26 +434,14 @@ Raid clear status still resets weekly.">
       btn.addEventListener('click', () => {
         const family = btn.dataset.family;
 
-        // If clicking the same family that's expanded
+        // Clicking the open family clears its whole filter, specialization included
         if (this.expandedClassFamily === family) {
-          // If a specialization is selected, deselect it but keep expanded
-          if (this.selectedSpecialization) {
-            this.selectedSpecialization = null;
-            this.selectedFinalClass = null;
-            this.selectedClassFamily = family;
-            document.querySelectorAll('.specialization-btn').forEach(b => b.classList.remove('active'));
-          } else if (this.selectedClassFamily === family) {
-            // If base class was filtering, collapse everything
-            this.expandedClassFamily = null;
-            this.selectedClassFamily = null;
-            this.selectedFinalClass = null;
-            btn.classList.remove('active', 'expanded');
-            this.renderSpecializations();
-          } else {
-            // Filter by base class
-            this.selectedClassFamily = family;
-            btn.classList.add('active');
-          }
+          this.expandedClassFamily = null;
+          this.selectedClassFamily = null;
+          this.selectedSpecialization = null;
+          this.selectedFinalClass = null;
+          btn.classList.remove('active', 'expanded');
+          this.renderSpecializations();
         } else {
           // Expanding a different family
           document.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active', 'expanded'));
@@ -1683,21 +1671,12 @@ Raid clear status still resets weekly.">
         const family = btn.dataset.family;
 
         if (modalExpandedFamily === family) {
-          if (modalSelectedSpecialization) {
-            modalSelectedSpecialization = null;
-            modalSelectedFinalClass = null;
-            modalSelectedFamily = family;
-            document.querySelectorAll('#modal-specialization-filter .specialization-btn').forEach(b => b.classList.remove('active'));
-          } else if (modalSelectedFamily === family) {
-            modalExpandedFamily = null;
-            modalSelectedFamily = null;
-            modalSelectedFinalClass = null;
-            btn.classList.remove('active', 'expanded');
-            renderModalSpecializations();
-          } else {
-            modalSelectedFamily = family;
-            btn.classList.add('active');
-          }
+          modalExpandedFamily = null;
+          modalSelectedFamily = null;
+          modalSelectedSpecialization = null;
+          modalSelectedFinalClass = null;
+          btn.classList.remove('active', 'expanded');
+          renderModalSpecializations();
         } else {
           modalElement.querySelectorAll('.class-family-btn').forEach(b => b.classList.remove('active', 'expanded'));
           modalExpandedFamily = family;
