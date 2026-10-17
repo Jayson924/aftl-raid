@@ -4,8 +4,7 @@
   transition: max-width 0.3s ease;
 
   &:has(#my-characters-list.two-columns),
-  &:has(.mc-tab.active[data-tab="cards"]),
-  &:has(.mc-tab.active[data-tab="shopping"]) {
+  &:has(.mc-tab.active[data-tab="tracked"]) {
     max-width: 1200px;
   }
 
@@ -540,7 +539,7 @@
   // ============================================
 
   .character-personal-raids {
-    padding: 0.5rem 0.75rem 0.75rem;
+    padding: 0.75rem 0.75rem 0.75rem;
   }
 
   .btn-add-raid {
@@ -1322,17 +1321,8 @@
 }
 
 // ============================================
-// CARDS TAB
+// CARDS (per-character view on the Raids tab)
 // ============================================
-.my-raids-page .my-cards-section .section-header h2 {
-  margin: 0;
-}
-
-.my-raids-page #my-cards-list .cards-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
 
 .my-raids-page .card-character-block {
   margin-bottom: 0;
@@ -1462,7 +1452,16 @@
 }
 
 // Level tabs, the paste button (All only) and the Card Stats total.
-.my-raids-page .card-tier-tabs .sim-card-tabs { justify-content: flex-start; }
+.my-raids-page .card-tier-tabs .sim-card-tabs { justify-content: flex-start; margin-bottom: 0; }
+// Level tabs and Equipped/Extras share one row; the toggle wraps below on narrow cards.
+.my-raids-page .card-controls-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-bottom: 0.6rem;
+  .card-section-tabs { order: 1; margin: 0 0 0 auto; }
+  .card-section-tab { padding: 0.3rem 0.6rem; }
+  .card-tier-tabs { flex: 1 1 0; min-width: max-content; }
+  .card-tier-tabs .sim-card-tabs button { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+  .card-tier-tabs[data-section-active="false"] { visibility: hidden; }
+}
 .my-raids-page .card-paste-btn.tier-hidden { display: none; }
 .my-raids-page .card-totals .sim-board-totals { margin-top: 0.75rem; overflow: visible; }
 
@@ -1675,49 +1674,14 @@
 }
 
 // ============================================
-// SHOPPING LIST TAB
+// SHOPPING LIST (per-character view on the Raids tab)
 // ============================================
-.my-raids-page #my-shopping-list .character-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-@media (max-width: 768px) {
-  .my-raids-page #my-shopping-list .character-cards {
-    grid-template-columns: 1fr;
-  }
-}
-
-// Fixed height so every card matches; the items list scrolls internally
-// while the add-item row and total stay pinned in view.
-.my-raids-page .shopping-character-block {
-  display: flex;
-  flex-direction: column;
-  height: 33rem;
-}
-
+// The items list scrolls while the add-item row and total stay pinned.
 .my-raids-page .character-shopping {
-  padding: 0.5rem 0.75rem 0.75rem;
-  flex: 1;
-  min-height: 0;
+  padding: 0.6rem 1rem 0.75rem;
+  height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.my-raids-page .shopping-character-block .character-card .character-info {
-  .character-name {
-    display: block;
-    font-weight: 600;
-    font-size: 1rem;
-    color: $text-light;
-  }
-
-  .character-class {
-    display: block;
-    font-size: 0.85rem;
-    color: $text-muted;
-  }
 }
 
 .my-raids-page .shopping-items-list {
@@ -2008,4 +1972,119 @@
       gap: 0.5rem;
     }
   }
+}
+
+// ============================================
+// AT-A-GLANCE STATS (Raids tab character cards)
+// ============================================
+.my-raids-page .mc-gs { flex: none; font-weight: 700; font-size: 0.8rem; padding: 0.1rem 0.45rem; border-radius: 5px; cursor: default; }
+.my-raids-page .mc-char-stats {
+  display: flex; flex-direction: column;
+  padding: 0.55rem 1rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  .cc-slots { border-top: 0; padding-top: 0; }
+}
+
+// ============================================
+// GUILD RAIDS TAB (everyone's personal raids)
+// ============================================
+
+.my-raids-page .tracked-toolbar {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.my-raids-page .tracked-groupby {
+  display: inline-flex; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; overflow: hidden;
+}
+.my-raids-page .tracked-seg {
+  background: transparent; border: 0; color: rgba(255, 255, 255, 0.6); padding: 0.4rem 0.85rem; font-size: 0.85rem; cursor: pointer;
+  & + & { border-left: 1px solid rgba(255, 255, 255, 0.12); }
+  &:hover { color: rgba(255, 255, 255, 0.9); }
+  &.active { background: rgba(244, 196, 48, 0.15); color: $primary-color; }
+}
+.my-raids-page .tracked-search {
+  flex: 1 1 220px; min-width: 0; max-width: 340px;
+  background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+  color: $text-light; padding: 0.4rem 0.7rem; font-size: 0.85rem;
+}
+.my-raids-page .tracked-hide-done { display: inline-flex; align-items: center; gap: 0.35rem; color: $text-muted; font-size: 0.85rem; cursor: pointer; }
+
+.my-raids-page .tracked-groups {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; align-items: start;
+}
+.my-raids-page .tracked-group {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: $border-radius;
+  padding: 0.75rem 0.9rem;
+  &.mine { border-color: rgba(244, 196, 48, 0.3); }
+}
+.my-raids-page .tracked-group-header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.my-raids-page .tracked-group-title { color: $primary-color; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-raids-page .tracked-group-stat { color: $text-muted; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.my-raids-page .tracked-group-bar { margin: 0.4rem 0 0.6rem; height: 4px; }
+.my-raids-page .tracked-rows { display: flex; flex-direction: column; gap: 0.15rem; }
+.my-raids-page .tracked-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) 7.5rem; align-items: center; gap: 0.6rem;
+  padding: 0.3rem 0.35rem; border-radius: 5px;
+  &.mine { background: rgba(244, 196, 48, 0.06); }
+  &.done { opacity: 0.55; }
+}
+// The 44x46 sprite at half size keeps its frame.
+.my-raids-page .tracked-icon-wrap { width: 22px; height: 23px; overflow: hidden; }
+.my-raids-page .tracked-icon { display: block; transform: scale(0.5); transform-origin: top left; }
+.my-raids-page .tracked-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.my-raids-page .tracked-char { font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-raids-page .tracked-sub { font-size: 0.75rem; color: $text-muted; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-raids-page .tracked-progress { display: flex; flex-direction: column; gap: 0.2rem; }
+.my-raids-page .tracked-count { text-align: right; font-size: 0.8rem; font-weight: 700; color: $text-muted; font-variant-numeric: tabular-nums; }
+.my-raids-page .tracked-row.done .tracked-count { color: #34ce57; }
+
+@media (max-width: 768px) {
+  .my-raids-page .mc-tabs { overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .my-raids-page .mc-tab { white-space: nowrap; padding: 0.6rem 0.75rem; }
+  .my-raids-page .tracked-groups { grid-template-columns: 1fr; }
+  .my-raids-page .tracked-search { max-width: none; }
+  .my-raids-page .mc-char-stats { padding: 0.5rem 0.75rem 0.6rem; }
+  .my-raids-page .mc-view-tabs { flex-wrap: wrap; padding: 0.45rem 0.75rem 0; }
+  .my-raids-page .mc-synced-note { order: -1; flex-basis: 100%; margin-left: 0; }
+}
+
+// Gear & Stats | Cards | Shopping switch inside each Raids-tab character card.
+.my-raids-page .mc-view-tabs {
+  display: flex; align-items: center; gap: 0.25rem; padding: 0.45rem 1rem 0;
+}
+.my-raids-page .mc-synced-note { margin-left: auto; color: $text-muted; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.my-raids-page .mc-view-tab {
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.55); padding: 0.25rem 0.6rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; white-space: nowrap;
+  &:hover:not([disabled]) { color: rgba(255, 255, 255, 0.85); }
+  &.active { color: $primary-color; border-bottom-color: $primary-color; }
+  &.mc-tab-locked { opacity: 0.45; cursor: default; }
+}
+.my-raids-page .mc-char-view {
+  // Every view gets the Gear & Stats height so switching never resizes the card.
+  height: 26rem;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  .mc-char-stats { border-bottom: 0; }
+  .mc-view-loading { padding: 1rem; margin: 0; }
+  .card-synced-note { display: none; }
+  .cards-synced .card-character-header { display: none; }
+  // Drawn smaller so the 4x4 grid and its pages fit without scrolling.
+  .card-grid { zoom: 0.8; }
+  .card-pagination-wrap { margin-top: 0.25rem; }
+  .card-character-block {
+    padding: 0.55rem 1rem 0.75rem; background: transparent; border: 0; border-radius: 0;
+    &:hover { background: transparent; box-shadow: none; }
+  }
+  .card-character-header {
+    justify-content: flex-end; margin-bottom: 0.5rem;
+    .character-info { display: none; }
+  }
+}
+
+// Room for the Equipped/Extras toggle wrapping onto its own line.
+@media (max-width: 768px) {
+  .my-raids-page .mc-char-view { height: 28.5rem; }
 }

@@ -4,7 +4,10 @@ import { modal } from '../modal.js';
 import {
   getClassSpriteStyle,
   CARDS_PER_PAGE,
-  EQUIPMENT_RARITIES
+  EQUIPMENT_RARITIES,
+  calculateGearscore,
+  getGearscoreTier,
+  gearscoreTooltipText
 } from '../constants.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
@@ -12,12 +15,26 @@ import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
 import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
-import { guildLockedPanel } from '../guild-lock.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
 
 const CARD_RARITIES = EQUIPMENT_RARITIES.filter(r => r.value);
+const SHOW_STATS_KEY = 'myCharsShowStats';
+const TRACKED_PREFS_KEY = 'myTrackedRaidsPrefs';
+
+function loadPref(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function savePref(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage blocked */ }
+}
 
 // Per-character "include bought in totals" prefs, persisted as a playerId->bool map.
 const SHOPPING_TOTAL_PREFS_KEY = 'myShoppingTotalAllByPlayer';
@@ -48,7 +65,13 @@ export const MyRaidsPage = {
   _editingRaidId: null,
   _editingRaidPlayerId: null,
   _lastAddedRaid: null,
-  _activeTab: 'raids', // 'raids' | 'shopping' | 'cards'
+  _activeTab: 'raids', // 'raids' | 'tracked' | 'shopping' | 'profile'
+  _viewByPlayer: {}, // playerId -> 'stats' | 'cards' | 'shopping' on the Raids tab
+  _allPlayers: [],
+  _showStats: loadPref(SHOW_STATS_KEY, true),
+  _trackedPrefs: { groupBy: 'raid', hideDone: false, ...loadPref(TRACKED_PREFS_KEY, {}), search: '' },
+  _trackedRaids: null,
+  _trackedUsers: null,
   _shoppingItems: [], // [{ id, playerId, item, bought, price, sortOrder }]
   _shoppingLoaded: false,
   _shoppingTotalAllByPlayer: loadShoppingTotalPrefs(), // { [playerId]: true } — true = include bought; default un-bought only
@@ -65,17 +88,13 @@ export const MyRaidsPage = {
       return;
     }
 
-    // Friends (part-time raiders) see the guild perks dimmed, as a nudge to join.
-    const locked = dataService.isPlayer() ? '' : ' mc-tab-locked';
-
     container.innerHTML = `
       <div class="my-raids-page">
         <div class="mc-header">
           <h1 class="page-title">My Characters</h1>
           <nav class="mc-tabs">
-            <button class="mc-tab active" data-tab="raids">Raids</button>
-            <button class="mc-tab${locked}" data-tab="cards">Cards</button>
-            <button class="mc-tab${locked}" data-tab="shopping">Shopping List</button>
+            <button class="mc-tab active" data-tab="raids">Characters</button>
+            <button class="mc-tab" data-tab="tracked">Raids</button>
             <button class="mc-tab" data-tab="profile">Profile</button>
           </nav>
         </div>
@@ -83,6 +102,7 @@ export const MyRaidsPage = {
         <div class="section my-characters-section" data-tab-panel="raids">
           <div class="section-header">
             <div class="section-header-actions">
+              <button class="btn btn-secondary mc-stats-toggle" id="toggle-stats-btn">${this._showStats ? 'Hide details' : 'Show details'}</button>
               <button class="btn btn-danger-ghost" id="delete-raid-all-btn">Delete All Raids</button>
               <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
               <button class="btn btn-primary" id="add-character-btn">+ Add Character</button>
@@ -91,12 +111,16 @@ export const MyRaidsPage = {
           <div id="my-characters-list" class="two-columns"></div>
         </div>
 
-        <div class="section my-cards-section" data-tab-panel="cards" style="display:none">
-          <div id="my-cards-list"></div>
-        </div>
-
-        <div class="section my-shopping-section" data-tab-panel="shopping" style="display:none">
-          <div id="my-shopping-list"></div>
+        <div class="section my-tracked-section" data-tab-panel="tracked" style="display:none">
+          <div class="tracked-toolbar">
+            <div class="tracked-groupby" role="group" aria-label="Group by">
+              <button class="tracked-seg" data-group-by="raid">By raid</button>
+              <button class="tracked-seg" data-group-by="owner">By member</button>
+            </div>
+            <input type="search" id="tracked-search" class="tracked-search" placeholder="Search raid, character or member">
+            <label class="tracked-hide-done"><input type="checkbox" id="tracked-hide-done"> Hide finished</label>
+          </div>
+          <div id="my-tracked-list"></div>
         </div>
 
         <div class="mc-profile" data-tab-panel="profile" style="display:none">
@@ -145,6 +169,8 @@ export const MyRaidsPage = {
     this.setupAddRaidToAllHandler();
     this.setupDeleteAllRaidsHandler();
     this.setupTabHandlers();
+    this.setupStatsToggle();
+    this.setupTrackedHandlers();
     await this.loadMyCharacters();
   },
 
@@ -159,6 +185,10 @@ export const MyRaidsPage = {
     this._editingRaidPlayerId = null;
     this._lastAddedRaid = null;
     this._activeTab = 'raids';
+    this._viewByPlayer = {};
+    this._allPlayers = [];
+    this._trackedRaids = null;
+    this._trackedUsers = null;
     this._shoppingItems = [];
     this._shoppingLoaded = false;
     this._cardsPageByPlayer = {};
@@ -192,8 +222,7 @@ export const MyRaidsPage = {
         document.querySelectorAll('[data-tab-panel]').forEach(panel => {
           panel.style.display = panel.dataset.tabPanel === tab ? '' : 'none';
         });
-        if (tab === 'cards') this.renderCardsTab();
-        if (tab === 'shopping') this.renderShoppingTab();
+        if (tab === 'tracked') this.loadTrackedTab();
       });
     });
   },
@@ -352,6 +381,7 @@ export const MyRaidsPage = {
         this.loadPersonalRaids()
       ]);
       const userId = dataService.getUser()?.id;
+      this._allPlayers = allPlayers;
       this._myPlayers = allPlayers.filter(p => p.discordId === userId);
       this._characterGroups = groups;
 
@@ -397,11 +427,13 @@ export const MyRaidsPage = {
                   <span class="character-name-link" data-player-id="${player.id}">${player.name}</span>
                   <span class="character-class">${player.role}</span>
                 </div>
+                ${this.renderGearscorePill(player)}
               </div>
               <div class="character-actions">
                 ${PlayersPage.renderRaidBadgesHTML(player, true)}
               </div>
             </div>
+            ${this._showStats ? this.renderCharDetailsHTML(player) : ''}
             ${this.renderCharMoveControls(player)}
             <div class="character-personal-raids">
               ${this.renderPlayerRaidsHTML(player.id, playerRaids)}
@@ -419,6 +451,264 @@ export const MyRaidsPage = {
     this.setupGroupHandlers(listEl);
     this.setupCharacterDnD(listEl);
     this.setupCharacterMoveHandlers(listEl);
+    this.setupCharViewHandlers(listEl);
+    this._myPlayers.forEach(p => this.bindCharView(p));
+  },
+
+  renderGearscorePill(player) {
+    const gs = calculateGearscore(player);
+    const tier = getGearscoreTier(gs);
+    return `<span class="mc-gs" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>`;
+  },
+
+  canUseCards(player) {
+    return dataService.isPlayer() && dataService.isPlayerWhitelisted(player);
+  },
+
+  canUseView(player, view) {
+    if (view === 'cards') return this.canUseCards(player);
+    if (view === 'shopping') return dataService.isPlayer();
+    return true;
+  },
+
+  charView(player) {
+    const view = this._viewByPlayer[player.id] || 'stats';
+    return this.canUseView(player, view) ? view : 'stats';
+  },
+
+  viewLoaded(view) {
+    if (view === 'cards') return this._cardsLoaded;
+    if (view === 'shopping') return this._shoppingLoaded;
+    return true;
+  },
+
+  renderCharDetailsHTML(player) {
+    const view = this.charView(player);
+    const tab = (v, label) => {
+      if (this.canUseView(player, v)) return `<button type="button" class="mc-view-tab${view === v ? ' active' : ''}" data-view="${v}" data-player-id="${player.id}">${label}</button>`;
+      // Friends see the guild perks dimmed, as a nudge to join.
+      return dataService.isPlayer() ? '' : `<button type="button" class="mc-view-tab mc-tab-locked" disabled data-tooltip-fixed="Guildmates only">${label}</button>`;
+    };
+    const synced = syncedLabel(player.syncedAt);
+    return `
+      <div class="mc-view-tabs">
+        ${tab('stats', 'Gear &amp; Stats')}${tab('cards', 'Cards')}${tab('shopping', 'Shopping')}
+        ${synced ? `<span class="mc-synced-note" data-tooltip-fixed="Re-sync from the toolbox to update gear, stats and cards">${synced}</span>` : ''}
+      </div>
+      <div class="mc-char-view" data-player-id="${player.id}">${this.renderCharViewBody(player, view)}</div>`;
+  },
+
+  // Gear tiles and stat grid match the Characters page cards; cards and shopping reuse their editors.
+  renderCharViewBody(player, view) {
+    if (view === 'stats') return `<div class="cc-embed mc-char-stats">${PlayersPage._cardSlotsHtml(player)}${PlayersPage._cardStatsHtml(player)}</div>`;
+    if (!this.viewLoaded(view)) return '<p class="empty-state mc-view-loading">Loading…</p>';
+    if (view === 'cards') return this.renderCardCharacterBlockHTML(player);
+    return `<div class="character-shopping" data-player-id="${player.id}">${this.renderShoppingItemsHTML(player.id)}</div>`;
+  },
+
+  bindCharView(player) {
+    const view = this.charView(player);
+    if (!this.viewLoaded(view)) return;
+    if (view === 'cards') this.bindCardHandlersFor(player.id);
+    if (view === 'shopping') {
+      const el = document.querySelector(`.character-shopping[data-player-id="${player.id}"]`);
+      if (el) this.bindShoppingHandlersFor(el, player.id);
+    }
+  },
+
+  setupCharViewHandlers(root) {
+    root.querySelectorAll('.mc-view-tab:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => this.setCharView(btn.dataset.playerId, btn.dataset.view));
+    });
+  },
+
+  async setCharView(playerId, view) {
+    const player = this._myPlayers.find(p => p.id === playerId);
+    if (!player || this.charView(player) === view) return;
+    this._viewByPlayer[playerId] = view;
+    document.querySelectorAll(`.mc-view-tab[data-player-id="${playerId}"]`).forEach(b => {
+      b.classList.toggle('active', b.dataset.view === view);
+    });
+    const body = document.querySelector(`.mc-char-view[data-player-id="${playerId}"]`);
+    if (!body) return;
+    body.innerHTML = this.renderCharViewBody(player, view);
+    if (this.viewLoaded(view)) {
+      this.bindCharView(player);
+      return;
+    }
+    const loaded = view === 'cards' ? await this.ensureCardsLoaded() : await this.ensureShoppingLoaded();
+    if (!loaded) {
+      body.innerHTML = '<p class="empty-state">Failed to load.</p>';
+      return;
+    }
+    // Fill every view still waiting on this load; the user may have switched some away.
+    this._myPlayers.filter(p => this.charView(p) === view).forEach(p => {
+      const el = document.querySelector(`.mc-char-view[data-player-id="${p.id}"]`);
+      if (!el?.querySelector('.mc-view-loading')) return;
+      el.innerHTML = this.renderCharViewBody(p, view);
+      this.bindCharView(p);
+    });
+  },
+
+  setupStatsToggle() {
+    const btn = document.getElementById('toggle-stats-btn');
+    btn?.addEventListener('click', () => {
+      this._showStats = !this._showStats;
+      savePref(SHOW_STATS_KEY, this._showStats);
+      btn.textContent = this._showStats ? 'Hide details' : 'Show details';
+      this.renderRaidsList();
+    });
+  },
+
+  async ensureShoppingLoaded() {
+    if (this._shoppingLoaded) return true;
+    this._shoppingLoading ||= dataService.getShoppingList().then(items => {
+      this._shoppingItems = items;
+      this._shoppingLoaded = true;
+    });
+    try {
+      await this._shoppingLoading;
+      return true;
+    } catch (error) {
+      console.error('Error loading shopping list:', error);
+      return false;
+    } finally {
+      this._shoppingLoading = null;
+    }
+  },
+
+  // ============================================
+  // GUILD RAIDS (everyone's personal raids)
+  // ============================================
+
+  setupTrackedHandlers() {
+    const prefs = this._trackedPrefs;
+    const search = document.getElementById('tracked-search');
+    const hideDone = document.getElementById('tracked-hide-done');
+    search.value = prefs.search || '';
+    hideDone.checked = !!prefs.hideDone;
+    const update = (patch) => {
+      Object.assign(prefs, patch);
+      savePref(TRACKED_PREFS_KEY, { groupBy: prefs.groupBy, hideDone: prefs.hideDone });
+      this.renderTrackedList();
+    };
+    document.querySelectorAll('.tracked-seg').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.groupBy === prefs.groupBy);
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tracked-seg').forEach(b => b.classList.toggle('active', b === btn));
+        update({ groupBy: btn.dataset.groupBy });
+      });
+    });
+    search.addEventListener('input', () => update({ search: search.value }));
+    hideDone.addEventListener('change', () => update({ hideDone: hideDone.checked }));
+  },
+
+  async loadTrackedTab() {
+    const listEl = document.getElementById('my-tracked-list');
+    if (!listEl) return;
+    if (!this._trackedRaids) listEl.innerHTML = '<p class="empty-state">Loading…</p>';
+    try {
+      const [raids, users] = await Promise.all([
+        dataService.getAllPersonalRaids(),
+        this._trackedUsers || dataService.getAppUsers()
+      ]);
+      this._trackedRaids = raids;
+      this._trackedUsers = users;
+      this.renderTrackedList();
+    } catch (error) {
+      console.error('Error loading tracked raids:', error);
+      listEl.innerHTML = '<p class="empty-state">Failed to load raids.</p>';
+    }
+  },
+
+  // Joins each raid to its character and owner; raids of deleted characters are dropped.
+  trackedEntries() {
+    const playersById = new Map(this._allPlayers.map(p => [p.id, p]));
+    const usersById = new Map((this._trackedUsers || []).map(u => [u.discordId, u]));
+    const myId = dataService.getUser()?.id;
+    return (this._trackedRaids || []).flatMap(raid => {
+      const player = playersById.get(raid.playerId);
+      if (!player) return [];
+      const ownerId = player.discordId || raid.discordId;
+      return [{
+        raid,
+        player,
+        ownerId,
+        ownerName: usersById.get(ownerId)?.displayName || 'Unknown',
+        mine: ownerId === myId,
+        done: raid.currentClears >= raid.maxClears
+      }];
+    });
+  },
+
+  renderTrackedList() {
+    const listEl = document.getElementById('my-tracked-list');
+    if (!listEl || !this._trackedRaids) return;
+    const { groupBy, hideDone, search } = this._trackedPrefs;
+    const q = (search || '').trim().toLowerCase();
+
+    let entries = this.trackedEntries();
+    if (q) entries = entries.filter(e => [e.raid.name, e.player.name, e.ownerName].some(s => s.toLowerCase().includes(q)));
+    if (hideDone) entries = entries.filter(e => !e.done);
+    if (!entries.length) {
+      const none = this._trackedRaids.length ? 'Nothing matches.' : 'Nobody is tracking a personal raid yet.';
+      listEl.innerHTML = `<p class="empty-state">${none}</p>`;
+      return;
+    }
+
+    const byOwner = groupBy === 'owner';
+    const groups = new Map();
+    for (const e of entries) {
+      const key = byOwner ? e.ownerId : e.raid.name.trim().toLowerCase();
+      if (!groups.has(key)) groups.set(key, { key, entries: [], mine: false });
+      const g = groups.get(key);
+      g.entries.push(e);
+      g.mine ||= e.mine;
+    }
+
+    const sorted = [...groups.values()].sort((a, b) => byOwner
+      ? (b.mine - a.mine) || a.entries[0].ownerName.localeCompare(b.entries[0].ownerName)
+      : (b.entries.length - a.entries.length) || a.key.localeCompare(b.key));
+
+    listEl.innerHTML = `<div class="tracked-groups">${sorted.map(g => this.renderTrackedGroup(g, byOwner)).join('')}</div>`;
+  },
+
+  renderTrackedGroup(group, byOwner) {
+    const entries = [...group.entries].sort((a, b) => (a.done - b.done)
+      || (byOwner
+        ? a.player.name.localeCompare(b.player.name) || a.raid.name.localeCompare(b.raid.name)
+        : (b.mine - a.mine) || a.ownerName.localeCompare(b.ownerName) || a.player.name.localeCompare(b.player.name)));
+    const doneCount = entries.filter(e => e.done).length;
+    const title = byOwner ? entries[0].ownerName : entries[0].raid.name;
+    const pct = Math.round((doneCount / entries.length) * 100);
+
+    const rows = entries.map(({ raid, player, ownerName, mine, done }) => {
+      const iconStyle = getClassSpriteStyle(player.role);
+      const sub = byOwner ? raid.name : ownerName;
+      const fill = Math.min((raid.currentClears / raid.maxClears) * 100, 100);
+      return `
+        <div class="tracked-row${done ? ' done' : ''}${mine ? ' mine' : ''}">
+          <span class="tracked-icon-wrap">${iconStyle ? `<span class="class-sprite tracked-icon" style="${iconStyle}"></span>` : ''}</span>
+          <div class="tracked-who">
+            <span class="tracked-char">${escapeHtml(player.name)}</span>
+            <span class="tracked-sub">${escapeHtml(sub)}</span>
+          </div>
+          <div class="tracked-progress">
+            <span class="tracked-count">${done ? '✓ ' : ''}${raid.currentClears}/${raid.maxClears}</span>
+            <div class="progress-bar"><div class="progress-fill${done ? ' complete' : ''}" style="width: ${fill}%"></div></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="tracked-group${group.mine ? ' mine' : ''}">
+        <div class="tracked-group-header">
+          <span class="tracked-group-title">${escapeHtml(title)}</span>
+          <span class="tracked-group-stat" data-tooltip-fixed="${doneCount} of ${entries.length} finished this week">${doneCount}/${entries.length}</span>
+        </div>
+        <div class="progress-bar tracked-group-bar"><div class="progress-fill${pct === 100 ? ' complete' : ''}" style="width: ${pct}%"></div></div>
+        <div class="tracked-rows">${rows}</div>
+      </div>`;
   },
 
   // ============================================
@@ -1631,83 +1921,8 @@ export const MyRaidsPage = {
   },
 
   // ============================================
-  // SHOPPING LIST TAB
+  // SHOPPING LIST (per-character view on the Raids tab)
   // ============================================
-
-  async renderShoppingTab() {
-    const listEl = document.getElementById('my-shopping-list');
-    if (!listEl) return;
-    const preview = !dataService.isPlayer();
-    const players = preview ? this.previewPlayers() : this._myPlayers;
-
-    if (players.length === 0) {
-      listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
-      return;
-    }
-
-    if (preview) {
-      const samples = [['Heraldry: Critical plate', 180000, false], ['Lv50 Unique accessory box', 950000, false], ['Stat reset scroll', 25000, true]];
-      this._shoppingItems = players.flatMap((p, n) => samples.slice(n % 2).map(([item, price, bought], i) => ({ id: `preview-${p.id}-${i}`, playerId: p.id, item, price, bought })));
-    } else if (!this._shoppingLoaded) {
-      // Lazy-load shopping items on first view
-      listEl.innerHTML = '<p class="empty-state">Loading…</p>';
-      try {
-        this._shoppingItems = await dataService.getShoppingList();
-        this._shoppingLoaded = true;
-      } catch (error) {
-        console.error('Error loading shopping list:', error);
-        listEl.innerHTML = '<p class="empty-state">Failed to load shopping list.</p>';
-        return;
-      }
-    }
-
-    // Shared account → group → ordered-character structure (read-only here)
-    const structure = this.buildAccountStructure(players);
-    const html = this.renderAccountStructure(structure, {
-      editable: false,
-      containerClass: 'character-cards',
-      renderCharacter: (player) => {
-        const iconStyle = getClassSpriteStyle(player.role);
-        return `
-          <div class="character-block shopping-character-block" data-player-id="${player.id}">
-            <div class="character-card">
-              <div class="character-info">
-                ${iconStyle ? `<div class="class-sprite class-icon" style="${iconStyle}"></div>` : ''}
-                <div>
-                  <span class="character-name">${player.name}</span>
-                  <span class="character-class">${player.role}</span>
-                </div>
-              </div>
-            </div>
-            <div class="character-shopping" data-player-id="${player.id}">
-              ${this.renderShoppingItemsHTML(player.id)}
-            </div>
-          </div>
-        `;
-      }
-    });
-    if (preview) {
-      this.renderGuildPreview(listEl, html, 'Shopping List', 'Per-character shopping lists');
-      return;
-    }
-    listEl.innerHTML = html;
-    this.bindShoppingHandlers();
-  },
-
-  // Friends see a guild-only tab filled with sample data under a "Guildmates only" panel.
-  renderGuildPreview(listEl, html, title, what) {
-    listEl.innerHTML = `
-      <div class="guild-preview">
-        <div class="guild-preview-content" inert aria-hidden="true">${html}</div>
-        ${guildLockedPanel(title, what)}
-      </div>`;
-  },
-
-  // Up to two of the friend's own characters, or a stand-in when they have none.
-  previewPlayers() {
-    if (this._myPlayers.length) return this._myPlayers.slice(0, 2);
-    return [{ id: 'preview-char', name: 'Your Character', role: 'Saint', accountNumber: 1 }];
-  },
 
   shoppingTotalFor(playerId) {
     const includeBought = !!this._shoppingTotalAllByPlayer[playerId];
@@ -1762,12 +1977,6 @@ export const MyRaidsPage = {
     if (!container) return;
     container.innerHTML = this.renderShoppingItemsHTML(playerId);
     this.bindShoppingHandlersFor(container, playerId);
-  },
-
-  bindShoppingHandlers() {
-    document.querySelectorAll('.character-shopping').forEach(container => {
-      this.bindShoppingHandlersFor(container, container.dataset.playerId);
-    });
   },
 
   bindShoppingHandlersFor(container, playerId) {
@@ -1880,82 +2089,39 @@ export const MyRaidsPage = {
   // CARDS TAB
   // ============================================
 
-  async renderCardsTab() {
-    const listEl = document.getElementById('my-cards-list');
-    if (!listEl) return;
-    if (!dataService.isPlayer()) {
-      // Sample grades on the first page, so the grid shows what a collection looks like.
-      const players = this.previewPlayers();
-      const grades = ['legend', 'unique', 'epic', 'epic', 'rare', 'rare', 'magic', '', ''];
-      this._playerCards = players.flatMap((p, n) => Array.from({ length: CARDS_PER_PAGE }, (_, i) => ({
-        playerId: p.id, slotIndex: i, rarity: grades[(i * 7 + n * 4) % grades.length],
-      })).filter(c => c.rarity));
-      const html = this.renderAccountStructure(this.buildAccountStructure(players), {
-        editable: false,
-        containerClass: 'character-cards cards-grid',
-        hideEmptyGroups: true,
-        renderCharacter: (player) => this.renderCardCharacterBlockHTML(player),
+  // Loads cards + extras for all card-eligible characters once; returns false on failure.
+  async ensureCardsLoaded() {
+    if (this._cardsLoaded) return true;
+    this._cardsLoading ||= (async () => {
+      const playerIds = this._myPlayers.filter(p => dataService.isPlayerWhitelisted(p)).map(p => p.id);
+      const [allCards, allExtras] = await Promise.all([
+        dataService.getPlayerCards(playerIds),
+        dataService.getExtraCards(playerIds)
+      ]);
+      this._playerCards = allCards;
+      const extrasByPlayer = {};
+      (allExtras || []).forEach(e => {
+        if (!extrasByPlayer[e.playerId]) extrasByPlayer[e.playerId] = [];
+        extrasByPlayer[e.playerId].push(e);
       });
-      this.renderGuildPreview(listEl, html, 'Card Collection', 'Card collections and the card tracker');
-      return;
+      const rarityOrder = ['legend', 'unique', 'epic', 'rare', 'magic'];
+      Object.values(extrasByPlayer).forEach(list => list.sort((a, b) => {
+        if (a.cardName !== b.cardName) return a.cardName.localeCompare(b.cardName);
+        return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+      }));
+      this._extrasByPlayer = extrasByPlayer;
+      this._cardsLoaded = true;
+      this.installCardsPasteHandler();
+    })();
+    try {
+      await this._cardsLoading;
+      return true;
+    } catch (error) {
+      console.error('Error loading cards:', error);
+      return false;
+    } finally {
+      this._cardsLoading = null;
     }
-
-    // Characters must be whitelisted (and not excluded) to use the card collection.
-    const cardEligiblePlayers = this._myPlayers.filter(p => dataService.isPlayerWhitelisted(p));
-
-    if (this._myPlayers.length === 0) {
-      listEl.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
-      return;
-    }
-    if (cardEligiblePlayers.length === 0) {
-      listEl.innerHTML = '<p class="empty-state">No card-eligible characters on your account.</p>';
-      return;
-    }
-
-    // Lazy-load cards + extras + custom slot names + page count on first view
-    if (!this._cardsLoaded) {
-      listEl.innerHTML = '<p class="empty-state">Loading cards…</p>';
-      try {
-        const playerIds = cardEligiblePlayers.map(p => p.id);
-        // Scoped to this user's characters — no reason to pull the whole guild's cards.
-        const [allCards, allExtras] = await Promise.all([
-          dataService.getPlayerCards(playerIds),
-          dataService.getExtraCards(playerIds)
-        ]);
-        this._playerCards = allCards;
-        // Group extras by player and sort
-        const extrasByPlayer = {};
-        (allExtras || []).forEach(e => {
-          if (!extrasByPlayer[e.playerId]) extrasByPlayer[e.playerId] = [];
-          extrasByPlayer[e.playerId].push(e);
-        });
-        const rarityOrder = ['legend', 'unique', 'epic', 'rare', 'magic'];
-        Object.values(extrasByPlayer).forEach(list => list.sort((a, b) => {
-          if (a.cardName !== b.cardName) return a.cardName.localeCompare(b.cardName);
-          return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
-        }));
-        this._extrasByPlayer = extrasByPlayer;
-        this._cardsLoaded = true;
-      } catch (error) {
-        console.error('Error loading cards:', error);
-        listEl.innerHTML = '<p class="empty-state">Failed to load cards.</p>';
-        return;
-      }
-    }
-
-    this.installCardsPasteHandler();
-
-    // Shared account → group → ordered structure (read-only). Only
-    // card-eligible characters appear, so empty group sections are hidden.
-    const structure = this.buildAccountStructure(cardEligiblePlayers);
-    listEl.innerHTML = this.renderAccountStructure(structure, {
-      editable: false,
-      containerClass: 'character-cards cards-grid',
-      hideEmptyGroups: true,
-      renderCharacter: (player) => this.renderCardCharacterBlockHTML(player)
-    });
-
-    this.setupCardGridHandlers();
   },
 
   // Equipped cards come from the meter once a sync carried them; extras stay hand-kept.
@@ -1992,13 +2158,15 @@ export const MyRaidsPage = {
             </button>`}
           </div>
         </div>
-        <div class="card-section-tabs" data-player-id="${player.id}">
-          <button class="card-section-tab ${showSlots ? 'active' : ''}" data-section="slots" data-player-id="${player.id}">Equipped</button>
-          <button class="card-section-tab ${!showSlots ? 'active' : ''}" data-section="extras" data-player-id="${player.id}">Extras</button>
+        <div class="card-controls-row">
+          <div class="card-section-tabs" data-player-id="${player.id}">
+            <button class="card-section-tab ${showSlots ? 'active' : ''}" data-section="slots" data-player-id="${player.id}">Equipped</button>
+            <button class="card-section-tab ${!showSlots ? 'active' : ''}" data-section="extras" data-player-id="${player.id}">Extras</button>
+          </div>
+          <div class="card-tier-tabs" data-player-id="${player.id}" data-section-active="${showSlots}">${tierTabsHtml(this._cardsTierByPlayer[player.id], `data-player-id="${player.id}"`)}</div>
         </div>
         <div class="card-section-stack" data-player-id="${player.id}">
           <div class="card-section card-section-slots" data-player-id="${player.id}" data-section-active="${showSlots}">
-            <div class="card-tier-tabs" data-player-id="${player.id}">${tierTabsHtml(this._cardsTierByPlayer[player.id], `data-player-id="${player.id}"`)}</div>
             <div class="card-grid sim-card-grid" data-player-id="${player.id}">
               ${this.renderCardGridHTML(player.id, currentPage)}
             </div>
@@ -2223,8 +2391,8 @@ export const MyRaidsPage = {
     }
   },
 
-  bindSectionTabs() {
-    document.querySelectorAll('.card-section-tab').forEach(btn => {
+  bindSectionTabs(playerId) {
+    document.querySelectorAll(`.card-section-tab[data-player-id="${playerId}"]`).forEach(btn => {
       btn.addEventListener('click', () => {
         const playerId = btn.dataset.playerId;
         const section = btn.dataset.section;
@@ -2243,6 +2411,9 @@ export const MyRaidsPage = {
         document.querySelectorAll(`.card-section-extras[data-player-id="${playerId}"]`).forEach(s => {
           s.dataset.sectionActive = String(!showSlots);
         });
+        document.querySelectorAll(`.card-tier-tabs[data-player-id="${playerId}"]`).forEach(t => {
+          t.dataset.sectionActive = String(showSlots);
+        });
         // Hide paste button on extras section
         document.querySelectorAll(`.card-paste-btn[data-player-id="${playerId}"]`).forEach(b => {
           b.style.display = showSlots ? '' : 'none';
@@ -2251,36 +2422,25 @@ export const MyRaidsPage = {
     });
   },
 
-  setupCardGridHandlers() {
-    // Pagination and level tabs per character
-    this._myPlayers.forEach(player => {
-      this.bindPlayerPagination(player.id);
-      this.bindTierTabs(player.id);
+  bindCardHandlersFor(playerId) {
+    this.bindPlayerPagination(playerId);
+    this.bindTierTabs(playerId);
+
+    document.querySelectorAll(`.card-paste-btn[data-player-id="${playerId}"]`).forEach(btn => {
+      btn.addEventListener('click', () => this.showCardScreenshotUpload(playerId));
     });
 
-    // Paste/upload buttons
-    document.querySelectorAll('.card-paste-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.showCardScreenshotUpload(btn.dataset.playerId);
-      });
-    });
-
-    // Hover tracking: which character is the mouse over?
-    // Used by the paste handler to paste-to-the-character-you're-hovering.
-    document.querySelectorAll('.card-character-block').forEach(block => {
-      const playerId = block.dataset.playerId;
+    // The paste handler targets whichever character the mouse is over.
+    document.querySelectorAll(`.card-character-block[data-player-id="${playerId}"]`).forEach(block => {
       block.addEventListener('mouseenter', () => { this._hoveredPlayerId = playerId; });
       block.addEventListener('mouseleave', () => {
         if (this._hoveredPlayerId === playerId) this._hoveredPlayerId = null;
       });
     });
 
-    // Slots/Extras section tabs and extras handlers
-    this.bindSectionTabs();
-    this._myPlayers.forEach(p => this.bindExtrasHandlers(p.id));
-
-    // Slot clicks
-    this._myPlayers.forEach(p => this.bindCardSlotHandlers(p.id));
+    this.bindSectionTabs(playerId);
+    this.bindExtrasHandlers(playerId);
+    this.bindCardSlotHandlers(playerId);
   },
 
   bindPlayerPagination(playerId) {
@@ -2369,7 +2529,7 @@ export const MyRaidsPage = {
   installCardsPasteHandler() {
     if (this._pasteHandler) return;
     this._pasteHandler = (e) => {
-      if (this._activeTab !== 'cards') return;
+      if (this._activeTab !== 'raids') return;
 
       // Modal target wins; otherwise paste against whichever character the mouse is over.
       const modalTarget = this._pasteTargetPlayerId;

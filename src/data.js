@@ -1268,6 +1268,19 @@ class DataService {
     }));
   }
 
+  // Everyone's personal raids, for the guild-wide tracker (the table is public read).
+  async getAllPersonalRaids() {
+    const rows = await this._fetchAllRows('personal_raids', 'player_id,sort_order,id');
+    return rows.map(r => ({
+      id: r.id,
+      discordId: r.discord_id,
+      playerId: r.player_id,
+      name: r.name,
+      maxClears: r.max_clears,
+      currentClears: r.current_clears
+    }));
+  }
+
   async addPersonalRaid(playerId, name, maxClears = 1) {
     if (!this._user) throw new Error('Not logged in');
     const { data } = await this._write('raids.add', { player_id: playerId, name, max_clears: maxClears });
