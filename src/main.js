@@ -137,21 +137,21 @@ function renderNavigation() {
       </button>
       <ul class="nav-links" id="nav-links">
         ${isFriend ? `
-          <li><a href="#" class="nav-link" data-route="lineups">Lineups</a></li>
+          <li><a href="/" class="nav-link" data-route="lineups">Lineups</a></li>
         ` : ''}
-        <li><a href="#" class="nav-link" data-route="characters">Characters</a></li>
+        <li><a href="/characters" class="nav-link" data-route="characters">Characters</a></li>
         ${isPlayer ? `
-          <li><a href="#" class="nav-link" data-route="editor">Lineup Editor</a></li>
+          <li><a href="/editor" class="nav-link" data-route="editor">Lineup Editor</a></li>
         ` : ''}
-        <li><a href="#" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
-        <li><a href="#" class="nav-link" data-route="enhancement">Enhancement</a></li>
-        <li><a href="#" class="nav-link" data-route="simulator">Simulator</a></li>
-        ${isPlayer ? `<li><a href="#" class="nav-link" data-route="arena">Arena</a></li>` : ''}
+        <li><a href="/lavish" class="nav-link" data-route="lavish">Gold/Lavish</a></li>
+        <li><a href="/enhancement" class="nav-link" data-route="enhancement">Enhancement</a></li>
+        <li><a href="/simulator" class="nav-link" data-route="simulator">Simulator</a></li>
+        ${isPlayer ? `<li><a href="/arena" class="nav-link" data-route="arena">Arena</a></li>` : ''}
         <li class="nav-auth-mobile">
           ${isAuthenticated ? `
-            ${isFriend ? `<a href="#" class="nav-link" id="my-raids-btn-mobile">My Characters</a>` : ''}
+            ${isFriend ? `<a href="/my-raids" class="nav-link" id="my-raids-btn-mobile">My Characters</a>` : ''}
             <a href="#" class="nav-link" id="change-name-btn-mobile">Change Name</a>
-            ${isAdmin ? `<a href="#" class="nav-link" id="admin-btn-mobile">Admin</a>` : ''}
+            ${isAdmin ? `<a href="/admin" class="nav-link" id="admin-btn-mobile">Admin</a>` : ''}
             <a href="#" class="nav-link" id="logout-btn-mobile">Logout (${displayName})</a>
           ` : `
             <a href="#" class="nav-link" id="login-btn-mobile">Login with Discord</a>

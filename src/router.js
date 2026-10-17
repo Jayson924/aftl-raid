@@ -88,6 +88,8 @@ class Router {
   init() {
     // Handle click navigation
     document.addEventListener('click', (e) => {
+      // Modified clicks fall through so the browser can open the link in a new tab
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
       if (e.target.matches('[data-route]')) {
         e.preventDefault();
         this.navigate(e.target.dataset.route);
