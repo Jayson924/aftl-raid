@@ -239,6 +239,18 @@
     > * {
       min-width: 0;
     }
+
+    > .existing-lineups-section {
+      grid-column: 1 / -1;
+      margin-top: 0;
+
+      // Stacked layout keeps the carousel between the lineup and the character list.
+      @media (max-width: 1200px) { order: 1; }
+    }
+
+    @media (max-width: 1200px) {
+      > .available-players { order: 2; }
+    }
   }
 
   .lineup-slots {

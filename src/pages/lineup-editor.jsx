@@ -183,19 +183,6 @@ Raid clear status still resets weekly.">
                   <button id="new-lineup-btn" class="btn btn-secondary">New Lineup</button>
                 </span>
               </div>
-              <div class="existing-lineups-section">
-                <div class="carousel-tabs">
-                  <button class="carousel-tab active" data-tab="lineups" id="carousel-tab-lineups">Lineups</button>
-                  <button class="carousel-tab" data-tab="next-week" id="carousel-tab-next-week">Next Week</button>
-                </div>
-                <div class="carousel-wrapper">
-                  <button id="editor-carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
-                  <div id="existing-lineups-container" class="existing-lineups-container">
-                    <div class="loading">Loading lineups...</div>
-                  </div>
-                  <button id="editor-carousel-next" class="carousel-nav-btn carousel-next" aria-label="Scroll right">▶</button>
-                </div>
-              </div>
             </div>
 
             <div class="available-players">
@@ -247,6 +234,20 @@ Raid clear status still resets weekly.">
               </div>
               <div id="available-players-list" class="players-list players-list--cols-2">
                 <div class="loading">Loading players...</div>
+              </div>
+            </div>
+
+            <div class="existing-lineups-section">
+              <div class="carousel-tabs">
+                <button class="carousel-tab active" data-tab="lineups" id="carousel-tab-lineups">Lineups</button>
+                <button class="carousel-tab" data-tab="next-week" id="carousel-tab-next-week">Next Week</button>
+              </div>
+              <div class="carousel-wrapper">
+                <button id="editor-carousel-prev" class="carousel-nav-btn carousel-prev" aria-label="Scroll left">◀</button>
+                <div id="existing-lineups-container" class="existing-lineups-container">
+                  <div class="loading">Loading lineups...</div>
+                </div>
+                <button id="editor-carousel-next" class="carousel-nav-btn carousel-next" aria-label="Scroll right">▶</button>
               </div>
             </div>
           </div>
