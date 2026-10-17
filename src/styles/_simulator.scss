@@ -79,6 +79,7 @@ $control-h: 2.6rem;  // toolbar buttons, dropdowns and inputs share one height
 .sim-guild-row {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 2rem; margin: -0.25rem 0 1rem;
   label { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; span:first-child { font-size: 0.8rem; color: $text-muted; } }
+  .sim-label-note { margin-left: 0.4rem; font-size: 0.72rem; opacity: 0.65; }
   .sim-inline { flex-wrap: nowrap; }
   select { flex: 1 1 auto; min-width: 0; width: auto; }
 }

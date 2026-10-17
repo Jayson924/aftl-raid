@@ -691,8 +691,8 @@ export const SimulatorPage = {
     if (!dataService.isPlayer()) {
       return `
       <div class="sim-guild-row guild-only">
-        <label><span>My characters (synced from Toolbox)${GUILD_ONLY_TAG}</span>
-          <span class="sim-inline"><select disabled><option>Guildmates sync characters from the Toolbox</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save to character</button></span>
+        <label><span>My characters <small class="sim-label-note">synced from the game (via toolbox)</small>${GUILD_ONLY_TAG}</span>
+          <span class="sim-inline"><select disabled><option>Guildmates sync characters from the game (via toolbox)</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save to character</button></span>
         </label>
         <label><span>Saved builds${GUILD_ONLY_TAG}</span>
           <span class="sim-inline"><select disabled><option>Guildmates can save builds</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save</button></span>
@@ -706,7 +706,7 @@ export const SimulatorPage = {
     const savedOptions = saved.map((b) => `<option value="${esc(b.id)}" ${b.id === this.savedIds[this.active] ? 'selected' : ''}>${esc(b.name)} · ${when(b.updated_at)}</option>`).join('');
     return `
       <div class="sim-guild-row">
-        <label><span>My characters (synced from Toolbox)</span>
+        <label><span>My characters <small class="sim-label-note">synced from the game (via toolbox)</small></span>
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
             <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
