@@ -27,7 +27,16 @@ export function initFixedTooltip() {
       strong.textContent = head;
       tip.append(strong, '\n');
     }
-    tip.append(text);
+    // Indented lines read as details of the line above: muted and nudged right.
+    text.split('\n').forEach((line, i) => {
+      if (i) tip.append('\n');
+      const detail = line.match(/^\s{2,}(.*)$/);
+      if (!detail) { tip.append(line); return; }
+      const span = document.createElement('span');
+      span.className = 'tooltip-fixed-detail';
+      span.textContent = detail[1];
+      tip.append(span);
+    });
     tip.style.display = 'block';
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();

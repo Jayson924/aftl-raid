@@ -1,4 +1,8 @@
 // The browser's share of the tables: lists, defaults and item facts, no stats.
+// Nested {a: {b: {c: {rank: stats}}}} -> {a: {b: {c: [ranks with stats]}}}.
+const rankKeys = (tree, depth) => Object.fromEntries(Object.entries(tree || {}).map(([key, sub]) => [key,
+  depth > 1 ? rankKeys(sub, depth - 1) : Object.keys(sub || {}).filter((rank) => Object.values(sub[rank] ?? 0).some(Number) || Number(sub[rank]))]));
+
 export function buildOptions(tables) {
   // Items point into suffix_sets by index.
   const suffixSets = []; const suffixIndex = new Map();
@@ -26,7 +30,14 @@ export function buildOptions(tables) {
     attribute_order: tables.attribute_order,
     job_map: tables.job_map,
     cards: { names: tables.cards.names, levels: tables.cards.levels },
-    buffs: Object.fromEntries(Object.entries(tables.buffs || {}).map(([key, b]) => [key, { category: b.category, source: b.source, skill: b.skill, max_level: b.max_level }])),
+    // Party and guild buffs carry their max-level stats for the party buff buttons.
+    buffs: Object.fromEntries(Object.entries(tables.buffs || {}).map(([key, b]) => [key, {
+      category: b.category, source: b.source, skill: b.skill, max_level: b.max_level,
+      ...(/^(Party|Guild) buff$/.test(b.category) ? { stats: b.levels?.[String(b.max_level)] || {} } : {}),
+    }])),
+    // Which ranks exist per rune line and fellowship stat, so pickers offer only those.
+    rune_ranks: rankKeys(tables.runes.normal, 3),
+    glyph_s_ranks: rankKeys(tables.heraldry.s, 3),
     gear,
     suffix_sets: suffixSets,
     accessories,

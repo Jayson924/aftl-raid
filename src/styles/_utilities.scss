@@ -216,6 +216,7 @@
   line-height: 1.4;
 
   .tooltip-fixed-head { color: $primary-color; font-weight: 600; }
+  .tooltip-fixed-detail { display: inline-block; padding-left: 0.75rem; color: rgba(255, 255, 255, 0.55); }
 }
 
 .settings-info {

@@ -3,6 +3,7 @@ import options from '../data/sim/options.json' with { type: 'json' };
 import { createRemoteCalculator, NONE } from '../sim/remote.js';
 import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, engravingSecondaryOptions, setEngravingRank, ENGRAVING_RARITY } from '../sim/engravings.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
+import { getClassSpriteStyle } from '../constants.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import { dataService } from '../data.js';
@@ -11,12 +12,13 @@ import icons from '../data/sim-icons.json' with { type: 'json' };
 import costumeList from '../data/sim-costumes.json' with { type: 'json' };
 
 const STORAGE_KEY = 'aftl.simulator.builds';
+const PARTY_KEY = 'aftl.simulator.party';
 const L = options.lists;
 // Answers come from the simulate function; the page re-renders when one arrives.
 const calc = createRemoteCalculator({ jobMap: options.job_map, onResult: (error) => SimulatorPage.onResult(error) });
 
 // Tabs under the character window, for everything that is not a game window.
-const TABS = [['sets', 'Gear Sets'], ['other', 'Other'], ['stats', 'Full Stats'], ['compare', 'Compare']];
+const TABS = [['sets', 'Gear Sets'], ['other', 'Other'], ['stats', 'Full Stats'], ['skills', 'Skills'], ['compare', 'Compare']];
 // The game's character window tabs, in its order.
 const VIEWS = [['general', 'General'], ['costume', 'Costume'], ['heraldry', 'Heraldry'], ['card', 'Card'], ['rune', 'Rune']];
 const COSTUME_MODES = [['fashion', 'Costume'], ['engraving', 'Engraving']];
@@ -69,6 +71,21 @@ const STAT_GROUPS = [
     'Paralyze resist', 'Paralyze resist %', 'Stun resist', 'Stun resist %'] },
   { title: 'Element', attrs: ['Fire attack %', 'Water attack %', 'Light attack %', 'Dark attack %', 'Fire resist %', 'Water resist %', 'Light resist %', 'Dark resist %'] },
 ];
+// Party buffs the Skills and Compare tabs add to both builds at max level; providers from the toolbox's TEAM_JOB_BUFFS.
+const PARTY_BUFFS = [
+  ['Saint', ['Party buff|Common|Striking', 'Party buff|Common|Blessing of Light', 'Party buff|Common|Cure Relic']],
+  ['Archer', ['Party buff|Common|Rage of the Owl']],
+  ['Barbarian', ['Party buff|Common|Battle Howl']],
+  ['Paladin', ['Party buff|Common|Elemental Aura', 'Party buff|Common|Conviction Aura']],
+  ['Academic', ['Party buff|Common|Cocktail', 'Party buff|Common|Special Enhancement Potion']],
+  ['Screamer', ['Party buff|Common|Spirit of Genie', 'Party buff|Common|Grudge Formation', 'Party buff|Common|Sadism Pleasure']],
+  ['Light Fury', ['Party buff|Common|Chakra Heal', 'Party buff|Common|Blessing of Ajna']],
+  ['Abyss Walker', ['Party buff|Common|Blessing of Ajna', 'Party buff|Common|Incarnation of the Dark']],
+  ['Saleana', ['Party buff|Elemental Lord|Fire Shield']],
+  ['Elestra', ['Party buff|Elemental Lord|Ice Shield']],
+  ['Dark Avenger', ['Party buff|Common|Shadow Call']],
+  ['Guild', ['Guild buff|Common|STR Boost', 'Guild buff|Common|AGI Boost', 'Guild buff|Common|INT Boost', 'Guild buff|Common|VIT Boost']],
+].map(([label, keys]) => [label, keys.filter((key) => options.buffs[key])]);
 const ELEMENTS_SHOWN = [['Fire', 'Fire'], ['Water', 'Ice'], ['Light', 'Light'], ['Dark', 'Dark']];
 const METRIC_TIPS = {
   effective_panel: ['Site score, not in game', '(Attack + skill flat damage) × Final dmg × Crit\nAgainst the boss crit resist'],
@@ -344,6 +361,10 @@ export const SimulatorPage = {
   costumeMode: 'fashion',
   statsBreakdown: false,
   compareAll: false,
+  // "Change on all equipped" toggles in the heraldry and engraving editors.
+  applyAll: { heraldry: false, engraving: false },
+  party: null,
+  partyMemo: { A: null, B: null },
   // Slot open in the editor, per window (data path of the clicked slot, or 'title').
   slots: { general: 'equipment.0', fashion: 'fashion.0', engraving: 'engravings.0', heraldry: 'glyph_a.0', rune: 'core_rune', card: 'card_grades.0' },
   cardTier: null,
@@ -371,14 +392,17 @@ export const SimulatorPage = {
       delete this.builds.characterIds;
       delete this.builds.characterSyncs;
     }
+    if (!this.party) {
+      try { this.party = new Set(JSON.parse(localStorage.getItem(PARTY_KEY) || '[]')); } catch (e) { this.party = new Set(); }
+    }
     initFixedTooltip();
     container.innerHTML = `
-      <div class="simulator-page">
+      <div class="simulator-page" data-build="${this.active}">
         <div class="page-header">
           <div><h1>Character Simulator</h1><p class="page-subtitle">Stats from the SEA client tables. Build by hand, or compare two builds.</p></div>
           <div class="sim-build-switch" role="tablist">
-            <button class="btn ${this.active === 'A' ? 'btn-primary' : 'btn-secondary'}" data-action="switch" data-value="A">${buildName('A')}</button>
-            <button class="btn ${this.active === 'B' ? 'btn-primary' : 'btn-secondary'}" data-action="switch" data-value="B">${buildName('B')}</button>
+            <button class="btn ${this.active === 'A' ? 'btn-primary' : 'btn-secondary'} sim-build-btn" data-action="switch" data-value="A" aria-pressed="${this.active === 'A'}">${buildName('A')}</button>
+            <button class="btn ${this.active === 'B' ? 'btn-primary' : 'btn-secondary'} sim-build-btn" data-action="switch" data-value="B" aria-pressed="${this.active === 'B'}">${buildName('B')}</button>
           </div>
         </div>
         <section class="sim-summary" id="sim-summary"></section>
@@ -498,6 +522,7 @@ export const SimulatorPage = {
   // Each control carries data-path; the handler applies the meter's dependent resets, then re-renders.
   onChange(e, live = false) {
     const el = e.target;
+    if (el.dataset.applyAll) { this.applyAll[el.dataset.applyAll] = el.checked; return; }
     const path = el.dataset.path;
     if (!path) return;
     const build = this.build;
@@ -514,8 +539,31 @@ export const SimulatorPage = {
     }
     setPath(build, path, value);
     this.afterChange(build, path, value);
+    this.spreadExtra(build, path, value);
     this.recalculate();
     if (!live) this.renderPanel();
+  },
+
+  // With its toggle on, an extra stat (or engraving roll) change goes to every equipped piece of that kind that offers it.
+  spreadExtra(build, path, value) {
+    const [field, index, key] = path.split('.');
+    const kind = { glyph_a: 'heraldry', glyph_s: 'heraldry', engravings: 'engraving' }[field];
+    if (!kind || !this.applyAll[kind] || !['extra', 'extra_option'].includes(key)) return;
+    const source = build[field][index];
+    build[field].forEach((item, i) => {
+      if (String(i) === index || !(field === 'engravings' ? hasValue(item.grade) : hasValue(item.name))) return;
+      const offered = key === 'extra_option'
+        ? item.extra === source.extra && (value === NONE || value.split(' ')[0] === item.grade)
+        : field !== 'glyph_s' || (L.glyph_s.extra_options[item.name] || []).includes(value);
+      if (!offered) return;
+      const each = `${field}.${i}.${key}`;
+      setPath(build, each, value);
+      this.afterChange(build, each, value);
+    });
+  },
+
+  applyAllToggle(kind, noun) {
+    return `<label class="sim-apply-all"><input type="checkbox" data-apply-all="${kind}" ${this.applyAll[kind] ? 'checked' : ''}>Change on all equipped ${noun}</label>`;
   },
 
   afterChange(build, path, value) {
@@ -531,7 +579,8 @@ export const SimulatorPage = {
     } else if (field === 'equipment' && key === 'name') {
       build.equipment[index].suffix = NONE;
     } else if (field === 'jewelry' && key === 'name') {
-      build.jewelry[index].variant = NONE;
+      // An accessory's stats all come from its variant, so a new pick starts on its first one.
+      build.jewelry[index].variant = variantOptions(build.jewelry[index].slot, value)[1] || NONE;
     } else if (field === 'fashion' && key === 'name') {
       delete build.fashion[index].item;
     } else if (field === 'fashion' && key === 'item') {
@@ -586,6 +635,17 @@ export const SimulatorPage = {
     if (action === 'slot') { this.slots[this.slotKey] = value; this.renderPanel(); return; }
     if (action === 'view') { this.view = value; this.renderPanel(); return; }
     if (action === 'costume-mode') { this.costumeMode = value; this.renderPanel(); return; }
+    if (action === 'party') {
+      if (this.party.has(value)) this.party.delete(value); else this.party.add(value);
+      try { localStorage.setItem(PARTY_KEY, JSON.stringify([...this.party])); } catch (e) { /* storage may be unavailable */ }
+      for (const el of this.container.querySelectorAll('.sim-party-btn')) {
+        el.classList.toggle('active', this.party.has(el.dataset.value));
+        el.setAttribute('aria-pressed', String(this.party.has(el.dataset.value)));
+      }
+      // Redraw once both buffed answers are in (onResult redraws when they arrive), so the tab never blanks.
+      if (['A', 'B'].every((slot) => this.partyView(slot).result.rows.length)) this.renderPanel();
+      return;
+    }
     if (action === 'compare-all') { this.compareAll = !this.compareAll; this.renderPanel(); return; }
     if (action === 'stats-breakdown') { this.statsBreakdown = !this.statsBreakdown; this.renderPanel(); return; }
     if (action === 'card-tier') { this.cardTier = value === 'all' ? null : Number(value); this.cardPage = 0; this.renderPanel(); return; }
@@ -639,17 +699,20 @@ export const SimulatorPage = {
     }
     if (action === 'save-build') { void this.saveBuild(); return; }
     if (action === 'delete-saved') { void this.deleteSaved(); return; }
-    if (action === 'import') {
-      const text = window.prompt('Paste a build JSON');
-      if (!text) return;
-      try {
-        this.builds[this.active] = normalizeBuild(JSON.parse(text));
-        this.characterIds[this.active] = null;
-        this.characterSyncs[this.active] = null;
-        this.recalculate(); this.render(this.container);
-      }
-      catch (e) { toast.error('That is not a build JSON'); }
-    }
+    if (action === 'import') { void this.importBuild(); return; }
+  },
+
+  async importBuild() {
+    const text = await modal.prompt(`Paste a build to load into the ${buildName(this.active).toLowerCase()}.`, {
+      title: 'Paste build JSON', okText: 'Load', placeholder: '{"first_job": ..., "second_job": ...}', multiline: true,
+    });
+    if (!text) return;
+    try {
+      this.builds[this.active] = normalizeBuild(JSON.parse(text));
+      this.characterIds[this.active] = null;
+      this.characterSyncs[this.active] = null;
+      this.recalculate(); this.render(this.container);
+    } catch (e) { toast.error('That is not a build JSON'); }
   },
 
   async saveBuild() {
@@ -768,9 +831,12 @@ export const SimulatorPage = {
     main.innerHTML = this.renderCharacter();
     const render = {
       sets: () => this.renderSets(), other: () => this.renderOther(),
-      stats: () => this.renderStats(), compare: () => this.renderCompare(),
+      stats: () => this.renderStats(), skills: () => this.renderSkills(), compare: () => this.renderCompare(),
     }[this.tab] || (() => this.renderSets());
+    // A tab still calculating is short; holding its height keeps the page from scrolling up.
+    const height = el.offsetHeight;
     el.innerHTML = render();
+    el.style.minHeight = el.querySelector('.sim-calculating-panel') ? `${height}px` : '';
   },
 
   classPicker() {
@@ -811,7 +877,10 @@ export const SimulatorPage = {
       heraldry: () => this.renderHeraldry(), card: () => this.renderCards(), rune: () => this.renderRunes(),
     }[view]();
     const rail = `<nav class="sim-rail">${VIEWS.map(([id, label]) => `<button class="${id === view ? 'active' : ''}" data-action="view" data-value="${id}">${label}</button>`).join('')}</nav>`;
-    return `${this.classPicker()}
+    const other = this.active === 'A' ? 'B' : 'A';
+    const banner = `<div class="sim-editing"><span>Editing</span><strong>${buildName(this.active)}</strong><em>${esc(b.second_job)}</em>
+      <button class="sim-editing-switch" data-action="switch" data-value="${other}">Switch to ${buildName(other).toLowerCase()}</button></div>`;
+    return `${banner}${this.classPicker()}
       <div class="sim-equip">
         <div class="sim-window-wrap">${character ? body : `<div class="sim-window sim-window-${view}">${body}</div>`}${rail}</div>
         ${this.slotEditor()}
@@ -1073,6 +1142,7 @@ export const SimulatorPage = {
           <label><span>Secondary</span><strong class="sim-field-value">${item.secondary_value ? `${fmt(item.secondary_value, 2)}%` : '—'}</strong></label>
           <label><span>Extra stat</span>${select(`${path}.extra`, L.engraving.extras, item.extra)}</label>
           <div class="sim-field"><span>Extra roll</span>${this.itemPicker(`${path}.extra_option`, engravingExtraRanks(item), engravingExtraOption(item), (o) => engravingRarity(o.split(' ')[0], o), { sort: false })}</div>
+          ${this.applyAllToggle('engraving', 'engravings')}
         </div>
         <h4>Stats</h4>
         ${statGrid(calc.engravingAttrs(item))}
@@ -1168,18 +1238,23 @@ export const SimulatorPage = {
     const cell = item.name === NONE ? undefined : icons.items.Heraldry?.[`${item.name}|${item.level}`];
     const fellowship = kind === 'glyph_s';
     const lists = fellowship ? L.glyph_s : L.glyph_a;
+    // The game allows one enhancement heraldry of each type, so plates worn in other slots are not offered.
+    const worn = new Set(fellowship ? [] : this.build.glyph_a.filter((_, i) => i !== index).map((g) => g.name).filter(hasValue));
+    const names = lists.names.filter((n) => !worn.has(n));
     const statRow = (n) => {
       const base = item[`base_attr${n}`];
       const gives = (rank) => {
         const stats = calc.glyphSRankAttrs(item, n, rank);
         return stats ? statLine(stats) : '';
       };
-      return `<div class="sim-field sim-pair"><span>Stat ${n}</span><span class="sim-inline">${select(`${path}.base_attr${n}`, L.glyph_s.base_options[item.name] || [NONE], base)}${this.rankPicker(`${path}.rank${n}`, L.glyph_s.ranks, item[`rank${n}`], gives)}</span></div>`;
+      return `<div class="sim-field sim-pair"><span>Stat ${n}</span><span class="sim-inline">${select(`${path}.base_attr${n}`, L.glyph_s.base_options[item.name] || [NONE], base)}${this.rankPicker(`${path}.rank${n}`, options.glyph_s_ranks[item.level]?.[item.name]?.[base] || L.glyph_s.ranks, item[`rank${n}`], gives)}</span></div>`;
     };
     const fields = fellowship
       ? `${[1, 2, 3, 4].map(statRow).join('')}
-         <label><span>Extra</span>${select(`${path}.extra`, L.glyph_s.extra_options[item.name] || [NONE], item.extra)}</label>`
-      : `<label><span>Extra</span>${select(`${path}.extra`, L.glyph_a.extras, item.extra)}</label>`;
+         <label><span>Extra</span>${select(`${path}.extra`, L.glyph_s.extra_options[item.name] || [NONE], item.extra)}</label>
+         ${this.applyAllToggle('heraldry', 'heraldry')}`
+      : `<label><span>Extra</span>${select(`${path}.extra`, L.glyph_a.extras, item.extra)}</label>
+         ${this.applyAllToggle('heraldry', 'heraldry')}`;
     return this.editorShell({
       icon: spriteIcon(cell, fellowship ? 'Fellowship' : 'Heraldry'), rarity: fellowship ? 'unique' : 'orange',
       title: item.name === NONE ? `${fellowship ? 'Fellowship' : 'Enhancement'} heraldry ${index + 1}` : item.name,
@@ -1187,7 +1262,7 @@ export const SimulatorPage = {
       body: `
         <div class="sim-editor-fields">
           <label><span>Level</span>${select(`${path}.level`, lists.levels, item.level)}</label>
-          <label><span>Heraldry</span>${select(`${path}.name`, lists.names, item.name)}</label>
+          <label><span>Heraldry</span>${select(`${path}.name`, names, item.name)}</label>
           ${fields}
         </div>
         <h4>Stats</h4>
@@ -1230,7 +1305,9 @@ export const SimulatorPage = {
     const b = this.build;
     const rune = b.normal_runes[index];
     const path = `normal_runes.${index}`;
-    const attrs = rune.type === 'Defense' ? L.runes.defense_attrs : L.runes.attack_attrs;
+    // Only lines and ranks the tables have at this level (Crit damage is Lv70 only, Lv70 MP stops at rank 2).
+    const available = options.rune_ranks[rune.level]?.[rune.type];
+    const attrs = (rune.type === 'Defense' ? L.runes.defense_attrs : L.runes.attack_attrs).filter((a) => !available || a === NONE || available[a]);
     const rank = runeRank(rune);
     const rarity = RANK_RARITY[rank];
     const line = (entry, j) => {
@@ -1238,7 +1315,7 @@ export const SimulatorPage = {
         const value = calc.runeRankValue(rune, j, r);
         return value ? `${entry.attr} +${fmt(value)}` : '';
       };
-      return `<div class="sim-field sim-pair"><span>Line ${j + 1}</span><span class="sim-inline">${select(`${path}.entries.${j}.attr`, attrs, entry.attr)}${this.rankPicker(`${path}.entries.${j}.rank`, L.runes.ranks, entry.rank, gives)}</span></div>`;
+      return `<div class="sim-field sim-pair"><span>Line ${j + 1}</span><span class="sim-inline">${select(`${path}.entries.${j}.attr`, attrs, entry.attr)}${this.rankPicker(`${path}.entries.${j}.rank`, available?.[entry.attr] || L.runes.ranks, entry.rank, gives)}</span></div>`;
     };
     return this.editorShell({
       icon: spriteIcon(rank ? icons.items.Rune?.[`${rune.type}|${rank}`] : undefined, rune.type), rarity: rarity || 'normal',
@@ -1459,8 +1536,76 @@ export const SimulatorPage = {
     return `<div class="sim-table-scroll"><table class="sim-table sim-numbers sim-fs-breakdown"><thead><tr><th>Stat</th>${sources.map(([, label]) => `<th>${label}</th>`).join('')}<th>Total</th><th>Rate</th></tr></thead><tbody>${body}</tbody></table></div>`;
   },
 
+  // A build with the chosen party buffs added; memoized so the calculator sees one stable object per content.
+  partyBuild(slot) {
+    const build = this.builds[slot];
+    const keys = [...new Set(PARTY_BUFFS.filter(([label]) => this.party.has(label)).flatMap(([, list]) => list))];
+    if (!keys.length) return build;
+    const rows = keys.map((key) => ({ key, skill: options.buffs[key].skill, level: options.buffs[key].max_level }));
+    const sig = JSON.stringify(build) + JSON.stringify(rows);
+    if (this.partyMemo[slot]?.sig !== sig) this.partyMemo[slot] = { sig, build: { ...clone(build), buffs: [...(build.buffs || []), ...rows] } };
+    return this.partyMemo[slot].build;
+  },
+
+  // What the Skills and Compare tabs read for a slot: the build itself, or its party-buffed copy.
+  partyView(slot) {
+    const build = this.partyBuild(slot);
+    return { build, result: build === this.builds[slot] ? this.results[slot] : calc.calculate(build) };
+  },
+
+  // Class icons; hovering shows the class and each buff it adds at max level.
+  partyBar() {
+    const buttons = PARTY_BUFFS.filter(([, keys]) => keys.length).map(([label, keys]) => {
+      const lines = keys.map((key) => {
+        const b = options.buffs[key];
+        return `${b.skill} Lv${b.max_level}\n   ${statPairs(b.stats || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}`;
+      }).join('\n');
+      const icon = getClassSpriteStyle(label)
+        ? `<span class="class-sprite" style="${getClassSpriteStyle(label)}"></span>`
+        : '<img src="/icons/group.svg" alt="">';
+      const on = this.party.has(label);
+      return `<button class="sim-party-btn ${on ? 'active' : ''}" data-action="party" data-value="${esc(label)}" aria-pressed="${on}" aria-label="${esc(label)}"
+        data-tooltip-head="${esc(label)}" data-tooltip-rarity="party" data-tooltip-fixed="${esc(lines)}">${icon}</button>`;
+    }).join('');
+    return `<div class="sim-party-bar"><span>Party buffs</span>${buttons}</div>`;
+  },
+
+  // Damage per cast of each damage skill at its highest Lv70 level; both builds side by side when they share a class.
+  renderSkills() {
+    return this.partyBar() + this.skillsTable();
+  },
+
+  skillsTable() {
+    const both = this.builds.A.second_job === this.builds.B.second_job;
+    const own = calc.skills(this.partyView(this.active).build);
+    if (!own.length) return `<p class="sim-delta-none sim-calculating-panel">${calc.pending() ? 'Calculating…' : `No skill data for ${esc(this.build.second_job)}`}</p>`;
+    const other = both ? new Map(calc.skills(this.partyView(this.active === 'A' ? 'B' : 'A').build).map((sk) => [sk.id, sk])) : null;
+    const [current, next] = both && this.active === 'B' ? [other, new Map(own.map((sk) => [sk.id, sk]))] : [new Map(own.map((sk) => [sk.id, sk])), other];
+    const dmg = (v) => fmt(Math.round(v || 0));
+    const split = (sk) => (sk ? ` data-tooltip-fixed="${esc(`Hit ${dmg(sk.hit)}
+Crit ${dmg(sk.crit)}`)}"` : '');
+    const row = (sk) => {
+      const what = `${fmt(sk.pct)}%${sk.fixed ? ` + ${fmt(sk.fixed)}` : ''}${sk.element !== 'None' ? `<small>${esc(statLabel(`${sk.element} attack`).replace(' attack', ''))}</small>` : ''}`;
+      const head = `<td>${esc(sk.name)}</td><td>${sk.level}</td><td>${what}</td>`;
+      if (!both) return `<tr>${head}<td>${dmg(sk.hit)}</td><td>${dmg(sk.crit)}</td><td>${dmg(sk.average)}</td></tr>`;
+      const x = current.get(sk.id)?.average || 0; const y = next.get(sk.id)?.average || 0;
+      const diff = y - x;
+      const dir = Math.round(diff) ? (diff > 0 ? 'up' : 'down') : '';
+      const change = dir ? `${signed(Math.round(diff))} <em>(${signed(x ? diff / x * 100 : 0, 1)}%)</em>` : '<span class="sim-delta-none">—</span>';
+      return `<tr>${head}<td${split(current.get(sk.id))}>${dmg(x)}</td><td${split(next.get(sk.id))}>${dmg(y)}</td><td class="sim-delta ${dir}">${change}</td></tr>`;
+    };
+    const sorted = [...own].sort((a, b) => (current.get(b.id)?.average || 0) - (current.get(a.id)?.average || 0));
+    const avgTip = ' data-tooltip-fixed="Crit-weighted, against the boss crit resist"';
+    const cols = both
+      ? `<th${avgTip}>${buildName('A')}</th><th${avgTip}>${buildName('B')}</th><th>Change</th>`
+      : `<th>Hit</th><th>Crit</th><th${avgTip}>Average</th>`;
+    return `<div class="sim-table-scroll"><table class="sim-table sim-numbers sim-skills-table">
+      <thead><tr><th>Skill</th><th>Lv</th><th>Skill damage</th>${cols}</tr></thead>
+      <tbody>${sorted.map(row).join('')}</tbody></table></div>`;
+  },
+
   renderCompare() {
-    const a = this.results.A; const b = this.results.B;
+    const a = this.partyView('A').result; const b = this.partyView('B').result;
     const metrics = SUMMARY_METRICS.map(([key, label]) => {
       const x = Number(a.summary[key] || 0); const y = Number(b.summary[key] || 0);
       const digits = key.endsWith('percent') ? 1 : 0;
@@ -1473,12 +1618,14 @@ export const SimulatorPage = {
           <button class="btn btn-secondary" data-action="copy" data-value="A>B">Copy current to new</button>
           <button class="btn btn-secondary" data-action="copy" data-value="B>A">Copy new to current</button>
         </div></div>
+      ${this.partyBar()}
       <div class="sim-metrics">${metrics}</div>
       ${this.compareTable(a.rows, b.rows)}`;
   },
 
   // One table per Full Stats group, flowed into columns; a stat's % bonus rides on its row, unchanged rows hide unless asked for.
   compareTable(leftRows, rightRows) {
+    if (!leftRows.length || !rightRows.length) return '<p class="sim-delta-none sim-calculating-panel">Calculating…</p>';
     const left = new Map(leftRows.map((r) => [r.attr, Number(r.buffed) || 0]));
     const right = new Map(rightRows.map((r) => [r.attr, Number(r.buffed) || 0]));
     const attrs = new Set([...left.keys(), ...right.keys()]);

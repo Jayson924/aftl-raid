@@ -32,6 +32,32 @@ $control-h: 2.6rem;  // toolbar buttons, dropdowns and inputs share one height
 
 .sim-build-switch { display: flex; gap: 0.5rem; }
 
+// Each build has its own color so it is always clear which one is being edited: current gold, new cyan.
+$build-new: #38bdf8;
+.simulator-page { --build-color: #{$primary-color}; }
+.simulator-page[data-build="B"] {
+  --build-color: #{$build-new};
+  .sim-build-btn.btn-primary { background: $build-new; border-color: $build-new; color: #0b1a24; }
+}
+.sim-summary-head strong { color: var(--build-color); }
+.sim-editing {
+  display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; padding: 0.55rem 0.9rem;
+  border-left: 4px solid var(--build-color); border-radius: 6px;
+  background: color-mix(in srgb, var(--build-color) 12%, transparent);
+  > span { color: $text-muted; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  > strong { color: var(--build-color); font-size: 1.05rem; }
+  > em { font-style: normal; color: $text-muted; }
+}
+.sim-editing-switch {
+  margin-left: auto; padding: 0.3rem 0.7rem; font: inherit; font-size: 0.85rem; cursor: pointer;
+  color: $text-light; background: transparent; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;
+  &:hover { border-color: rgba(255, 255, 255, 0.45); }
+}
+// The window and the item editor are tinted diagonally from the bottom right in the editing build's color.
+$build-tint: linear-gradient(to top left, color-mix(in srgb, var(--build-color) 11%, transparent) 0%, transparent 45%);
+.simulator-page .sim-window, .simulator-page .sim-char { background: $build-tint, linear-gradient(180deg, #23272b 0%, #15181b 100%); }
+.simulator-page .sim-slot-editor { background: $build-tint, rgba(255, 255, 255, 0.04); }
+
 .sim-summary {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -381,6 +407,9 @@ $rune-board: 320px;
   display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
   label, .sim-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; > span { font-size: 0.8rem; color: $text-muted; } }
   select { min-width: 12rem; }
+  // Full-width checkbox row under the extra stat fields.
+  label.sim-apply-all { flex: 1 1 100%; flex-direction: row; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: $text-muted; cursor: pointer;
+    input { accent-color: $primary-color; margin: 0; } }
 }
 
 // A row of short fields (rune Type / Level / Rarity) that share the width instead of wrapping.
@@ -528,4 +557,31 @@ p.link-code { margin: 0.5rem 0 1rem; }
   .tooltip-fixed-head { font-size: 0.9rem; }
   @each $name, $color in $rarity { &[data-rarity="#{$name}"] .tooltip-fixed-head { color: $color; } }
   &[data-rarity="normal"] .tooltip-fixed-head { color: $text-light; }
+  // Party buff tooltips: class name on top, each buff name bright with its stats beneath.
+  &[data-rarity="party"] { color: $text-light; .tooltip-fixed-head { font-size: 0.95rem; } }
+}
+
+// Skills tab: damage per cast; the element rides after the skill damage.
+.sim-skills-table {
+  td small { display: inline; margin-left: 0.4rem; color: $text-muted; font-size: 0.75rem; }
+  td:nth-child(2) { color: $text-muted; }
+  .sim-delta { em { font-style: normal; opacity: 0.75; } &.up { color: $success-color; } &.down { color: $danger-color; } }
+  td[data-tooltip-fixed] { cursor: help; }
+}
+
+// Party buff toggles above the Skills and Compare tables; same button size as the toolbar rows.
+.sim-party-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 1rem;
+  > span { color: $text-muted; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 0.35rem; }
+}
+// Class icon toggles: dim when off, gold ring when on.
+.sim-party-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 54px; padding: 0;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  .class-sprite, img { opacity: 0.45; filter: grayscale(0.6); transition: opacity 0.15s, filter 0.15s; pointer-events: none; }
+  img { width: 28px; height: 28px; }
+  &:hover { border-color: rgba($primary-color, 0.5); .class-sprite, img { opacity: 0.85; filter: none; } }
+  &.active { background: rgba($primary-color, 0.12); border-color: $primary-color; box-shadow: 0 0 0 1px rgba($primary-color, 0.35);
+    .class-sprite, img { opacity: 1; filter: none; } }
 }

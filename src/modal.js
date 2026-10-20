@@ -62,7 +62,7 @@ class ModalService {
     });
   }
 
-  // Show a prompt modal for single-line text input.
+  // Show a prompt modal for text input; `multiline` gives a textarea where Ctrl+Enter submits.
   // Resolves with the trimmed input string, or null if cancelled.
   prompt(message, options = {}) {
     return new Promise((resolve) => {
@@ -73,8 +73,13 @@ class ModalService {
         placeholder = '',
         defaultValue = '',
         required = true,
-        danger = false
+        danger = false,
+        multiline = false
       } = options;
+      const hint = placeholder.replace(/"/g, '&quot;');
+      const field = multiline
+        ? `<textarea class="prompt-input prompt-textarea" id="prompt-input" rows="10" spellcheck="false" placeholder="${hint}">${defaultValue.replace(/</g, '&lt;')}</textarea>`
+        : `<input type="text" class="prompt-input" id="prompt-input" placeholder="${hint}" value="${defaultValue.replace(/"/g, '&quot;')}">`;
 
       const modalEl = document.createElement('div');
       modalEl.className = 'modal';
@@ -82,7 +87,7 @@ class ModalService {
         <div class="modal-content confirmation-modal">
           <h2>${title}</h2>
           <p class="confirmation-message">${message}</p>
-          <input type="text" class="prompt-input" id="prompt-input" placeholder="${placeholder}" value="${defaultValue.replace(/"/g, '&quot;')}">
+          ${field}
           <div class="form-actions">
             <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="ok-btn">${okText}</button>
             <button type="button" class="btn btn-secondary" id="cancel-btn">${cancelText}</button>
@@ -126,7 +131,7 @@ class ModalService {
       const handleKey = (e) => {
         if (e.key === 'Escape') {
           cleanup(null);
-        } else if (e.key === 'Enter' && document.activeElement === input) {
+        } else if (e.key === 'Enter' && document.activeElement === input && (!multiline || e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           submit();
         }

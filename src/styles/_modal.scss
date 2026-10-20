@@ -55,6 +55,14 @@
         }
       }
 
+      .prompt-textarea {
+        min-height: 12rem;
+        resize: vertical;
+        font-family: Consolas, 'Courier New', monospace;
+        font-size: 0.85rem;
+        line-height: 1.45;
+      }
+
       .form-actions {
         justify-content: flex-end;
         margin-top: 2rem;

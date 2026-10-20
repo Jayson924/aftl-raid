@@ -84,6 +84,7 @@ export function createRemoteCalculator({ onResult, jobMap }) {
     },
     pending: () => timer !== null || pending.size > 0,
     coreRunePreview: (build) => resultOf(build)?.preview || {},
+    skills: (build) => resultOf(build)?.skills || [],
     setBonusBreakdown(equipment) {
       for (const build of builds.keys()) if (build.equipment === equipment) return resultOf(build)?.items.sets || [];
       return [];
