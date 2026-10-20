@@ -3,6 +3,23 @@
 const rankKeys = (tree, depth) => Object.fromEntries(Object.entries(tree || {}).map(([key, sub]) => [key,
   depth > 1 ? rankKeys(sub, depth - 1) : Object.keys(sub || {}).filter((rank) => Object.values(sub[rank] ?? 0).some(Number) || Number(sub[rank]))]));
 
+// Enhancement heraldry extras a plate cannot roll: the game never gives a plate its own stat (Magic has no MATK extra).
+const baseStat = (key) => key.replace(/ (min|max)$/, '').replace(/ (min|max) %$/, ' %').replace(/ %$/, '');
+function glyphABlockedExtras(heraldry) {
+  const own = {};
+  for (const plates of Object.values(heraldry.a || {})) {
+    for (const [name, stats] of Object.entries(plates)) for (const key of Object.keys(stats)) (own[name] ??= new Set()).add(baseStat(key));
+  }
+  const extraStats = {};
+  for (const extras of Object.values(heraldry.a_extra || {})) {
+    for (const [extra, stats] of Object.entries(extras)) for (const key of Object.keys(stats)) (extraStats[extra] ??= new Set()).add(baseStat(key));
+  }
+  return Object.fromEntries(Object.entries(own).map(([name, stats]) => [name,
+    // The picker lists "MATK"; the data keys it "MATK max", so both forms are blocked.
+    Object.entries(extraStats).filter(([, keys]) => [...keys].some((k) => stats.has(k))).flatMap(([extra]) => [extra, extra.replace(/ max$/, '')])
+      .filter((e, i, all) => all.indexOf(e) === i)]).filter(([, list]) => list.length));
+}
+
 export function buildOptions(tables) {
   // Items point into suffix_sets by index.
   const suffixSets = []; const suffixIndex = new Map();
@@ -37,6 +54,7 @@ export function buildOptions(tables) {
     }])),
     // Which ranks exist per rune line and fellowship stat, so pickers offer only those.
     rune_ranks: rankKeys(tables.runes.normal, 3),
+    glyph_a_blocked: glyphABlockedExtras(tables.heraldry),
     glyph_s_ranks: rankKeys(tables.heraldry.s, 3),
     gear,
     suffix_sets: suffixSets,

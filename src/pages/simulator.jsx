@@ -344,6 +344,8 @@ function tierMeta(tier) {
 }
 const COSTUME_ITEM_SLOTS = new Set(['Necklace', 'Earring', 'Ring 1', 'Ring 2']);  // picked by real item
 const hasValue = (value) => value !== null && value !== undefined && value !== NONE;
+// The game never gives an enhancement heraldry its own stat as the extra (Magic has no MATK extra).
+const glyphABlocked = (plate, extra) => (options.glyph_a_blocked?.[plate] || []).includes(extra);
 const rarityOf = (entry) => RARITIES.find((r) => entry?.level?.endsWith(r))?.toLowerCase() || 'normal';
 const CARD_TIERS = [...new Set(Object.values(options.cards.levels))].sort((a, b) => a - b);
 
@@ -554,7 +556,7 @@ export const SimulatorPage = {
       if (String(i) === index || !(field === 'engravings' ? hasValue(item.grade) : hasValue(item.name))) return;
       const offered = key === 'extra_option'
         ? item.extra === source.extra && (value === NONE || value.split(' ')[0] === item.grade)
-        : field !== 'glyph_s' || (L.glyph_s.extra_options[item.name] || []).includes(value);
+        : field === 'glyph_s' ? (L.glyph_s.extra_options[item.name] || []).includes(value) : !glyphABlocked(item.name, value);
       if (!offered) return;
       const each = `${field}.${i}.${key}`;
       setPath(build, each, value);
@@ -601,6 +603,8 @@ export const SimulatorPage = {
         item.extra_value = value === NONE ? 0 : optionNumber(value);
         if (value !== NONE && grade !== item.grade) item.grade = grade;
       }
+    } else if (field === 'glyph_a' && key === 'name' && glyphABlocked(value, build.glyph_a[index].extra)) {
+      build.glyph_a[index].extra = NONE;
     } else if (field === 'glyph_s' && key === 'name') {
       Object.assign(build.glyph_s[index], { base_attr1: NONE, rank1: NONE, base_attr2: NONE, rank2: NONE, base_attr3: NONE, rank3: NONE, base_attr4: NONE, rank4: NONE, extra: NONE });
     } else if (field === 'normal_runes' && key === 'rarity') {
@@ -1253,7 +1257,7 @@ export const SimulatorPage = {
       ? `${[1, 2, 3, 4].map(statRow).join('')}
          <label><span>Extra</span>${select(`${path}.extra`, L.glyph_s.extra_options[item.name] || [NONE], item.extra)}</label>
          ${this.applyAllToggle('heraldry', 'heraldry')}`
-      : `<label><span>Extra</span>${select(`${path}.extra`, L.glyph_a.extras, item.extra)}</label>
+      : `<label><span>Extra</span>${select(`${path}.extra`, L.glyph_a.extras.filter((e) => !glyphABlocked(item.name, e)), item.extra)}</label>
          ${this.applyAllToggle('heraldry', 'heraldry')}`;
     return this.editorShell({
       icon: spriteIcon(cell, fellowship ? 'Fellowship' : 'Heraldry'), rarity: fellowship ? 'unique' : 'orange',
