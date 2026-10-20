@@ -1589,7 +1589,10 @@ export const SimulatorPage = {
     const split = (sk) => (sk ? ` data-tooltip-fixed="${esc(`Hit ${dmg(sk.hit)}
 Crit ${dmg(sk.crit)}`)}"` : '');
     const row = (sk) => {
-      const what = `${fmt(sk.pct)}%${sk.fixed ? ` + ${fmt(sk.fixed)}` : ''}${sk.element !== 'None' ? `<small>${esc(statLabel(`${sk.element} attack`).replace(' attack', ''))}</small>` : ''}`;
+      // Hybrid skills list each part with its attack type.
+      const hybrid = sk.parts.length > 1;
+      const what = sk.parts.map((p) => `${fmt(p.pct)}%${p.fixed ? ` + ${fmt(p.fixed)}` : ''}${hybrid ? `<small>${p.kind === 'M' ? 'MATK' : 'PATK'}</small>` : ''}`).join('<br>')
+        + (sk.element !== 'None' ? `<small>${esc(statLabel(`${sk.element} attack`).replace(' attack', ''))}</small>` : '');
       const head = `<td>${esc(sk.name)}</td><td>${sk.level}</td><td>${what}</td>`;
       if (!both) return `<tr>${head}<td>${dmg(sk.hit)}</td><td>${dmg(sk.crit)}</td><td>${dmg(sk.average)}</td></tr>`;
       const x = current.get(sk.id)?.average || 0; const y = next.get(sk.id)?.average || 0;

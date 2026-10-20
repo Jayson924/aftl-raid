@@ -88,7 +88,7 @@ test('skill damage uses the same math as power level', () => {
   const build = golden.builds[2].build;
   const part = tables.effective_panel[build.second_job].find((p) => p.weight > 0);
   const kind = part.attack === 'MATK' ? 'M' : 'P';
-  const probe = { id: 0, name: 'probe', level: 1, kind, pct: part.weight, fixed: part.fixed, element: part.element };
+  const probe = { id: 0, name: 'probe', level: 1, parts: [{ kind, pct: part.weight, fixed: part.fixed }], element: part.element };
   const withSkills = createCalculator({ ...tables, skills: { [build.second_job]: [probe, ...skills[build.second_job]] } });
   const { summary, skills: out } = withSkills.calculate(build);
   close(out[0].average, summary.effective_panel, 'probe average');
@@ -101,4 +101,14 @@ test('a final damage buff multiplies power level on its own', () => {
   const withBuff = calc.calculate(g.build).summary;
   assert.equal(withBuff.final_buff_percent, 25);
   close(withBuff.effective_panel / without.effective_panel, 1.25, 'Cyclone Slash EX multiplier');
+});
+
+test('a hybrid skill hits with its physical and magic parts together', () => {
+  const skills = JSON.parse(fs.readFileSync(new URL('skills.json', dataDir), 'utf8'));
+  const smite = skills.Guardian.find((s) => s.parts.length === 2);
+  const one = (parts) => createCalculator({ ...tables, skills: { Guardian: [{ ...smite, parts }] } });
+  const build = { ...tables.defaults.build1, first_job: 'Paladin', second_job: 'Guardian' };
+  const [p, m] = smite.parts;
+  const both = one([p, m]).calculate(build).skills[0].hit;
+  close(both, one([p]).calculate(build).skills[0].hit + one([m]).calculate(build).skills[0].hit, 'physical + magic');
 });

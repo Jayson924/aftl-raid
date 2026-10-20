@@ -19,6 +19,8 @@ LEVEL_CAP = 70
 SKILL_FILES = ("academic", "archer", "assassin", "cleric", "etc", "kali", "soceress", "warrior")
 ELEMENT = {0: "Fire", 1: "Water", 2: "Light", 3: "Dark"}
 KINDS = {"物攻": "P", "魔攻": "M"}
+# Damage the toolbox lists miss: Divine Punishment EX ticks for "{0}% Physical ATK" (client tooltip, first parameter).
+EXTRA_SKILLS = {"Guardian": ((3306, "P", "(per tick)"),)}
 
 
 def main(root: Path) -> None:
@@ -48,19 +50,28 @@ def main(root: Path) -> None:
                 continue
             top = reachable[-1]
             parts = top[3] if len(top) == 4 else [top[3:6]]
-            match = next((p for p in parts if p[0] in kinds), None)
-            if not match or match[1] <= 0:
+            # Listed when a part uses the class's attack; hybrid skills keep every physical and magic part.
+            if not any(p[0] in kinds and p[1] > 0 for p in parts):
                 continue
-            kind, pct, fixed = match
             row = levels.get((skill_id, top[0]))
             params = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", str(row.get("_SkillExplanationIDParam", "")))] if row else []
             info = skills.get(skill_id)
-            if not row or not info or pct not in params or (fixed and fixed not in params):
+            # One part per attack type: a second same-type entry (e.g. a 1% burn tick) isn't the skill's hit.
+            confirmed = []
+            for k, pct, fixed in parts:
+                if k in ("P", "M") and pct > 0 and k not in {p["kind"] for p in confirmed} and pct in params and (not fixed or fixed in params):
+                    confirmed.append({"kind": k, "pct": pct, "fixed": fixed})
+            if not row or not info or not any(p["kind"] in kinds for p in confirmed):
                 dropped += 1
                 continue
             rows.append({"id": skill_id, "name": re.sub(r"\s+", " ", ui.get(info["_NameID"], name)).strip(),
-                         "level": top[0], "kind": kind, "pct": pct, "fixed": fixed,
-                         "element": ELEMENT.get(info.get("_Element"), "None")})
+                         "level": top[0], "parts": confirmed, "element": ELEMENT.get(info.get("_Element"), "None")})
+        for skill_id, kind, label in EXTRA_SKILLS.get(english[cn], ()):
+            info = skills[skill_id]
+            row = levels[(skill_id, 1)]
+            pct = float(str(row["_SkillExplanationIDParam"]).split(",")[0])
+            rows.append({"id": skill_id, "name": f"{ui[info['_NameID']]} {label}", "level": 1,
+                         "parts": [{"kind": kind, "pct": pct, "fixed": 0}], "element": ELEMENT.get(info.get("_Element"), "None")})
         if rows:
             out[english[cn]] = rows
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

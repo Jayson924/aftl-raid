@@ -733,8 +733,9 @@ class BuildCalculator {
     }
     const effective = weightTotal ? total / (weightTotal / 100) : 0;
     const critHit = critDamage * (1 + critExtraPct / 100);
+    // A hybrid skill hits with its physical and magic parts together.
     const skills = (this.t.skills?.[norm(secondJob)] || []).map((skill) => {
-      const normal = hit(skill.kind === 'M' ? 'MATK' : 'PATK', skill.element, num(skill.pct), num(skill.fixed));
+      const normal = (skill.parts || []).reduce((sum, p) => sum + hit(p.kind === 'M' ? 'MATK' : 'PATK', skill.element, num(p.pct), num(p.fixed)), 0);
       return { ...skill, hit: normal, crit: normal * critHit, average: normal * critAverage };
     });
     const allSame = new Set(Object.values(resists)).size === 1;
