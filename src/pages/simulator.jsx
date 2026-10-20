@@ -71,7 +71,7 @@ const STAT_GROUPS = [
 ];
 const ELEMENTS_SHOWN = [['Fire', 'Fire'], ['Water', 'Ice'], ['Light', 'Light'], ['Dark', 'Dark']];
 const METRIC_TIPS = {
-  effective_panel: ['Site score, not in game', 'Attack × Final dmg × Crit\nAgainst the boss crit resist'],
+  effective_panel: ['Site score, not in game', '(Attack + skill flat damage) × Final dmg × Crit\nAgainst the boss crit resist'],
 };
 const metricLabel = (key, label) => {
   const tip = METRIC_TIPS[key];
@@ -154,6 +154,12 @@ function statPairs(stats) {
     out.push([statLabel(key), fmt(value)]);
   }
   return out;
+}
+
+// Hover tooltip for a slot: name in its rarity color, then what it is and the stats it gives.
+function slotTip(head, rarity, sub, stats) {
+  const lines = [sub, ...statPairs(stats || {}).map(([k, v]) => `${k} ${v}`)].filter(Boolean);
+  return ` data-tooltip-head="${esc(head)}" data-tooltip-rarity="${esc(rarity)}" data-tooltip-fixed="${esc(lines.join('\n'))}"`;
 }
 
 function getPath(obj, path) {
@@ -326,6 +332,10 @@ const CARD_TIERS = [...new Set(Object.values(options.cards.levels))].sort((a, b)
 
 // ---- page -----------------------------------------------------------------------------
 
+const BUILD_NAMES = { A: 'Current build', B: 'New build' };
+const buildName = (slot) => BUILD_NAMES[slot];
+const intoBuild = (slot) => `the ${BUILD_NAMES[slot].toLowerCase()}`;
+
 export const SimulatorPage = {
   builds: null,
   active: 'A',
@@ -333,6 +343,7 @@ export const SimulatorPage = {
   view: 'general',
   costumeMode: 'fashion',
   statsBreakdown: false,
+  compareAll: false,
   // Slot open in the editor, per window (data path of the clicked slot, or 'title').
   slots: { general: 'equipment.0', fashion: 'fashion.0', engraving: 'engravings.0', heraldry: 'glyph_a.0', rune: 'core_rune', card: 'card_grades.0' },
   cardTier: null,
@@ -366,8 +377,8 @@ export const SimulatorPage = {
         <div class="page-header">
           <div><h1>Character Simulator</h1><p class="page-subtitle">Stats from the SEA client tables. Build by hand, or compare two builds.</p></div>
           <div class="sim-build-switch" role="tablist">
-            <button class="btn ${this.active === 'A' ? 'btn-primary' : 'btn-secondary'}" data-action="switch" data-value="A">Build A</button>
-            <button class="btn ${this.active === 'B' ? 'btn-primary' : 'btn-secondary'}" data-action="switch" data-value="B">Build B</button>
+            <button class="btn ${this.active === 'A' ? 'btn-primary' : 'btn-secondary'}" data-action="switch" data-value="A">${buildName('A')}</button>
+            <button class="btn ${this.active === 'B' ? 'btn-primary' : 'btn-secondary'}" data-action="switch" data-value="B">${buildName('B')}</button>
           </div>
         </div>
         <section class="sim-summary" id="sim-summary"></section>
@@ -406,7 +417,7 @@ export const SimulatorPage = {
       if (!record) { this.characterSyncs[slot] = syncRecord(row, this.builds[slot]); continue; }
       if (!row.synced_at || row.synced_at === record.syncedAt) continue;
       if (gameSentPart(this.builds[slot]) !== record.gear) {
-        toast.info(`${row.name} has a new sync; Load it into Build ${slot} to replace your gear edits`);
+        toast.info(`${row.name} has a new sync; Load it into ${intoBuild(slot)} to replace your gear edits`);
         record.syncedAt = row.synced_at;
         continue;
       }
@@ -424,7 +435,7 @@ export const SimulatorPage = {
       this.builds[slot] = next;
       this.characterSyncs[slot] = syncRecord(row, next);
       updated = true;
-      toast.success(`${row.name}'s new sync loaded into Build ${slot}`);
+      toast.success(`${row.name}'s new sync loaded into ${intoBuild(slot)}`);
     }
     this.save();
     return updated;
@@ -436,33 +447,32 @@ export const SimulatorPage = {
       document.removeEventListener('visibilitychange', this.onReturn);
       this.onReturn = null;
     }
-    if (this.closePickers) {
-      document.removeEventListener('click', this.closePickers);
-      document.removeEventListener('keydown', this.closePickers);
-      this.closePickers = null;
-    }
+    this.listeners?.abort();
+    this.listeners = null;
   },
 
+  // Re-renders call this again; dropping the old listeners stops one click toggling a picker twice.
   bind() {
+    this.listeners?.abort();
+    this.listeners = new AbortController();
+    const { signal } = this.listeners;
     const root = this.container;
-    root.addEventListener('change', (e) => this.onChange(e));
-    root.addEventListener('input', (e) => { if (e.target.matches('input[type="number"][data-path]')) this.onChange(e, true); });
+    root.addEventListener('change', (e) => this.onChange(e), { signal });
+    root.addEventListener('input', (e) => { if (e.target.matches('input[type="number"][data-path]')) this.onChange(e, true); }, { signal });
     root.addEventListener('click', (e) => {
       const button = e.target.closest('[data-action]');
       if (!button || !root.contains(button)) return;
       e.preventDefault();
       this.onAction(button.dataset.action, button.dataset.value, button);
-    });
-    // Item pickers close on a click elsewhere or Escape; one listener for the page's life.
-    if (!this.closePickers) {
-      this.closePickers = (e) => {
-        if (e.type === 'keydown' && e.key !== 'Escape') return;
-        const keep = e.type === 'click' ? e.target.closest?.('.sim-picker') : null;
-        for (const picker of document.querySelectorAll('.sim-picker.open')) if (picker !== keep) picker.classList.remove('open');
-      };
-      document.addEventListener('click', this.closePickers);
-      document.addEventListener('keydown', this.closePickers);
-    }
+    }, { signal });
+    // Item pickers close on a click elsewhere or Escape.
+    const closePickers = (e) => {
+      if (e.type === 'keydown' && e.key !== 'Escape') return;
+      const keep = e.type === 'click' ? e.target.closest?.('.sim-picker') : null;
+      for (const picker of document.querySelectorAll('.sim-picker.open')) if (picker !== keep) picker.classList.remove('open');
+    };
+    document.addEventListener('click', closePickers, { signal });
+    document.addEventListener('keydown', closePickers, { signal });
   },
 
   save() {
@@ -576,6 +586,7 @@ export const SimulatorPage = {
     if (action === 'slot') { this.slots[this.slotKey] = value; this.renderPanel(); return; }
     if (action === 'view') { this.view = value; this.renderPanel(); return; }
     if (action === 'costume-mode') { this.costumeMode = value; this.renderPanel(); return; }
+    if (action === 'compare-all') { this.compareAll = !this.compareAll; this.renderPanel(); return; }
     if (action === 'stats-breakdown') { this.statsBreakdown = !this.statsBreakdown; this.renderPanel(); return; }
     if (action === 'card-tier') { this.cardTier = value === 'all' ? null : Number(value); this.cardPage = 0; this.renderPanel(); return; }
     if (action === 'card-tab') { this.cardTab = value; this.renderPanel(); return; }
@@ -591,7 +602,7 @@ export const SimulatorPage = {
       this.characterIds[to] = this.characterIds[from];
       this.characterSyncs[to] = this.characterSyncs[from] && { ...this.characterSyncs[from] };
       this.recalculate(); this.renderPanel();
-      toast.success(`Build ${from} copied to Build ${to}`); return;
+      toast.success(`${buildName(from)} copied to ${intoBuild(to)}`); return;
     }
     if (action === 'save-character') { void this.saveCharacter(); return; }
     if (action === 'reset') {
@@ -613,7 +624,7 @@ export const SimulatorPage = {
       this.characterIds[this.active] = row.id;
       this.characterSyncs[this.active] = syncRecord(row, this.builds[this.active]);
       this.recalculate(); this.render(this.container);
-      toast.success(`${row.name} loaded into Build ${this.active}`); return;
+      toast.success(`${row.name} loaded into ${intoBuild(this.active)}`); return;
     }
     if (action === 'load-saved') {
       const id = this.container.querySelector('[data-guild="saved"]')?.value;
@@ -624,7 +635,7 @@ export const SimulatorPage = {
       this.characterIds[this.active] = null;
       this.characterSyncs[this.active] = null;
       this.recalculate(); this.render(this.container);
-      toast.success(`${row.name} loaded into Build ${this.active}`); return;
+      toast.success(`${row.name} loaded into ${intoBuild(this.active)}`); return;
     }
     if (action === 'save-build') { void this.saveBuild(); return; }
     if (action === 'delete-saved') { void this.deleteSaved(); return; }
@@ -737,7 +748,7 @@ export const SimulatorPage = {
       [metricLabel('', 'DEF rate %'), fmt(row('DEF rate %')?.buffed, 1)],
     ];
     el.innerHTML = `
-      <div class="sim-summary-head"><strong>Build ${this.active}</strong><span>${esc(this.build.second_job)} · ${esc(this.build.first_job)}</span>${rows.length ? '' : '<em class="sim-calculating">Calculating…</em>'}</div>
+      <div class="sim-summary-head"><strong>${buildName(this.active)}</strong><span>${esc(this.build.second_job)} · ${esc(this.build.first_job)}</span>${rows.length ? '' : '<em class="sim-calculating">Calculating…</em>'}</div>
       <div class="sim-metrics">${cards.map(([label, value]) => `<article>${label}<strong>${value}</strong></article>`).join('')}</div>`;
     const stats = this.container.querySelector('#sim-char-stats');
     if (stats) stats.innerHTML = this.characterStats();
@@ -773,7 +784,7 @@ export const SimulatorPage = {
         <label><span>Boss crit resist</span>${number('crit_resist_value', b.crit_resist_value, L.limits.crit_resist)}</label>
         <div class="sim-class-actions">
           <div class="btn-group">
-            <button class="btn btn-secondary" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to Build ${this.active === 'A' ? 'B' : 'A'}</button>
+            <button class="btn btn-secondary" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to ${buildName(this.active === 'A' ? 'B' : 'A')}</button>
             <button class="btn btn-secondary" data-action="export">Copy JSON</button>
             <button class="btn btn-secondary" data-action="import">Paste JSON</button>
           </div>
@@ -863,17 +874,22 @@ export const SimulatorPage = {
     return `<span class="sim-slot sim-slot-inert normal" aria-label="Costume ${esc(slot)}"><span class="sim-slot-empty">${esc(slot)}</span></span>`;
   },
 
-  slotButton(ref, { icon, rarity, badge, label }) {
+  slotButton(ref, { icon, rarity, badge, label, tip = '' }) {
     const selected = ref === this.slots[this.slotKey];
-    return `<button class="sim-slot ${rarity} ${selected ? 'selected' : ''}" data-action="slot" data-value="${ref}" aria-label="${esc(label)}">${icon}${badge ? `<b>${esc(badge)}</b>` : ''}</button>`;
+    return `<button class="sim-slot ${rarity} ${selected ? 'selected' : ''}" data-action="slot" data-value="${ref}" aria-label="${esc(label)}"${tip}>${icon}${badge ? `<b>${esc(badge)}</b>` : ''}</button>`;
   },
 
   gearSlot(field, i) {
     const b = this.build;
     const item = b[field][i];
+    const entry = slotEntry(b, field, item);
+    const gear = field === 'equipment';
+    const extra = gear ? item.suffix : item.variant;
+    const sub = [item.slot, entry?.level, gear && item.enhance ? `+${item.enhance}` : '', hasValue(extra) ? extra : ''].filter(Boolean).join(' · ');
     return this.slotButton(`${field}.${i}`, {
       icon: slotIcon(b, field, item),
-      rarity: rarityOf(slotEntry(b, field, item)),
+      rarity: rarityOf(entry),
+      tip: item.name === NONE ? '' : slotTip(item.name, rarityOf(entry), sub, gear ? calc.equipmentAttrs(item) : calc.jewelryAttrs(item)),
       badge: field === 'equipment' && item.enhance && item.name !== NONE ? `+${item.enhance}` : '',
       label: item.name === NONE ? item.slot : `${item.slot}: ${item.name}`,
     });
@@ -884,6 +900,7 @@ export const SimulatorPage = {
     const item = b.fashion[i];
     return this.slotButton(`fashion.${i}`, {
       icon: slotIcon(b, 'fashion', item), rarity: costumeRarity(item), badge: '',
+      tip: item.name === NONE ? '' : slotTip(item.item || tierMeta(item.name).label, costumeRarity(item), `Costume ${item.slot}`, calc.fashionAttrs(item.name)),
       label: item.name === NONE ? item.slot : `${item.slot}: ${item.item || item.name}`,
     });
   },
@@ -902,6 +919,7 @@ export const SimulatorPage = {
       icon: host ? slotIcon(b, host.field, host.item) : `<span class="sim-slot-empty">${esc(item.slot)}</span>`,
       rarity: engravingRarity(item.grade).rarity,  // the frame shows the engraving's rarity
       badge: '',
+      tip: ENGRAVING_RARITY[item.grade] ? slotTip(`${item.slot} engraving`, engravingRarity(item.grade).rarity, `${engravingKind(item.slot)} · ${ENGRAVING_RARITY[item.grade]}`, calc.engravingAttrs(item)) : '',
       label: `${item.slot} engraving${ENGRAVING_RARITY[item.grade] ? ` (${ENGRAVING_RARITY[item.grade]})` : ''}`,
     });
   },
@@ -1119,6 +1137,9 @@ export const SimulatorPage = {
       icon: spriteIcon(cell, kind === 'glyph_s' ? 'Fellowship' : 'Heraldry'),
       rarity: kind === 'glyph_s' ? 'unique' : 'orange',
       badge: '',
+      tip: item.name === NONE ? '' : slotTip(item.name, kind === 'glyph_s' ? 'unique' : 'epic',
+        [kind === 'glyph_s' ? 'Fellowship Heraldry' : 'Enhancement Heraldry', hasValue(item.level) ? item.level : ''].filter(Boolean).join(' · '),
+        kind === 'glyph_s' ? calc.glyphSAttrs(item) : calc.glyphAAttrs(item)),
       label: item.name === NONE ? `${kind === 'glyph_s' ? 'Fellowship' : 'Enhancement'} heraldry ${i + 1}` : item.name,
     });
   },
@@ -1181,6 +1202,8 @@ export const SimulatorPage = {
     return this.slotButton(`normal_runes.${i}`, {
       icon: spriteIcon(rank ? icons.items.Rune?.[`${rune.type}|${rank}`] : undefined, rune.type), rarity: RANK_RARITY[rank] || 'normal',
       badge: hasValue(rune.level) ? `Lv${rune.level}` : '',
+      tip: rank ? slotTip(`${rune.type} rune`, RANK_RARITY[rank], [hasValue(rune.level) ? `Lv${rune.level}` : '', RUNE_RARITIES[rank - 2]].filter(Boolean).join(' · '),
+        calc.runeAttrsForItem(rune)) : '',
       label: `${rune.type} rune ${i + 1}${rank ? ` (${RANK_RARITY[rank]})` : ''}`,
     });
   },
@@ -1286,7 +1309,10 @@ export const SimulatorPage = {
     const grid = shown.map(({ card, index }) => {
       const ref = `card_grades.${index}`;
       const selected = ref === this.slots.card ? 'selected' : '';
-      return `<button class="sim-card-cell ${selected}" data-action="slot" data-value="${ref}" aria-label="${esc(card.name)}">
+      const { rarity, label } = cardRarity(card.grade);
+      const tip = slotTip(card.name, rarity, `Monster Card · Lv${options.cards.levels[card.name]}${hasValue(card.grade) ? ` · ${label}` : ''}`,
+        hasValue(card.grade) ? calc.cardAttrs(card.name, card.grade) : {});
+      return `<button class="sim-card-cell ${selected}" data-action="slot" data-value="${ref}" aria-label="${esc(card.name)}"${tip}>
           <span class="sim-slot ${cardFrame(card.grade)}">${spriteIcon(icons.items.Card?.[card.name], card.name)}</span>
           <span class="sim-card-name ${cardRarity(card.grade).rarity}">${esc(card.name)}</span>
         </button>`;
@@ -1302,7 +1328,8 @@ export const SimulatorPage = {
     const levels = this.build.card_bonus_levels;
     return `<div class="sim-mastery">${MASTERY.map(([name, attr]) => {
       const ref = `card_bonus_levels.${attr}`;
-      return `<button class="sim-mastery-cell ${ref === this.slots.card ? 'selected' : ''}" data-action="slot" data-value="${esc(ref)}" aria-label="${esc(name)}">
+      const tip = slotTip(name, 'epic', `The Power of Mastery · Lv.${fmt(levels[attr] || 0)}`, calc.masteryGain(this.build, attr));
+      return `<button class="sim-mastery-cell ${ref === this.slots.card ? 'selected' : ''}" data-action="slot" data-value="${esc(ref)}" aria-label="${esc(name)}"${tip}>
           <span class="sim-slot epic">${spriteIcon(icons.items.Mastery?.[name], name)}</span>
           <span><strong>${esc(name)}</strong><small>Lv.${fmt(levels[attr] || 0)}</small></span>
         </button>`;
@@ -1439,17 +1466,56 @@ export const SimulatorPage = {
       const digits = key.endsWith('percent') ? 1 : 0;
       return `<article>${metricLabel(key, label)}<strong>${fmt(x, digits)} → ${fmt(y, digits)}</strong><em class="${y - x >= 0 ? 'up' : 'down'}">${signed(y - x, digits)} · ${x ? ((y - x) / Math.abs(x) * 100).toFixed(2) : '0.00'}%</em></article>`;
     }).join('');
-    const left = new Map(a.rows.map((r) => [r.attr, r])); const right = new Map(b.rows.map((r) => [r.attr, r]));
-    const attrs = [...new Set([...left.keys(), ...right.keys()])];
-    const rows = attrs.map((attr) => {
-      const digits = attr.endsWith('%') ? 2 : 0;
-      const x = left.get(attr)?.buffed ?? 0; const y = right.get(attr)?.buffed ?? 0;
-      return `<tr class="${y - x > 0 ? 'up' : y - x < 0 ? 'down' : ''}"><td>${esc(attr)}</td><td>${fmt(x, digits)}</td><td>${fmt(y, digits)}</td><td>${signed(y - x, digits)}</td><td>${x ? ((y - x) / Math.abs(x) * 100).toFixed(2) : '0.00'}%</td></tr>`;
-    }).join('');
     return `
-      <div class="sim-compare-head"><p>Build A: ${esc(this.builds.A.second_job)} · Build B: ${esc(this.builds.B.second_job)}. Positive values mean Build B is higher.</p>
-        <div class="btn-group"><button class="btn btn-secondary" data-action="copy" data-value="A>B">Copy A to B</button><button class="btn btn-secondary" data-action="copy" data-value="B>A">Copy B to A</button></div></div>
+      <div class="sim-compare-head"><p>${buildName('A')}: ${esc(this.builds.A.second_job)} · ${buildName('B')}: ${esc(this.builds.B.second_job)}</p>
+        <div class="btn-group">
+          <button class="btn btn-secondary" data-action="compare-all">${this.compareAll ? 'Show changes only' : 'Show all stats'}</button>
+          <button class="btn btn-secondary" data-action="copy" data-value="A>B">Copy current to new</button>
+          <button class="btn btn-secondary" data-action="copy" data-value="B>A">Copy new to current</button>
+        </div></div>
       <div class="sim-metrics">${metrics}</div>
-      <div class="sim-table-scroll"><table class="sim-table sim-numbers"><thead><tr><th>Stat</th><th>Build A</th><th>Build B</th><th>Difference</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      ${this.compareTable(a.rows, b.rows)}`;
+  },
+
+  // One table per Full Stats group, flowed into columns; a stat's % bonus rides on its row, unchanged rows hide unless asked for.
+  compareTable(leftRows, rightRows) {
+    const left = new Map(leftRows.map((r) => [r.attr, Number(r.buffed) || 0]));
+    const right = new Map(rightRows.map((r) => [r.attr, Number(r.buffed) || 0]));
+    const attrs = new Set([...left.keys(), ...right.keys()]);
+    const isPct = (attr) => attr.endsWith('%');
+    const show = (attr, v) => (isPct(attr) ? `${fmt(v, 2)}%` : fmt(Math.round(v)));
+    const differs = (attr) => {
+      const x = left.get(attr) || 0; const y = right.get(attr) || 0;
+      return isPct(attr) ? Math.abs(y - x) >= 0.005 : Math.round(y) !== Math.round(x);
+    };
+    const row = (attr, bonus) => {
+      const x = left.get(attr) || 0; const y = right.get(attr) || 0;
+      const value = (side, v) => `${show(attr, v)}${side.get(bonus) ? `<small>+${fmt(side.get(bonus), 2)}%</small>` : ''}`;
+      const diff = y - x;
+      const rel = x ? diff / Math.abs(x) * 100 : (diff ? 100 : 0);
+      const dir = differs(attr) ? (diff > 0 ? 'up' : 'down') : '';
+      const bonusDiff = bonus && differs(bonus) ? (right.get(bonus) || 0) - (left.get(bonus) || 0) : 0;
+      const change = [
+        dir ? (isPct(attr) ? `${signed(diff, 2)}%` : `${signed(Math.round(diff))} <em>(${signed(rel, 1)}%)</em>`) : '',
+        bonusDiff ? `<small class="${bonusDiff > 0 ? 'up' : 'down'}">bonus ${signed(bonusDiff, 2)}%</small>` : '',
+      ].join('');
+      // Bar length: a 25% change fills it.
+      const bar = dir ? `<span class="sim-delta-bar ${dir}"><i style="width:${Math.min(100, Math.abs(rel) * 4).toFixed(1)}%"></i></span>` : '';
+      return `<tr><td>${esc(statLabel(attr))}</td><td>${value(left, x)}</td><td>${value(right, y)}</td><td class="sim-delta ${dir}">${change || '<span class="sim-delta-none">—</span>'}</td><td>${bar}</td></tr>`;
+    };
+    const used = new Set();
+    const groups = [...STAT_GROUPS.map((g) => [g.title, g.attrs.filter((a) => attrs.has(a) && !used.has(a) && used.add(a))]),
+      ['Other', [...attrs].filter((a) => !used.has(a))]];
+    const body = groups.map(([title, list]) => {
+      const bonusOf = (attr) => (!isPct(attr) && list.includes(`${attr} %`) ? `${attr} %` : null);
+      const merged = new Set(list.map(bonusOf).filter(Boolean));
+      const shown = list.filter((attr) => !merged.has(attr))
+        .filter((attr) => this.compareAll || differs(attr) || (bonusOf(attr) && differs(bonusOf(attr))));
+      if (!shown.length) return '';
+      return `<section class="sim-compare-card"><div class="sim-table-scroll"><table class="sim-table sim-numbers sim-compare-table">
+        <thead><tr><th>${title}</th><th>${buildName('A')}</th><th>${buildName('B')}</th><th>Change</th><th></th></tr></thead>
+        <tbody>${shown.map((attr) => row(attr, bonusOf(attr))).join('')}</tbody></table></div></section>`;
+    }).join('');
+    return body ? `<div class="sim-compare-grid">${body}</div>` : '<p class="sim-delta-none">Both builds have the same stats</p>';
   },
 };

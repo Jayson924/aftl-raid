@@ -18,6 +18,9 @@ export function initFixedTooltip() {
     // Optional bold first line from data-tooltip-head.
     const head = el.getAttribute('data-tooltip-head');
     tip.textContent = '';
+    // Optional rarity (simulator items) colors the head and uses the larger item style.
+    const rarity = el.getAttribute('data-tooltip-rarity');
+    if (rarity) tip.dataset.rarity = rarity; else delete tip.dataset.rarity;
     if (head) {
       const strong = document.createElement('strong');
       strong.className = 'tooltip-fixed-head';
@@ -46,4 +49,6 @@ export function initFixedTooltip() {
     if (el) hide();
   });
   window.addEventListener('scroll', hide, true);
+  // A tap on a touch screen fires mouseover too; any click dismisses it.
+  document.addEventListener('click', hide, true);
 }

@@ -500,3 +500,32 @@ $rune-board: 320px;
 }
 .link-code { font-family: monospace; font-size: 1.6rem; letter-spacing: 0.2em; color: $primary-color; }
 p.link-code { margin: 0.5rem 0 1rem; }
+
+// Compare: grouped rows, neutral numbers, one colored change column with a size bar.
+// Groups flow into as many columns as fit, so wide screens are not half empty.
+.sim-compare-grid { columns: 2 520px; column-gap: 1.5rem; margin-top: 1.25rem; }
+.sim-compare-card { break-inside: avoid; margin-bottom: 1rem; }
+.sim-compare-table {
+  table-layout: fixed; min-width: 480px;  // same column widths in every group, so the columns line up
+  th:first-child { color: $primary-color; width: 26%; }
+  th:nth-child(2), th:nth-child(3) { width: 20%; }
+  th:last-child { width: 90px; }
+  td small { display: inline; margin-left: 0.4rem; color: $text-muted; font-size: 0.75rem; }
+  .sim-delta { em { font-style: normal; opacity: 0.75; } &.up { color: $success-color; } &.down { color: $danger-color; }
+    small { display: block; margin: 0; &.up { color: $success-color; } &.down { color: $danger-color; } } }
+  .sim-delta-none { color: rgba(255, 255, 255, 0.25); }
+}
+.sim-delta-bar {
+  display: block; width: 80px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.06); overflow: hidden;
+  i { display: block; height: 100%; border-radius: 2px; }
+  &.up i { background: $success-color; }
+  &.down i { background: $danger-color; }
+}
+
+// Item hover tooltips: the name in its rarity color, like the game's item tooltip.
+.tooltip-fixed[data-rarity] {
+  font-size: 0.8rem; padding: 0.5rem 0.75rem; line-height: 1.5;
+  .tooltip-fixed-head { font-size: 0.9rem; }
+  @each $name, $color in $rarity { &[data-rarity="#{$name}"] .tooltip-fixed-head { color: $color; } }
+  &[data-rarity="normal"] .tooltip-fixed-head { color: $text-light; }
+}
