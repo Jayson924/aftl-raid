@@ -1,4 +1,4 @@
-// POST {builds: {key: build}} (up to four) -> {results: {key: {rows, summary, preview, items}}}.
+// POST {builds: {key: build}} (up to four) -> {results: {key: {rows, summary, skills, preview, items}}}.
 import { getTables } from '../lib/sim/tables.js';
 import { createCalculator } from '../lib/sim/calc.js';
 import { buildResult } from '../lib/sim/results.js';

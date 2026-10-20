@@ -3,7 +3,7 @@ const NONE = 'None';
 const has = (value) => value !== null && value !== undefined && value !== NONE && value !== '';
 
 export function buildResult(calc, tables, build) {
-  const { rows, summary } = calc.calculate(build);
+  const { rows, summary, skills } = calc.calculate(build);
   const first = build.first_job; const second = build.second_job;
   const ranksS = tables.lists.glyph_s.ranks;
   const runeRanks = tables.lists.runes.ranks.filter(has);
@@ -70,5 +70,5 @@ export function buildResult(calc, tables, build) {
     collection: { [String(build.collection_level ?? 0)]: calc.collectionAttrs(build.collection_level) },
     sets,
   };
-  return { rows, summary, preview: calc.coreRunePreview(build), items };
+  return { rows, summary, skills, preview: calc.coreRunePreview(build), items };
 }

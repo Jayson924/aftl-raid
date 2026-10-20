@@ -643,8 +643,8 @@ class BuildCalculator {
       }
     }
     const effectiveSecondJob = norm(build.effective_second_job) || secondJob;
-    const summary = this.effectivePanel(effectiveSecondJob, build, buffed, buffs);
-    return { rows, summary };
+    const { summary, skills } = this.effectivePanel(effectiveSecondJob, build, buffed, buffs);
+    return { rows, summary, skills };
   }
 
   panelPercentBonus(buffs, attr) {
@@ -680,10 +680,13 @@ class BuildCalculator {
     const magicMin = get(buffed, 'MATK min'); const magicMax = get(buffed, 'MATK max');
     const phys = (physicalMin + physicalMax) / 2;
     const magic = (magicMin + magicMax) / 2;
-    const finalPct = finalPercent(get(buffed, 'Final damage')) + this.freePercentBonus(build, 'Final damage') + this.panelPercentBonus(buffs, 'Final damage');
+    // Final damage buffs multiply on their own (SEA logs: Cyclone Slash EX +25 gave x1.24, not +25 points).
+    const finalBuffPct = this.panelPercentBonus(buffs, 'Final damage');
+    const finalPct = finalPercent(get(buffed, 'Final damage')) + this.freePercentBonus(build, 'Final damage') + finalBuffPct;
     const critPct = Math.min(pyRound(get(buffed, 'Crit') / 433, 1) + this.freePercentBonus(build, 'Crit') + this.panelPercentBonus(buffs, 'Crit'), 90);
     const critDamagePct = Math.min(pyRound(get(buffed, 'Crit damage') / 62500 * 100, 3) + this.freePercentBonus(build, 'Crit damage') + this.panelPercentBonus(buffs, 'Crit damage'), 100);
-    const finalRate = finalPct / 100;
+    const finalRate = (finalPct - finalBuffPct) / 100;
+    const finalBuffMultiplier = 1 + finalBuffPct / 100;
     const critRate = critPct / 100;
     const critResistValue = num('crit_resist_value' in build ? build.crit_resist_value : build.crit_resist);
     const critResistReductionPct = Math.max(0, ...Object.entries(buffs).filter(([k]) => BUFF.critResistDown.includes(norm(k))).map(([, v]) => Math.max(0, num(v))));
@@ -708,11 +711,8 @@ class BuildCalculator {
     const resists = this.elementResists(build);
     const effectiveResists = {};
     for (const e of ELEMENTS) effectiveResists[e] = resists[e] - sumKeys(buffs, BUFF.resistDown[e]);
-    let total = 0; let weightTotal = 0;
-    for (const part of parts) {
-      const attack = norm(part.attack); const element = norm(part.element);
-      const weight = num(part.weight); const fixed = num(part.fixed); const extraFinal = num(part.extra_final);
-      if (isNone(attack) || weight <= 0) continue;
+    // One non-crit hit of `pct`% attack plus flat damage; power level and the Skills tab share it.
+    const hit = (attack, element, pct, fixed, extraFinal = 0) => {
       const panel = attack === 'PATK' ? phys : attack === 'MATK' ? magic : attack === 'Both' ? phys + magic : 0;
       const elemRate = ELEMENT_ATTACK[element];
       const effectiveResist = effectiveResists[element] ?? 0;
@@ -720,16 +720,29 @@ class BuildCalculator {
       const damageAmpMultiplier = 1 + this.damageAmpPercent(buffs, attack, phys, magic) / 100;
       const attackDefense = Math.max(0, monsterDefense * (1 - defenseReductionForAttack(buffs, attack, phys, magic) / 100));
       const defenseMultiplier = Math.max(0, 1 - defensePercent(attackDefense) / 100);
-      total += (panel * weight / 100 + fixed) * (1 + finalRate + extraFinal / 100) * critMultiplier * critExtraMultiplier
-        * sniperMultiplier * hpConditionalMultiplier * independentMultiplier * elementMultiplier * damageAmpMultiplier * defenseMultiplier;
+      return (panel * pct / 100 + fixed) * (1 + finalRate + extraFinal / 100) * finalBuffMultiplier
+        * hpConditionalMultiplier * independentMultiplier * elementMultiplier * damageAmpMultiplier * defenseMultiplier;
+    };
+    const critAverage = critMultiplier * critExtraMultiplier * sniperMultiplier;
+    let total = 0; let weightTotal = 0;
+    for (const part of parts) {
+      const attack = norm(part.attack); const weight = num(part.weight);
+      if (isNone(attack) || weight <= 0) continue;
+      total += hit(attack, norm(part.element), weight, num(part.fixed), num(part.extra_final)) * critAverage;
       weightTotal += weight;
     }
     const effective = weightTotal ? total / (weightTotal / 100) : 0;
+    const critHit = critDamage * (1 + critExtraPct / 100);
+    const skills = (this.t.skills?.[norm(secondJob)] || []).map((skill) => {
+      const normal = hit(skill.kind === 'M' ? 'MATK' : 'PATK', skill.element, num(skill.pct), num(skill.fixed));
+      return { ...skill, hit: normal, crit: normal * critHit, average: normal * critAverage };
+    });
     const allSame = new Set(Object.values(resists)).size === 1;
-    return {
+    const summary = {
       HP: get(buffed, 'HP'),
       effective_panel: effective,
       final_percent: finalPct,
+      final_buff_percent: finalBuffPct,
       crit_percent: critPct,
       crit_damage_percent: critDamagePct,
       crit_resist_percent: critResistPct,
@@ -767,6 +780,7 @@ class BuildCalculator {
       'Ecstatic Dance average gain %': get(buffs, BUFF.hpLow[0]) * 37.5,
       'Independent damage multiplier %': (independentMultiplier - 1) * 100,
     };
+    return { summary, skills };
   }
 
   coreRunePreview(build) {

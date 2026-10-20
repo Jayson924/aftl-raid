@@ -22,6 +22,9 @@ export function loadTables(dir = dataDir()) {
   const tables = Object.fromEntries(TABLE_NAMES.map((name) => [name, read(name)]));
   const clientPath = path.join(dir, 'gear-client.json');
   if (fs.existsSync(clientPath)) mergeClientGear(tables, JSON.parse(fs.readFileSync(clientPath, 'utf8')));
+  // Damage skills per class, from tools/pak/build_sim_skills.py.
+  const skillsPath = path.join(dir, 'skills.json');
+  if (fs.existsSync(skillsPath)) tables.skills = JSON.parse(fs.readFileSync(skillsPath, 'utf8'));
   return tables;
 }
 

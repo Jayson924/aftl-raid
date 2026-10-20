@@ -82,3 +82,23 @@ test('a buff named without a key is the passive, not a self buff of the same nam
   const self = buffed([{ key: 'Self buff|Abyss Walker|Increased Abyss Chakra', skill: 'Increased Abyss Chakra', level: 1 }]);
   assert.ok(self.get('PATK min') > none.get('PATK min'));
 });
+
+test('skill damage uses the same math as power level', () => {
+  const skills = JSON.parse(fs.readFileSync(new URL('skills.json', dataDir), 'utf8'));
+  const build = golden.builds[2].build;
+  const part = tables.effective_panel[build.second_job].find((p) => p.weight > 0);
+  const kind = part.attack === 'MATK' ? 'M' : 'P';
+  const probe = { id: 0, name: 'probe', level: 1, kind, pct: part.weight, fixed: part.fixed, element: part.element };
+  const withSkills = createCalculator({ ...tables, skills: { [build.second_job]: [probe, ...skills[build.second_job]] } });
+  const { summary, skills: out } = withSkills.calculate(build);
+  close(out[0].average, summary.effective_panel, 'probe average');
+  assert.ok(out.length > 10 && out.every((s) => s.crit > s.hit && s.average >= s.hit));
+});
+
+test('a final damage buff multiplies power level on its own', () => {
+  const g = golden.builds.find((b) => b.label.includes('Cyclone Slash EX'));
+  const without = calc.calculate({ ...g.build, buffs: g.build.buffs.filter((b) => b.skill !== 'Cyclone Slash EX') }).summary;
+  const withBuff = calc.calculate(g.build).summary;
+  assert.equal(withBuff.final_buff_percent, 25);
+  close(withBuff.effective_panel / without.effective_panel, 1.25, 'Cyclone Slash EX multiplier');
+});
