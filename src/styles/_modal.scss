@@ -534,6 +534,33 @@
   max-width: 800px;
 }
 
+// Add/Edit Character with the simulator's General window: wide enough for the window and its editor.
+.modal .modal-content.modal-builder {
+  max-width: 980px;
+  width: 95%;
+  box-sizing: border-box;
+
+  .modal-builder-head {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0 1rem;
+  }
+
+  .modal-builder-window .sim-equip { margin-bottom: 0; }
+  .modal-builder-window .sim-class-row { margin-bottom: 0.75rem; }
+
+  .hand-stats {
+    .stats-form-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.5rem 0.75rem; }
+    .stat-input-row { flex-direction: column; align-items: stretch; gap: 0.2rem; label { min-width: 0; } }
+  }
+
+  .hand-stats-hint { margin-left: 0.4rem; font-weight: 400; font-size: 0.8rem; color: $text-muted; }
+}
+
+@media (max-width: 720px) {
+  .modal-builder .hand-stats .stats-form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 .modal-add-chooser {
   max-width: 420px;
   display: flex;

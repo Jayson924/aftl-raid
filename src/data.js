@@ -389,6 +389,7 @@ class DataService {
         panel: p.panel || null,
         syncedAt: p.synced_at || null,
         handSetWins: !!p.overrides?.hand_set_wins,
+        handStats: p.overrides?.hand_stats || null,
         // Legacy fields (derived from equipment for backward compat)
         weapon: mainWeapon.rarity || p.weapon || '',
         weaponEnhance: mainWeapon.enhancement != null ? String(mainWeapon.enhancement) : (p.weapon_enhance || ''),
@@ -627,8 +628,8 @@ class DataService {
       exclude_label: player.excludeLabel?.trim() || null,
       exclude_reason: player.excludeReason?.trim() || null
     };
-    // The server makes the logged-in user the owner.
-    const { data } = await this._write('player.add', { fields });
+    // The server makes the logged-in user the owner; a build from the simulator window sets gear and stats.
+    const { data } = await this._write('player.add', { fields, build: player.build, hand_stats: player.handStats });
     return { success: true, data };
   }
 
@@ -653,7 +654,7 @@ class DataService {
       equipment: player.equipment || {},
       character_stats: player.characterStats || {}
     };
-    await this._write('player.update', { id: player.id, fields });
+    await this._write('player.update', { id: player.id, fields, build: player.build, hand_stats: player.handStats });
     return { success: true };
   }
 

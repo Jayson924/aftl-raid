@@ -4,6 +4,8 @@
 // POST {session, action, ...args}.
 import { verifySession } from '../lib/session.js';
 import { sbGet, sbPost, sbPatch, sbDelete, sbUpsert, sbRpc, json } from '../lib/db.js';
+import { calculatePanel } from '../lib/sync-merge.js';
+import { deriveColumns } from '../lib/sync-derive.js';
 
 const enc = encodeURIComponent;
 const MAX_BODY = 512 * 1024;
@@ -29,6 +31,30 @@ const COMPLETION_BY_RAID = {
 // Character fields a form may set; the gear set only while the character is not synced.
 const PLAYER_FIELDS = ['name', 'notes', 'account_number', 'exclude', 'exclude_label', 'exclude_reason'];
 const PLAYER_GEAR_FIELDS = ['role', 'weapon', 'weapon_enhance', 'suffix1', 'suffix2', 'armor', 'armor_enhance', 'equipment', 'character_stats'];
+// character_stats keys a hand-built character may type from the game window.
+const HAND_STATS = ['attackPower', 'magicAttack', 'finalDamage', 'hp', 'defense', 'magicDefense',
+  'criticalRate', 'criticalDamage', 'fireAttack', 'iceAttack', 'lightAttack', 'darkAttack'];
+
+// A character built in the simulator window: the panel is calculated as for a sync; typed stats stay on top.
+function handBuiltFields(a, overrides) {
+  const build = a.build;
+  if (!build || typeof build !== 'object' || Array.isArray(build)) return {};
+  const typed = Object.fromEntries(HAND_STATS
+    .filter((k) => a.hand_stats?.[k] !== null && a.hand_stats?.[k] !== '' && Number.isFinite(Number(a.hand_stats?.[k])))
+    .map((k) => [k, Number(a.hand_stats[k])]));
+  const panel = calculatePanel(build);
+  const derived = deriveColumns(build, panel, build.second_job);
+  const equipment = derived.equipment || {};
+  const enhance = (piece) => (piece?.enhancement ? String(piece.enhancement) : '');
+  return {
+    build, panel, equipment,
+    character_stats: { ...(derived.character_stats || {}), ...typed },
+    suffix1: derived.suffix1 || '', suffix2: derived.suffix2 || '',
+    weapon: equipment.mainWeapon?.rarity || '', weapon_enhance: enhance(equipment.mainWeapon),
+    armor: equipment.helmet?.rarity || '', armor_enhance: enhance(equipment.helmet),
+    overrides: { ...(overrides || {}), hand_stats: typed },
+  };
+}
 
 class Denied extends Error {}
 const deny = (message) => { throw new Denied(message); };
@@ -53,7 +79,7 @@ async function context(discordId) {
     requireEditor() { if (!ctx.isEditor) deny('Editors and admins only'); },
     // A character the caller owns; admins may act on anyone's unless ownerOnly.
     async player(playerId, { ownerOnly = false } = {}) {
-      const p = await one('players', `id=eq.${enc(playerId)}&select=id,discord_id,synced_at`);
+      const p = await one('players', `id=eq.${enc(playerId)}&select=id,discord_id,synced_at,overrides`);
       if (!p) deny('No such character');
       if (p.discord_id !== discordId && (ownerOnly || !isAdmin)) deny('Not your character');
       return p;
@@ -124,12 +150,13 @@ const ACTIONS = {
   async 'player.add'(ctx, a) {
     const fields = pick(a.fields, [...PLAYER_FIELDS, ...PLAYER_GEAR_FIELDS, ...COMPLETION_COLUMNS]);
     if (!String(fields.name || '').trim()) deny('A character needs a name');
-    const [row] = await sbPost('players', { ...fields, discord_id: ctx.id });
+    const [row] = await sbPost('players', { ...fields, ...handBuiltFields(a), discord_id: ctx.id });
     return { data: row };
   },
   async 'player.update'(ctx, a) {
     const p = await ctx.player(a.id);
-    const fields = pick(a.fields, p.synced_at ? PLAYER_FIELDS : [...PLAYER_FIELDS, ...PLAYER_GEAR_FIELDS]);
+    const fields = p.synced_at ? pick(a.fields, PLAYER_FIELDS)
+      : { ...pick(a.fields, [...PLAYER_FIELDS, ...PLAYER_GEAR_FIELDS]), ...handBuiltFields(a, p.overrides) };
     await sbPatch('players', `id=eq.${enc(p.id)}`, fields);
     return {};
   },

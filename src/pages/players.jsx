@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, EQUIPMENT_LEVELS, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, CLASS_FAMILIES, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
 import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import simOptions from '../data/sim/options.json' with { type: 'json' };
@@ -12,6 +12,8 @@ import { initFixedTooltip } from '../fixed-tooltip.js';
 import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import itemIcons from '../data/sim-icons.json' with { type: 'json' };
 import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
+import { createCharacterBuilder, emptyBuildFor, siteClassName } from './simulator.jsx';
+import { deriveStats } from '../sim/derive-stats.js';
 
 // Gear slots on the character card: site key, simulator slot, short label.
 const CARD_ARMOR = [['helmet', 'Helmet', 'Helm'], ['top', 'Upper', 'Top'], ['bottom', 'Lower', 'Bottom'], ['gloves', 'Gloves', 'Gloves'], ['boots', 'Shoes', 'Boots']];
@@ -21,6 +23,10 @@ const CARD_JEWELRY = [['necklace', 'Necklace', 'Neck'], ['earring', 'Earring', '
 const SIM_JOB_NAMES = { 'Moon Lord': 'Moonlord' };
 const ICON_SPRITE = '/sim/item-icons.webp';
 const ICON_PX = 44;
+// Stats a hand-built character may type from the game window: character_stats key, label, has decimals.
+const HAND_STATS = [['attackPower', 'ATK'], ['magicAttack', 'MATK'], ['finalDamage', 'FD'], ['hp', 'HP'], ['defense', 'Def'], ['magicDefense', 'MDef'],
+  ['criticalRate', 'Crit %', true], ['criticalDamage', 'Crit Dmg %', true], ['fireAttack', 'Fire %', true], ['iceAttack', 'Ice %', true],
+  ['lightAttack', 'Light %', true], ['darkAttack', 'Dark %', true]];
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 
 
@@ -29,6 +35,8 @@ Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 export const PlayersPage = {
   // Cache for app users (for owner dropdown)
   _appUsers: [],
+  // Open Add/Edit Character builders by form prefix.
+  _builders: {},
 
   // Group by owner toggle state (persisted in localStorage)
   // Flat view disabled for now - grouped view is the only option
@@ -1685,7 +1693,7 @@ export const PlayersPage = {
     const stats = player.characterStats || {};
     const statRows = [];
     // A character synced from the meter shows the meter's numbers instead of the typed ones.
-    const synced = player.panel ? panelStats(player.panel) : [];
+    const synced = player.panel && player.syncedAt ? panelStats(player.panel) : [];
     for (const { label, value } of synced) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">${label}</span><span class="equip-cell-value stat-value">${value}</span></div>`);
     if (!synced.length && stats.attackPower) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">ATK</span><span class="equip-cell-value stat-value">${stats.attackPower.toLocaleString()}</span></div>`);
     if (!synced.length && stats.magicAttack) statRows.push(`<div class="equip-cell"><span class="equip-cell-label">MATK</span><span class="equip-cell-value stat-value">${stats.magicAttack.toLocaleString()}</span></div>`);
@@ -2103,142 +2111,63 @@ export const PlayersPage = {
     render();
   },
 
-  // Helper: generate equipment dropdown row HTML
-  _equipSlotHtml(id, label, rarity, enhancement, showEnhance = true, level = '50') {
-    const rarityOptions = EQUIPMENT_RARITIES.map(r =>
-      `<option value="${r.value}" ${rarity === r.value ? 'selected' : ''}>${r.label}</option>`
-    ).join('');
-    const enhanceOptions = ENHANCEMENT_LEVELS.map(l =>
-      `<option value="${l.value}" ${String(enhancement) === l.value ? 'selected' : ''} ${!l.value ? 'disabled hidden' : ''}>${l.label}</option>`
-    ).join('');
+  // The simulator's General window, plus stats typed from the game window over the calculated ones.
+  _builderHtml(prefix) {
     return `
-      <div class="equip-slot-row">
-        <span class="equip-slot-label">${label}</span>
-        <button type="button" class="equip-level-toggle level-${level}" id="${id}-level" data-level="${level}" title="Equipment level">Lv${level}</button>
-        <select id="${id}-rarity" class="equipment-select equip-compact">${rarityOptions}</select>
-        ${showEnhance ? `<select id="${id}-enhance" class="equipment-select equip-compact enhancement-select">${enhanceOptions}</select>` : ''}
+      <div class="form-group">
+        <label>Gear:</label>
+        <div id="${prefix}-builder" class="modal-builder-window"></div>
+      </div>
+      <div class="form-group hand-stats">
+        <label>Stats in game: <span class="hand-stats-hint">blank uses the calculated value</span></label>
+        <div class="stats-form-grid">${HAND_STATS.map(([key, label, decimals]) => `
+          <div class="stat-input-row">
+            <label for="${prefix}-hs-${key}">${label}</label>
+            <input type="number" ${decimals ? 'step="0.01"' : 'step="1"'} id="${prefix}-hs-${key}" data-hand-stat="${key}" />
+          </div>`).join('')}
+        </div>
       </div>
     `;
   },
 
-  // Helper: read equipment form into jsonb object
-  _readEquipmentForm(prefix) {
-    const readSlot = (slotId, hasEnhance) => {
-      const rarity = document.getElementById(`${prefix}-${slotId}-rarity`)?.value || '';
-      const enhancement = hasEnhance ? parseInt(document.getElementById(`${prefix}-${slotId}-enhance`)?.value || '0', 10) : 0;
-      const level = document.getElementById(`${prefix}-${slotId}-level`)?.dataset?.level || '50';
-      if (!rarity) return {};
-      return { rarity, enhancement, level };
-    };
-
-    return {
-      helmet: readSlot('helmet', true),
-      top: readSlot('top', true),
-      bottom: readSlot('bottom', true),
-      gloves: readSlot('gloves', true),
-      boots: readSlot('boots', true),
-      mainWeapon: readSlot('mainWeapon', true),
-      subWeapon: readSlot('subWeapon', true),
-      necklace: readSlot('necklace', false),
-      earring: readSlot('earring', false),
-      ring1: readSlot('ring1', false),
-      ring2: readSlot('ring2', false)
-    };
+  _mountBuilder(prefix, modalElement, build, handStats) {
+    const inputs = [...modalElement.querySelectorAll('[data-hand-stat]')];
+    for (const input of inputs) {
+      const value = handStats?.[input.dataset.handStat];
+      if (value != null && value !== '') input.value = value;
+    }
+    this._builders[prefix] = createCharacterBuilder(modalElement.querySelector(`#${prefix}-builder`), build, {
+      onUpdate: (result) => {
+        const calculated = deriveStats(result);
+        for (const input of inputs) input.placeholder = calculated[input.dataset.handStat] != null ? String(calculated[input.dataset.handStat]) : '';
+      },
+    });
+    return this._builders[prefix];
   },
 
-  // Helper: read stats form
-  _readStatsForm(prefix) {
-    const val = (id) => {
-      const v = document.getElementById(`${prefix}-${id}`)?.value;
-      return v ? parseInt(v, 10) : null;
-    };
+  _readHandStats(modalElement) {
     const stats = {};
-    if (val('atk') != null) stats.attackPower = val('atk');
-    if (val('matk') != null) stats.magicAttack = val('matk');
-    if (val('fd') != null) stats.finalDamage = val('fd');
-    if (val('hp') != null) stats.hp = val('hp');
-    if (val('def') != null) stats.defense = val('def');
-    if (val('mdef') != null) stats.magicDefense = val('mdef');
-    // Percentages for the power index — keep decimals.
-    const pct = (id) => {
-      const v = document.getElementById(`${prefix}-${id}`)?.value;
-      return v ? parseFloat(v) : null;
-    };
-    if (pct('crit') != null) stats.criticalRate = pct('crit');
-    if (pct('critdmg') != null) stats.criticalDamage = pct('critdmg');
-    if (pct('fire') != null) stats.fireAttack = pct('fire');
-    if (pct('ice') != null) stats.iceAttack = pct('ice');
-    if (pct('light') != null) stats.lightAttack = pct('light');
-    if (pct('dark') != null) stats.darkAttack = pct('dark');
+    for (const input of modalElement.querySelectorAll('[data-hand-stat]')) {
+      if (input.value !== '' && Number.isFinite(Number(input.value))) stats[input.dataset.handStat] = Number(input.value);
+    }
     return stats;
   },
 
-  // Helper: fill equipment form from analyzed data
+  _closeBuilderModal(prefix, modalElement) {
+    this._builders[prefix]?.destroy();
+    delete this._builders[prefix];
+    modalElement.remove();
+  },
+
+  // Name, class and stats from an analyzed screenshot; gear is picked in the window.
   _fillFromScreenshot(prefix, data) {
-    const equip = data.equipment || {};
-    const stats = data.stats || {};
-
-    // Fill name and class if available
-    if (data.name) {
-      const nameInput = document.getElementById(`${prefix}-name`);
-      if (nameInput && !nameInput.value) nameInput.value = data.name;
+    const nameInput = document.getElementById(`${prefix}-name`);
+    if (data.name && nameInput && !nameInput.value) nameInput.value = data.name;
+    if (data.class) this._builders[prefix]?.setJob(data.class);
+    for (const [key, value] of Object.entries(data.stats || {})) {
+      const input = document.getElementById(`${prefix}-hs-${key}`);
+      if (input && Number(value)) input.value = value;
     }
-    if (data.class) {
-      const classInput = document.getElementById(`${prefix}-class`);
-      if (classInput) {
-        classInput.value = data.class;
-        // Re-render class picker to show selection
-        const pickerContainer = prefix === 'player' ? 'class-picker' : 'edit-class-picker';
-        this.renderClassPicker(pickerContainer, `${prefix}-class`, data.class);
-      }
-    }
-
-    // Fill equipment dropdowns
-    const fillSlot = (slotId, piece, hasEnhance) => {
-      if (!piece?.rarity) return;
-      const rarityEl = document.getElementById(`${prefix}-${slotId}-rarity`);
-      if (rarityEl) rarityEl.value = piece.rarity;
-      if (hasEnhance && piece.enhancement) {
-        const enhEl = document.getElementById(`${prefix}-${slotId}-enhance`);
-        if (enhEl) enhEl.value = String(piece.enhancement);
-      }
-      // Equipment level isn't visible on a character sheet screenshot (it only
-      // shows in the hover tooltip), so it can't be read — assume Lv70 (the cap)
-      // for every imported piece and let the user correct the toggle before saving.
-      const levelBtn = document.getElementById(`${prefix}-${slotId}-level`);
-      if (levelBtn) {
-        levelBtn.dataset.level = '70';
-        levelBtn.textContent = 'Lv70';
-        levelBtn.classList.remove('level-40', 'level-50', 'level-60', 'level-70');
-        levelBtn.classList.add('level-70');
-      }
-    };
-
-    fillSlot('helmet', equip.helmet, true);
-    fillSlot('top', equip.top, true);
-    fillSlot('bottom', equip.bottom, true);
-    fillSlot('gloves', equip.gloves, true);
-    fillSlot('boots', equip.boots, true);
-    fillSlot('mainWeapon', equip.mainWeapon, true);
-    fillSlot('subWeapon', equip.subWeapon, true);
-    fillSlot('necklace', equip.necklace, false);
-    fillSlot('earring', equip.earring, false);
-    fillSlot('ring1', equip.ring1, false);
-    fillSlot('ring2', equip.ring2, false);
-
-    // Fill stats
-    if (stats.attackPower) document.getElementById(`${prefix}-atk`).value = stats.attackPower;
-    if (stats.magicAttack) document.getElementById(`${prefix}-matk`).value = stats.magicAttack;
-    if (stats.finalDamage) document.getElementById(`${prefix}-fd`).value = stats.finalDamage;
-    if (stats.hp) document.getElementById(`${prefix}-hp`).value = stats.hp;
-    if (stats.defense) document.getElementById(`${prefix}-def`).value = stats.defense;
-    if (stats.magicDefense) document.getElementById(`${prefix}-mdef`).value = stats.magicDefense;
-    if (stats.criticalRate != null) document.getElementById(`${prefix}-crit`).value = stats.criticalRate;
-    if (stats.criticalDamage != null) document.getElementById(`${prefix}-critdmg`).value = stats.criticalDamage;
-    if (stats.fireAttack != null) document.getElementById(`${prefix}-fire`).value = stats.fireAttack;
-    if (stats.iceAttack != null) document.getElementById(`${prefix}-ice`).value = stats.iceAttack;
-    if (stats.lightAttack != null) document.getElementById(`${prefix}-light`).value = stats.lightAttack;
-    if (stats.darkAttack != null) document.getElementById(`${prefix}-dark`).value = stats.darkAttack;
   },
 
   // Helper: setup screenshot upload handlers
@@ -2342,21 +2271,6 @@ export const PlayersPage = {
     });
   },
 
-  // Helper: setup per-piece equipment level toggle buttons
-  _setupEquipLevelButtons(prefix, modalElement) {
-    modalElement.querySelectorAll('.equip-level-toggle').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const cycle = { '50': '60', '60': '70', '70': '40', '40': '50' };
-        const next = cycle[btn.dataset.level] || '50';
-        btn.dataset.level = next;
-        btn.textContent = `Lv${next}`;
-        btn.classList.remove('level-40', 'level-50', 'level-60', 'level-70');
-        btn.classList.add(`level-${next}`);
-      });
-    });
-  },
-
   // Helper: generate screenshot upload HTML
   _screenshotUploadHtml(prefix) {
     return `
@@ -2377,109 +2291,6 @@ export const PlayersPage = {
         <div class="modal-upload-analyze-row" style="display:none" id="${prefix}-analyze-row">
           <button type="button" class="btn-analyze" id="${prefix}-analyze-btn" disabled>Analyze Screenshot</button>
           <span class="upload-status" id="${prefix}-upload-status"></span>
-        </div>
-      </div>
-    `;
-  },
-
-  _equipmentFormHtml(prefix, equipment, stats, suffix1, suffix2) {
-    const eq = equipment || {};
-    const st = stats || {};
-    const s1 = suffix1 || '';
-    const s2 = suffix2 || '';
-    const slot = (id, label, hasEnhance = true) => {
-      const piece = eq[id] || {};
-      return this._equipSlotHtml(`${prefix}-${id}`, label, piece.rarity || '', piece.enhancement || 0, hasEnhance, piece.level || '50');
-    };
-
-    const suffixSelect = (id, label, selected) => `
-      <div class="equip-slot-row">
-        <span class="equip-slot-label">${label}</span>
-        <select id="${prefix}-${id}" class="equip-compact" required>
-          ${WEAPON_SUFFIXES.map(s =>
-            `<option value="${s.value}" ${s.value === selected ? 'selected' : ''}>${s.label}</option>`
-          ).join('')}
-        </select>
-      </div>
-    `;
-
-    return `
-      <div class="equip-form-section">
-        <div class="equip-form-group">
-          <h4>Armor</h4>
-          ${slot('helmet', 'Helmet')}
-          ${slot('top', 'Top')}
-          ${slot('bottom', 'Bottom')}
-          ${slot('gloves', 'Gloves')}
-          ${slot('boots', 'Boots')}
-        </div>
-        <div class="equip-form-group">
-          <h4>Weapons</h4>
-          ${slot('mainWeapon', 'Main')}
-          ${slot('subWeapon', 'Sub')}
-          <h4>Suffixes</h4>
-          ${suffixSelect('suffix1', 'Main', s1)}
-          ${suffixSelect('suffix2', 'Sub', s2)}
-        </div>
-        <div class="equip-form-group">
-          <h4>Accessories</h4>
-          ${slot('necklace', 'Necklace', false)}
-          ${slot('earring', 'Earring', false)}
-          ${slot('ring1', 'Ring 1', false)}
-          ${slot('ring2', 'Ring 2', false)}
-        </div>
-        <div class="equip-form-group">
-          <h4>Stats</h4>
-          <div class="stats-form-grid">
-            <div class="stat-input-row">
-              <label>ATK</label>
-              <input type="number" id="${prefix}-atk" value="${st.attackPower || ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>MATK</label>
-              <input type="number" id="${prefix}-matk" value="${st.magicAttack || ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>FD</label>
-              <input type="number" id="${prefix}-fd" value="${st.finalDamage || ''}" placeholder="0" required />
-            </div>
-            <div class="stat-input-row">
-              <label>HP</label>
-              <input type="number" id="${prefix}-hp" value="${st.hp || ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Def</label>
-              <input type="number" id="${prefix}-def" value="${st.defense || ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>MDef</label>
-              <input type="number" id="${prefix}-mdef" value="${st.magicDefense || ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Crit %</label>
-              <input type="number" step="0.1" id="${prefix}-crit" value="${st.criticalRate ?? ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Crit Dmg %</label>
-              <input type="number" step="0.1" id="${prefix}-critdmg" value="${st.criticalDamage ?? ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Fire %</label>
-              <input type="number" step="0.1" id="${prefix}-fire" value="${st.fireAttack ?? ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Ice %</label>
-              <input type="number" step="0.1" id="${prefix}-ice" value="${st.iceAttack ?? ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Light %</label>
-              <input type="number" step="0.1" id="${prefix}-light" value="${st.lightAttack ?? ''}" placeholder="0" />
-            </div>
-            <div class="stat-input-row">
-              <label>Dark %</label>
-              <input type="number" step="0.1" id="${prefix}-dark" value="${st.darkAttack ?? ''}" placeholder="0" />
-            </div>
-          </div>
         </div>
       </div>
     `;
@@ -2533,43 +2344,37 @@ export const PlayersPage = {
     const isAdmin = dataService.isAdmin();
     const currentUser = dataService.getUser();
 
-    const initialOwnerId = isAdmin ? (this._appUsers[0]?.discordId || null) : (currentUser?.id || null);
-    const maxAccount = initialOwnerId ? this.getMaxAccountForOwner(initialOwnerId) : 0;
-
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     modalElement.innerHTML = `
-      <div class="modal-content modal-equipment">
+      <div class="modal-content modal-equipment modal-builder">
         <h2>Add New Character</h2>
         <form id="add-player-form">
-          <div class="form-group">
-            <label for="player-name">Name: *</label>
-            <input type="text" id="player-name" required>
-          </div>
-          ${isAdmin ? `
-          <div class="form-group">
-            <label for="player-owner">Owner:</label>
-            <select id="player-owner">
-              <option value="">No owner (unassigned)</option>
-              ${this._appUsers.map(u => `
-                <option value="${u.discordId}" ${currentUser && u.discordId === currentUser.id ? 'selected' : ''}>
-                  ${u.displayName} (${u.username})
-                </option>
-              `).join('')}
-            </select>
-          </div>
-          ` : ''}
-          <div class="form-group" id="account-group">
-            <label>Account:</label>
-            <div id="account-buttons-container"></div>
+          <div class="modal-builder-head">
+            <div class="form-group">
+              <label for="player-name">Name: *</label>
+              <input type="text" id="player-name" required>
+            </div>
+            ${isAdmin ? `
+            <div class="form-group">
+              <label for="player-owner">Owner:</label>
+              <select id="player-owner">
+                <option value="">No owner (unassigned)</option>
+                ${this._appUsers.map(u => `
+                  <option value="${u.discordId}" ${currentUser && u.discordId === currentUser.id ? 'selected' : ''}>
+                    ${u.displayName} (${u.username})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+            ` : ''}
+            <div class="form-group" id="account-group">
+              <label>Account:</label>
+              <div id="account-buttons-container"></div>
+            </div>
           </div>
           ${this._screenshotUploadHtml('player')}
-          <div class="form-group">
-            <label>Class:</label>
-            <input type="hidden" id="player-class" value="">
-            <div class="class-picker" id="class-picker"></div>
-          </div>
-          ${this._equipmentFormHtml('player', {}, {}, '', '')}
+          ${this._builderHtml('player')}
           <div class="form-group">
             <label for="player-notes">Notes:</label>
             <textarea id="player-notes" rows="3" maxlength="140"></textarea>
@@ -2595,11 +2400,9 @@ export const PlayersPage = {
     `;
 
     document.body.appendChild(modalElement);
+    const close = () => this._closeBuilderModal('player', modalElement);
+    const builder = this._mountBuilder('player', modalElement, emptyBuildFor(''), {});
 
-    // Initialize class picker
-    this.renderClassPicker('class-picker', 'player-class', '');
-
-    // Toggle exclude-fields visibility
     const excludeCb = document.getElementById('player-exclude');
     const excludeFields = document.getElementById('player-exclude-fields');
     if (excludeCb && excludeFields) {
@@ -2608,18 +2411,14 @@ export const PlayersPage = {
       });
     }
 
-    // Initialize account buttons
     const selectedOwnerId = isAdmin
       ? (currentUser?.id || this._appUsers[0]?.discordId || null)
       : (currentUser?.id || null);
     const initialMax = selectedOwnerId ? Math.max(1, this.getMaxAccountForOwner(selectedOwnerId)) : 1;
     this.renderAccountButtons('account-buttons-container', 1, initialMax);
 
-    // Setup screenshot upload and equip level buttons
     this._setupScreenshotUpload('player', modalElement);
-    this._setupEquipLevelButtons('player', modalElement);
 
-    // Update account buttons when owner changes (admin only)
     if (isAdmin) {
       const ownerSelect = document.getElementById('player-owner');
       ownerSelect.addEventListener('change', () => {
@@ -2632,37 +2431,25 @@ export const PlayersPage = {
     document.getElementById('add-player-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('player-name').value;
-      const role = document.getElementById('player-class').value;
       const notes = document.getElementById('player-notes').value;
       const accountNumber = this.getSelectedAccount('account-buttons-container');
-      const equipment = this._readEquipmentForm('player');
-      const characterStats = this._readStatsForm('player');
-
-      // Legacy fields from main weapon + helmet
-      const weapon = equipment.mainWeapon?.rarity || '';
-      const weaponEnhance = equipment.mainWeapon?.enhancement ? String(equipment.mainWeapon.enhancement) : '';
-      const armor = equipment.helmet?.rarity || '';
-      const armorEnhance = equipment.helmet?.enhancement ? String(equipment.helmet.enhancement) : '';
 
       if (!dataService.hasWriteAccess()) {
         toast.warning('Please log in to add characters.', 5000);
-        document.body.removeChild(modalElement);
+        close();
         return;
       }
 
+      const submitBtn = e.target.querySelector('button[type="submit"]');
       try {
-        const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
 
-        const suffix1 = document.getElementById('player-suffix1').value;
-        const suffix2 = document.getElementById('player-suffix2').value;
         const exclude = document.getElementById('player-exclude')?.checked || false;
         const excludeLabel = document.getElementById('player-exclude-label')?.value || '';
         const excludeReason = document.getElementById('player-exclude-reason')?.value || '';
         const result = await dataService.addPlayer({
-          name, role, weapon, weaponEnhance, suffix1, suffix2,
-          armor, armorEnhance, equipment, characterStats,
+          name, role: siteClassName(builder.build.second_job), build: builder.build, handStats: this._readHandStats(modalElement),
           notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason
         });
 
@@ -2671,26 +2458,18 @@ export const PlayersPage = {
           await dataService.assignCharacterOwner(result.data.id, selectedOwner);
         }
 
-        document.body.removeChild(modalElement);
+        close();
         toast.success(`Character "${name}" added successfully!`);
         this.loadPlayers();
       } catch (error) {
         toast.error(`Error adding player: ${error.message}`);
-        const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Add Character';
       }
     });
 
-    document.getElementById('cancel-btn').addEventListener('click', () => {
-      document.body.removeChild(modalElement);
-    });
-
-    modalElement.addEventListener('click', (e) => {
-      if (e.target === modalElement) {
-        document.body.removeChild(modalElement);
-      }
-    });
+    document.getElementById('cancel-btn').addEventListener('click', close);
+    modalElement.addEventListener('click', (e) => { if (e.target === modalElement) close(); });
   },
 
   // Hand-set fields of a synced character; buffs stay on the simulator.
@@ -2806,29 +2585,31 @@ export const PlayersPage = {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     modalElement.innerHTML = `
-      <div class="modal-content modal-equipment">
+      <div class="modal-content modal-equipment${synced ? '' : ' modal-builder'}">
         <h2>Edit Character</h2>
         <form id="edit-player-form">
-          <div class="form-group">
-            <label for="edit-player-name">Name: *</label>
-            <input type="text" id="edit-player-name" required value="${player.name}">
-          </div>
-          ${isAdmin ? `
-          <div class="form-group">
-            <label for="edit-player-owner">Owner:</label>
-            <select id="edit-player-owner">
-              <option value="">No owner (unassigned)</option>
-              ${this._appUsers.map(u => `
-                <option value="${u.discordId}" ${player.discordId === u.discordId ? 'selected' : ''}>
-                  ${u.displayName} (${u.username})
-                </option>
-              `).join('')}
-            </select>
-          </div>
-          ` : ''}
-          <div class="form-group" id="edit-account-group">
-            <label>Account:</label>
-            <div id="edit-account-buttons-container"></div>
+          <div class="modal-builder-head">
+            <div class="form-group">
+              <label for="edit-player-name">Name: *</label>
+              <input type="text" id="edit-player-name" required value="${player.name}">
+            </div>
+            ${isAdmin ? `
+            <div class="form-group">
+              <label for="edit-player-owner">Owner:</label>
+              <select id="edit-player-owner">
+                <option value="">No owner (unassigned)</option>
+                ${this._appUsers.map(u => `
+                  <option value="${u.discordId}" ${player.discordId === u.discordId ? 'selected' : ''}>
+                    ${u.displayName} (${u.username})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+            ` : ''}
+            <div class="form-group" id="edit-account-group">
+              <label>Account:</label>
+              <div id="edit-account-buttons-container"></div>
+            </div>
           </div>
           ${synced ? `
           <div class="modal-synced-note">
@@ -2836,13 +2617,12 @@ export const PlayersPage = {
             <span>Re-sync from the toolbox to change gear or stats</span>
           </div>
           ` : this._screenshotUploadHtml('edit-player')}
-          ${synced ? this._overridesHtml(player) : ''}
+          ${synced ? `${this._overridesHtml(player)}
           <div class="form-group">
             <label>Class:</label>
             <input type="hidden" id="edit-player-class" value="${player.role || ''}">
-            <div class="class-picker${synced ? ' locked' : ''}" id="edit-class-picker" ${synced ? 'inert' : ''}></div>
-          </div>
-          ${synced ? '' : this._equipmentFormHtml('edit-player', player.equipment || {}, player.characterStats || {}, player.suffix1 || '', player.suffix2 || '')}
+            <div class="class-picker locked" id="edit-class-picker" inert></div>
+          </div>` : this._builderHtml('edit-player')}
           <div class="form-group">
             <label for="edit-player-notes">Notes:</label>
             <textarea id="edit-player-notes" rows="3" maxlength="140">${player.notes}</textarea>
@@ -2869,8 +2649,12 @@ export const PlayersPage = {
     `;
 
     document.body.appendChild(modalElement);
+    const close = () => this._closeBuilderModal('edit-player', modalElement);
 
-    this.renderClassPicker('edit-class-picker', 'edit-player-class', player.role || '');
+    // A character from before the builder keeps its typed gear and stats until the window is touched.
+    const builder = synced ? null : this._mountBuilder('edit-player', modalElement,
+      player.build || emptyBuildFor(player.role), player.handStats || (player.build ? {} : player.characterStats));
+    if (synced) this.renderClassPicker('edit-class-picker', 'edit-player-class', player.role || '');
 
     // Toggle exclude-fields visibility
     const editExcludeCb = document.getElementById('edit-player-exclude');
@@ -2887,7 +2671,6 @@ export const PlayersPage = {
     // Setup screenshot upload and equip level buttons
     if (!synced) {
       this._setupScreenshotUpload('edit-player', modalElement);
-      this._setupEquipLevelButtons('edit-player', modalElement);
     } else {
       this._setupOverrides(modalElement);
       document.getElementById('override-clear-cards')?.addEventListener('click', async (e) => {
@@ -2899,7 +2682,7 @@ export const PlayersPage = {
         e.target.disabled = true;
         try {
           await dataService.clearCharacterCards(player.id);
-          document.body.removeChild(modalElement);
+          close();
           toast.success(`Cleared ${player.name}'s cards`);
           this.loadPlayers();
         } catch (error) {
@@ -2921,23 +2704,17 @@ export const PlayersPage = {
     document.getElementById('edit-player-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('edit-player-name').value;
-      const role = document.getElementById('edit-player-class').value;
       const notes = document.getElementById('edit-player-notes').value;
       const accountNumber = this.getSelectedAccount('edit-account-buttons-container');
-      const equipment = synced ? {} : this._readEquipmentForm('edit-player');
-      const characterStats = synced ? {} : this._readStatsForm('edit-player');
-
-      const weapon = equipment.mainWeapon?.rarity || '';
-      const weaponEnhance = equipment.mainWeapon?.enhancement ? String(equipment.mainWeapon.enhancement) : '';
-      const armor = equipment.helmet?.rarity || '';
-      const armorEnhance = equipment.helmet?.enhancement ? String(equipment.helmet.enhancement) : '';
+      const built = !!builder && (!!player.build || builder.dirty);
+      const handStats = synced ? {} : this._readHandStats(modalElement);
 
       const ownerSelect = document.getElementById('edit-player-owner');
       const newOwnerId = ownerSelect ? ownerSelect.value : null;
 
       if (!dataService.hasWriteAccess()) {
         toast.warning('Please log in to edit characters.', 5000);
-        document.body.removeChild(modalElement);
+        close();
         return;
       }
 
@@ -2946,17 +2723,17 @@ export const PlayersPage = {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
 
-        const suffix1 = document.getElementById('edit-player-suffix1')?.value || '';
-        const suffix2 = document.getElementById('edit-player-suffix2')?.value || '';
         const exclude = document.getElementById('edit-player-exclude')?.checked ?? player.exclude ?? false;
         const excludeLabel = document.getElementById('edit-player-exclude-label')?.value ?? player.excludeLabel ?? '';
         const excludeReason = document.getElementById('edit-player-exclude-reason')?.value ?? player.excludeReason ?? '';
+        // A sent build has the server derive gear and stats; otherwise the stored ones go back unchanged.
         await dataService.updatePlayer({
-          id: player.id, name, role,
-          weapon, weaponEnhance, suffix1, suffix2,
-          armor, armorEnhance, equipment, characterStats,
-          notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason,
-          syncedAt: player.syncedAt
+          ...player, name,
+          role: built ? siteClassName(builder.build.second_job) : player.role,
+          build: built ? builder.build : undefined,
+          handStats: built ? handStats : undefined,
+          characterStats: built ? {} : handStats,
+          notes, accountNumber: accountNumber || 1, exclude, excludeLabel, excludeReason
         }, player.name);
 
         if (isAdmin && newOwnerId !== player.discordId) {
@@ -2964,7 +2741,7 @@ export const PlayersPage = {
         }
         if (synced) await dataService.saveCharacterOverrides(player.id, this._readOverrides(modalElement, player), modalElement.querySelector('#override-hand-set-wins').checked);
 
-        document.body.removeChild(modalElement);
+        close();
         toast.success(`Character "${name}" updated successfully!`);
         this.loadPlayers();
       } catch (error) {
@@ -2992,7 +2769,7 @@ export const PlayersPage = {
 
         try {
           await dataService.deletePlayer(player.id);
-          document.body.removeChild(modalElement);
+          close();
           toast.success(`${player.name} deleted! Wala na!!`);
           this.loadPlayers();
         } catch (error) {
@@ -3001,15 +2778,8 @@ export const PlayersPage = {
       });
     }
 
-    document.getElementById('cancel-edit-btn').addEventListener('click', () => {
-      document.body.removeChild(modalElement);
-    });
-
-    modalElement.addEventListener('click', (e) => {
-      if (e.target === modalElement) {
-        document.body.removeChild(modalElement);
-      }
-    });
+    document.getElementById('cancel-edit-btn').addEventListener('click', close);
+    modalElement.addEventListener('click', (e) => { if (e.target === modalElement) close(); });
   },
 
   async togglePlayerCompleted(playerName) {

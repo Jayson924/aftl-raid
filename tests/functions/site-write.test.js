@@ -1,5 +1,6 @@
 // site-write permission rules against a stubbed Supabase REST.
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { signSession } from '../../netlify/lib/session.js';
 import { handler } from '../../netlify/functions/site-write.js';
@@ -103,6 +104,25 @@ test('characters: owners and admins edit, others cannot; new ones belong to the 
   assert.equal(added.data.discord_id, 'mate');
   assert.equal(added.data.whitelisted, undefined);
   assert.equal((await parse(call('mate', 'player.adminFlags', { id: 'p-mate', fields: { whitelisted: true } }))).status, 403);
+});
+
+test('a hand-built character gets its panel calculated; typed stats win and synced ones ignore builds', async () => {
+  const db = fixture(); stubDb(db);
+  const build = JSON.parse(fs.readFileSync(new URL('../../netlify/data/sim/defaults.json', import.meta.url), 'utf8')).build1;
+  const added = await parse(call('pal', 'player.add', { fields: { name: 'Built', role: 'Elestra' }, build, hand_stats: { finalDamage: 12345, hp: '' } }));
+  assert.equal(added.status, 200);
+  const row = db.players.find((p) => p.name === 'Built');
+  assert.ok(row.panel?.rows?.length);
+  assert.ok(row.equipment.helmet.rarity && row.equipment.helmet.enhancement > 0);
+  assert.equal(row.character_stats.finalDamage, 12345);
+  assert.ok(row.character_stats.attackPower > 0 && row.character_stats.hp > 0);
+  assert.deepEqual(row.overrides.hand_stats, { finalDamage: 12345 });
+  // Re-saving keeps other override keys; a synced character never takes a build from the form.
+  row.overrides.hand_set_wins = true;
+  await parse(call('pal', 'player.update', { id: row.id, fields: { name: 'Built' }, build, hand_stats: {} }));
+  assert.deepEqual(row.overrides, { hand_set_wins: true, hand_stats: {} });
+  await parse(call('mate', 'player.update', { id: 'p-synced', fields: {}, build }));
+  assert.equal(db.players[1].build, undefined);
 });
 
 test('lineup completion and tickets need an editor', async () => {

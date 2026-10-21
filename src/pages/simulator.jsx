@@ -15,7 +15,9 @@ const STORAGE_KEY = 'aftl.simulator.builds';
 const PARTY_KEY = 'aftl.simulator.party';
 const L = options.lists;
 // Answers come from the simulate function; the page re-renders when one arrives.
-const calc = createRemoteCalculator({ jobMap: options.job_map, onResult: (error) => SimulatorPage.onResult(error) });
+const calc = createRemoteCalculator({ jobMap: options.job_map, onResult: (error) => { SimulatorPage.onResult(error); openBuilder?.onResult(error); } });
+// The Add/Edit Character builder while its modal is open.
+let openBuilder = null;
 
 // Tabs under the character window, for everything that is not a game window.
 const TABS = [['sets', 'Gear Sets'], ['other', 'Other'], ['stats', 'Full Stats'], ['skills', 'Skills'], ['compare', 'Compare']];
@@ -1673,3 +1675,81 @@ Crit ${dmg(sk.crit)}`)}"` : '');
     return body ? `<div class="sim-compare-grid">${body}</div>` : '<p class="sim-delta-none">Both builds have the same stats</p>';
   },
 };
+
+// ---- hand builder: the General window alone, for Add/Edit Character -------------------------
+
+const SITE_CLASS_NAMES = { Moonlord: 'Moon Lord' };
+export const siteClassName = (job) => SITE_CLASS_NAMES[job] || job;
+const simJobName = (role) => Object.keys(SITE_CLASS_NAMES).find((job) => SITE_CLASS_NAMES[job] === role) || role;
+
+// An empty build of the site class: only what the General window shows adds stats.
+export function emptyBuildFor(role) {
+  const second = simJobName(role);
+  const job = L.jobs.find((j) => j.seconds.includes(second)) || L.jobs.find((j) => j.seconds.includes(options.defaults.build1.second_job));
+  return normalizeBuild({ first_job: job.first, second_job: job.seconds.includes(second) ? second : job.seconds[0], crit_resist_value: options.defaults.build1.crit_resist_value });
+}
+
+// Mounts the window into container; onUpdate(result) runs after every change and calculator answer.
+export function createCharacterBuilder(container, raw, { onUpdate } = {}) {
+  const builder = Object.assign(Object.create(SimulatorPage), {
+    container, builds: { A: normalizeBuild(raw) }, active: 'A', view: 'general', dirty: false,
+    results: { A: { rows: [], summary: {} } }, slots: { ...SimulatorPage.slots, general: 'equipment.0' },
+    applyAll: { heraldry: false, engraving: false }, listeners: null,
+    get result() { return this.results.A; },
+    save() {},
+    recalculate() {
+      this.results.A = calc.calculate(this.build);
+      this.renderSummary();
+    },
+    onResult(error) {
+      if (!this.container) return;
+      if (error) { toast.error(error.message); return; }
+      this.results.A = calc.calculate(this.build);
+      this.renderSummary();
+      const focused = document.activeElement;
+      if (!(focused?.matches?.('input[type="number"][data-path]') && this.container.contains(focused))) this.renderPanel();
+    },
+    renderSummary() {
+      const stats = this.container?.querySelector('#sim-char-stats');
+      if (stats) stats.innerHTML = this.characterStats();
+      onUpdate?.(this.results.A);
+    },
+    renderPanel() {
+      const main = this.container?.querySelector('.sim-main');
+      if (main) main.innerHTML = this.renderCharacter();
+    },
+    renderCharacter() {
+      const b = this.build;
+      const seconds = L.jobs.find((j) => j.first === b.first_job)?.seconds || [];
+      return `
+        <div class="sim-class-row">
+          <label><span>Class</span>${select('first_job', L.jobs.map((j) => j.first), b.first_job)}</label>
+          <label><span>Specialization</span>${select('second_job', seconds, b.second_job)}</label>
+        </div>
+        <div class="sim-equip"><div class="sim-window-wrap">${this.generalWindow()}</div>${this.slotEditor()}</div>`;
+    },
+    onChange(e, live) {
+      if (e.target.dataset?.path) this.dirty = true;
+      SimulatorPage.onChange.call(this, e, live);
+    },
+    // A specialization from outside the window (a screenshot); the class follows it.
+    setJob(secondJob) {
+      const second = simJobName(secondJob);
+      if (!L.jobs.some((j) => j.seconds.includes(second))) return;
+      this.onChange({ target: { dataset: { path: 'second_job' }, value: second, type: 'select-one' } });
+    },
+    destroy() {
+      this.listeners?.abort();
+      this.listeners = null;
+      this.container = null;
+      if (openBuilder === this) openBuilder = null;
+    },
+  });
+  initFixedTooltip();
+  container.innerHTML = '<div class="simulator-page sim-builder"><section class="sim-main"></section></div>';
+  openBuilder = builder;
+  builder.bind();
+  builder.recalculate();
+  builder.renderPanel();
+  return builder;
+}
