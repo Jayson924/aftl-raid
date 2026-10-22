@@ -46,6 +46,7 @@ export async function handler(event) {
     const incoming = gradedCards(body.build.card_grades);
     const resent = Array.isArray(cleared) && incoming.length && incoming.join() === cleared.join();
     const gameFields = (Array.isArray(body.character?.game_fields) ? body.character.game_fields : []).filter((f) => GAME_FIELDS.includes(f));
+    const weeklyClears = cleanWeeklyClears(body.character?.weekly_clears);
     const synced = {
       ...body.build,
       game_fields: gameFields,
@@ -58,6 +59,8 @@ export async function handler(event) {
       // New cards replace the cleared set, so the mark goes.
       ...(Array.isArray(cleared) && incoming.length && !resent ? { overrides: Object.fromEntries(Object.entries(prior.overrides).filter(([k]) => k !== 'cleared_cards')) } : {}),
       ...deriveColumns(build, panel, job),
+      // Only a login that carried the counts may replace them; an older toolbox leaves the stored ones.
+      ...(weeklyClears ? { weekly_clears: weeklyClears, weekly_clears_at: new Date().toISOString() } : {}),
     };
     // The game's guild decides the in-guild flag; a blank one (no guild, or the login was missed) leaves it alone.
     const guild = String(body.character?.guild || '').trim().toLowerCase();
@@ -86,6 +89,18 @@ export async function handler(event) {
     console.error('character-sync error:', err);
     return json(500, { error: err.message });
   }
+}
+
+// Per-stage weekly counts keyed by map id, as the meter read them at login; null when the sync carried none.
+function cleanWeeklyClears(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const count = (v) => Math.max(0, Math.min(999, Math.round(Number(v) || 0)));
+  const out = {};
+  for (const [mapId, stage] of Object.entries(raw).slice(0, 400)) {
+    if (!/^\d{1,6}$/.test(mapId) || !stage || typeof stage !== 'object') continue;
+    out[mapId] = { name: String(stage.name || `Stage ${mapId}`).slice(0, 80), clears: count(stage.clears), entries: count(stage.entries), limit: count(stage.limit) };
+  }
+  return out;
 }
 
 // The game sends cards once per session; a sync without any keeps the cards already stored.

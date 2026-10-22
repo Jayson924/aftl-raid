@@ -119,6 +119,35 @@ test('character-sync creates, updates, and refuses another user\'s character', a
   assert.equal(db.players.find((p) => p.name === 'Taken').discord_id, 'z9');
 });
 
+test('character-sync stores the weekly clears the login carried and keeps them when a sync has none', async () => {
+  const token = 'meter-token-value';
+  const db = {
+    app_users: [{ discord_id: 'g1', role: 'guildmate' }],
+    meter_tokens: [{ token_hash: sha256(token), discord_id: 'g1' }],
+    players: [],
+  };
+  stubDb(db);
+  const weekly_clears = {
+    14501: { name: 'Black Dragon Nest (Classic)', clears: 1, entries: 4, limit: 10 },
+    17610: { name: 'Desert Dragon Nest (Hardcore Mode)', clears: '1', entries: 0, limit: 0 },
+    junk: { clears: 5 }, 14300: 'nope', 14410: { clears: -2, entries: 1e9 },
+  };
+  const payload = { character: { name: 'Swipe', job: 'Elestra', weekly_clears }, build: { second_job: 'Elestra' }, meter_version: '1.4.3' };
+  assert.equal(parse(await characterSync(post(payload, { 'x-meter-token': token }))).status, 200);
+  const row = db.players.find((p) => p.name === 'Swipe');
+  assert.deepEqual(row.weekly_clears, {
+    14501: { name: 'Black Dragon Nest (Classic)', clears: 1, entries: 4, limit: 10 },
+    17610: { name: 'Desert Dragon Nest (Hardcore Mode)', clears: 1, entries: 0, limit: 0 },
+    14410: { name: 'Stage 14410', clears: 0, entries: 999, limit: 0 },
+  });
+  assert.ok(Date.now() - Date.parse(row.weekly_clears_at) < 60e3);
+  const readAt = row.weekly_clears_at;
+  // An older toolbox sends no counts; the stored ones stay.
+  assert.equal(parse(await characterSync(post({ ...payload, character: { name: 'Swipe', job: 'Elestra' } }, { 'x-meter-token': token }))).status, 200);
+  assert.equal(row.weekly_clears[14501].clears, 1);
+  assert.equal(row.weekly_clears_at, readAt);
+});
+
 test('character-sync keeps characters of one game account on one account number', async () => {
   const token = 'meter-token-value';
   const db = {

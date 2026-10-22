@@ -94,6 +94,60 @@ $build-tint: linear-gradient(to top left, color-mix(in srgb, var(--build-color) 
   }
 }
 .sim-main { margin-bottom: 1rem; }
+// Page sections, like Lineups' raid tabs; RNG Table sits apart at the end, as Loot Log does.
+.sim-page-tabs {
+  @extend .sim-tabs;
+  margin: 0 0 1.5rem;
+  .sim-tab-rng { margin-left: auto; border-left: 1px solid rgba(255, 255, 255, 0.12); }
+}
+
+// RNG Table: every roll for engravings, potentials and runes.
+.rng-tabs { margin-top: 0; }
+.rng-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2rem; align-items: start; }
+.rng-grid-odds { grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); }
+.rng-grid-pot { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.rng-grid > section { min-width: 0; }
+.rng-section [hidden], .simulator-page > [hidden] { display: none !important; }
+.rng-section h2 { margin-top: 0.5rem; }
+.rng-section h3 { margin: 0.75rem 0 0.4rem; font-size: 0.95rem; span { color: $text-muted; font-weight: 400; font-size: 0.85rem; } }
+.rng-table td { white-space: normal; }
+.rng-table td small { white-space: nowrap; }
+.rng-note { margin: 0 0 0.75rem; color: $text-muted; font-size: 0.85rem; max-width: 70ch; }
+.rng-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; margin-bottom: 0.75rem; .rng-note { margin: 0; } select { min-width: 16rem; } }
+// Roll chips shaded from the lowest roll (red) to the highest (green).
+$roll-shades: (0: #e0605a, 1: #e39a4f, 2: #d8cf5c, 3: #8fd06a, 4: #3fc47f);
+.rng-rolls { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.rng-stack { flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+// Potential set cards, styled like the simulator window: chance on top, one line per row, value shaded by its roll.
+.rng-sets { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.75rem; }
+.rng-set {
+  display: flex; flex-direction: column; border-radius: 10px; overflow: hidden;
+  background: linear-gradient(180deg, #23272b 0%, #181b1e 100%); border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); transition: border-color 0.15s, transform 0.15s;
+  &:hover { border-color: rgba(244, 196, 48, 0.45); transform: translateY(-1px); }
+  header {
+    display: flex; align-items: baseline; gap: 0.4rem; padding: 0.55rem 0.8rem;
+    background: rgba(244, 196, 48, 0.06); border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    strong { color: $primary-color; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    span { color: $text-muted; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  }
+  ul { list-style: none; margin: 0; padding: 0.45rem 0.8rem 0.6rem; display: flex; flex-direction: column; gap: 0.15rem; }
+  li {
+    display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.15rem 0 0.15rem 0.55rem;
+    border-left: 3px solid rgba(255, 255, 255, 0.15); font-size: 0.86rem; cursor: default;
+    span { color: $text-light; }
+    b { font-weight: 600; font-variant-numeric: tabular-nums; color: $text-light; }
+    @each $i, $c in $roll-shades { &.roll-#{$i} { border-left-color: $c; b { color: $c; } } }
+  }
+}
+.rng-roll {
+  display: inline-flex; flex-direction: column; align-items: center; padding: 0.15rem 0.45rem; border-radius: 5px;
+  font-size: 0.82rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04);
+  small { font-size: 0.68rem; color: $text-muted; }
+  @each $i, $c in $roll-shades { &.roll-#{$i} { color: $c; border-color: rgba($c, 0.45); background: rgba($c, 0.08); } }
+}
+@media (max-width: 900px) { .rng-grid, .rng-grid-pot { grid-template-columns: minmax(0, 1fr); } }
 
 .sim-class-row {
   display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1rem;
@@ -446,6 +500,15 @@ $rune-board: 320px;
     &.selected { background: rgba(244, 196, 48, 0.12); }
   }
 }
+// Potential sets are long lines of stats, so the list wraps and stays as wide as the editor.
+.sim-potential-set .sim-picker-list { width: 100%; max-width: none; li button { font-size: 0.85rem; } }
+.sim-potential-set .sim-picker-name { white-space: normal; }
+.sim-pot-lines {
+  display: flex; flex-direction: column; gap: 0.1rem; line-height: 1.3;
+  small { color: $text-muted; font-size: 0.75rem; }
+}
+.sim-potential-set .sim-picker-list li + li { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.sim-h4-note { margin-left: 0.4rem; font-weight: 400; text-transform: none; letter-spacing: 0; }
 .sim-picker-name {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   @each $name, $color in $rarity { &.#{$name} { color: $color; } }

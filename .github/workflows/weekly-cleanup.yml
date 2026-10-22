@@ -1,11 +1,8 @@
 name: Weekly Lineup Cleanup
 
+# The weekly reset is scheduled in Postgres by pg_cron (supabase/schedule-weekly-cleanup.sql);
+# this workflow is a manual fallback only, since GitHub's scheduler starts late or skips runs.
 on:
-  schedule:
-    # Runs daily at 23:00 UTC (4:00 PM PT) - job checks if it's Friday PT before running
-    - cron: '0 23 * * *'
-
-  # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
 
 jobs:

@@ -7,6 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { usesTickets } from './constants.js';
+import { GAME_RAIDS, isThisGameWeek, markField, RAID_BY_TYPE, raidStatus } from './raid-clears.js';
 import { guardClient, previewRole, previewDiscordId } from './dev-preview.js';
 import { toast } from './toast.js';
 
@@ -22,11 +23,7 @@ const supabase = guardClient(createClient(supabaseUrl || '', supabaseAnonKey || 
 // Map a raid_type string to the players-table completion column it tracks.
 // Returns null for raid types that don't track weekly completion.
 function raidTypeToCompletionColumn(raidType) {
-  if (raidType === 'DDN Hardcore') return 'ddn_hardcore_completed';
-  if (raidType === 'DDN Classic') return 'ddn_classic_completed';
-  if (raidType === 'DDN Normal') return 'ddn_normal_completed';
-  if (raidType === 'BDN Classic') return 'bdn_classic_completed';
-  return null;
+  return RAID_BY_TYPE[raidType]?.column || null;
 }
 
 const lootFromRow = (data) => ({
@@ -388,6 +385,8 @@ class DataService {
         build: p.build || null,
         panel: p.panel || null,
         syncedAt: p.synced_at || null,
+        weeklyClears: p.weekly_clears || null,
+        weeklyClearsAt: p.weekly_clears_at || null,
         handSetWins: !!p.overrides?.hand_set_wins,
         handStats: p.overrides?.hand_stats || null,
         // Legacy fields (derived from equipment for backward compat)
@@ -401,6 +400,7 @@ class DataService {
         ddnClassicCompleted: p.ddn_classic_completed || '',
         ddnNormalCompleted: p.ddn_normal_completed || '',
         bdnClassicCompleted: p.bdn_classic_completed || '',
+        ...Object.fromEntries(GAME_RAIDS.filter((r) => r.column).map(({ column }) => [markField(column), p[column] || ''])),
         ticketsUsed: p.tickets_used || {},
         discordId: p.discord_id || null,
         accountNumber: p.account_number || null,
@@ -1111,53 +1111,14 @@ class DataService {
   // COMPLETION TRACKING
   // ============================================
 
-  /**
-   * Check if a completion timestamp is from the current weekly reset period
-   */
+  // Marks count from the game's weekly reset (Saturday 00:00 SEA), the same week as the synced clears.
   isCompletedThisWeek(timestamp) {
-    if (!timestamp) return false;
-
-    try {
-      const completedDate = new Date(timestamp);
-      const now = new Date();
-
-      // Get the most recent Friday 5pm in Pacific Time
-      const nowPT = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-      const dayOfWeek = nowPT.getDay();
-
-      let daysBack;
-      if (dayOfWeek === 5) {
-        daysBack = nowPT.getHours() >= 17 ? 0 : 7;
-      } else if (dayOfWeek === 6) {
-        daysBack = 1;
-      } else if (dayOfWeek === 0) {
-        daysBack = 2;
-      } else {
-        daysBack = dayOfWeek + 2;
-      }
-
-      const lastFridayPT = new Date(nowPT);
-      lastFridayPT.setDate(lastFridayPT.getDate() - daysBack);
-      lastFridayPT.setHours(17, 0, 0, 0);
-
-      const completedPT = new Date(completedDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-
-      return completedPT >= lastFridayPT;
-    } catch (error) {
-      console.error('Error parsing completion timestamp:', error);
-      return false;
-    }
+    return isThisGameWeek(timestamp);
   }
 
+  // Raids with no weekly tracking (4-man, Unspecified, retired types) are always needed.
   playerNeedsRaid(player, raidType) {
-    // 4-man and Unspecified don't track weekly completion
-    if (raidType === 'Unspecified' || raidType === '4-man') return true;
-    if (raidType === 'DDN Hardcore') return !this.isCompletedThisWeek(player.ddnHardcoreCompleted);
-    if (raidType === 'DDN Classic') return !this.isCompletedThisWeek(player.ddnClassicCompleted);
-    if (raidType === 'DDN Normal') return !this.isCompletedThisWeek(player.ddnNormalCompleted);
-    if (raidType === 'BDN Classic') return !this.isCompletedThisWeek(player.bdnClassicCompleted);
-    // Retired or unknown raid types have no completion column.
-    return true;
+    return !raidStatus(player, raidType).done;
   }
 
   playerTicketUsed(player, raidType) {

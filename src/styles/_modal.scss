@@ -555,6 +555,40 @@
   }
 
   .hand-stats-hint { margin-left: 0.4rem; font-weight: 400; font-size: 0.8rem; color: $text-muted; }
+
+  // Slots read from a screenshot whose icon matches more than one item.
+  .gear-review {
+    margin-bottom: 0.75rem; padding: 0.75rem 0.9rem; border-radius: $border-radius;
+    border: 1px solid rgba($primary-color, 0.45); background: rgba($primary-color, 0.06);
+  }
+  .gear-review-head {
+    display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem;
+    strong { color: $primary-color; }
+    span { color: $text-muted; font-size: 0.85rem; }
+  }
+  .gear-review-done {
+    margin-left: auto; padding: 0.25rem 0.75rem; font: inherit; font-size: 0.85rem; cursor: pointer;
+    color: $text-light; background: transparent; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;
+    &:hover { border-color: rgba(255, 255, 255, 0.45); }
+  }
+  .gear-review-row { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.3rem 0; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .gear-review-slot {
+    flex: none; width: 8.5rem; padding: 0.3rem 0; text-align: left; font: inherit; font-size: 0.85rem; cursor: pointer;
+    color: $text-light; background: none; border: 0; text-decoration: underline dotted rgba(255, 255, 255, 0.3);
+  }
+  .gear-review-picks {
+    display: flex; flex-wrap: wrap; gap: 0.35rem;
+    button {
+      padding: 0.3rem 0.6rem; font: inherit; font-size: 0.85rem; cursor: pointer; color: $text-light;
+      background: rgba(255, 255, 255, 0.06); border: 1px solid transparent; border-radius: 6px;
+      &:hover { background: rgba(255, 255, 255, 0.1); }
+      &.active { background: rgba($primary-color, 0.15); border-color: $primary-color; color: $primary-color; }
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .modal-builder .gear-review-row { flex-direction: column; gap: 0.25rem; }
 }
 
 @media (max-width: 720px) {

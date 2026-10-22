@@ -3,6 +3,8 @@ import options from '../data/sim/options.json' with { type: 'json' };
 import { createRemoteCalculator, NONE } from '../sim/remote.js';
 import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, engravingSecondaryOptions, setEngravingRank, ENGRAVING_RARITY } from '../sim/engravings.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
+import { rngTable, lineRank } from '../sim/rng-table.js';
+import rngData from '../data/sim-rng.json' with { type: 'json' };
 import { getClassSpriteStyle } from '../constants.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
@@ -124,7 +126,7 @@ function signed(value, digits = 0) {
 function select(path, options, value, extra = '') {
   const current = value === null || value === undefined ? NONE : String(value);
   const list = options.includes(current) ? options : [current, ...options];
-  return `<select data-path="${esc(path)}" ${extra}>${list.map((o) => `<option value="${esc(o)}" ${o === current ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  return `<select data-path="${esc(path)}" ${extra}>${list.map((o) => `<option value="${esc(o)}" ${o === current ? 'selected' : ''}>${esc(statLabel(o))}</option>`).join('')}</select>`;
 }
 
 function number(path, value, [min, max], extra = '') {
@@ -303,6 +305,22 @@ function engravingExtraOption(item) {
   if (item.extra_tier === NONE || !item.extra_value) return NONE;
   return engravingExtraRanks(item).find((o) => o.startsWith(`${item.grade} ${item.extra_tier} `)) || NONE;
 }
+// The game's potential pool for an item: picked by its rarity and its noun (the last word of the name).
+const JEWELRY_NOUN = { Necklace: 'Necklace', Earring: 'Earrings', 'Ring 1': 'Ring', 'Ring 2': 'Ring' };
+function potentialPool(build, field, item) {
+  const rarity = rarityOf(slotEntry(build, field, item));
+  const noun = field === 'jewelry' ? JEWELRY_NOUN[item.slot] : String(item.name).split(' ').at(-1);
+  return rngData.potentials.find((p) => p.rarity.includes(rarity) && p.items.some((i) => i.toLowerCase() === noun?.toLowerCase())) || null;
+}
+const potentialSetKey = (keys) => [...keys].sort().join(' + ');
+
+const potentialLinesHtml = (keys, note) => `<span class="sim-pot-lines">${[...keys].sort((a, b) => lineRank(a) - lineRank(b))
+  .map((k) => `<span>${esc(statLabel(k))}</span>`).join('')}<small>${esc(note)}</small></span>`;
+// Lines that are not a whole set: how many of the item's sets contain them all.
+function partialNote(lines, pool) {
+  const n = pool.rolls.filter((r) => lines.every((l) => r.keys.includes(l))).length;
+  return n ? `part of ${n} possible set${n === 1 ? '' : 's'}` : 'not a set this item rolls';
+}
 function slotEntry(build, field, item) {
   if (item.name === NONE || field === 'fashion') return null;
   return field === 'jewelry' ? jewelryEntry(item.slot, item.name) : equipmentEntry(build, item.name);
@@ -360,6 +378,8 @@ const intoBuild = (slot) => `the ${BUILD_NAMES[slot].toLowerCase()}`;
 export const SimulatorPage = {
   builds: null,
   active: 'A',
+  section: 'sim',
+  rng: { tab: 'engravings', runeLevel: '70', potRarity: 'legend', potPool: 0 },
   tab: 'sets',
   view: 'general',
   costumeMode: 'fashion',
@@ -404,15 +424,22 @@ export const SimulatorPage = {
       <div class="simulator-page" data-build="${this.active}">
         <div class="page-header">
           <div><h1>Character Simulator</h1><p class="page-subtitle">Stats from the SEA client tables. Build by hand, or compare two builds.</p></div>
-          <div class="sim-build-switch" role="tablist">
+          ${this.section === 'sim' ? `<div class="sim-build-switch" role="tablist">
             <button class="btn ${this.active === 'A' ? 'btn-primary' : 'btn-secondary'} sim-build-btn" data-action="switch" data-value="A" aria-pressed="${this.active === 'A'}">${buildName('A')}</button>
             <button class="btn ${this.active === 'B' ? 'btn-primary' : 'btn-secondary'} sim-build-btn" data-action="switch" data-value="B" aria-pressed="${this.active === 'B'}">${buildName('B')}</button>
-          </div>
+          </div>` : ''}
         </div>
-        <section class="sim-summary" id="sim-summary"></section>
-        <section class="sim-main" id="sim-main"></section>
-        <nav class="sim-tabs" id="sim-tabs"></nav>
-        <section class="sim-panel" id="sim-panel"></section>
+        <nav class="sim-page-tabs">
+          <button class="${this.section === 'sim' ? 'active' : ''}" data-action="section" data-value="sim">Simulator</button>
+          <button class="sim-tab-rng ${this.section === 'rng' ? 'active' : ''}" data-action="section" data-value="rng">RNG Table</button>
+        </nav>
+        <div class="sim-section" ${this.section === 'sim' ? '' : 'hidden'}>
+          <section class="sim-summary" id="sim-summary"></section>
+          <section class="sim-main" id="sim-main"></section>
+          <nav class="sim-tabs" id="sim-tabs"></nav>
+          <section class="sim-panel" id="sim-panel"></section>
+        </div>
+        <div class="rng-section" id="rng-section" ${this.section === 'rng' ? '' : 'hidden'}>${rngTable(this.rng)}</div>
       </div>`;
     this.bind();
     this.recalculate();
@@ -524,14 +551,30 @@ export const SimulatorPage = {
   },
 
   // Each control carries data-path; the handler applies the meter's dependent resets, then re-renders.
+  renderRng() {
+    this.container.querySelector('#rng-section').innerHTML = rngTable(this.rng);
+  },
+
   onChange(e, live = false) {
     const el = e.target;
+    if (el.dataset.rngPool !== undefined) { this.rng.potPool = Number(el.value); this.renderRng(); return; }
     if (el.dataset.applyAll) { this.applyAll[el.dataset.applyAll] = el.checked; return; }
     const path = el.dataset.path;
     if (!path) return;
     const build = this.build;
     let value = el.type === 'checkbox' ? el.checked : el.value;
     if (el.type === 'number') value = el.value === '' ? 0 : Number(el.value);
+    if (path.endsWith('.potential_set')) {
+      const itemPath = path.slice(0, -'.potential_set'.length);
+      const item = getPath(build, itemPath);
+      const field = itemPath.split('.')[0];
+      const roll = value === NONE ? null : potentialPool(build, field, item)?.rolls.find((r) => potentialSetKey(r.keys) === value);
+      if (value === NONE) item.enchants = [];
+      else if (roll) item.enchants = [...roll.keys];
+      this.recalculate();
+      this.renderPanel();
+      return;
+    }
     if (el.dataset.enchant !== undefined) {
       const item = getPath(build, path);
       const list = new Set(item.enchants || []);
@@ -626,6 +669,14 @@ export const SimulatorPage = {
   onAction(action, value, button) {
     if (action === 'switch') { this.active = value; this.render(this.container); return; }
     if (action === 'tab') { this.tab = value; this.renderTabs(); this.renderPanel(); return; }
+    if (action === 'section') { this.section = value; this.render(this.container); return; }
+    const rngField = { 'rng-tab': 'tab', 'rng-rune-level': 'runeLevel', 'rng-pot-rarity': 'potRarity' }[action];
+    if (rngField) {
+      this.rng[rngField] = value;
+      if (rngField === 'potRarity') this.rng.potPool = 0;
+      this.renderRng();
+      return;
+    }
     if (action === 'picker-toggle') {
       const picker = button.closest('.sim-picker');
       const open = !picker.classList.contains('open');
@@ -866,6 +917,19 @@ export const SimulatorPage = {
       ${this.guildRow()}`;
   },
 
+  // One whole set from the item's pool, as the game rolls it; lines that match no set stay shown as they are.
+  potentialPicker(path, item, pool) {
+    const sets = new Map(pool.rolls.map((r) => [potentialSetKey(r.keys), r]));
+    const current = item.enchants?.length ? potentialSetKey(item.enchants) : NONE;
+    const options = [NONE, ...(current !== NONE && !sets.has(current) ? [current] : []), ...sets.keys()];
+    return this.itemPicker(`${path}.potential_set`, options, current, (key) => {
+      const roll = sets.get(key);
+      return roll
+        ? { rarity: 'normal', level: 0, html: potentialLinesHtml(roll.keys, `${roll.pct}% chance`) }
+        : { rarity: 'normal', level: 0, html: potentialLinesHtml(item.enchants, partialNote(item.enchants, pool)) };
+    }, { sort: false });
+  },
+
   enchantList(path, item, slot) {
     const options = enchantOptions(slot).filter((o) => o !== NONE);
     const selected = new Set(item.enchants || []);
@@ -1052,8 +1116,8 @@ export const SimulatorPage = {
   itemPicker(path, options, value, metaOf, { sort = true } = {}) {
     const meta = (name) => (name === NONE ? { rarity: 'normal', level: 0 } : metaOf(name));
     const row = (name) => {
-      const { rarity, level, label } = meta(name);
-      return `<span class="sim-picker-name ${rarity}">${esc(label ?? name)}</span>${level ? `<span class="sim-lv">Lv${level}</span>` : ''}`;
+      const { rarity, level, label, html } = meta(name);
+      return `<span class="sim-picker-name ${rarity}">${html ?? esc(label ?? name)}</span>${level ? `<span class="sim-lv">Lv${level}</span>` : ''}`;
     };
     // Highest level first, then rarity (Legend, Unique, Epic...), then name; None stays on top.
     const rankOf = (name) => RANK_RARITY.indexOf(meta(name).rarity);
@@ -1089,14 +1153,17 @@ export const SimulatorPage = {
       : `<div class="sim-field"><span>Accessory</span>${this.itemPicker(`${path}.name`, jewelryOptions(item.slot), item.name, (name) => entryMeta(jewelryEntry(item.slot, name)))}</div>
          <label><span>Variant</span>${select(`${path}.variant`, variantOptions(item.slot, item.name), item.variant)}</label>`;
     const bonus = gear ? calc.equipmentAttrs(item, b.first_job, b.second_job) : calc.jewelryAttrs(item);
+    const pool = item.name === NONE ? null : potentialPool(b, field, item);
+    const potentials = pool
+      ? `<h4>Potential <span class="sim-h4-note">${pool.rolls.length} possible sets</span></h4><div class="sim-field sim-potential-set">${this.potentialPicker(path, item, pool)}</div>`
+      : `<h4>Potentials (max ${MAX_ENCHANTS})</h4>${this.enchantList(path, item, item.slot)}`;
     return this.editorShell({
       icon: slotIcon(b, field, item), rarity: rarityOf(entry),
       title: item.name === NONE ? item.slot : item.name,
       subtitle: `${item.slot}${entry?.level ? ` · ${entry.level}` : ''}`,
       body: `
         <div class="sim-editor-fields">${fields}</div>
-        <h4>Potentials (max ${MAX_ENCHANTS})</h4>
-        ${this.enchantList(path, item, item.slot)}
+        ${potentials}
         <h4>Stats</h4>
         ${statGrid(bonus)}`,
     });
@@ -1316,12 +1383,13 @@ export const SimulatorPage = {
     const attrs = (rune.type === 'Defense' ? L.runes.defense_attrs : L.runes.attack_attrs).filter((a) => !available || a === NONE || available[a]);
     const rank = runeRank(rune);
     const rarity = RANK_RARITY[rank];
+    // A rune holds any stat on at most two lines, so a stat already on two other lines isn't offered.
     const line = (entry, j) => {
       const gives = (r) => {
         const value = calc.runeRankValue(rune, j, r);
         return value ? `${entry.attr} +${fmt(value)}` : '';
       };
-      return `<div class="sim-field sim-pair"><span>Line ${j + 1}</span><span class="sim-inline">${select(`${path}.entries.${j}.attr`, attrs, entry.attr)}${this.rankPicker(`${path}.entries.${j}.rank`, available?.[entry.attr] || L.runes.ranks, entry.rank, gives)}</span></div>`;
+      return `<div class="sim-field sim-pair"><span>Line ${j + 1}</span><span class="sim-inline">${select(`${path}.entries.${j}.attr`, attrs.filter((a) => a === NONE || rune.entries.filter((e, k) => k !== j && e.attr === a).length < 2), entry.attr)}${this.rankPicker(`${path}.entries.${j}.rank`, available?.[entry.attr] || L.runes.ranks, entry.rank, gives)}</span></div>`;
     };
     return this.editorShell({
       icon: spriteIcon(rank ? icons.items.Rune?.[`${rune.type}|${rank}`] : undefined, rune.type), rarity: rarity || 'normal',
@@ -1731,6 +1799,25 @@ export function createCharacterBuilder(container, raw, { onUpdate } = {}) {
     onChange(e, live) {
       if (e.target.dataset?.path) this.dirty = true;
       SimulatorPage.onChange.call(this, e, live);
+    },
+    // Gear or accessories a slot can hold for this class, with their icon cells.
+    candidates(field, index) {
+      const names = field === 'jewelry' ? jewelryOptions(this.build.jewelry[index].slot) : equipmentOptions(this.build, this.build.equipment[index].slot);
+      return names.filter(hasValue).map((name) => ({ name, cell: iconCell(this.build, field, name) }));
+    },
+    // Several [path, value] edits as one change, with the window's usual dependent resets.
+    apply(changes) {
+      for (const [path, value] of changes) {
+        setPath(this.build, path, value);
+        this.afterChange(this.build, path, value);
+      }
+      this.dirty = true;
+      this.recalculate();
+      this.renderPanel();
+    },
+    openSlot(ref) {
+      this.slots.general = ref;
+      this.renderPanel();
     },
     // A specialization from outside the window (a screenshot); the class follows it.
     setJob(secondJob) {

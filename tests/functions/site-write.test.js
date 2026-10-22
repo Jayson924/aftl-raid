@@ -261,3 +261,14 @@ test('admin is Discord-only: nobody grants or removes it on the site', async () 
   assert.equal((await parse(call('owner', 'admin.updateUser', { discord_id: 'admin2', fields: { role: 'guildmate' } }))).status, 403);
   assert.equal(db.app_users.find((u) => u.discord_id === 'admin2').role, 'admin');
 });
+
+test('raid marks: owners set the lineup raids and the hand-marked ones, nothing else', async () => {
+  const db = fixture(); stubDb(db);
+  assert.equal((await parse(call('mate', 'player.raidCompletion', { id: 'p-mate', column: 'bdn_memoria_completed', completed: true }))).status, 200);
+  assert.ok(db.players[0].bdn_memoria_completed);
+  assert.equal((await parse(call('mate', 'player.raidCompletion', { id: 'p-mate', column: 'bdn_memoria_completed', completed: false }))).status, 200);
+  assert.equal(db.players[0].bdn_memoria_completed, null);
+  assert.equal((await parse(call('mate', 'player.raidCompletion', { id: 'p-mate', column: 'ddn_classic_completed', completed: true }))).status, 200);
+  assert.equal((await parse(call('mate', 'player.raidCompletion', { id: 'p-mate', column: 'synced_at', completed: true }))).status, 403);
+  assert.equal((await parse(call('other', 'player.raidCompletion', { id: 'p-mate', column: 'abyssal_mire_completed', completed: true }))).status, 403);
+});

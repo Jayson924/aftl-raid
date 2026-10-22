@@ -15,6 +15,7 @@ import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
 import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
+import { GAME_RAIDS, raidProgress, raidStatus, unlistedStageRaids, weeklyClearsThisWeek } from '../raid-clears.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -72,6 +73,7 @@ export const MyRaidsPage = {
   _trackedPrefs: { groupBy: 'raid', hideDone: false, ...loadPref(TRACKED_PREFS_KEY, {}), search: '' },
   _trackedRaids: null,
   _trackedUsers: null,
+  _olderRaidsOpen: new Set(), // playerIds whose "Older raids" group is open on the Raids tab
   _shoppingItems: [], // [{ id, playerId, item, bought, price, sortOrder }]
   _shoppingLoaded: false,
   _shoppingTotalAllByPlayer: loadShoppingTotalPrefs(), // { [playerId]: true } — true = include bought; default un-bought only
@@ -83,6 +85,7 @@ export const MyRaidsPage = {
 
   async render(container) {
     initFixedTooltip();
+    this._olderRaidsOpen = new Set();
     if (!dataService.isAuthenticated()) {
       container.innerHTML = '<p>Please log in to view your characters.</p>';
       return;
@@ -112,6 +115,9 @@ export const MyRaidsPage = {
         </div>
 
         <div class="section my-tracked-section" data-tab-panel="tracked" style="display:none">
+          <h2 class="tracked-heading">This week</h2>
+          <div id="my-game-raids"></div>
+          <h2 class="tracked-heading">Personal raids</h2>
           <div class="tracked-toolbar">
             <div class="tracked-groupby" role="group" aria-label="Group by">
               <button class="tracked-seg" data-group-by="raid">By raid</button>
@@ -386,6 +392,7 @@ export const MyRaidsPage = {
       this._characterGroups = groups;
 
       this.renderRaidsList();
+      this.renderGameRaids();
     } catch (error) {
       console.error('Error loading characters:', error);
       listEl.innerHTML = '<p class="empty-state">Failed to load characters.</p>';
@@ -709,6 +716,110 @@ export const MyRaidsPage = {
         <div class="progress-bar tracked-group-bar"><div class="progress-fill${pct === 100 ? ' complete' : ''}" style="width: ${pct}%"></div></div>
         <div class="tracked-rows">${rows}</div>
       </div>`;
+  },
+
+  // Each of my characters' raids this week: the game's counts grouped by raid, plus manual marks for the site's raid types.
+  renderGameRaids() {
+    const el = document.getElementById('my-game-raids');
+    if (!el) return;
+    if (!this._myPlayers.length) {
+      el.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
+      return;
+    }
+    el.innerHTML = this.renderAccountStructure(this.buildAccountStructure(this._myPlayers), {
+      editable: false,
+      containerClass: 'game-raid-cards',
+      renderCharacter: (player) => this.renderGameRaidCard(player)
+    });
+    el.querySelectorAll('[data-mark-raid]').forEach(btn => btn.addEventListener('click', () => this.markGameRaid(btn)));
+    el.querySelectorAll('[data-older-toggle]').forEach(btn => btn.addEventListener('click', () => this.toggleOlderRaids(btn)));
+  },
+
+  renderGameRaidCard(player) {
+    const weeklyClears = weeklyClearsThisWeek(player);
+    const iconStyle = getClassSpriteStyle(player.role);
+    const readAt = weeklyClears
+      ? `Game read ${new Date(player.weeklyClearsAt).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`
+      : 'Not synced this week';
+    const rows = (raids) => raids.map(raid => this.renderGameRaidRows(player, raid, weeklyClears)).join('');
+    const open = this._olderRaidsOpen.has(player.id);
+
+    return `
+      <div class="game-raid-card" data-player-id="${player.id}">
+        <div class="game-raid-head">
+          ${iconStyle ? `<span class="class-sprite game-raid-icon" style="${iconStyle}"></span>` : ''}
+          <span class="game-raid-char">${escapeHtml(player.name)}</span>
+          <span class="game-raid-read">${readAt}</span>
+        </div>
+        <div class="game-raid-scroll">
+        <table class="game-raid-table">
+          <thead><tr><th>Raid</th><th>Clears</th><th>Entries</th><th>Done</th></tr></thead>
+          <tbody>${rows(GAME_RAIDS.filter(raid => raid.tier < 3))}</tbody>
+          <tbody>
+            <tr class="game-raid-older-row"><td colspan="4">
+              <button type="button" class="game-raid-older" data-older-toggle="${player.id}" aria-expanded="${open}"><span class="game-raid-chevron" aria-hidden="true"></span>Older raids</button>
+            </td></tr>
+          </tbody>
+          <tbody class="game-raid-older-body"${open ? '' : ' hidden'}>${rows([...GAME_RAIDS.filter(raid => raid.tier === 3), ...unlistedStageRaids(weeklyClears)])}</tbody>
+        </table>
+        </div>
+      </div>`;
+  },
+
+  // A raid's row, plus a row per stage when a multi-stage raid was run this week.
+  renderGameRaidRows(player, raid, weeklyClears) {
+    const dash = '<span class="game-raid-none">—</span>';
+    const progress = raidProgress(raid, weeklyClears);
+    const status = raid.raidType ? raidStatus(player, raid.raidType) : { done: progress.done, source: progress.done ? 'game' : null };
+    const limit = raid.sharedLimit || (raid.stages.length === 1 ? raid.stages[0].limit : 0);
+    const entries = !weeklyClears ? dash : limit ? `${progress.entries}/${limit}` : '';
+    let done = '';
+    if (status.source === 'game') {
+      done = '<span class="game-raid-done from-game"><span class="game-raid-check checked locked" role="img" aria-label="Done, from game" data-tooltip-fixed="From game">✓</span><span class="game-raid-done-text">from game</span></span>';
+    } else if (raid.raidType) {
+      const marked = status.source === 'marked';
+      done = `<span class="game-raid-done"><button type="button" class="game-raid-check${marked ? ' checked' : ''}" data-mark-raid="${raid.raidType}" data-player-id="${player.id}" aria-pressed="${marked}" aria-label="Marked done" data-tooltip-fixed="${marked ? 'Unmark' : 'Mark as done'}">${marked ? '✓' : ''}</button>${marked ? '<span class="game-raid-done-text">marked</span>' : ''}</span>`;
+    }
+    const showStages = raid.stages.length > 1 && (raid.tier < 3 || (weeklyClears && progress.active));
+    const stageRows = showStages
+      ? progress.stages.map(stage => {
+        const run = weeklyClears && (stage.clears > 0 || stage.entries > 0);
+        return `
+        <tr class="game-raid-stage">
+          <td>${stage.name}</td>
+          <td>${run ? stage.clears : dash}</td>
+          <td>${!run ? dash : raid.sharedLimit ? stage.entries : stage.limit ? `${stage.entries}/${stage.limit}` : ''}</td>
+          <td></td>
+        </tr>`;
+      }).join('')
+      : '';
+    return `
+      <tr class="game-raid-row${status.done ? ' done' : ''}">
+        <td>${escapeHtml(raid.name)}</td>
+        <td>${weeklyClears ? progress.clears : dash}</td>
+        <td>${entries}</td>
+        <td>${done}</td>
+      </tr>${stageRows}`;
+  },
+
+  toggleOlderRaids(btn) {
+    const playerId = btn.dataset.olderToggle;
+    const open = !this._olderRaidsOpen.has(playerId);
+    if (open) this._olderRaidsOpen.add(playerId);
+    else this._olderRaidsOpen.delete(playerId);
+    btn.setAttribute('aria-expanded', String(open));
+    btn.closest('table').querySelector('.game-raid-older-body').hidden = !open;
+  },
+
+  async markGameRaid(btn) {
+    btn.disabled = true;
+    try {
+      await dataService.togglePlayerRaidCompletion(btn.dataset.playerId, btn.dataset.markRaid, btn.getAttribute('aria-pressed') !== 'true');
+      await this.loadMyCharacters();
+    } catch (error) {
+      btn.disabled = false;
+      toast.error(`Failed to update: ${error.message}`);
+    }
   },
 
   // ============================================

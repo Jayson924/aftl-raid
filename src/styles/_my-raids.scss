@@ -1721,16 +1721,11 @@
       color: rgba(255, 255, 255, 0.5);
       text-decoration: line-through;
     }
-
-    .shopping-check {
-      border-color: $success-color;
-      background: $success-color;
-      color: #fff;
-    }
   }
 }
 
-.my-raids-page .shopping-check {
+.my-raids-page .shopping-check,
+.my-raids-page .game-raid-check {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
@@ -1751,6 +1746,13 @@
     border-color: $success-color;
     box-shadow: 0 0 6px rgba(40, 167, 69, 0.3);
   }
+}
+
+.my-raids-page .shopping-item.bought .shopping-check,
+.my-raids-page .game-raid-check.checked {
+  border-color: $success-color;
+  background: $success-color;
+  color: #fff;
 }
 
 .my-raids-page .shopping-item-text {
@@ -2039,10 +2041,77 @@
 .my-raids-page .tracked-count { text-align: right; font-size: 0.8rem; font-weight: 700; color: $text-muted; font-variant-numeric: tabular-nums; }
 .my-raids-page .tracked-row.done .tracked-count { color: #34ce57; }
 
+// A clear the game reported, as opposed to one marked on the site.
+body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff; }
+
+.my-raids-page .tracked-heading { font-size: 1rem; color: $text-muted; margin: 0 0 0.75rem; }
+.my-raids-page .tracked-heading:not(:first-child) { margin-top: 1.75rem; }
+.my-raids-page .game-raid-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; align-items: start;
+}
+// Capped so an open "Older raids" group scrolls inside the card instead of stretching its row.
+.my-raids-page .game-raid-card {
+  display: flex; flex-direction: column; max-height: 34rem; container-type: inline-size;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: $border-radius;
+  padding: 0.75rem 0.9rem;
+}
+.my-raids-page .game-raid-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin-right: -0.5rem; padding-right: 0.5rem; }
+.my-raids-page .game-raid-head { flex: none; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; min-width: 0; }
+// The 44x46 sprite at half size keeps its frame.
+.my-raids-page .game-raid-icon { flex: none; width: 44px; height: 46px; margin: -11px -11px -12px; transform: scale(0.5); }
+.my-raids-page .game-raid-char { color: $primary-color; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-raids-page .game-raid-read { margin-left: auto; font-size: 0.75rem; color: $text-muted; white-space: nowrap; }
+.my-raids-page .game-raid-table {
+  width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums;
+  th { text-align: left; font-size: 0.7rem; font-weight: 700; color: $text-muted; text-transform: uppercase; letter-spacing: 0.4px; padding: 0 0.4rem 0.3rem; }
+  td { padding: 0.25rem 0.4rem; border-top: 1px solid rgba(255, 255, 255, 0.06); white-space: nowrap; }
+  th:nth-child(2), th:nth-child(3), td:nth-child(2), td:nth-child(3) { text-align: right; }
+  td:first-child { white-space: normal; }
+}
+.my-raids-page .game-raid-row.done td:first-child { color: #34ce57; }
+.my-raids-page .game-raid-stage td { border-top: 0; padding-top: 0; padding-bottom: 0.15rem; font-size: 0.78rem; color: $text-muted; }
+.my-raids-page .game-raid-stage td:first-child { padding-left: 1.4rem; }
+.my-raids-page .game-raid-none { color: rgba(255, 255, 255, 0.3); }
+.my-raids-page .game-raid-older-row td { padding: 0.4rem 0.4rem 0.2rem; }
+.my-raids-page .game-raid-older {
+  display: inline-flex; align-items: center; gap: 0.45rem; background: none; border: 0; padding: 0;
+  color: $text-muted; font: inherit; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; cursor: pointer;
+  &:hover { color: $text-light; }
+}
+.my-raids-page .game-raid-chevron {
+  width: 0.4rem; height: 0.4rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform 0.15s ease;
+}
+.my-raids-page .game-raid-older[aria-expanded="true"] .game-raid-chevron { transform: rotate(45deg); }
+.my-raids-page .game-raid-done { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #34ce57; }
+.my-raids-page .game-raid-done.from-game { color: #7fd8ff; }
+// On a narrow card the check alone tells "marked" from the locked game check; the name keeps the room.
+@container (max-width: 400px) {
+  .my-raids-page .game-raid-done-text { display: none; }
+}
+.my-raids-page .game-raid-check { width: 18px; height: 18px; font-size: 0.75rem; padding: 0; }
+// A game clear: filled in the game's blue with a padlock, since the manual mark can't undo it.
+.my-raids-page .game-raid-check.locked {
+  position: relative;
+  border-color: #7fd8ff;
+  background: #7fd8ff;
+  color: #0d1f2a;
+  cursor: default;
+  &:hover { border-color: #7fd8ff; box-shadow: none; }
+  &::after {
+    content: '';
+    position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 50%;
+    background: $background-dark url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3crect x='3' y='7' width='10' height='8' rx='1.5' fill='%237fd8ff'/%3e%3cpath d='M5 7V5a3 3 0 0 1 6 0v2' fill='none' stroke='%237fd8ff' stroke-width='2'/%3e%3c/svg%3e") center / 10px no-repeat;
+  }
+}
+
 @media (max-width: 768px) {
   .my-raids-page .mc-tabs { overflow-x: auto; max-width: 100%; scrollbar-width: none; }
   .my-raids-page .mc-tab { white-space: nowrap; padding: 0.6rem 0.75rem; }
   .my-raids-page .tracked-groups { grid-template-columns: 1fr; }
+  .my-raids-page .game-raid-cards { grid-template-columns: 1fr; }
   .my-raids-page .tracked-search { max-width: none; }
   .my-raids-page .mc-char-stats { padding: 0.5rem 0.75rem 0.6rem; }
   .my-raids-page .mc-view-tabs { flex-wrap: wrap; padding: 0.45rem 0.75rem 0; }

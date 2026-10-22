@@ -22,6 +22,8 @@ const MIN_ROLE = {
 };
 const rank = (role) => ROLES.indexOf(role);
 const COMPLETION_COLUMNS = new Set(['bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
+// Raids only marked by hand (no lineup raid type); supabase/add-raid-marks.sql adds them.
+const MARK_ONLY_COLUMNS = new Set(['bdn_memoria_completed', 'bdn_hardcore_completed', 'abyssal_mire_completed', 'dragon_fellowship_completed']);
 const RARITIES = new Set(['magic', 'rare', 'epic', 'unique', 'legend']);
 const COMPLETION_BY_RAID = {
   'DDN Hardcore': 'ddn_hardcore_completed', 'DDN Classic': 'ddn_classic_completed',
@@ -172,7 +174,7 @@ const ACTIONS = {
     return {};
   },
   async 'player.raidCompletion'(ctx, a) {
-    if (!COMPLETION_COLUMNS.has(a.column)) deny('Unknown raid');
+    if (!COMPLETION_COLUMNS.has(a.column) && !MARK_ONLY_COLUMNS.has(a.column)) deny('Unknown raid');
     const p = await ctx.player(a.id);
     await sbPatch('players', `id=eq.${enc(p.id)}`, { [a.column]: a.completed ? new Date().toISOString() : null });
     return {};

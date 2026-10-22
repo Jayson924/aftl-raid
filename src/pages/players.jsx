@@ -14,6 +14,8 @@ import itemIcons from '../data/sim-icons.json' with { type: 'json' };
 import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
 import { createCharacterBuilder, emptyBuildFor, siteClassName } from './simulator.jsx';
 import { deriveStats } from '../sim/derive-stats.js';
+import { GAME_RAIDS, raidProgress, raidStatus, weeklyClearsThisWeek } from '../raid-clears.js';
+import { readGear } from '../sim/icon-match.js';
 
 // Gear slots on the character card: site key, simulator slot, short label.
 const CARD_ARMOR = [['helmet', 'Helmet', 'Helm'], ['top', 'Upper', 'Top'], ['bottom', 'Lower', 'Bottom'], ['gloves', 'Gloves', 'Gloves'], ['boots', 'Shoes', 'Boots']];
@@ -24,6 +26,8 @@ const SIM_JOB_NAMES = { 'Moon Lord': 'Moonlord' };
 const ICON_SPRITE = '/sim/item-icons.webp';
 const ICON_PX = 44;
 // Stats a hand-built character may type from the game window: character_stats key, label, has decimals.
+// The analyzer's gear keys in the simulator's equipment order.
+const VISION_GEAR_KEYS = ['helmet', 'top', 'bottom', 'gloves', 'boots', 'mainWeapon', 'subWeapon'];
 const HAND_STATS = [['attackPower', 'ATK'], ['magicAttack', 'MATK'], ['finalDamage', 'FD'], ['hp', 'HP'], ['defense', 'Def'], ['magicDefense', 'MDef'],
   ['criticalRate', 'Crit %', true], ['criticalDamage', 'Crit Dmg %', true], ['fireAttack', 'Fire %', true], ['iceAttack', 'Ice %', true],
   ['lightAttack', 'Light %', true], ['darkAttack', 'Dark %', true]];
@@ -369,39 +373,29 @@ export const PlayersPage = {
   // Uncleared-raid filter: bcl = BDN Classic, dhc/dcl/dn = DDN Hardcore/Classic/Normal.
   _raidPriorityFilter: { bcl: false, dhc: false, dcl: false, dn: false },
 
-  // Render the BDN/DDN raid badge group for a player.
+  // Render the BDN/DDN raid badge group for a player; a clear the game reported can't be toggled off.
   renderRaidBadgesHTML(player, canToggleRaid) {
-    const needsBCL = dataService.playerNeedsRaid(player, 'BDN Classic');
-    const needsDHC = dataService.playerNeedsRaid(player, 'DDN Hardcore');
-    const needsDCL = dataService.playerNeedsRaid(player, 'DDN Classic');
-    const needsDN = dataService.playerNeedsRaid(player, 'DDN Normal');
-    const clickClass = canToggleRaid ? 'clickable' : '';
-    const titleAttr = canToggleRaid ? 'Click to toggle' : '';
-    const toggleAttrs = (raidType, completed) =>
-      canToggleRaid
-        ? `data-player-id="${player.id}" data-raid-type="${raidType}" data-completed="${completed}"`
-        : '';
     const check = '<span class="raid-badge-check">✓</span>';
-    const lbl = (text) => `<span class="raid-badge-label">${text}</span>`;
+    const badge = (raidType, cls, label) => {
+      const { done, source } = raidStatus(player, raidType);
+      const fromGame = source === 'game';
+      const clickable = canToggleRaid && !fromGame;
+      const attrs = clickable ? `data-player-id="${player.id}" data-raid-type="${raidType}" data-completed="${done}"` : '';
+      const title = fromGame ? 'From game' : source === 'marked' ? 'Marked' : '';
+      return `<span class="raid-badge ${cls}${done ? ' completed' : ''}${fromGame ? ' from-game' : ''}${clickable ? ' clickable' : ''}"
+                ${attrs} title="${title}"><span class="raid-badge-label">${label}</span>${done ? check : ''}</span>`;
+    };
     return `
       <div class="raid-badge-group">
         <div class="raid-row bdn-row">
           <span class="raid-row-label">BDN</span>
-          <span class="raid-badge raid-bdn-classic ${!needsBCL ? 'completed' : ''} ${clickClass}"
-                ${toggleAttrs('BDN Classic', !needsBCL)}
-                title="${titleAttr}">${lbl('CL')}${!needsBCL ? check : ''}</span>
+          ${badge('BDN Classic', 'raid-bdn-classic', 'CL')}
         </div>
         <div class="raid-row ddn-row">
           <span class="raid-row-label">DDN</span>
-          <span class="raid-badge raid-ddn-hardcore ${!needsDHC ? 'completed' : ''} ${clickClass}"
-                ${toggleAttrs('DDN Hardcore', !needsDHC)}
-                title="${titleAttr}">${lbl('HC')}${!needsDHC ? check : ''}</span>
-          <span class="raid-badge raid-ddn-classic ${!needsDCL ? 'completed' : ''} ${clickClass}"
-                ${toggleAttrs('DDN Classic', !needsDCL)}
-                title="${titleAttr}">${lbl('CL')}${!needsDCL ? check : ''}</span>
-          <span class="raid-badge raid-ddn-normal ${!needsDN ? 'completed' : ''} ${clickClass}"
-                ${toggleAttrs('DDN Normal', !needsDN)}
-                title="${titleAttr}">${lbl('N')}${!needsDN ? check : ''}</span>
+          ${badge('DDN Hardcore', 'raid-ddn-hardcore', 'HC')}
+          ${badge('DDN Classic', 'raid-ddn-classic', 'CL')}
+          ${badge('DDN Normal', 'raid-ddn-normal', 'N')}
         </div>
       </div>
     `;
@@ -1733,6 +1727,7 @@ export const PlayersPage = {
             ${statRows.join('')}
             ${synced.length ? `<div class="equip-cell synced-note"><span class="equip-cell-value">${syncedLabel(player.syncedAt)}</span></div>` : ''}
             ${synced.length && player.build ? `<div class="equip-cell synced-note"><span class="equip-cell-value">${this._overridesSummary(player.build)}</span></div>` : ''}
+            ${synced.length && weeklyClearsThisWeek(player) ? `<div class="equip-cell synced-note"><span class="equip-cell-value">${this._weeklyClearsSummary(weeklyClearsThisWeek(player))}</span></div>` : ''}
           </div>
         ` : ''}
       </div>
@@ -1866,7 +1861,7 @@ export const PlayersPage = {
           const iconStyle = getClassSpriteStyle(player.role);
 
           const age = syncedAge(player.syncedAt);
-          const syncedTip = [syncedLabel(player.syncedAt), player.build ? this._overridesSummary(player.build) : ''].filter(Boolean).join('\n');
+          const syncedTip = [syncedLabel(player.syncedAt), player.build ? this._overridesSummary(player.build) : '', weeklyClearsThisWeek(player) ? this._weeklyClearsSummary(weeklyClearsThisWeek(player)) : ''].filter(Boolean).join('\n');
           const pills = [this._buildExcludeToggleHtml(player), this._buildWhitelistToggleHtml(player)].join('');
 
           return `
@@ -2116,6 +2111,7 @@ export const PlayersPage = {
     return `
       <div class="form-group">
         <label>Gear:</label>
+        <div id="${prefix}-gear-review" class="gear-review" hidden></div>
         <div id="${prefix}-builder" class="modal-builder-window"></div>
       </div>
       <div class="form-group hand-stats">
@@ -2168,6 +2164,58 @@ export const PlayersPage = {
       const input = document.getElementById(`${prefix}-hs-${key}`);
       if (input && Number(value)) input.value = value;
     }
+  },
+
+  // Gear from the screenshot's slot icons; Vision only reads the +N enhancements.
+  async _readScreenshotGear(prefix, modalElement, src, visionEquipment) {
+    const builder = this._builders[prefix];
+    if (!builder) return null;
+    const slots = await readGear(src, (field, index) => builder.candidates(field, index));
+    if (!slots) return null;
+    const changes = [];
+    for (const slot of slots) {
+      const path = `${slot.field}.${slot.index}`;
+      changes.push([`${path}.name`, slot.name]);
+      const enhance = slot.field === 'equipment' ? Number(visionEquipment?.[VISION_GEAR_KEYS[slot.index]]?.enhancement) : 0;
+      if (enhance > 0) changes.push([`${path}.enhance`, enhance]);
+    }
+    builder.apply(changes);
+    this._renderGearReview(prefix, modalElement, slots.filter((slot) => !slot.sure));
+    return slots;
+  },
+
+  // Slots whose icon is shared or close to another item's: the user confirms or swaps them.
+  _renderGearReview(prefix, modalElement, slots) {
+    const el = modalElement.querySelector(`#${prefix}-gear-review`);
+    const builder = this._builders[prefix];
+    if (!el || !builder) return;
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const draw = () => {
+      el.hidden = !slots.length;
+      el.innerHTML = slots.length ? `
+        <div class="gear-review-head"><strong>Check ${slots.length === 1 ? 'this slot' : `these ${slots.length} slots`}</strong><span>the icons look alike</span>
+          <button type="button" class="gear-review-done" data-review-done>Done</button></div>
+        ${slots.map((slot, i) => {
+          const item = builder.build[slot.field][slot.index];
+          const names = [slot.name, ...slot.alternatives];
+          return `<div class="gear-review-row">
+            <button type="button" class="gear-review-slot" data-review-open="${i}">${esc(item.slot)}</button>
+            <div class="gear-review-picks">${names.map((name) => `<button type="button" class="${name === item.name ? 'active' : ''}" data-review-pick="${i}" data-name="${esc(name)}">${esc(name)}</button>`).join('')}</div>
+          </div>`;
+        }).join('')}` : '';
+    };
+    el.onclick = (e) => {
+      const open = e.target.closest('[data-review-open]');
+      const pick = e.target.closest('[data-review-pick]');
+      if (e.target.closest('[data-review-done]')) { slots = []; draw(); return; }
+      const slot = slots[Number(open ? open.dataset.reviewOpen : pick?.dataset.reviewPick)];
+      if (!slot) return;
+      const path = `${slot.field}.${slot.index}`;
+      if (pick) builder.apply([[`${path}.name`, pick.dataset.name]]);
+      builder.openSlot(path);
+      draw();
+    };
+    draw();
   },
 
   // Helper: setup screenshot upload handlers
@@ -2246,28 +2294,33 @@ export const PlayersPage = {
       if (!imageData) return;
       analyzeBtn.disabled = true;
       status.textContent = 'Analyzing...';
+      status.style.color = '';
+      let data = null;
       try {
         const response = await fetch('/.netlify/functions/analyze-screenshot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: imageData, mimeType })
         });
-        const data = await response.json();
-        if (data.error && !data.raw) {
-          status.textContent = 'Failed: ' + data.error;
-          toast.error('Analysis failed');
-        } else {
-          this._fillFromScreenshot(prefix, data);
-          status.textContent = `Extracted! (${data.confidence || 'unknown'} confidence)`;
-          status.style.color = '#4caf50';
-          toast.success('Screenshot analyzed — review and save');
-        }
+        data = await response.json();
+        if (data.error && !data.raw) data = null;
       } catch (err) {
-        status.textContent = 'Error analyzing screenshot';
-        toast.error('Failed to analyze screenshot');
-      } finally {
-        analyzeBtn.disabled = false;
+        console.error('Screenshot analysis failed:', err);
       }
+      // The class from the analysis decides which gear the icons are matched against.
+      if (data) this._fillFromScreenshot(prefix, data);
+      let gear = null;
+      try {
+        gear = await this._readScreenshotGear(prefix, modalElement, preview.src, data?.equipment);
+      } catch (err) {
+        console.error('Reading gear from the screenshot failed:', err);
+      }
+      const parts = [data ? 'Stats read' : 'Stats not read', gear ? `${gear.length} gear slots read` : 'gear slots not found'];
+      status.textContent = parts.join(' · ');
+      status.style.color = data && gear ? '#4caf50' : '';
+      if (data || gear) toast.success('Screenshot read — check the gear and stats, then save');
+      else toast.error('Could not read the screenshot');
+      analyzeBtn.disabled = false;
     });
   },
 
@@ -2552,6 +2605,14 @@ export const PlayersPage = {
     const mastery = keys.filter((k) => Number(build.card_bonus_levels?.[k]) > 0).length;
     const title = (build.title && build.title !== NONE ? build.title : 'No title').replace(/&/g, '&amp;').replace(/</g, '&lt;');
     return `${title} · Collection Lv ${Number(build.collection_level) || 0} · Mastery ${mastery}/${keys.length} set`;
+  },
+
+  // "Weekly clears: Black Dragon Nest (Classic) 1 · Desert Dragon Nest (Normal) 2/4 stages", from this week's sync.
+  _weeklyClearsSummary(weeklyClears) {
+    const cleared = GAME_RAIDS.map((raid) => [raid, raidProgress(raid, weeklyClears)])
+      .filter(([, progress]) => progress.stagesCleared > 0)
+      .map(([raid, progress]) => `${raid.name} ${raid.allStages && !progress.done ? `${progress.stagesCleared}/${raid.stages.length} stages` : progress.clears}`);
+    return `Weekly clears: ${cleared.length ? cleared.join(' · ') : 'none this week'}`;
   },
 
   // The section's values as a partial build for character-overrides; unchanged extras ride along.
