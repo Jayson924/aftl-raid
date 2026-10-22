@@ -5,6 +5,25 @@
  * and extracts character stats. Keeps API key server-side.
  */
 
+// Each read is a paid Vision call and the simulator offers it to anyone, so reads are capped per IP per warm instance.
+const RATE_LIMIT = 6;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const hits = new Map();
+
+function limited(ip) {
+  const now = Date.now();
+  const hit = hits.get(ip);
+  if (!hit || now - hit.start > RATE_WINDOW_MS) { hits.set(ip, { start: now, count: 1 }); return false; }
+  hit.count += 1;
+  if (hits.size > 5000) for (const [key, h] of hits) if (now - h.start > RATE_WINDOW_MS) hits.delete(key);
+  return hit.count > RATE_LIMIT;
+}
+
+function clientIp(event) {
+  const h = event.headers || {};
+  return h['x-nf-client-connection-ip'] || h['client-ip'] || String(h['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+}
+
 export async function handler(event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -21,6 +40,14 @@ export async function handler(event) {
       statusCode: 405,
       headers,
       body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
+  if (limited(clientIp(event))) {
+    return {
+      statusCode: 429,
+      headers,
+      body: JSON.stringify({ error: 'Too many screenshots; try again in a few minutes' })
     };
   }
 

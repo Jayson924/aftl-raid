@@ -15,7 +15,7 @@ import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesF
 import { createCharacterBuilder, emptyBuildFor, siteClassName } from './simulator.jsx';
 import { deriveStats } from '../sim/derive-stats.js';
 import { GAME_RAIDS, raidProgress, raidStatus, weeklyClearsThisWeek } from '../raid-clears.js';
-import { readGear } from '../sim/icon-match.js';
+import { uploadHtml, setupUpload, renderGearReview } from '../sim/screenshot-import.js';
 
 // Gear slots on the character card: site key, simulator slot, short label.
 const CARD_ARMOR = [['helmet', 'Helmet', 'Helm'], ['top', 'Upper', 'Top'], ['bottom', 'Lower', 'Bottom'], ['gloves', 'Gloves', 'Gloves'], ['boots', 'Shoes', 'Boots']];
@@ -26,8 +26,6 @@ const SIM_JOB_NAMES = { 'Moon Lord': 'Moonlord' };
 const ICON_SPRITE = '/sim/item-icons.webp';
 const ICON_PX = 44;
 // Stats a hand-built character may type from the game window: character_stats key, label, has decimals.
-// The analyzer's gear keys in the simulator's equipment order.
-const VISION_GEAR_KEYS = ['helmet', 'top', 'bottom', 'gloves', 'boots', 'mainWeapon', 'subWeapon'];
 const HAND_STATS = [['attackPower', 'ATK'], ['magicAttack', 'MATK'], ['finalDamage', 'FD'], ['hp', 'HP'], ['defense', 'Def'], ['magicDefense', 'MDef'],
   ['criticalRate', 'Crit %', true], ['criticalDamage', 'Crit Dmg %', true], ['fireAttack', 'Fire %', true], ['iceAttack', 'Ice %', true],
   ['lightAttack', 'Light %', true], ['darkAttack', 'Dark %', true]];
@@ -2155,198 +2153,23 @@ export const PlayersPage = {
     modalElement.remove();
   },
 
-  // Name, class and stats from an analyzed screenshot; gear is picked in the window.
-  _fillFromScreenshot(prefix, data) {
-    const nameInput = document.getElementById(`${prefix}-name`);
-    if (data.name && nameInput && !nameInput.value) nameInput.value = data.name;
-    if (data.class) this._builders[prefix]?.setJob(data.class);
-    for (const [key, value] of Object.entries(data.stats || {})) {
-      const input = document.getElementById(`${prefix}-hs-${key}`);
-      if (input && Number(value)) input.value = value;
-    }
-  },
-
-  // Gear from the screenshot's slot icons; Vision only reads the +N enhancements.
-  async _readScreenshotGear(prefix, modalElement, src, visionEquipment) {
-    const builder = this._builders[prefix];
-    if (!builder) return null;
-    const slots = await readGear(src, (field, index) => builder.candidates(field, index));
-    if (!slots) return null;
-    const changes = [];
-    for (const slot of slots) {
-      const path = `${slot.field}.${slot.index}`;
-      changes.push([`${path}.name`, slot.name]);
-      const enhance = slot.field === 'equipment' ? Number(visionEquipment?.[VISION_GEAR_KEYS[slot.index]]?.enhancement) : 0;
-      if (enhance > 0) changes.push([`${path}.enhance`, enhance]);
-    }
-    builder.apply(changes);
-    this._renderGearReview(prefix, modalElement, slots.filter((slot) => !slot.sure));
-    return slots;
-  },
-
-  // Slots whose icon is shared or close to another item's: the user confirms or swaps them.
-  _renderGearReview(prefix, modalElement, slots) {
-    const el = modalElement.querySelector(`#${prefix}-gear-review`);
-    const builder = this._builders[prefix];
-    if (!el || !builder) return;
-    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    const draw = () => {
-      el.hidden = !slots.length;
-      el.innerHTML = slots.length ? `
-        <div class="gear-review-head"><strong>Check ${slots.length === 1 ? 'this slot' : `these ${slots.length} slots`}</strong><span>the icons look alike</span>
-          <button type="button" class="gear-review-done" data-review-done>Done</button></div>
-        ${slots.map((slot, i) => {
-          const item = builder.build[slot.field][slot.index];
-          const names = [slot.name, ...slot.alternatives];
-          return `<div class="gear-review-row">
-            <button type="button" class="gear-review-slot" data-review-open="${i}">${esc(item.slot)}</button>
-            <div class="gear-review-picks">${names.map((name) => `<button type="button" class="${name === item.name ? 'active' : ''}" data-review-pick="${i}" data-name="${esc(name)}">${esc(name)}</button>`).join('')}</div>
-          </div>`;
-        }).join('')}` : '';
-    };
-    el.onclick = (e) => {
-      const open = e.target.closest('[data-review-open]');
-      const pick = e.target.closest('[data-review-pick]');
-      if (e.target.closest('[data-review-done]')) { slots = []; draw(); return; }
-      const slot = slots[Number(open ? open.dataset.reviewOpen : pick?.dataset.reviewPick)];
-      if (!slot) return;
-      const path = `${slot.field}.${slot.index}`;
-      if (pick) builder.apply([[`${path}.name`, pick.dataset.name]]);
-      builder.openSlot(path);
-      draw();
-    };
-    draw();
-  },
-
-  // Helper: setup screenshot upload handlers
+  // Name and stats from the analyzer go in the form; class and gear go in the window (screenshot-import.js).
   _setupScreenshotUpload(prefix, modalElement) {
-    const uploadZone = modalElement.querySelector('.modal-upload-zone');
-    const fileInput = modalElement.querySelector(`#${prefix}-screenshot-input`);
-    const analyzeBtn = modalElement.querySelector(`#${prefix}-analyze-btn`);
-    const clearBtn = modalElement.querySelector(`#${prefix}-clear-screenshot`);
-    const analyzeRow = modalElement.querySelector(`#${prefix}-analyze-row`);
-    const preview = modalElement.querySelector(`#${prefix}-screenshot-preview`);
-    const placeholder = modalElement.querySelector('.modal-upload-placeholder');
-    const status = modalElement.querySelector(`#${prefix}-upload-status`);
-
-    let imageData = null;
-    let mimeType = null;
-
-    uploadZone.addEventListener('click', () => fileInput.click());
-    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-    uploadZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadZone.classList.remove('drag-over');
-      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files[0]) handleFile(e.target.files[0]);
-    });
-    const onPaste = (e) => {
-      if (!document.body.contains(modalElement)) {
-        document.removeEventListener('paste', onPaste);
-        return;
-      }
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of items) {
-        if (item.type.startsWith('image/')) {
-          e.preventDefault();
-          handleFile(item.getAsFile());
-          return;
+    setupUpload(modalElement, prefix, {
+      getTarget: () => this._builders[prefix],
+      onAnalyzed: (data) => {
+        const nameInput = document.getElementById(`${prefix}-name`);
+        if (data.name && nameInput && !nameInput.value) nameInput.value = data.name;
+        for (const [key, value] of Object.entries(data.stats || {})) {
+          const input = document.getElementById(`${prefix}-hs-${key}`);
+          if (input && Number(value)) input.value = value;
         }
-      }
-    };
-    document.addEventListener('paste', onPaste);
-
-    const handleFile = (file) => {
-      if (!file.type.startsWith('image/')) return;
-      mimeType = file.type;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        preview.src = e.target.result;
-        preview.style.display = 'block';
-        placeholder.style.display = 'none';
-        clearBtn.style.display = 'inline-flex';
-        analyzeRow.style.display = 'flex';
-        analyzeBtn.disabled = false;
-        imageData = e.target.result.split(',')[1];
-      };
-      reader.readAsDataURL(file);
-    };
-
-    clearBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      imageData = null;
-      preview.style.display = 'none';
-      placeholder.style.display = 'flex';
-      clearBtn.style.display = 'none';
-      analyzeRow.style.display = 'none';
-      analyzeBtn.disabled = true;
-      status.textContent = '';
-      status.style.color = '';
-      fileInput.value = '';
+      },
+      onRead: (slots) => {
+        const review = modalElement.querySelector(`#${prefix}-gear-review`);
+        if (slots && review) renderGearReview(review, this._builders[prefix], slots.filter((slot) => !slot.sure));
+      },
     });
-
-    analyzeBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (!imageData) return;
-      analyzeBtn.disabled = true;
-      status.textContent = 'Analyzing...';
-      status.style.color = '';
-      let data = null;
-      try {
-        const response = await fetch('/.netlify/functions/analyze-screenshot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: imageData, mimeType })
-        });
-        data = await response.json();
-        if (data.error && !data.raw) data = null;
-      } catch (err) {
-        console.error('Screenshot analysis failed:', err);
-      }
-      // The class from the analysis decides which gear the icons are matched against.
-      if (data) this._fillFromScreenshot(prefix, data);
-      let gear = null;
-      try {
-        gear = await this._readScreenshotGear(prefix, modalElement, preview.src, data?.equipment);
-      } catch (err) {
-        console.error('Reading gear from the screenshot failed:', err);
-      }
-      const parts = [data ? 'Stats read' : 'Stats not read', gear ? `${gear.length} gear slots read` : 'gear slots not found'];
-      status.textContent = parts.join(' · ');
-      status.style.color = data && gear ? '#4caf50' : '';
-      if (data || gear) toast.success('Screenshot read — check the gear and stats, then save');
-      else toast.error('Could not read the screenshot');
-      analyzeBtn.disabled = false;
-    });
-  },
-
-  // Helper: generate screenshot upload HTML
-  _screenshotUploadHtml(prefix) {
-    return `
-      <div class="modal-upload-section">
-        <div class="modal-upload-zone">
-          <div class="modal-upload-placeholder">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <span>Upload/Paste character screenshot</span>
-          </div>
-          <img id="${prefix}-screenshot-preview" class="modal-screenshot-preview" style="display:none" />
-          <input type="file" id="${prefix}-screenshot-input" accept="image/*" style="display:none" />
-          <button type="button" class="btn-clear-screenshot" id="${prefix}-clear-screenshot" style="display:none">Clear</button>
-        </div>
-        <div class="modal-upload-analyze-row" style="display:none" id="${prefix}-analyze-row">
-          <button type="button" class="btn-analyze" id="${prefix}-analyze-btn" disabled>Analyze Screenshot</button>
-          <span class="upload-status" id="${prefix}-upload-status"></span>
-        </div>
-      </div>
-    `;
   },
 
   // Add Character: syncing from the toolbox first, hand entry as the fallback.
@@ -2426,7 +2249,7 @@ export const PlayersPage = {
               <div id="account-buttons-container"></div>
             </div>
           </div>
-          ${this._screenshotUploadHtml('player')}
+          ${uploadHtml('player')}
           ${this._builderHtml('player')}
           <div class="form-group">
             <label for="player-notes">Notes:</label>
@@ -2677,7 +2500,7 @@ export const PlayersPage = {
             Synced from the meter on ${new Date(player.syncedAt).toLocaleDateString()}
             <span>Re-sync from the toolbox to change gear or stats</span>
           </div>
-          ` : this._screenshotUploadHtml('edit-player')}
+          ` : uploadHtml('edit-player')}
           ${synced ? `${this._overridesHtml(player)}
           <div class="form-group">
             <label>Class:</label>

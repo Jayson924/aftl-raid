@@ -12,6 +12,7 @@ import { dataService } from '../data.js';
 import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import icons from '../data/sim-icons.json' with { type: 'json' };
 import costumeList from '../data/sim-costumes.json' with { type: 'json' };
+import { uploadHtml, setupUpload, renderGearReview } from '../sim/screenshot-import.js';
 
 const STORAGE_KEY = 'aftl.simulator.builds';
 const PARTY_KEY = 'aftl.simulator.party';
@@ -441,6 +442,7 @@ export const SimulatorPage = {
         </nav>
         <div class="sim-section" ${this.section === 'sim' ? '' : 'hidden'}>
           <section class="sim-summary" id="sim-summary"></section>
+          <div class="gear-review" id="sim-gear-review" hidden></div>
           <section class="sim-main" id="sim-main"></section>
           <nav class="sim-tabs" id="sim-tabs"></nav>
           <section class="sim-panel" id="sim-panel"></section>
@@ -668,11 +670,51 @@ export const SimulatorPage = {
     }
   },
 
+  // ---- screenshot import (src/sim/screenshot-import.js) drives the window through these -----
+
+  // Gear or accessories a slot can hold for this class, with their icon cells.
+  candidates(field, index) {
+    const names = field === 'jewelry' ? jewelryOptions(this.build.jewelry[index].slot) : equipmentOptions(this.build, this.build.equipment[index].slot);
+    return names.filter(hasValue).map((name) => ({ name, cell: iconCell(this.build, field, name) }));
+  },
+
+  jobNames: () => L.jobs.flatMap((j) => j.seconds),
+
+  // Gear a specialization's slot can hold, to tell the class from a screenshot's icons.
+  gearFor(secondJob, index) {
+    const build = { first_job: L.jobs.find((j) => j.seconds.includes(secondJob))?.first, second_job: secondJob };
+    return equipmentOptions(build, EQUIPMENT_SLOTS[index]).filter(hasValue).map((name) => ({ name, cell: iconCell(build, 'equipment', name) }));
+  },
+
+  // Several [path, value] edits as one change, with the window's usual dependent resets.
+  apply(changes) {
+    for (const [path, value] of changes) {
+      setPath(this.build, path, value);
+      this.afterChange(this.build, path, value);
+    }
+    this.recalculate();
+    this.renderPanel();
+  },
+
+  openSlot(ref) {
+    this.view = 'general';
+    this.slots.general = ref;
+    this.renderPanel();
+  },
+
+  // A specialization from outside the window (a screenshot); the class follows it.
+  setJob(secondJob) {
+    const second = simJobName(secondJob);
+    if (!L.jobs.some((j) => j.seconds.includes(second))) return;
+    this.onChange({ target: { dataset: { path: 'second_job' }, value: second, type: 'select-one' } });
+  },
+
   resetClassGear(build) {
     for (const item of build.equipment) { item.name = NONE; item.suffix = NONE; }
   },
 
   onAction(action, value, button) {
+    if (action !== 'picker-toggle') button.closest('.sim-more')?.classList.remove('open');
     if (action === 'switch') { this.active = value; this.render(this.container); return; }
     if (action === 'tab') { this.tab = value; this.renderTabs(); this.renderPanel(); return; }
     if (action === 'section') { this.section = value; this.render(this.container); return; }
@@ -763,6 +805,38 @@ export const SimulatorPage = {
     if (action === 'save-build') { void this.saveBuild(); return; }
     if (action === 'delete-saved') { void this.deleteSaved(); return; }
     if (action === 'import') { void this.importBuild(); return; }
+    if (action === 'screenshot') { this.openScreenshot(); return; }
+  },
+
+  // Class, gear and +N from a character window screenshot into the active build; the rest of the build stays.
+  openScreenshot() {
+    const root = document.createElement('div');
+    root.className = 'modal';
+    root.innerHTML = `
+      <div class="modal-content modal-add-chooser">
+        <h2>Read a screenshot</h2>
+        <p class="sync-steps-lead">Paste the character sheet from the General tab in-game. Only reads equipment and enhancement levels (for now) - other tabs may be coming soon.</p>
+        <p class="sync-steps-note">Afterlight members sync directly from the game via the Toolbox</p>
+        ${uploadHtml('sim')}
+        <div class="form-actions"><button type="button" class="btn btn-secondary" data-close>Close</button></div>
+      </div>`;
+    const close = () => root.remove();
+    root.addEventListener('click', (e) => { if (e.target === root || e.target.closest('[data-close]')) close(); });
+    document.body.appendChild(root);
+    setupUpload(root, 'sim', {
+      getTarget: () => this,
+      onRead: (slots) => {
+        if (!slots) return;
+        // The build no longer follows the synced character it came from.
+        this.characterIds[this.active] = null;
+        this.characterSyncs[this.active] = null;
+        this.save();
+        close();
+        const review = this.container?.querySelector('#sim-gear-review');
+        if (review) renderGearReview(review, this, slots.filter((slot) => !slot.sure));
+        this.openSlot('equipment.0');
+      },
+    });
   },
 
   async importBuild() {
@@ -827,13 +901,13 @@ export const SimulatorPage = {
     return `<div class="sim-guild-row">${this.charactersField()}${this.savedBuildsField()}</div>`;
   },
 
-  // Synced characters are a guild perk; everyone else sees the field dimmed.
+  // Synced characters are a guild perk; everyone else sees the field dimmed, showing what a synced one of their class looks like.
   charactersField() {
     const label = 'My characters <small class="sim-label-note">synced from the game (via toolbox)</small>';
     if (!dataService.isPlayer()) {
       return `
         <label class="guild-only"><span>${label}${GUILD_ONLY_TAG}</span>
-          <span class="sim-inline"><select disabled><option>Guildmates sync characters from the game (via toolbox)</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save to character</button></span>
+          <span class="sim-inline"><select disabled><option>Synced ${esc(this.build.second_job)}</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save to character</button></span>
         </label>`;
     }
     const { characters, loaded } = this.guild;
@@ -923,8 +997,14 @@ export const SimulatorPage = {
         <div class="sim-class-actions">
           <div class="btn-group">
             <button class="btn btn-secondary" data-action="copy" data-value="${this.active === 'A' ? 'A>B' : 'B>A'}">Copy to ${buildName(this.active === 'A' ? 'B' : 'A')}</button>
-            <button class="btn btn-secondary" data-action="export">Copy JSON</button>
-            <button class="btn btn-secondary" data-action="import">Paste JSON</button>
+            <button class="btn btn-secondary" data-action="screenshot">Read screenshot</button>
+          </div>
+          <div class="sim-picker sim-more">
+            <button type="button" class="sim-more-btn" data-action="picker-toggle" aria-haspopup="menu" aria-label="More build actions" title="More">&#8943;</button>
+            <ul class="sim-picker-list" role="menu">
+              <li><button type="button" role="menuitem" data-action="export">Copy build JSON</button></li>
+              <li><button type="button" role="menuitem" data-action="import">Paste build JSON</button></li>
+            </ul>
           </div>
           <button class="btn btn-danger-ghost" data-action="reset">Reset</button>
         </div>
@@ -1815,30 +1895,9 @@ export function createCharacterBuilder(container, raw, { onUpdate } = {}) {
       if (e.target.dataset?.path) this.dirty = true;
       SimulatorPage.onChange.call(this, e, live);
     },
-    // Gear or accessories a slot can hold for this class, with their icon cells.
-    candidates(field, index) {
-      const names = field === 'jewelry' ? jewelryOptions(this.build.jewelry[index].slot) : equipmentOptions(this.build, this.build.equipment[index].slot);
-      return names.filter(hasValue).map((name) => ({ name, cell: iconCell(this.build, field, name) }));
-    },
-    // Several [path, value] edits as one change, with the window's usual dependent resets.
     apply(changes) {
-      for (const [path, value] of changes) {
-        setPath(this.build, path, value);
-        this.afterChange(this.build, path, value);
-      }
       this.dirty = true;
-      this.recalculate();
-      this.renderPanel();
-    },
-    openSlot(ref) {
-      this.slots.general = ref;
-      this.renderPanel();
-    },
-    // A specialization from outside the window (a screenshot); the class follows it.
-    setJob(secondJob) {
-      const second = simJobName(secondJob);
-      if (!L.jobs.some((j) => j.seconds.includes(second))) return;
-      this.onChange({ target: { dataset: { path: 'second_job' }, value: second, type: 'select-one' } });
+      SimulatorPage.apply.call(this, changes);
     },
     destroy() {
       this.listeners?.abort();

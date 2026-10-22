@@ -181,22 +181,43 @@ function matchSlot(sheet, image, box, candidates) {
   return { name: winner.name, score: winner.score, margin, alternatives };
 }
 
-// For each slot: { field, index, name, alternatives, sure }; null when the window is not found.
-// candidatesOf(field, index) gives [{ name, cell }] for the build's class.
-export async function readGear(src, candidatesOf) {
+// The specialization whose gear icons best fit the 7 gear slots, each read once at its box's middle.
+function guessJob(sheet, image, boxes, jobs, gearOf) {
+  const sigs = boxes.map((box) => {
+    const inner = box.s * (1 - 2 * INSET);
+    return signature(image, box.x + box.s * INSET, box.y + box.s * INSET, inner, inner);
+  });
+  let best = null;
+  for (const job of jobs) {
+    let total = 0;
+    sigs.forEach((sig, i) => {
+      let top = -1;
+      for (const c of gearOf(job, i)) if (c.cell !== undefined) top = Math.max(top, dot(sig, iconSignature(sheet, c.cell)));
+      total += top;
+    });
+    if (!best || total > best.total) best = { job, total };
+  }
+  return best?.job ?? null;
+}
+
+// Returns { job, slots } (slots: { field, index, name, alternatives, sure }), or null when the window is not found.
+// candidatesOf(field, index) gives [{ name, cell }] for the build's class. With guess ({ jobs, gearOf(job, index) })
+// the class is told from the gear icons first, and job is the specialization picked.
+export async function readGear(src, candidatesOf, guess) {
   const [sheet, image] = await Promise.all([loadSheet(), loadImage(src)]);
   const hits = await frameHits(image);
   const found = slotLayout(hits);
   if (!found) return null;
   const toImage = (h) => ({ x: h.x / hits.f, y: h.y / hits.f, s: h.s / hits.f });
-  const slots = { gear: found.gear.map(toImage), jewelry: found.jewelry.map(toImage) };
-  const out = [];
-  for (const [field, boxes] of [['equipment', slots.gear], ['jewelry', slots.jewelry]]) {
-    boxes.forEach((box, index) => {
-      const hit = matchSlot(sheet, image, box, candidatesOf(field, index));
+  const boxes = { equipment: found.gear.map(toImage), jewelry: found.jewelry.map(toImage) };
+  const job = guess ? guessJob(sheet, image, boxes.equipment, guess.jobs, guess.gearOf) : null;
+  const slots = [];
+  for (const field of ['equipment', 'jewelry']) {
+    boxes[field].forEach((box, index) => {
+      const hit = matchSlot(sheet, image, box, job && field === 'equipment' ? guess.gearOf(job, index) : candidatesOf(field, index));
       if (!hit) return;
-      out.push({ field, index, ...hit, sure: hit.score >= SURE_SCORE && !hit.alternatives.length });
+      slots.push({ field, index, ...hit, sure: hit.score >= SURE_SCORE && !hit.alternatives.length });
     });
   }
-  return out;
+  return { job, slots };
 }

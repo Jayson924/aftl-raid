@@ -536,6 +536,21 @@ $rune-board: 320px;
   @each $name, $color in $rarity { &.#{$name} { color: $color; } }
 }
 .sim-rarity-text, .sim-card-name { @each $name, $color in $rarity { &.#{$name} { color: $color; } } }
+
+// The class row's overflow menu (Copy / Paste build JSON), opened like a picker.
+.sim-picker.sim-more {
+  min-width: 0;
+  // A quiet icon button, like Reset beside it: no fill or border until hovered.
+  .sim-more-btn {
+    height: $control-h; padding: 0 0.6rem; font: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer;
+    color: $text-muted; background: transparent; border: 0; border-radius: 6px;
+    &:hover, &:focus-visible { outline: none; color: $text-light; background: rgba(255, 255, 255, 0.06); }
+  }
+  &.open .sim-more-btn { color: $text-light; background: rgba(255, 255, 255, 0.06); }
+  .sim-picker-list { left: auto; right: 0; min-width: 11rem; }
+  // The row wraps on phones and the button lands on the left edge.
+  @media (max-width: 768px) { .sim-picker-list { left: 0; right: auto; } }
+}
 .sim-lv {
   flex: none; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600;
   background: rgba(255, 255, 255, 0.1); color: $text-light; font-variant-numeric: tabular-nums;
