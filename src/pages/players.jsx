@@ -2430,7 +2430,7 @@ export const PlayersPage = {
     return `${title} · Collection Lv ${Number(build.collection_level) || 0} · Mastery ${mastery}/${keys.length} set`;
   },
 
-  // "Weekly clears: Black Dragon Nest (Classic) 1 · Desert Dragon Nest (Normal) 2/4 stages", from this week's sync.
+  // "Weekly clears: Black Dragon Nest (Classic) 1 · Desert Dragon Nest: Memoria 2/4 stages", from this week's sync.
   _weeklyClearsSummary(weeklyClears) {
     const cleared = GAME_RAIDS.map((raid) => [raid, raidProgress(raid, weeklyClears)])
       .filter(([, progress]) => progress.stagesCleared > 0)

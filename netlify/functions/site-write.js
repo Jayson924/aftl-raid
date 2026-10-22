@@ -6,22 +6,34 @@ import { verifySession } from '../lib/session.js';
 import { sbGet, sbPost, sbPatch, sbDelete, sbUpsert, sbRpc, json } from '../lib/db.js';
 import { calculatePanel } from '../lib/sync-merge.js';
 import { deriveColumns } from '../lib/sync-derive.js';
+import { randomUUID } from 'node:crypto';
+import { GAME_RAIDS, applyRaidMark, isThisGameWeek } from '../../src/raid-clears.js';
+import { applyGuestMark, stepGuestCustomRaid, MAX_CUSTOM_RAIDS, MAX_CUSTOM_CLEARS } from '../../src/guest-raid-marks.js';
 
 const enc = encodeURIComponent;
 const MAX_BODY = 512 * 1024;
 const ROLES = ['guest', 'friend', 'guildmate', 'editor', 'admin'];
 // Lowest role per action; unlisted actions check ownership or editor/admin themselves.
 const MIN_ROLE = {
-  'player.add': 'friend', 'player.update': 'friend', 'player.raidCompletion': 'friend',
+  'player.add': 'friend', 'player.update': 'friend', 'player.raidCompletion': 'friend', 'player.raidMark': 'friend',
   'player.setGroup': 'friend', 'player.saveOrder': 'friend',
   'raids.add': 'friend', 'raids.update': 'friend', 'raids.step': 'friend', 'raids.delete': 'friend',
   'groups.add': 'friend', 'groups.rename': 'friend', 'groups.delete': 'friend', 'groups.reorder': 'friend',
   'cards.set': 'guildmate', 'extras.add': 'guildmate', 'extras.setAmount': 'guildmate',
   'shopping.add': 'guildmate', 'shopping.update': 'guildmate', 'shopping.delete': 'guildmate',
   'builds.save': 'guest', 'builds.delete': 'guest',
+  'guestChars.add': 'guest', 'guestChars.rename': 'guest', 'guestChars.delete': 'guest', 'guestChars.mark': 'guest',
+  'guestChars.addRaid': 'guest', 'guestChars.updateRaid': 'guest', 'guestChars.stepRaid': 'guest', 'guestChars.removeRaid': 'guest',
 };
-// Saved builds are open to any signed-in user, so each one gets a cap.
+// Saved builds and guest characters are open to any signed-in user, so each one gets a cap.
 const MAX_SAVED_BUILDS = 50;
+const MAX_GUEST_CHARACTERS = 12;
+const COLUMN_RAIDS = GAME_RAIDS.filter((raid) => raid.column);
+const customRaidFields = (a) => {
+  const name = String(a.name || '').trim().slice(0, 40);
+  if (!name) deny('Give the raid a name');
+  return { name, max_clears: Math.min(MAX_CUSTOM_CLEARS, Math.max(1, Math.floor(Number(a.max_clears)) || 1)) };
+};
 const rank = (role) => ROLES.indexOf(role);
 const COMPLETION_COLUMNS = new Set(['bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
 // Raids only marked by hand (no lineup raid type); supabase/add-raid-marks.sql adds them.
@@ -179,6 +191,31 @@ const ACTIONS = {
     if (!COMPLETION_COLUMNS.has(a.column) && !MARK_ONLY_COLUMNS.has(a.column)) deny('Unknown raid');
     const p = await ctx.player(a.id);
     await sbPatch('players', `id=eq.${enc(p.id)}`, { [a.column]: a.completed ? new Date().toISOString() : null });
+    return {};
+  },
+  // Any raid or stage on My Characters; lineup and hand-mark raids keep their *_completed column, the rest go to raid_marks.
+  async 'player.raidMark'(ctx, a) {
+    const p = await ctx.player(a.id);
+    const columns = COLUMN_RAIDS.map((r) => r.column).join(',');
+    // Before supabase/add-player-raid-marks.sql only the column raids can be marked.
+    const hasMarks = await one('players', `id=eq.${enc(p.id)}&select=raid_marks`).then(() => true, () => false);
+    const row = await one('players', `id=eq.${enc(p.id)}&select=${hasMarks ? 'raid_marks,' : ''}${columns}`);
+    const current = { ...(row.raid_marks || {}) };
+    for (const raid of COLUMN_RAIDS) if (row[raid.column]) current[raid.raidType] = row[raid.column];
+    const next = applyRaidMark(current, String(a.key || ''), !!a.done, { stageRaids: true });
+    if (!next) deny('Unknown raid');
+    const patch = {};
+    for (const raid of COLUMN_RAIDS) {
+      const value = next[raid.raidType] || null;
+      if (value !== (row[raid.column] || null)) patch[raid.column] = value;
+      delete next[raid.raidType];
+    }
+    // Last week's marks no longer count, so they are dropped as the map is rewritten.
+    const raidMarks = Object.fromEntries(Object.entries(next).filter(([, at]) => isThisGameWeek(at)));
+    if (hasMarks) patch.raid_marks = raidMarks;
+    else if (Object.keys(raidMarks).length) deny('Run supabase/add-player-raid-marks.sql to mark stages and other raids');
+    if (!Object.keys(patch).length) return {};
+    await sbPatch('players', `id=eq.${enc(p.id)}`, patch);
     return {};
   },
   // Clearing a lineup marks its members, by name.
@@ -473,6 +510,78 @@ const ACTIONS = {
   async 'builds.delete'(ctx, a) {
     const row = await ctx.own('saved_builds', a.id);
     await sbDelete('saved_builds', `id=eq.${enc(row.id)}`);
+    return {};
+  },
+
+  // ---- guest raid tracker ----
+  async 'guestChars.add'(ctx) {
+    const mine = await sbGet('guest_characters', `discord_id=eq.${enc(ctx.id)}&select=name,sort_order`);
+    if (mine.length >= MAX_GUEST_CHARACTERS) deny(`You can track up to ${MAX_GUEST_CHARACTERS} characters`);
+    const names = new Set(mine.map((c) => c.name));
+    let n = 1;
+    while (names.has(`Character ${n}`)) n++;
+    const next = Math.max(-1, ...mine.map((c) => c.sort_order)) + 1;
+    const [row] = await sbPost('guest_characters', { discord_id: ctx.id, name: `Character ${n}`, marks: {}, sort_order: next });
+    return { data: row };
+  },
+  async 'guestChars.rename'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    const name = String(a.name || '').trim().slice(0, 40);
+    if (!name) deny('Give the character a name');
+    await sbPatch('guest_characters', `id=eq.${enc(row.id)}`, { name });
+    return {};
+  },
+  async 'guestChars.delete'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    await sbDelete('guest_characters', `id=eq.${enc(row.id)}`);
+    return {};
+  },
+  async 'guestChars.mark'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    const marks = applyGuestMark(row, a.raid_type, !!a.done);
+    if (!marks) deny('Unknown raid');
+    await sbPatch('guest_characters', `id=eq.${enc(row.id)}`, { marks });
+    return { marks };
+  },
+  async 'guestChars.addRaid'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    const customRaids = row.custom_raids || [];
+    if (customRaids.length >= MAX_CUSTOM_RAIDS) deny(`A character can have up to ${MAX_CUSTOM_RAIDS} of its own raids`);
+    const raid = { id: randomUUID().slice(0, 8), ...customRaidFields(a), clears: 0, clears_at: null };
+    await sbPatch('guest_characters', `id=eq.${enc(row.id)}`, { custom_raids: [...customRaids, raid] });
+    return { data: raid };
+  },
+  async 'guestChars.updateRaid'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    const customRaids = row.custom_raids || [];
+    if (!customRaids.some((r) => r.id === a.raid_id)) deny('No such raid');
+    const fields = customRaidFields(a);
+    const next = customRaids.map((r) => (r.id === a.raid_id ? { ...r, ...fields, clears: Math.min(Number(r.clears) || 0, fields.max_clears) } : r));
+    await sbPatch('guest_characters', `id=eq.${enc(row.id)}`, { custom_raids: next });
+    return { data: next.find((r) => r.id === a.raid_id) };
+  },
+  async 'guestChars.stepRaid'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    const next = stepGuestCustomRaid(row, a.raid_id, a.delta);
+    if (!next) deny('Already at the limit');
+    await sbPatch('guest_characters', `id=eq.${enc(row.id)}`, { custom_raids: next });
+    return { data: next.find((r) => r.id === a.raid_id) };
+  },
+  async 'guestChars.removeRaid'(ctx, a) {
+    const row = await ctx.own('guest_characters', a.id);
+    await sbPatch('guest_characters', `id=eq.${enc(row.id)}`, { custom_raids: (row.custom_raids || []).filter((r) => r.id !== a.raid_id) });
+    return {};
+  },
+
+  // ---- admins cleaning up guest accounts ----
+  async 'admin.deleteSavedBuild'(ctx, a) {
+    ctx.requireAdmin();
+    await sbDelete('saved_builds', `id=eq.${enc(a.id)}`);
+    return {};
+  },
+  async 'admin.deleteGuestCharacter'(ctx, a) {
+    ctx.requireAdmin();
+    await sbDelete('guest_characters', `id=eq.${enc(a.id)}`);
     return {};
   },
 };

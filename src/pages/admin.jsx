@@ -3,6 +3,7 @@ import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import { setPowerIndexMax, POWER_INDEX_MAX_DEFAULT, getClassSpriteStyle, calculateGearscore, getGearscoreTier } from '../constants.js';
 import { renderChipTipBody, initChipTooltip } from '../chip-tooltip.js';
+import { guestRaidTally } from '../guest-raid-marks.js';
 
 // Escape user-controlled values before interpolating into innerHTML.
 function escapeHtml(str) {
@@ -33,6 +34,7 @@ export const AdminPage = {
           <nav class="admin-tabs">
             <button class="admin-tab active" data-tab="users">Users</button>
             <button class="admin-tab" data-tab="new-characters">New Characters <span class="admin-pending-count" id="admin-whitelist-count"></span></button>
+            <button class="admin-tab" data-tab="guests">Guests <span class="admin-pending-count" id="admin-guest-count"></span></button>
             <button class="admin-tab" data-tab="settings">Settings</button>
           </nav>
         </div>
@@ -62,6 +64,15 @@ export const AdminPage = {
           <div class="section" id="admin-whitelist-section">
             <p class="admin-fd-desc">Characters that haven't been confirmed as in-guild. Mark as in-guild to grant access to in-guild features (or if guild friend, kayo na bahala :) pang incentivise lang naman natin na ipasok mga characters sa guild)</p>
             <div id="admin-whitelist-list" class="admin-whitelist-list">
+              <p class="loading">Loading...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" id="admin-tab-guests" style="display:none">
+          <div class="section">
+            <p class="admin-fd-desc">Signed-in users without a guild role, and what they keep on the site: saved simulator builds and My Raids characters.</p>
+            <div id="admin-guests-list" class="admin-guests-list">
               <p class="loading">Loading...</p>
             </div>
           </div>
@@ -116,6 +127,131 @@ export const AdminPage = {
     initChipTooltip();
     this._loadPowerIndexMax();
     this._loadWhitelistQueue();
+    this._loadGuests();
+  },
+
+  // ============================================
+  // GUEST ACCOUNTS
+  // ============================================
+
+  _guestUsers() {
+    return this._users.filter(u => u.role === 'guest');
+  },
+
+  async _loadGuests() {
+    try {
+      this._guestData = await dataService.getGuestAccountData(this._guestUsers().map(u => u.discordId));
+    } catch (err) {
+      console.error('Failed to load guest data:', err);
+      this._guestData = { builds: [], characters: [] };
+      toast.error('Could not load guest accounts');
+    }
+    this._renderGuests();
+  },
+
+  _renderGuests() {
+    const list = document.getElementById('admin-guests-list');
+    if (!list || !this._guestData) return;
+    const { builds, characters } = this._guestData;
+    const owned = (rows, id) => rows.filter(r => r.discord_id === id);
+    // Guests with something saved first, then newest.
+    const guests = this._guestUsers()
+      .map(user => ({ user, builds: owned(builds, user.discordId), characters: owned(characters, user.discordId) }))
+      .sort((a, b) => (b.builds.length + b.characters.length > 0) - (a.builds.length + a.characters.length > 0)
+        || new Date(b.user.createdAt || 0) - new Date(a.user.createdAt || 0));
+    const count = document.getElementById('admin-guest-count');
+    if (count) count.textContent = guests.length ? String(guests.length) : '';
+    if (!guests.length) {
+      list.innerHTML = '<p class="empty-state">No guest accounts.</p>';
+      return;
+    }
+    list.innerHTML = guests.map(g => this._renderGuest(g)).join('');
+    list.onclick = (e) => this._onGuestClick(e);
+  },
+
+  _renderGuest({ user, builds, characters }) {
+    const discordId = escapeHtml(user.discordId);
+    const buildRows = builds.map(b => `
+      <li class="admin-guest-item">
+        <span class="admin-guest-item-name">${escapeHtml(b.name)}</span>
+        <span class="admin-guest-item-meta">${escapeHtml(b.build?.second_job || '')} · ${this._formatDate(b.updated_at)}</span>
+        <button class="btn btn-secondary btn-sm" data-guest-action="copy-build" data-id="${escapeHtml(b.id)}" title="Copy the build JSON; use Paste JSON on the simulator to open it">Copy JSON</button>
+        <button class="btn btn-danger-ghost btn-sm" data-guest-action="delete-build" data-id="${escapeHtml(b.id)}">Delete</button>
+      </li>`).join('');
+    const characterRows = characters.map(c => {
+      const tally = guestRaidTally(c);
+      const own = (c.custom_raids || []).length;
+      const tip = tally.done ? `Done this week: ${tally.doneNames.join(', ')}` : 'Nothing marked this week';
+      return `
+      <li class="admin-guest-item">
+        <span class="admin-guest-item-name">${escapeHtml(c.name)}</span>
+        <span class="admin-guest-item-meta" title="${escapeHtml(tip)}">${tally.done}/${tally.total} this week${own ? ` · ${own} own raid${own === 1 ? '' : 's'}` : ''}</span>
+        <button class="btn btn-danger-ghost btn-sm" data-guest-action="delete-character" data-id="${escapeHtml(c.id)}">Delete</button>
+      </li>`;
+    }).join('');
+    return `
+      <div class="admin-guest-row" data-discord-id="${discordId}">
+        <div class="admin-guest-head">
+          <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
+          <div class="admin-user-details">
+            <div class="admin-user-name-row">
+              <span class="admin-user-name not-editable">${escapeHtml(user.displayName)}</span>
+              ${this._isNewUser(user) ? '<span class="admin-user-new-badge">NEW</span>' : ''}
+            </div>
+            <span class="admin-user-username">${escapeHtml(user.username)}</span>
+            ${user.createdAt ? `<span class="admin-user-joined">Joined ${this._formatDate(user.createdAt)}</span>` : ''}
+          </div>
+          <button class="btn btn-danger-ghost btn-sm" data-guest-action="delete-account" data-discord-id="${discordId}">Delete account</button>
+        </div>
+        <div class="admin-guest-lists">
+          <div>
+            <h3>Saved builds <span class="admin-guest-count">${builds.length}</span></h3>
+            ${buildRows ? `<ul>${buildRows}</ul>` : '<p class="admin-user-nochars">None</p>'}
+          </div>
+          <div>
+            <h3>My Raids characters <span class="admin-guest-count">${characters.length}</span></h3>
+            ${characterRows ? `<ul>${characterRows}</ul>` : '<p class="admin-user-nochars">None</p>'}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  async _onGuestClick(e) {
+    const btn = e.target.closest('[data-guest-action]');
+    if (!btn) return;
+    const { guestAction, id } = btn.dataset;
+    const data = this._guestData;
+    if (guestAction === 'delete-account') {
+      if (await this._confirmAndDeleteUser(btn.dataset.discordId)) this._renderGuests();
+      return;
+    }
+    if (guestAction === 'copy-build') {
+      const build = data.builds.find(b => b.id === id);
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(build.build, null, 2));
+        toast.success(`Copied ${build.name}; use Paste JSON on the simulator to open it`);
+      } catch (err) {
+        toast.error('Could not copy to the clipboard');
+      }
+      return;
+    }
+    const isBuild = guestAction === 'delete-build';
+    const row = (isBuild ? data.builds : data.characters).find(r => r.id === id);
+    if (!row) return;
+    if (!await modal.confirm(`Delete ${escapeHtml(row.name)}?`, { title: isBuild ? 'Delete saved build' : 'Delete raid character', confirmText: 'Delete', danger: true })) return;
+    try {
+      if (isBuild) {
+        await dataService.adminDeleteSavedBuild(id);
+        data.builds = data.builds.filter(r => r !== row);
+      } else {
+        await dataService.adminDeleteGuestCharacter(id);
+        data.characters = data.characters.filter(r => r !== row);
+      }
+      toast.success(`Deleted ${row.name}`);
+      this._renderGuests();
+    } catch (err) {
+      toast.error(err.message || 'Could not delete');
+    }
   },
 
   // ============================================
@@ -355,6 +491,59 @@ export const AdminPage = {
     });
   },
 
+  // Shows what a user delete removes, confirms it, then deletes; true when the user was deleted.
+  async _confirmAndDeleteUser(discordId) {
+    const user = this._users.find(u => u.discordId === discordId);
+    let preview;
+    try {
+      preview = await dataService.previewUserDelete(discordId);
+    } catch (err) {
+      toast.error(err.message);
+      return false;
+    }
+
+    // Show exactly what goes, then make the admin type the name.
+    const c = preview.counts;
+    const lines = [
+      [c.characters, 'character'], [c.cards, 'card'], [c.personalRaids, 'personal raid'],
+      [c.shoppingList, 'shopping-list item'], [c.savedBuilds, 'saved build'], [c.meterLinks, 'meter link'],
+      [c.characterGroups, 'character group'], [c.guestCharacters, 'guest raid character'], [c.lineupSlots, 'lineup slot']
+    ].filter(([n]) => n > 0).map(([n, label]) => `<span class="admin-delete-item">${n} ${label}${n === 1 ? '' : 's'}</span>`).join('');
+    const name = user.displayName;
+    const summary = `
+      <span class="admin-delete-summary">
+        Deletes <strong>${escapeHtml(name)}</strong>${preview.characters.length ? ` (${preview.characters.map(escapeHtml).join(', ')})` : ''} and:
+      </span>
+      ${lines ? `<span class="admin-delete-list">${lines}</span>` : '<span class="admin-delete-summary">Nothing else is linked to them.</span>'}
+      ${preview.lineups.length ? `<span class="admin-delete-summary">Lineups losing a slot: ${preview.lineups.map(escapeHtml).join(', ')}</span>` : ''}
+      <span class="admin-delete-summary">Loot history is kept. This cannot be undone.</span>`;
+    // The site owner confirms with one click; other admins type the name.
+    if (dataService.getUser()?.id === import.meta.env.VITE_OWNER_DISCORD_ID) {
+      if (!await modal.confirm(summary, { title: 'Delete User', confirmText: 'Delete', danger: true })) return false;
+    } else {
+      const typed = await modal.prompt(`${summary}
+        <span class="admin-delete-summary">Type the name to confirm.</span>
+      `, { title: 'Delete User', okText: 'Delete', placeholder: name, danger: true });
+      if (typed === null) return false;
+      if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) {
+        toast.error('The name did not match; nothing was deleted');
+        return false;
+      }
+    }
+
+    try {
+      await dataService.deleteAppUser(discordId);
+      toast.success(`Deleted ${name}`);
+      this._users = this._users.filter(u => u.discordId !== discordId);
+      this._renderUsers();
+      return true;
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      toast.error(err.message || 'Failed to delete user');
+      return false;
+    }
+  },
+
   _renderUserList(container, users, emptyText) {
     if (!container) return;
 
@@ -444,6 +633,7 @@ export const AdminPage = {
           user.role = newRole;
           toast.success(`${user.displayName} is now ${newRole} (Discord roles follow shortly)`);
           this._renderUsers();
+          this._renderGuests();
         } catch (err) {
           console.error('Failed to update role:', err);
           toast.error(err.message || 'Failed to update role');
@@ -454,56 +644,7 @@ export const AdminPage = {
 
     // Delete listeners
     container.querySelectorAll('.admin-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const discordId = btn.dataset.discordId;
-        const user = this._users.find(u => u.discordId === discordId);
-        let preview;
-        try {
-          preview = await dataService.previewUserDelete(discordId);
-        } catch (err) {
-          toast.error(err.message);
-          return;
-        }
-
-        // Show exactly what goes, then make the admin type the name.
-        const c = preview.counts;
-        const lines = [
-          [c.characters, 'character'], [c.cards, 'card'], [c.personalRaids, 'personal raid'],
-          [c.shoppingList, 'shopping-list item'], [c.savedBuilds, 'saved build'], [c.meterLinks, 'meter link'],
-          [c.characterGroups, 'character group'], [c.lineupSlots, 'lineup slot']
-        ].filter(([n]) => n > 0).map(([n, label]) => `<span class="admin-delete-item">${n} ${label}${n === 1 ? '' : 's'}</span>`).join('');
-        const name = user.displayName;
-        const summary = `
-          <span class="admin-delete-summary">
-            Deletes <strong>${escapeHtml(name)}</strong>${preview.characters.length ? ` (${preview.characters.map(escapeHtml).join(', ')})` : ''} and:
-          </span>
-          ${lines ? `<span class="admin-delete-list">${lines}</span>` : '<span class="admin-delete-summary">Nothing else is linked to them.</span>'}
-          ${preview.lineups.length ? `<span class="admin-delete-summary">Lineups losing a slot: ${preview.lineups.map(escapeHtml).join(', ')}</span>` : ''}
-          <span class="admin-delete-summary">Loot history is kept. This cannot be undone.</span>`;
-        // The site owner confirms with one click; other admins type the name.
-        if (dataService.getUser()?.id === import.meta.env.VITE_OWNER_DISCORD_ID) {
-          if (!await modal.confirm(summary, { title: 'Delete User', confirmText: 'Delete', danger: true })) return;
-        } else {
-          const typed = await modal.prompt(`${summary}
-            <span class="admin-delete-summary">Type the name to confirm.</span>
-          `, { title: 'Delete User', okText: 'Delete', placeholder: name, danger: true });
-          if (typed === null) return;
-          if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) {
-            toast.error('The name did not match; nothing was deleted');
-            return;
-          }
-        }
-
-        try {
-          await dataService.deleteAppUser(discordId);
-          toast.success(`Deleted ${name}`);
-          this._users = this._users.filter(u => u.discordId !== discordId);
-          this._renderUsers();
-        } catch (err) {
-          console.error('Failed to delete user:', err);
-          toast.error(err.message || 'Failed to delete user');
-        }
-      });
+      btn.addEventListener('click', () => this._confirmAndDeleteUser(btn.dataset.discordId));
     });
 
     // Name edit listeners

@@ -2057,6 +2057,13 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
   border-radius: $border-radius;
   padding: 0.75rem 0.9rem;
 }
+// Personal raids sit under the table and stay put while it scrolls.
+.my-raids-page .game-raid-card .game-raid-personal {
+  flex: none;
+  padding: 0.75rem 0 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
 .my-raids-page .game-raid-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin-right: -0.5rem; padding-right: 0.5rem; }
 .my-raids-page .game-raid-head { flex: none; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; min-width: 0; }
 // The 44x46 sprite at half size keeps its frame.
@@ -2070,11 +2077,27 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
   th:nth-child(2), th:nth-child(3), td:nth-child(2), td:nth-child(3) { text-align: right; }
   td:first-child { white-space: normal; }
 }
-.my-raids-page .game-raid-row.done td:first-child { color: #34ce57; }
+// A done raid's name matches its check: gold marked by hand, blue from the game.
+.my-raids-page .game-raid-row.done td:first-child { color: $primary-color; }
+.my-raids-page .game-raid-row.done.from-game td:first-child { color: #7fd8ff; }
 .my-raids-page .game-raid-stage td { border-top: 0; padding-top: 0; padding-bottom: 0.15rem; font-size: 0.78rem; color: $text-muted; }
 .my-raids-page .game-raid-stage td:first-child { padding-left: 1.4rem; }
 .my-raids-page .game-raid-none { color: rgba(255, 255, 255, 0.3); }
-.my-raids-page .game-raid-older-row td { padding: 0.4rem 0.4rem 0.2rem; }
+// Memoria-style stages: one row of small checks under the raid, lined up with its name.
+.my-raids-page .game-raid-stage-checks td { border-top: 0; padding: 0 0.4rem 0.35rem 1.4rem; white-space: normal; }
+.my-raids-page .game-raid-stage-check {
+  display: inline-flex; align-items: center; gap: 0.35rem; margin-right: 1rem;
+  font-size: 0.78rem; color: $text-muted;
+  .game-raid-check { width: 15px; height: 15px; font-size: 0.6rem; }
+}
+// A gold wash marks where Other raids starts, so the divider stays easy to find once the list below it is open.
+.my-raids-page .game-raid-older-row td {
+  padding: 0.4rem 0.4rem 0.3rem;
+  background: linear-gradient(90deg, rgba($primary-color, 0.08) 0%, transparent 70%);
+  border-top-color: rgba($primary-color, 0.18);
+}
+.my-raids-page .game-raid-older-row:has([aria-expanded="true"]) td { background: linear-gradient(90deg, rgba($primary-color, 0.13) 0%, transparent 80%); }
+.my-raids-page .game-raid-older[aria-expanded="true"] { color: rgba($primary-color, 0.85); }
 .my-raids-page .game-raid-older {
   display: inline-flex; align-items: center; gap: 0.45rem; background: none; border: 0; padding: 0;
   color: $text-muted; font: inherit; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; cursor: pointer;
@@ -2086,6 +2109,10 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
 }
 .my-raids-page .game-raid-older[aria-expanded="true"] .game-raid-chevron { transform: rotate(45deg); }
 .my-raids-page .game-raid-done { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #34ce57; }
+// Hand marks take the site's gold; the game's locked check stays blue.
+.my-raids-page .game-raid-done:not(.from-game) { color: rgba($primary-color, 0.85); }
+.my-raids-page .game-raid-check:hover { border-color: $primary-color; box-shadow: 0 0 6px rgba($primary-color, 0.3); }
+.my-raids-page .game-raid-check.checked:not(.locked) { border-color: $primary-color; background: $primary-color; color: #2a2100; }
 .my-raids-page .game-raid-done.from-game { color: #7fd8ff; }
 // On a narrow card the check alone tells "marked" from the locked game check; the name keeps the room.
 @container (max-width: 400px) {

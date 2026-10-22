@@ -59,7 +59,7 @@ function fixture() {
     ],
     player_cards: [], player_extra_cards: [{ id: 'x1', player_id: 'p-other', card_name: 'Bishop Gaius', rarity: 'epic', amount: 2 }],
     personal_raids: [{ id: 'r1', discord_id: 'mate', player_id: 'p-mate', current_clears: 1, max_clears: 1 }],
-    shopping_list: [], character_groups: [{ id: 'g-other', discord_id: 'other' }], saved_builds: [],
+    shopping_list: [], character_groups: [{ id: 'g-other', discord_id: 'other' }], saved_builds: [], guest_characters: [],
   };
 }
 
@@ -254,6 +254,91 @@ test('any signed-in user can save builds, up to a cap', async () => {
   assert.equal((await parse(call('visitor', 'builds.delete', { id: saved.data.id }))).status, 200);
   for (let i = 0; i < 50; i++) db.saved_builds.push({ id: `full-${i}`, discord_id: 'visitor' });
   assert.equal((await parse(call('visitor', 'builds.save', { name: 'One more', build: {} }))).status, 403);
+});
+
+test('only admins can delete a guest account\'s builds and raid characters', async () => {
+  const db = fixture(); stubDb(db);
+  db.saved_builds.push({ id: 'b-guest', discord_id: 'visitor', name: 'B' });
+  db.guest_characters.push({ id: 'c-guest', discord_id: 'visitor', name: 'Character 1' });
+  assert.equal((await parse(call('mate', 'admin.deleteSavedBuild', { id: 'b-guest' }))).status, 403);
+  assert.equal((await parse(call('mate', 'admin.deleteGuestCharacter', { id: 'c-guest' }))).status, 403);
+  assert.equal((await parse(call('owner', 'admin.deleteSavedBuild', { id: 'b-guest' }))).status, 200);
+  assert.equal((await parse(call('owner', 'admin.deleteGuestCharacter', { id: 'c-guest' }))).status, 200);
+  assert.equal(db.saved_builds.length, 0);
+  assert.equal(db.guest_characters.length, 0);
+});
+
+const pickRaid = (row, id) => { const { name, max_clears, clears } = row.custom_raids.find((r) => r.id === id); return { name, max_clears, clears }; };
+
+test('My Characters marks any raid or stage; lineup raids keep their column', async () => {
+  const db = fixture(); stubDb(db);
+  const mate = db.players.find((p) => p.id === 'p-mate');
+  const mark = (key, done, who = 'mate') => parse(call(who, 'player.raidMark', { id: 'p-mate', key, done }));
+  assert.equal((await mark('guardian', true)).status, 200);
+  assert.ok(mate.raid_marks.guardian);
+  assert.equal((await mark('stage-14600', true)).status, 200);
+  assert.equal((await mark('nope', true)).status, 403);
+  assert.equal((await mark('guardian', true, 'other')).status, 403);
+  // Memoria's stages live in raid_marks; the last one ticked fills bdn_memoria_completed.
+  await mark('BDN Memoria#I', true);
+  await mark('BDN Memoria#II', true);
+  assert.equal(mate.bdn_memoria_completed, undefined);
+  await mark('BDN Memoria#III', true);
+  assert.ok(mate.bdn_memoria_completed);
+  assert.equal(mate.raid_marks['BDN Memoria'], undefined);
+  await mark('BDN Memoria#II', false);
+  assert.equal(mate.bdn_memoria_completed, null);
+  assert.deepEqual(Object.keys(mate.raid_marks).filter((k) => k.startsWith('BDN Memoria')).sort(), ['BDN Memoria#I', 'BDN Memoria#III']);
+  await mark('BDN Classic', true);
+  assert.ok(mate.bdn_classic_completed);
+});
+
+test('guest checklists mark Memoria stage by stage and keep their own raids', async () => {
+  const db = fixture(); stubDb(db);
+  const { data: char } = await parse(call('visitor', 'guestChars.add'));
+  const row = db.guest_characters.find((c) => c.id === char.id);
+  await parse(call('visitor', 'guestChars.mark', { id: char.id, raid_type: 'BDN Memoria#II', done: true }));
+  assert.deepEqual(Object.keys(row.marks), ['BDN Memoria#II']);
+  await parse(call('visitor', 'guestChars.mark', { id: char.id, raid_type: 'BDN Memoria', done: true }));
+  assert.deepEqual(Object.keys(row.marks).sort(), ['BDN Memoria', 'BDN Memoria#I', 'BDN Memoria#II', 'BDN Memoria#III']);
+  // An old whole-raid mark splits into stages when one stage is unticked.
+  row.marks = { 'BDN Memoria': new Date().toISOString() };
+  await parse(call('visitor', 'guestChars.mark', { id: char.id, raid_type: 'BDN Memoria#I', done: false }));
+  assert.deepEqual(Object.keys(row.marks).sort(), ['BDN Memoria#II', 'BDN Memoria#III']);
+
+  const { data: raid } = await parse(call('visitor', 'guestChars.addRaid', { id: char.id, name: 'Sea Dragon Nest', max_clears: 2 }));
+  assert.deepEqual(pickRaid(row, raid.id), { name: 'Sea Dragon Nest', max_clears: 2, clears: 0 });
+  await parse(call('visitor', 'guestChars.stepRaid', { id: char.id, raid_id: raid.id, delta: 1 }));
+  await parse(call('visitor', 'guestChars.stepRaid', { id: char.id, raid_id: raid.id, delta: 1 }));
+  assert.equal(pickRaid(row, raid.id).clears, 2);
+  assert.equal((await parse(call('visitor', 'guestChars.stepRaid', { id: char.id, raid_id: raid.id, delta: 1 }))).status, 403);
+  // Lowering the max trims this week's clears to it.
+  await parse(call('visitor', 'guestChars.updateRaid', { id: char.id, raid_id: raid.id, name: 'Sea Dragon', max_clears: 1 }));
+  assert.deepEqual(pickRaid(row, raid.id), { name: 'Sea Dragon', max_clears: 1, clears: 1 });
+  // Clears from last week read as 0, so the counter starts over.
+  row.custom_raids[0].clears_at = '2020-01-01T00:00:00Z';
+  await parse(call('visitor', 'guestChars.stepRaid', { id: char.id, raid_id: raid.id, delta: 1 }));
+  assert.equal(pickRaid(row, raid.id).clears, 1);
+  assert.equal((await parse(call('other', 'guestChars.addRaid', { id: char.id, name: 'Sneaky' }))).status, 403);
+  assert.equal((await parse(call('visitor', 'guestChars.addRaid', { id: char.id, name: ' ' }))).status, 403);
+  await parse(call('visitor', 'guestChars.removeRaid', { id: char.id, raid_id: raid.id }));
+  assert.equal(row.custom_raids.length, 0);
+});
+
+test('guests keep a raid checklist on their own placeholder characters', async () => {
+  const db = fixture(); stubDb(db);
+  const first = await parse(call('visitor', 'guestChars.add'));
+  assert.equal(first.data.name, 'Character 1');
+  assert.equal((await parse(call('visitor', 'guestChars.add'))).data.name, 'Character 2');
+  assert.equal((await parse(call('visitor', 'guestChars.rename', { id: first.data.id, name: 'Litten' }))).status, 200);
+  assert.equal((await parse(call('visitor', 'guestChars.add'))).data.name, 'Character 1');
+  const marked = await parse(call('visitor', 'guestChars.mark', { id: first.data.id, raid_type: 'BDN Classic', done: true }));
+  assert.ok(marked.marks['BDN Classic']);
+  assert.equal((await parse(call('visitor', 'guestChars.mark', { id: first.data.id, raid_type: 'Not a raid', done: true }))).status, 403);
+  assert.equal((await parse(call('other', 'guestChars.mark', { id: first.data.id, raid_type: 'BDN Classic', done: false }))).status, 403);
+  assert.equal((await parse(call('other', 'guestChars.delete', { id: first.data.id }))).status, 403);
+  for (let i = 0; i < 9; i++) await call('visitor', 'guestChars.add');
+  assert.equal((await parse(call('visitor', 'guestChars.add'))).status, 403);
 });
 
 test('admins can set the friend role', async () => {

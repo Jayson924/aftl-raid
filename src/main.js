@@ -7,6 +7,7 @@ import { LineupEditorPage } from './pages/lineup-editor.jsx'
 import { EnhancementPage } from './pages/enhancement.jsx'
 import { SpendingGuidePage } from './pages/spending-guide.jsx'
 import { MyRaidsPage } from './pages/my-raids.jsx'
+import { GuestRaidsPage } from './pages/guest-raids.jsx'
 // Parked with its route below — see the note in the route registrations.
 // import { RecruitingPage } from './pages/recruiting.jsx'
 import { EnhanceRacePage } from './pages/enhance-race.jsx'
@@ -86,6 +87,7 @@ async function initApp() {
   router.register('link-meter', LinkMeterPage); // Public - signs in first, then approves a meter link code
   router.register('lavish', SpendingGuidePage); // Public - no auth required
   router.register('my-raids', MyRaidsPage, 'friend'); // Friends get Raids + Profile; Cards/Shopping are guildmate tabs
+  router.register('raids', GuestRaidsPage); // Weekly raid checklist for signed-in guests
   // Recruiting is parked — page kept for possible future use, but not routable
   // here. Re-activate by uncommenting this line (and its import above). The
   // standalone recruiting site (recruit.html / vite.config.recruit.js) is a
@@ -124,6 +126,9 @@ function renderNavigation() {
   const isAdmin = dataService.isAdmin();
   const isPlayer = dataService.isPlayer();
   const isFriend = dataService.isFriend();
+  // Guests get the simple raid checklist; friends and up get My Characters.
+  const myPage = isFriend ? 'my-raids' : 'raids';
+  const myPageLabel = isFriend ? 'My Characters' : 'My Raids';
   const displayName = dataService.getDisplayName();
   const avatarUrl = dataService.getAvatarUrl();
 
@@ -139,6 +144,7 @@ function renderNavigation() {
         ${isFriend ? `
           <li><a href="/" class="nav-link" data-route="lineups">Lineups</a></li>
         ` : ''}
+        ${isAuthenticated && !isFriend ? `<li><a href="/raids" class="nav-link" data-route="raids">My Raids</a></li>` : ''}
         <li><a href="/characters" class="nav-link" data-route="characters">Characters</a></li>
         ${isPlayer ? `
           <li><a href="/editor" class="nav-link" data-route="editor">Lineup Editor</a></li>
@@ -170,7 +176,7 @@ function renderNavigation() {
               <div class="dropdown-header">
                 <span class="dropdown-role">${dataService.getUserRole()}</span>
               </div>
-              ${isFriend ? `<button class="dropdown-item" id="my-raids-btn">My Characters</button>` : ''}
+              <button class="dropdown-item" id="my-raids-btn">${myPageLabel}</button>
               <button class="dropdown-item" id="change-name-btn">Change Name</button>
               ${isAdmin ? `<button class="dropdown-item" id="admin-btn">Admin</button>` : ''}
               <button class="dropdown-item" id="logout-btn">Logout</button>
@@ -245,7 +251,7 @@ function renderNavigation() {
     document.getElementById('my-raids-btn')?.addEventListener('click', () => {
       dropdownMenu.classList.remove('open');
       dropdownToggle.classList.remove('open');
-      router.navigate('my-raids');
+      router.navigate(myPage);
     });
 
     document.getElementById('change-name-btn').addEventListener('click', () => {
@@ -269,7 +275,7 @@ function renderNavigation() {
       e.preventDefault();
       hamburgerBtn.classList.remove('active');
       navLinks.classList.remove('open');
-      router.navigate('my-raids');
+      router.navigate(myPage);
     });
 
     document.getElementById('change-name-btn-mobile').addEventListener('click', (e) => {

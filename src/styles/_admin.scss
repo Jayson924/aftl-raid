@@ -431,9 +431,77 @@
   text-overflow: ellipsis;
 }
 
+// Guest accounts: a card per guest with their saved builds and My Raids characters.
+.admin-page .admin-guests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-page .admin-guest-row {
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.admin-page .admin-guest-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  .admin-user-details { flex: 1; min-width: 0; }
+}
+
+.admin-page .admin-guest-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.75rem;
+
+  h3 { margin: 0 0 0.35rem; font-size: 0.85rem; font-weight: 600; color: $text-muted; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  .admin-user-nochars { margin: 0; }
+}
+
+.admin-page .admin-guest-count {
+  margin-left: 0.25rem;
+  color: $text-light;
+}
+
+.admin-page .admin-guest-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.85rem;
+
+  .btn { flex: none; white-space: nowrap; }
+}
+
+.admin-page .admin-guest-item-name {
+  color: $text-light;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-page .admin-guest-item-meta {
+  flex: 1;
+  color: $text-muted;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 // Mobile responsive
 @media (max-width: 600px) {
   .admin-page .admin-whitelist-list {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page .admin-guest-lists {
     grid-template-columns: 1fr;
   }
 }

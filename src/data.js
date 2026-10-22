@@ -387,6 +387,7 @@ class DataService {
         syncedAt: p.synced_at || null,
         weeklyClears: p.weekly_clears || null,
         weeklyClearsAt: p.weekly_clears_at || null,
+        raidMarks: p.raid_marks || {},
         handSetWins: !!p.overrides?.hand_set_wins,
         handStats: p.overrides?.hand_stats || null,
         // Legacy fields (derived from equipment for backward compat)
@@ -478,6 +479,72 @@ class DataService {
   async deleteSavedBuild(id) {
     if (!this._user) throw new Error('Log in first');
     await this._write('builds.delete', { id });
+  }
+
+  // Guest characters, without custom_raids until supabase/guest-custom-raids.sql has run.
+  async _selectGuestCharacters(columns, filter) {
+    const query = (cols) => filter(supabase.from('guest_characters').select(cols)).order('sort_order');
+    const result = await query(`${columns}, custom_raids`);
+    return result.error?.code === '42703' ? query(columns) : result;
+  }
+
+  async getGuestCharacters() {
+    if (!this._user) return [];
+    const { data, error } = await this._selectGuestCharacters('id, name, marks, sort_order', (q) => q.eq('discord_id', this._user.id));
+    if (error) throw error;
+    return data;
+  }
+
+  async addGuestCharacter() {
+    return (await this._write('guestChars.add')).data;
+  }
+
+  async renameGuestCharacter(id, name) {
+    await this._write('guestChars.rename', { id, name });
+  }
+
+  async deleteGuestCharacter(id) {
+    await this._write('guestChars.delete', { id });
+  }
+
+  async markGuestRaid(id, raidType, done) {
+    return (await this._write('guestChars.mark', { id, raid_type: raidType, done })).marks;
+  }
+
+  async addGuestCustomRaid(id, name, maxClears) {
+    return (await this._write('guestChars.addRaid', { id, name, max_clears: maxClears })).data;
+  }
+
+  async updateGuestCustomRaid(id, raidId, name, maxClears) {
+    return (await this._write('guestChars.updateRaid', { id, raid_id: raidId, name, max_clears: maxClears })).data;
+  }
+
+  async stepGuestCustomRaid(id, raidId, delta) {
+    return (await this._write('guestChars.stepRaid', { id, raid_id: raidId, delta })).data;
+  }
+
+  async removeGuestCustomRaid(id, raidId) {
+    await this._write('guestChars.removeRaid', { id, raid_id: raidId });
+  }
+
+  // Admin view of what guest accounts keep: their saved builds and raid-tracker characters.
+  async getGuestAccountData(discordIds) {
+    if (!discordIds.length) return { builds: [], characters: [] };
+    const [builds, characters] = await Promise.all([
+      supabase.from('saved_builds').select('id, discord_id, name, build, updated_at').in('discord_id', discordIds).order('updated_at', { ascending: false }),
+      this._selectGuestCharacters('id, discord_id, name, marks, sort_order', (q) => q.in('discord_id', discordIds)),
+    ]);
+    if (builds.error) throw builds.error;
+    if (characters.error) console.error('Error fetching guest characters:', characters.error);
+    return { builds: builds.data, characters: characters.data || [] };
+  }
+
+  async adminDeleteSavedBuild(id) {
+    await this._write('admin.deleteSavedBuild', { id });
+  }
+
+  async adminDeleteGuestCharacter(id) {
+    await this._write('admin.deleteGuestCharacter', { id });
   }
 
   /**
@@ -1154,6 +1221,11 @@ class DataService {
    * @param {string} raidType - e.g. 'BDN Classic', 'DDN Hardcore'
    * @param {boolean} completed - Whether to mark as completed or not
    */
+  // A raid, stage ("BDN Memoria#II") or synced stage raid ("stage-14600") marked by hand on My Characters.
+  async setPlayerRaidMark(playerId, key, done) {
+    await this._write('player.raidMark', { id: playerId, key, done: !!done });
+  }
+
   async togglePlayerRaidCompletion(playerId, raidType, completed) {
     const column = raidTypeToCompletionColumn(raidType);
     if (!column) return { success: true };

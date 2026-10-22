@@ -62,7 +62,7 @@ test('preview counts what would go and deletes nothing', async () => {
   stubDb(db);
   const res = parse(await preview('admin', 'gone'));
   assert.equal(res.status, 200);
-  assert.deepEqual(res.counts, { characters: 2, cards: 3, personalRaids: 1, shoppingList: 1, savedBuilds: 0, meterLinks: 0, characterGroups: 1, lineupSlots: 1 });
+  assert.deepEqual(res.counts, { characters: 2, cards: 3, personalRaids: 1, shoppingList: 1, savedBuilds: 0, meterLinks: 0, characterGroups: 1, guestCharacters: 0, lineupSlots: 1 });
   assert.deepEqual(res.lineups, ['BDN Team 1']);
   assert.equal(db.players.length, 4);
 });

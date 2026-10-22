@@ -9,7 +9,7 @@ import { sbGet, sbDelete, userRecord, json } from '../lib/db.js';
 const enc = encodeURIComponent;
 
 // Owned by the user, keyed by discord_id.
-const USER_TABLES = ['personal_raids', 'shopping_list', 'saved_builds', 'meter_tokens', 'character_groups'];
+const USER_TABLES = ['personal_raids', 'shopping_list', 'saved_builds', 'meter_tokens', 'character_groups', 'guest_characters'];
 // Owned by a character, keyed by player_id.
 const PLAYER_TABLES = ['player_cards', 'player_extra_cards', 'personal_raids', 'shopping_list'];
 
@@ -49,6 +49,7 @@ async function plan(discordId) {
       savedBuilds: await count('saved_builds', `discord_id=eq.${enc(discordId)}`),
       meterLinks: await count('meter_tokens', `discord_id=eq.${enc(discordId)}`),
       characterGroups: await count('character_groups', `discord_id=eq.${enc(discordId)}`),
+      guestCharacters: await count('guest_characters', `discord_id=eq.${enc(discordId)}`),
       lineupSlots: slots.length,
     },
     lineups,

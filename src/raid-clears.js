@@ -18,7 +18,7 @@ export const GAME_RAIDS = [
   { key: 'abyssal-mire', tier: 2, name: 'Abyssal Mire', raidType: 'Abyssal Mire', column: 'abyssal_mire_completed', manual: true, stages: [] },
   { key: 'ddn-classic', tier: 3, name: 'Desert Dragon Nest (Classic)', raidType: 'DDN Classic', column: 'ddn_classic_completed', stages: [{ id: 14221, limit: 10 }] },
   {
-    key: 'ddn-normal', tier: 3, name: 'Desert Dragon Nest (Normal)', raidType: 'DDN Normal', column: 'ddn_normal_completed', allStages: true,
+    key: 'ddn-normal', tier: 3, name: 'Desert Dragon Nest: Memoria', raidType: 'DDN Normal', column: 'ddn_normal_completed', allStages: true,
     stages: [{ id: 14210, name: 'I', limit: 10 }, { id: 14211, name: 'II', limit: 10 }, { id: 14212, name: 'III', limit: 10 }, { id: 14213, name: 'IV', limit: 10 }],
   },
   { key: 'gdn-hardcore', tier: 3, name: 'Green Dragon Nest (Hardcore)', stages: [{ id: 17608, limit: 0 }] },
@@ -91,4 +91,58 @@ export function raidStatus(player, raidType, now = new Date()) {
   if (weeklyClears && raidProgress(raid, weeklyClears).done) return { done: true, source: 'game', synced: true };
   const marked = isThisGameWeek(player?.[markField(raid.column)], now);
   return { done: marked, source: marked ? 'marked' : null, synced: !!weeklyClears };
+}
+
+// Hand marks for any raid or stage, keyed by raid type (else raid key) and "<raid>#<stage>"; values are when marked.
+export const raidMarkKey = (raid) => raid.raidType || raid.key;
+export const stageMarkKey = (raid, stage) => `${raidMarkKey(raid)}#${stage.name}`;
+// Raids done only when every stage is: their stages get a mark each.
+export const isStagedRaid = (raid) => !!raid.allStages && raid.stages.length > 1;
+
+// A player's marks in one map: raid_marks plus the *_completed column of each lineup and hand-mark raid.
+export function playerRaidMarks(player) {
+  const marks = { ...(player?.raidMarks || {}) };
+  for (const raid of GAME_RAIDS) if (raid.column && player?.[markField(raid.column)]) marks[raid.raidType] = player[markField(raid.column)];
+  return marks;
+}
+
+export function isMarked(marks, key, now = new Date()) {
+  return isThisGameWeek(marks?.[key], now);
+}
+
+// A staged raid counts as marked when the whole raid or every stage is.
+export function raidMarked(marks, raid, now = new Date()) {
+  if (isMarked(marks, raidMarkKey(raid), now)) return true;
+  return isStagedRaid(raid) && raid.stages.every((stage) => isMarked(marks, stageMarkKey(raid, stage), now));
+}
+
+const STAGE_RAID_KEY = /^stage-\d+$/;
+
+// marks after checking or unchecking one key, or null for an unknown key; `stageRaids` also allows synced "stage-<id>" raids.
+// A staged raid's own key sets or clears every stage; ticking its last stage marks the whole raid too.
+export function applyRaidMark(marks, key, done, { at = new Date().toISOString(), now = new Date(), stageRaids = false } = {}) {
+  const next = { ...(marks || {}) };
+  const raid = GAME_RAIDS.find((r) => raidMarkKey(r) === key || (isStagedRaid(r) && r.stages.some((s) => stageMarkKey(r, s) === key)));
+  if (!raid) {
+    if (!stageRaids || !STAGE_RAID_KEY.test(key)) return null;
+    if (done) next[key] = at;
+    else delete next[key];
+    return next;
+  }
+  const whole = raidMarkKey(raid);
+  if (!isStagedRaid(raid)) {
+    if (done) next[whole] = at;
+    else delete next[whole];
+    return next;
+  }
+  const stageKeys = raid.stages.map((s) => stageMarkKey(raid, s));
+  // A whole-raid mark from this week stands for every stage before one of them changes.
+  if (isMarked(next, whole, now)) for (const k of stageKeys) if (!isMarked(next, k, now)) next[k] = next[whole];
+  for (const k of key === whole ? stageKeys : [key]) {
+    if (done) next[k] = at;
+    else delete next[k];
+  }
+  if (stageKeys.every((k) => isMarked(next, k, now))) next[whole] = at;
+  else delete next[whole];
+  return next;
 }

@@ -15,7 +15,7 @@ import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
 import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
-import { GAME_RAIDS, raidProgress, raidStatus, unlistedStageRaids, weeklyClearsThisWeek } from '../raid-clears.js';
+import { GAME_RAIDS, raidProgress, unlistedStageRaids, weeklyClearsThisWeek, playerRaidMarks, raidMarkKey, stageMarkKey, isStagedRaid, isMarked, raidMarked } from '../raid-clears.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -453,8 +453,8 @@ export const MyRaidsPage = {
 
     this.setupRaidBadgeHandlers();
     this.setupEditCharacterHandlers();
-    this.setupPersonalRaidHandlers();
-    this.setupAddRaidHandlers();
+    this.setupPersonalRaidHandlers(listEl);
+    this.setupAddRaidHandlers(listEl);
     this.setupGroupHandlers(listEl);
     this.setupCharacterDnD(listEl);
     this.setupCharacterMoveHandlers(listEl);
@@ -731,7 +731,9 @@ export const MyRaidsPage = {
       containerClass: 'game-raid-cards',
       renderCharacter: (player) => this.renderGameRaidCard(player)
     });
-    el.querySelectorAll('[data-mark-raid]').forEach(btn => btn.addEventListener('click', () => this.markGameRaid(btn)));
+    el.querySelectorAll('[data-mark-key]').forEach(btn => btn.addEventListener('click', () => this.markGameRaid(btn)));
+    el.onclick = (e) => this.onGameCardRaidClick(e);
+    el.onkeydown = (e) => this.onGameCardRaidKeydown(e);
     el.querySelectorAll('[data-older-toggle]').forEach(btn => btn.addEventListener('click', () => this.toggleOlderRaids(btn)));
     el.querySelectorAll('.game-raid-card').forEach(card => this.lockGameRaidCard(card, this._olderRaidsOpen.has(card.dataset.playerId)));
   },
@@ -742,7 +744,8 @@ export const MyRaidsPage = {
     const readAt = weeklyClears
       ? `Game read ${new Date(player.weeklyClearsAt).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`
       : 'Not synced this week';
-    const rows = (raids) => raids.map(raid => this.renderGameRaidRows(player, raid, weeklyClears)).join('');
+    const marks = playerRaidMarks(player);
+    const rows = (raids) => raids.map(raid => this.renderGameRaidRows(player, raid, weeklyClears, marks)).join('');
     const open = this._olderRaidsOpen.has(player.id);
 
     return `
@@ -764,44 +767,184 @@ export const MyRaidsPage = {
           <tbody class="game-raid-older-body"${open ? '' : ' hidden'}>${rows([...GAME_RAIDS.filter(raid => raid.tier === 3), ...unlistedStageRaids(weeklyClears)])}</tbody>
         </table>
         </div>
+        <div class="character-personal-raids game-raid-personal" data-player-id="${player.id}">${this.renderGameCardRaids(player.id)}</div>
       </div>`;
   },
 
-  // A raid's row, plus a row per stage when a multi-stage raid was run this week.
-  renderGameRaidRows(player, raid, weeklyClears) {
+  // A raid's row, plus a row per stage; every raid, and each stage of a raid that needs them all, can be marked by hand.
+  // Synced counts of 0 are left blank; a character the game never read shows dashes.
+  renderGameRaidRows(player, raid, weeklyClears, marks) {
     const dash = '<span class="game-raid-none">—</span>';
     const progress = raidProgress(raid, weeklyClears);
-    const status = raid.raidType ? raidStatus(player, raid.raidType) : { done: progress.done, source: progress.done ? 'game' : null };
     const limit = raid.sharedLimit || (raid.stages.length === 1 ? raid.stages[0].limit : 0);
     const counted = weeklyClears && !raid.manual;
-    const entries = !counted ? dash : limit ? `${progress.entries}/${limit}` : '';
-    let done = '';
-    if (status.source === 'game') {
-      done = '<span class="game-raid-done from-game"><span class="game-raid-check checked locked" role="img" aria-label="Done, from game" data-tooltip-fixed="From game">✓</span><span class="game-raid-done-text">from game</span></span>';
-    } else if (raid.raidType) {
-      const marked = status.source === 'marked';
-      done = `<span class="game-raid-done"><button type="button" class="game-raid-check${marked ? ' checked' : ''}" data-mark-raid="${raid.raidType}" data-player-id="${player.id}" aria-pressed="${marked}" aria-label="Marked done" data-tooltip-fixed="${marked ? 'Unmark' : 'Mark as done'}">${marked ? '✓' : ''}</button>${marked ? '<span class="game-raid-done-text">marked</span>' : ''}</span>`;
-    }
-    const showStages = raid.stages.length > 1 && (raid.tier < 3 || (weeklyClears && progress.active));
-    const stageRows = showStages
-      ? progress.stages.map(stage => {
-        const run = weeklyClears && (stage.clears > 0 || stage.entries > 0);
-        return `
+    const count = (n, text = n) => (!counted ? dash : n > 0 ? text : '');
+    const entries = limit ? count(progress.entries, `${progress.entries}/${limit}`) : (counted ? '' : dash);
+    const gameDone = counted && progress.done;
+    const marked = !gameDone && raidMarked(marks, raid);
+    const staged = isStagedRaid(raid);
+    let stageRows = '';
+    if (staged) {
+      // Stages that all need clearing get one row of checks under the raid; the game's numbers go in the tooltip.
+      const checks = progress.stages.map(stage => {
+        const key = stageMarkKey(raid, stage);
+        const tip = counted && (stage.clears || stage.entries) ? ` data-tooltip-fixed="${stage.clears} clear${stage.clears === 1 ? '' : 's'}, ${stage.entries}/${stage.limit} entries"` : '';
+        return `<span class="game-raid-stage-check"${tip}>${stage.name}${this.renderMarkCell(player, key, counted && stage.clears > 0, gameDone || marked || isMarked(marks, key), false)}</span>`;
+      }).join('');
+      stageRows = `<tr class="game-raid-stage-checks"><td colspan="4">${checks}</td></tr>`;
+    } else if (raid.stages.length > 1 && (raid.tier < 3 || (weeklyClears && progress.active))) {
+      stageRows = progress.stages.map(stage => `
         <tr class="game-raid-stage">
           <td>${stage.name}</td>
-          <td>${run ? stage.clears : dash}</td>
-          <td>${!run ? dash : raid.sharedLimit ? stage.entries : stage.limit ? `${stage.entries}/${stage.limit}` : ''}</td>
+          <td>${count(stage.clears)}</td>
+          <td>${raid.sharedLimit ? count(stage.entries) : stage.limit ? count(stage.entries, `${stage.entries}/${stage.limit}`) : (counted ? '' : dash)}</td>
           <td></td>
-        </tr>`;
-      }).join('')
-      : '';
+        </tr>`).join('');
+    }
     return `
-      <tr class="game-raid-row${status.done ? ' done' : ''}">
+      <tr class="game-raid-row${gameDone ? ' done from-game' : marked ? ' done' : ''}">
         <td>${escapeHtml(raid.name)}</td>
-        <td>${counted ? progress.clears : dash}</td>
+        <td>${count(progress.clears)}</td>
         <td>${entries}</td>
-        <td>${done}</td>
+        <td>${this.renderMarkCell(player, raidMarkKey(raid), gameDone, marked, true)}</td>
       </tr>${stageRows}`;
+  },
+
+  // A locked blue check when the game reports the clear, else a hand mark the owner can toggle.
+  renderMarkCell(player, key, fromGame, marked, withText) {
+    if (fromGame) {
+      return `<span class="game-raid-done from-game"><span class="game-raid-check checked locked" role="img" aria-label="Done, from game" data-tooltip-fixed="From game">✓</span>${withText ? '<span class="game-raid-done-text">from game</span>' : ''}</span>`;
+    }
+    return `<span class="game-raid-done"><button type="button" class="game-raid-check${marked ? ' checked' : ''}" data-mark-key="${escapeHtml(key)}" data-player-id="${player.id}" aria-pressed="${marked}" aria-label="Marked done" data-tooltip-fixed="${marked ? 'Unmark' : 'Mark as done'}">${marked ? '✓' : ''}</button>${withText && marked ? '<span class="game-raid-done-text">marked</span>' : ''}</span>`;
+  },
+
+  // Personal raids under a This week card, the same counters as on the Characters tab.
+  renderGameCardRaids(playerId) {
+    const form = this._gameRaidForm?.playerId === playerId ? this._gameRaidForm : null;
+    const raids = (this._personalRaids || []).filter(r => r.playerId === playerId);
+    const cards = raids.map(raid => {
+      if (form?.raidId === raid.id) return this.renderGameCardRaidForm(raid);
+      const done = raid.currentClears >= raid.maxClears;
+      const pct = Math.min((raid.currentClears / raid.maxClears) * 100, 100);
+      return `
+        <div class="personal-raid-card${done ? ' completed' : ''}" data-raid-id="${raid.id}">
+          <div class="raid-card-body">
+            <div class="raid-card-top">
+              <span class="raid-name-link" data-gr-action="edit">${escapeHtml(raid.name)}<span class="edit-icon">✎</span></span>
+              <span class="progress-text">${raid.currentClears}/${raid.maxClears}</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill${done ? ' complete' : ''}" style="width: ${pct}%"></div></div>
+          </div>
+          <div class="raid-counter-btns">
+            <button class="btn-counter btn-decrement" data-gr-action="step" data-delta="-1" ${raid.currentClears <= 0 ? 'disabled' : ''}>-</button>
+            <button class="btn-counter btn-increment" data-gr-action="step" data-delta="1" ${done ? 'disabled' : ''}>+</button>
+          </div>
+          <button class="btn-icon raid-delete-btn" data-gr-action="delete" data-tooltip-fixed="Delete">&times;</button>
+        </div>`;
+    });
+    if (form && !form.raidId) cards.push(this.renderGameCardRaidForm(null));
+    return `
+      ${cards.length ? `<div class="personal-raid-cards">${cards.join('')}</div>` : ''}
+      ${form ? '' : '<button class="btn btn-add-raid" data-gr-action="add">+ Add Raid</button>'}`;
+  },
+
+  renderGameCardRaidForm(raid) {
+    return `
+      <div class="personal-raid-card adding" data-raid-id="${raid?.id || ''}">
+        <input type="text" class="raid-edit-name-input" placeholder="Raid name" maxlength="50" value="${escapeHtml(raid?.name || this._lastAddedRaid?.name || '')}">
+        <div class="raid-edit-max">
+          <span>Max</span>
+          <input type="number" class="raid-edit-max-input" min="1" max="99" value="${raid?.maxClears || this._lastAddedRaid?.maxClears || 1}">
+        </div>
+        <div class="raid-edit-actions">
+          <button class="btn btn-small btn-secondary" data-gr-action="cancel">Cancel</button>
+          <button class="btn btn-small btn-primary" data-gr-action="save">${raid ? 'Save' : 'Add'}</button>
+        </div>
+      </div>`;
+  },
+
+  refreshGameCardRaids(playerId) {
+    const el = document.querySelector(`.game-raid-personal[data-player-id="${playerId}"]`);
+    if (!el) return;
+    el.innerHTML = this.renderGameCardRaids(playerId);
+    el.querySelector('.raid-edit-name-input')?.focus();
+  },
+
+  openGameCardRaidForm(playerId, raidId = null) {
+    const previous = this._gameRaidForm?.playerId;
+    this._gameRaidForm = playerId ? { playerId, raidId } : null;
+    if (previous && previous !== playerId) this.refreshGameCardRaids(previous);
+    if (playerId) this.refreshGameCardRaids(playerId);
+  },
+
+  onGameCardRaidClick(e) {
+    const target = e.target.closest('[data-gr-action]');
+    if (!target || target.disabled) return;
+    const playerId = target.closest('.game-raid-personal')?.dataset.playerId;
+    const card = target.closest('.personal-raid-card');
+    const raid = (this._personalRaids || []).find(r => r.id === card?.dataset.raidId);
+    const action = target.dataset.grAction;
+    if (action === 'add') this.openGameCardRaidForm(playerId);
+    else if (action === 'edit' && raid) this.openGameCardRaidForm(playerId, raid.id);
+    else if (action === 'cancel') this.openGameCardRaidForm(null);
+    else if (action === 'save') void this.saveGameCardRaid(playerId, card);
+    else if (action === 'step' && raid) void this.stepGameCardRaid(raid, Number(target.dataset.delta), target);
+    else if (action === 'delete' && raid) void this.deleteGameCardRaid(raid);
+  },
+
+  onGameCardRaidKeydown(e) {
+    const card = e.target.closest('.game-raid-personal .personal-raid-card.adding');
+    if (!card || !e.target.matches('input')) return;
+    if (e.key === 'Escape') this.openGameCardRaidForm(null);
+    if (e.key === 'Enter') void this.saveGameCardRaid(card.closest('.game-raid-personal').dataset.playerId, card);
+  },
+
+  async saveGameCardRaid(playerId, card) {
+    const name = card.querySelector('.raid-edit-name-input').value.trim();
+    const maxClears = parseInt(card.querySelector('.raid-edit-max-input').value, 10);
+    if (!name) { toast.error('Raid name cannot be empty'); return; }
+    if (!maxClears || maxClears < 1) { toast.error('Max clears must be at least 1'); return; }
+    const raidId = card.dataset.raidId;
+    try {
+      if (raidId) {
+        const raid = this._personalRaids.find(r => r.id === raidId);
+        await dataService.updatePersonalRaid(raidId, { name, maxClears, currentClears: Math.min(raid.currentClears, maxClears) });
+      } else {
+        await dataService.addPersonalRaid(playerId, name, maxClears);
+        this._lastAddedRaid = { name, maxClears };
+      }
+      this._gameRaidForm = null;
+      await this.loadPersonalRaids();
+      this.refreshPlayerRaids(playerId);
+    } catch (error) {
+      const duplicate = error.message?.includes('duplicate') || error.code === '23505';
+      toast.error(duplicate ? 'A raid with that name already exists for this character' : `Failed to save raid: ${error.message}`);
+    }
+  },
+
+  async stepGameCardRaid(raid, delta, btn) {
+    btn.disabled = true;
+    try {
+      if (delta > 0) await dataService.incrementPersonalRaid(raid.id);
+      else await dataService.decrementPersonalRaid(raid.id);
+      raid.currentClears += delta > 0 ? 1 : -1;
+      this.refreshPlayerRaids(raid.playerId);
+    } catch (error) {
+      toast.error(error.message);
+      btn.disabled = false;
+    }
+  },
+
+  async deleteGameCardRaid(raid) {
+    if (!await modal.confirm(`Delete "${escapeHtml(raid.name)}"?`, { title: 'Delete Personal Raid', confirmText: 'Delete', danger: true })) return;
+    try {
+      await dataService.deletePersonalRaid(raid.id);
+      this._personalRaids = this._personalRaids.filter(r => r.id !== raid.id);
+      this.refreshPlayerRaids(raid.playerId);
+      toast.success('Raid deleted');
+    } catch (error) {
+      toast.error(`Failed to delete: ${error.message}`);
+    }
   },
 
   toggleOlderRaids(btn) {
@@ -826,7 +969,7 @@ export const MyRaidsPage = {
   async markGameRaid(btn) {
     btn.disabled = true;
     try {
-      await dataService.togglePlayerRaidCompletion(btn.dataset.playerId, btn.dataset.markRaid, btn.getAttribute('aria-pressed') !== 'true');
+      await dataService.setPlayerRaidMark(btn.dataset.playerId, btn.dataset.markKey, btn.getAttribute('aria-pressed') !== 'true');
       await this.loadMyCharacters();
     } catch (error) {
       btn.disabled = false;
@@ -1618,9 +1761,10 @@ export const MyRaidsPage = {
     return html;
   },
 
-  setupPersonalRaidHandlers() {
+  // Scoped to the Characters list; the Raids tab cards handle their own personal raids.
+  setupPersonalRaidHandlers(root) {
     // Increment
-    document.querySelectorAll('.btn-increment').forEach(btn => {
+    root.querySelectorAll('.btn-increment').forEach(btn => {
       btn.addEventListener('click', async () => {
         const raidId = btn.dataset.raidId;
         btn.disabled = true;
@@ -1637,7 +1781,7 @@ export const MyRaidsPage = {
     });
 
     // Decrement
-    document.querySelectorAll('.btn-decrement').forEach(btn => {
+    root.querySelectorAll('.btn-decrement').forEach(btn => {
       btn.addEventListener('click', async () => {
         const raidId = btn.dataset.raidId;
         btn.disabled = true;
@@ -1654,7 +1798,7 @@ export const MyRaidsPage = {
     });
 
     // Edit (clickable raid name)
-    document.querySelectorAll('.raid-name-link').forEach(link => {
+    root.querySelectorAll('.raid-name-link').forEach(link => {
       link.addEventListener('click', () => {
         const raidId = link.dataset.raidId;
         const raid = this._personalRaids.find(r => r.id === raidId);
@@ -1663,7 +1807,7 @@ export const MyRaidsPage = {
     });
 
     // Delete
-    document.querySelectorAll('.raid-delete-btn').forEach(btn => {
+    root.querySelectorAll('.raid-delete-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const raidId = btn.dataset.raidId;
         const raid = this._personalRaids.find(r => r.id === raidId);
@@ -1691,8 +1835,8 @@ export const MyRaidsPage = {
     });
   },
 
-  setupAddRaidHandlers() {
-    document.querySelectorAll('.btn-add-raid').forEach(btn => {
+  setupAddRaidHandlers(root) {
+    root.querySelectorAll('.btn-add-raid').forEach(btn => {
       btn.addEventListener('click', () => {
         const playerId = btn.dataset.playerId;
         this.showAddRaidForm(playerId);
@@ -1701,6 +1845,7 @@ export const MyRaidsPage = {
   },
 
   refreshPlayerRaids(playerId) {
+    this.refreshGameCardRaids(playerId);
     const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
     if (!block) return;
 

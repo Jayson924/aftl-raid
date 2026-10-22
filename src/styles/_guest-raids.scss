@@ -1,0 +1,27 @@
+// Guest raid tracker (/raids): the My Characters "This week" cards (styles under .my-raids-page) with a header button.
+.guest-raids-page {
+  .mc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .game-raid-head .character-name-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+
+    .edit-icon { font-size: 0.85em; opacity: 0.4; transition: opacity 0.2s ease; }
+    &:hover .edit-icon { opacity: 1; }
+  }
+
+  .guest-char-delete { flex: none; opacity: 0.5; }
+  .guest-raid-card:hover .guest-char-delete { opacity: 1; }
+}
+
+.guest-raids-intro {
+  margin: 0 0 1.25rem;
+  color: $text-muted;
+}
