@@ -110,6 +110,7 @@ const RARITIES = ['Magic', 'Rare', 'Epic', 'Unique', 'Legend'];
 // ---- helpers --------------------------------------------------------------------------
 
 const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 function fmt(value, digits = 0) {
@@ -450,7 +451,7 @@ export const SimulatorPage = {
     this.recalculate();
     this.renderTabs();
     this.renderPanel();
-    if (dataService.isPlayer() && !this.onReturn) {
+    if (dataService.isAuthenticated() && !this.onReturn) {
       // Back from the game: pick up any sync made meanwhile.
       this.onReturn = () => { if (document.visibilityState === 'visible') void this.loadGuild(); };
       document.addEventListener('visibilitychange', this.onReturn);
@@ -459,7 +460,7 @@ export const SimulatorPage = {
   },
 
   async loadGuild() {
-    const [characters, saved] = await Promise.all([dataService.getMySyncedCharacters(), dataService.getSavedBuilds()]);
+    const [characters, saved] = await Promise.all([dataService.isPlayer() ? dataService.getMySyncedCharacters() : [], dataService.getSavedBuilds()]);
     this.guild = { characters, saved, loaded: true };
     const updated = await this.followSyncs();
     if (!this.container) return;
@@ -823,32 +824,42 @@ export const SimulatorPage = {
   },
 
   guildRow() {
-    // Everyone else sees the guild tools dimmed: synced characters and saved builds are guild perks.
+    return `<div class="sim-guild-row">${this.charactersField()}${this.savedBuildsField()}</div>`;
+  },
+
+  // Synced characters are a guild perk; everyone else sees the field dimmed.
+  charactersField() {
+    const label = 'My characters <small class="sim-label-note">synced from the game (via toolbox)</small>';
     if (!dataService.isPlayer()) {
       return `
-      <div class="sim-guild-row guild-only">
-        <label><span>My characters <small class="sim-label-note">synced from the game (via toolbox)</small>${GUILD_ONLY_TAG}</span>
+        <label class="guild-only"><span>${label}${GUILD_ONLY_TAG}</span>
           <span class="sim-inline"><select disabled><option>Guildmates sync characters from the game (via toolbox)</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save to character</button></span>
-        </label>
-        <label><span>Saved builds${GUILD_ONLY_TAG}</span>
-          <span class="sim-inline"><select disabled><option>Guildmates can save builds</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save</button></span>
-        </label>
-      </div>`;
+        </label>`;
     }
-    const { characters, saved, loaded } = this.guild;
-    const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
-    const synced = (iso) => (iso ? `${when(iso)}, ${new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '');
+    const { characters, loaded } = this.guild;
+    const synced = (iso) => (iso ? `${shortDate(iso)}, ${new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '');
     const characterOptions = characters.map((c) => `<option value="${esc(c.id)}" ${c.id === this.characterIds[this.active] ? 'selected' : ''}>${esc(c.name)} · ${esc(c.role)} · ${synced(c.synced_at)}</option>`).join('');
-    const savedOptions = saved.map((b) => `<option value="${esc(b.id)}" ${b.id === this.savedIds[this.active] ? 'selected' : ''}>${esc(b.name)} · ${when(b.updated_at)}</option>`).join('');
     return `
-      <div class="sim-guild-row">
-        <label><span>My characters <small class="sim-label-note">synced from the game (via toolbox)</small></span>
+        <label><span>${label}</span>
           <span class="sim-inline">
             <select data-guild="character" ${characters.length ? '' : 'disabled'}>${characterOptions || `<option value="">${loaded ? 'Nothing synced from the meter yet' : 'Loading'}</option>`}</select>
             <button class="btn btn-secondary" data-action="load-character" ${characters.length ? '' : 'disabled'}>Load</button>
             <button class="btn btn-accent" data-action="save-character" data-tooltip-fixed="Keeps this build's title, card mastery, collection level, engravings and passive levels on the character across syncs">Save to character</button>
           </span>
-        </label>
+        </label>`;
+  },
+
+  // Any signed-in user can save builds; they are tied to their Discord account.
+  savedBuildsField() {
+    if (!dataService.isAuthenticated()) {
+      return `
+        <label class="guild-only"><span>Saved builds</span>
+          <span class="sim-inline"><select disabled><option>Log in with Discord to save builds</option></select><button class="btn btn-secondary" disabled>Load</button><button class="btn btn-accent" disabled>Save</button></span>
+        </label>`;
+    }
+    const { saved, loaded } = this.guild;
+    const savedOptions = saved.map((b) => `<option value="${esc(b.id)}" ${b.id === this.savedIds[this.active] ? 'selected' : ''}>${esc(b.name)} · ${shortDate(b.updated_at)}</option>`).join('');
+    return `
         <label><span>Saved builds</span>
           <span class="sim-inline">
             <select data-guild="saved" ${saved.length ? '' : 'disabled'}>${savedOptions || `<option value="">${loaded ? 'No saved builds' : 'Loading'}</option>`}</select>
@@ -856,8 +867,7 @@ export const SimulatorPage = {
             <button class="btn btn-accent" data-action="save-build">Save</button>
             <button class="btn btn-danger-ghost" data-action="delete-saved" ${saved.length ? '' : 'disabled'}>Delete</button>
           </span>
-        </label>
-      </div>`;
+        </label>`;
   },
 
   // ---- rendering ----------------------------------------------------------------------

@@ -18,8 +18,10 @@ const MIN_ROLE = {
   'groups.add': 'friend', 'groups.rename': 'friend', 'groups.delete': 'friend', 'groups.reorder': 'friend',
   'cards.set': 'guildmate', 'extras.add': 'guildmate', 'extras.setAmount': 'guildmate',
   'shopping.add': 'guildmate', 'shopping.update': 'guildmate', 'shopping.delete': 'guildmate',
-  'builds.save': 'guildmate', 'builds.delete': 'guildmate',
+  'builds.save': 'guest', 'builds.delete': 'guest',
 };
+// Saved builds are open to any signed-in user, so each one gets a cap.
+const MAX_SAVED_BUILDS = 50;
 const rank = (role) => ROLES.indexOf(role);
 const COMPLETION_COLUMNS = new Set(['bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
 // Raids only marked by hand (no lineup raid type); supabase/add-raid-marks.sql adds them.
@@ -463,6 +465,8 @@ const ACTIONS = {
       const [updated] = await sbPatch('saved_builds', `id=eq.${enc(a.id)}`, row);
       return { data: updated };
     }
+    const existing = await sbGet('saved_builds', `discord_id=eq.${enc(ctx.id)}&select=id`);
+    if (existing.length >= MAX_SAVED_BUILDS) deny(`You can keep up to ${MAX_SAVED_BUILDS} saved builds; delete one first`);
     const [created] = await sbPost('saved_builds', row);
     return { data: created };
   },

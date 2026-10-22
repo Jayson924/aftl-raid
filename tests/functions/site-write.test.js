@@ -236,15 +236,24 @@ test('guests cannot add characters; friends can', async () => {
   assert.ok(db.players.some((p) => p.name === 'Pal' && p.discord_id === 'pal'));
 });
 
-test('friends keep personal raids but not cards, shopping or saved builds', async () => {
+test('friends keep personal raids but not cards or shopping', async () => {
   const db = fixture(); stubDb(db);
   db.players.push({ id: 'p-pal', discord_id: 'pal', name: 'Pal', synced_at: null });
   assert.equal((await parse(call('pal', 'raids.add', { player_id: 'p-pal', name: 'Nest', max_clears: 2 }))).status, 200);
-  for (const [action, args] of [['shopping.add', { player_id: 'p-pal', item: 'Plate' }], ['extras.add', { player_id: 'p-pal', card_name: 'X', rarity: 'epic', amount: 1 }], ['builds.save', { name: 'B', build: {} }]]) {
+  for (const [action, args] of [['shopping.add', { player_id: 'p-pal', item: 'Plate' }], ['extras.add', { player_id: 'p-pal', card_name: 'X', rarity: 'epic', amount: 1 }]]) {
     const res = await parse(call('pal', action, args));
     assert.equal(res.status, 403, action);
     assert.equal(res.error, 'Guildmates only');
   }
+});
+
+test('any signed-in user can save builds, up to a cap', async () => {
+  const db = fixture(); stubDb(db);
+  const saved = await parse(call('visitor', 'builds.save', { name: 'B', build: {} }));
+  assert.equal(saved.status, 200);
+  assert.equal((await parse(call('visitor', 'builds.delete', { id: saved.data.id }))).status, 200);
+  for (let i = 0; i < 50; i++) db.saved_builds.push({ id: `full-${i}`, discord_id: 'visitor' });
+  assert.equal((await parse(call('visitor', 'builds.save', { name: 'One more', build: {} }))).status, 403);
 });
 
 test('admins can set the friend role', async () => {
