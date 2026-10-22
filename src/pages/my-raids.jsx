@@ -15,7 +15,7 @@ import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
 import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
-import { GAME_RAIDS, raidProgress, unlistedStageRaids, weeklyClearsThisWeek, playerRaidMarks, raidMarkKey, stageMarkKey, isStagedRaid, isMarked, raidMarked } from '../raid-clears.js';
+import { GAME_RAIDS, raidProgress, unlistedStageRaids, weeklyClearsThisWeek, playerRaidMarks, raidMarkKey, stageMarkKey, isStagedRaid, isMarked, raidMarked, keepCardScroll } from '../raid-clears.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -726,6 +726,7 @@ export const MyRaidsPage = {
       el.innerHTML = '<p class="empty-state">No characters assigned to your account.</p>';
       return;
     }
+    const restoreScroll = keepCardScroll(el, '.game-raid-card', 'playerId');
     el.innerHTML = this.renderAccountStructure(this.buildAccountStructure(this._myPlayers), {
       editable: false,
       containerClass: 'game-raid-cards',
@@ -736,6 +737,7 @@ export const MyRaidsPage = {
     el.onkeydown = (e) => this.onGameCardRaidKeydown(e);
     el.querySelectorAll('[data-older-toggle]').forEach(btn => btn.addEventListener('click', () => this.toggleOlderRaids(btn)));
     el.querySelectorAll('.game-raid-card').forEach(card => this.lockGameRaidCard(card, this._olderRaidsOpen.has(card.dataset.playerId)));
+    restoreScroll();
   },
 
   renderGameRaidCard(player) {

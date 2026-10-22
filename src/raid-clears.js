@@ -93,6 +93,19 @@ export function raidStatus(player, raidType, now = new Date()) {
   return { done: marked, source: marked ? 'marked' : null, synced: !!weeklyClears };
 }
 
+// Before re-rendering raid cards: returns a function that puts each card's table scroll, and the page's, back where they were.
+export function keepCardScroll(root, cardSelector, idKey) {
+  const pageY = window.scrollY;
+  const tops = new Map([...root.querySelectorAll(cardSelector)].map((card) => [card.dataset[idKey], card.querySelector('.game-raid-scroll')?.scrollTop || 0]));
+  return () => {
+    for (const card of root.querySelectorAll(cardSelector)) {
+      const scroll = card.querySelector('.game-raid-scroll');
+      if (scroll && tops.get(card.dataset[idKey])) scroll.scrollTop = tops.get(card.dataset[idKey]);
+    }
+    if (window.scrollY !== pageY) window.scrollTo(0, pageY);
+  };
+}
+
 // Hand marks for any raid or stage, keyed by raid type (else raid key) and "<raid>#<stage>"; values are when marked.
 export const raidMarkKey = (raid) => raid.raidType || raid.key;
 export const stageMarkKey = (raid, stage) => `${raidMarkKey(raid)}#${stage.name}`;

@@ -3,6 +3,7 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import { guestRaidList, guestCustomRaids, applyGuestMark, MAX_CUSTOM_RAIDS, MAX_CUSTOM_CLEARS } from '../guest-raid-marks.js';
+import { keepCardScroll } from '../raid-clears.js';
 
 const MAX_CHARACTERS = 12;
 const escapeHtml = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -53,11 +54,13 @@ export const GuestRaidsPage = {
     if (!list) return;
     const addBtn = this.container.querySelector('#guest-add-character');
     if (addBtn) addBtn.hidden = this.characters.length >= MAX_CHARACTERS;
+    const restoreScroll = keepCardScroll(list, '.guest-raid-card', 'id');
     list.innerHTML = this.characters.length
       ? `<div class="game-raid-cards">${this.characters.map((c) => this.renderCharacter(c)).join('')}</div>`
       : '<p class="empty-state">Add a character to start tracking. Rename it to match your character in game.</p>';
     list.querySelectorAll('.guest-raid-card').forEach((card) => this.lockCard(card, this.olderOpen.has(card.dataset.id)));
-    list.querySelector('.raid-edit-name-input')?.focus();
+    restoreScroll();
+    list.querySelector('.raid-edit-name-input')?.focus({ preventScroll: true });
   },
 
   // The friends' "This week" card for a character that never syncs: Clears and Entries stay dashes, Done is marked by hand.
