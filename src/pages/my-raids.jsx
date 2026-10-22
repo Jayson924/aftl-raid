@@ -73,7 +73,7 @@ export const MyRaidsPage = {
   _trackedPrefs: { groupBy: 'raid', hideDone: false, ...loadPref(TRACKED_PREFS_KEY, {}), search: '' },
   _trackedRaids: null,
   _trackedUsers: null,
-  _olderRaidsOpen: new Set(), // playerIds whose "Older raids" group is open on the Raids tab
+  _olderRaidsOpen: new Set(), // playerIds whose "Other raids" group is open on the Raids tab
   _shoppingItems: [], // [{ id, playerId, item, bought, price, sortOrder }]
   _shoppingLoaded: false,
   _shoppingTotalAllByPlayer: loadShoppingTotalPrefs(), // { [playerId]: true } — true = include bought; default un-bought only
@@ -733,6 +733,7 @@ export const MyRaidsPage = {
     });
     el.querySelectorAll('[data-mark-raid]').forEach(btn => btn.addEventListener('click', () => this.markGameRaid(btn)));
     el.querySelectorAll('[data-older-toggle]').forEach(btn => btn.addEventListener('click', () => this.toggleOlderRaids(btn)));
+    el.querySelectorAll('.game-raid-card').forEach(card => this.lockGameRaidCard(card, this._olderRaidsOpen.has(card.dataset.playerId)));
   },
 
   renderGameRaidCard(player) {
@@ -757,7 +758,7 @@ export const MyRaidsPage = {
           <tbody>${rows(GAME_RAIDS.filter(raid => raid.tier < 3))}</tbody>
           <tbody>
             <tr class="game-raid-older-row"><td colspan="4">
-              <button type="button" class="game-raid-older" data-older-toggle="${player.id}" aria-expanded="${open}"><span class="game-raid-chevron" aria-hidden="true"></span>Older raids</button>
+              <button type="button" class="game-raid-older" data-older-toggle="${player.id}" aria-expanded="${open}"><span class="game-raid-chevron" aria-hidden="true"></span>Other raids</button>
             </td></tr>
           </tbody>
           <tbody class="game-raid-older-body"${open ? '' : ' hidden'}>${rows([...GAME_RAIDS.filter(raid => raid.tier === 3), ...unlistedStageRaids(weeklyClears)])}</tbody>
@@ -772,7 +773,8 @@ export const MyRaidsPage = {
     const progress = raidProgress(raid, weeklyClears);
     const status = raid.raidType ? raidStatus(player, raid.raidType) : { done: progress.done, source: progress.done ? 'game' : null };
     const limit = raid.sharedLimit || (raid.stages.length === 1 ? raid.stages[0].limit : 0);
-    const entries = !weeklyClears ? dash : limit ? `${progress.entries}/${limit}` : '';
+    const counted = weeklyClears && !raid.manual;
+    const entries = !counted ? dash : limit ? `${progress.entries}/${limit}` : '';
     let done = '';
     if (status.source === 'game') {
       done = '<span class="game-raid-done from-game"><span class="game-raid-check checked locked" role="img" aria-label="Done, from game" data-tooltip-fixed="From game">✓</span><span class="game-raid-done-text">from game</span></span>';
@@ -796,7 +798,7 @@ export const MyRaidsPage = {
     return `
       <tr class="game-raid-row${status.done ? ' done' : ''}">
         <td>${escapeHtml(raid.name)}</td>
-        <td>${weeklyClears ? progress.clears : dash}</td>
+        <td>${counted ? progress.clears : dash}</td>
         <td>${entries}</td>
         <td>${done}</td>
       </tr>${stageRows}`;
@@ -808,7 +810,17 @@ export const MyRaidsPage = {
     if (open) this._olderRaidsOpen.add(playerId);
     else this._olderRaidsOpen.delete(playerId);
     btn.setAttribute('aria-expanded', String(open));
-    btn.closest('table').querySelector('.game-raid-older-body').hidden = !open;
+    this.lockGameRaidCard(btn.closest('.game-raid-card'), open);
+  },
+
+  // Holds the card at its closed height, so an open Other raids group scrolls inside it instead of growing it.
+  lockGameRaidCard(card, open) {
+    const body = card.querySelector('.game-raid-older-body');
+    body.hidden = true;
+    card.style.height = '';
+    if (!open) return;
+    card.style.height = `${card.getBoundingClientRect().height}px`;
+    body.hidden = false;
   },
 
   async markGameRaid(btn) {

@@ -36,7 +36,7 @@ test('counts read before the game reset are last week\'s', () => {
   assert.equal(raidStatus(player, 'BDN Classic', new Date('2026-10-23T16:30:00Z')).done, false);
 });
 
-test('stages outside the raid table come back as their own older raids', () => {
+test('stages outside the raid table come back as their own other raids', () => {
   const weeklyClears = { 14501: { name: 'Black Dragon Nest (Classic)', clears: 1 }, 14171: { name: 'Sea Dragon Nest (Classic Mode)', clears: 0, limit: 0 }, 14093: { name: 'Green Dragon Nest (Classic Mode)', clears: 1, limit: 10 } };
   const extra = unlistedStageRaids(weeklyClears);
   assert.deepEqual(extra.map((raid) => [raid.name, raid.tier, raid.stages[0].id, raid.stages[0].limit]), [
@@ -45,13 +45,16 @@ test('stages outside the raid table come back as their own older raids', () => {
   ]);
   assert.equal(raidProgress(extra[0], weeklyClears).done, true);
   assert.deepEqual(GAME_RAIDS.filter((raid) => raid.tier < 3).map((raid) => raid.key),
-    ['bdn-classic', 'bdn-memoria', 'bdn-hardcore', 'ddn-hardcore', 'abyssal-mire', 'dragon-fellowship']);
+    ['bdn-classic', 'bdn-memoria', 'bdn-hardcore', 'ddn-hardcore', 'dragon-fellowship', 'abyssal-mire']);
 });
 
 test('the hand-marked raids follow the same precedence as the lineup ones', () => {
   const now = new Date('2026-10-22T03:00:00Z');
   const player = { abyssalMireCompleted: '2026-10-20T10:00:00Z', weeklyClears: { 14526: { clears: 1 } }, weeklyClearsAt: '2026-10-21T12:00:00Z', bdnHardcoreCompleted: '2026-10-20T10:00:00Z' };
   assert.deepEqual(raidStatus(player, 'Abyssal Mire', now), { done: true, source: 'marked', synced: true });
+  // Abyssal Mire has no limit and the game keeps counting, so a synced run never marks it done.
+  const ran = { weeklyClears: { 17613: { clears: 2, entries: 2 } }, weeklyClearsAt: '2026-10-21T12:00:00Z' };
+  assert.deepEqual(raidStatus(ran, 'Abyssal Mire', now), { done: false, source: null, synced: true });
   assert.deepEqual(raidStatus(player, 'BDN Hardcore', now), { done: true, source: 'game', synced: true });
   assert.equal(raidStatus(player, 'Dragon Fellowship', now).done, false);
   assert.equal(raidStatus(player, 'BDN Memoria', now).done, false);

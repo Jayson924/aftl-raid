@@ -2,7 +2,8 @@
 
 // Map ids from the client's stage table; `allStages` raids are done only when every stage is cleared.
 // A raid with a raidType can be marked by hand in its players `column` (a *_completed timestamp).
-// Tier 1 is the guild's endgame, tier 2 what follows it, tier 3 sits under "Older raids".
+// A `manual` raid has no stages: the sync never completes it, the mark alone does.
+// Tier 1 is the guild's endgame, tier 2 what follows it, tier 3 sits under "Other raids".
 export const GAME_RAIDS = [
   { key: 'bdn-classic', tier: 1, name: 'Black Dragon Nest (Classic)', raidType: 'BDN Classic', column: 'bdn_classic_completed', stages: [{ id: 14501, limit: 10 }] },
   {
@@ -11,17 +12,10 @@ export const GAME_RAIDS = [
   },
   { key: 'bdn-hardcore', tier: 1, name: 'Black Dragon Nest (Hardcore)', raidType: 'BDN Hardcore', column: 'bdn_hardcore_completed', stages: [{ id: 14526, limit: 0 }] },
   { key: 'ddn-hardcore', tier: 1, name: 'Desert Dragon Nest (Hardcore)', raidType: 'DDN Hardcore', column: 'ddn_hardcore_completed', stages: [{ id: 17610, limit: 0 }] },
-  // Stage ids from the client table, unconfirmed until a synced login lists them.
-  {
-    key: 'abyssal-mire', tier: 2, name: 'Abyssal Mire', raidType: 'Abyssal Mire', column: 'abyssal_mire_completed',
-    stages: [
-      { id: 17613, name: 'Desolate Isle', limit: 0 }, { id: 17614, name: 'Abandoned Village', limit: 0 },
-      { id: 17617, name: 'Pirate Ship', limit: 0 }, { id: 17620, name: 'Ghost Town', limit: 0 },
-      { id: 17623, name: 'Valley', limit: 0 }, { id: 17624, name: 'Mutant Habitat', limit: 0 },
-      { id: 17625, name: 'Ghost Town (second)', limit: 0 },
-    ],
-  },
-  { key: 'dragon-fellowship', tier: 2, name: 'Dragon Fellowship (Lv70)', raidType: 'Dragon Fellowship', column: 'dragon_fellowship_completed', stages: [{ id: 16330, limit: 0 }] },
+  // Once a week in play; the client's enter row carries no limit for it.
+  { key: 'dragon-fellowship', tier: 2, name: 'Dragon Fellowship (Lv70)', raidType: 'Dragon Fellowship', column: 'dragon_fellowship_completed', stages: [{ id: 16330, limit: 1 }] },
+  // No weekly limit and the game keeps counting runs, so only the manual mark decides.
+  { key: 'abyssal-mire', tier: 2, name: 'Abyssal Mire', raidType: 'Abyssal Mire', column: 'abyssal_mire_completed', manual: true, stages: [] },
   { key: 'ddn-classic', tier: 3, name: 'Desert Dragon Nest (Classic)', raidType: 'DDN Classic', column: 'ddn_classic_completed', stages: [{ id: 14221, limit: 10 }] },
   {
     key: 'ddn-normal', tier: 3, name: 'Desert Dragon Nest (Normal)', raidType: 'DDN Normal', column: 'ddn_normal_completed', allStages: true,

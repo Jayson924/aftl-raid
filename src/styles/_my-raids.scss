@@ -2049,7 +2049,7 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
 .my-raids-page .game-raid-cards {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; align-items: start;
 }
-// Capped so an open "Older raids" group scrolls inside the card instead of stretching its row.
+// Capped so an open "Other raids" group scrolls inside the card instead of stretching its row.
 .my-raids-page .game-raid-card {
   display: flex; flex-direction: column; max-height: 34rem; container-type: inline-size;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
