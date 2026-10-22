@@ -808,7 +808,7 @@ export const MyRaidsPage = {
         <td>${escapeHtml(raid.name)}</td>
         <td>${count(progress.clears)}</td>
         <td>${entries}</td>
-        <td>${this.renderMarkCell(player, raidMarkKey(raid), gameDone, marked, true)}</td>
+        <td>${this.renderMarkCell(player, raidMarkKey(raid), gameDone, marked, !!weeklyClears)}</td>
       </tr>${stageRows}`;
   },
 

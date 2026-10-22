@@ -2108,7 +2108,8 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
   transform: rotate(-45deg); transition: transform 0.15s ease;
 }
 .my-raids-page .game-raid-older[aria-expanded="true"] .game-raid-chevron { transform: rotate(45deg); }
-.my-raids-page .game-raid-done { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #34ce57; }
+// Middle-aligned: an empty check has no text baseline, so baseline alignment made unticked rows 3px taller.
+.my-raids-page .game-raid-done { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #34ce57; vertical-align: middle; }
 // Hand marks take the site's gold; the game's locked check stays blue.
 .my-raids-page .game-raid-done:not(.from-game) { color: rgba($primary-color, 0.85); }
 .my-raids-page .game-raid-check:hover { border-color: $primary-color; box-shadow: 0 0 6px rgba($primary-color, 0.3); }

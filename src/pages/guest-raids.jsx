@@ -81,15 +81,15 @@ export const GuestRaidsPage = {
   // Rows as on My Characters; where a raid needs every stage, each stage row gets its own check.
   renderWeekTable(character, raids) {
     const dash = '<span class="game-raid-none">—</span>';
-    const check = (item, label, withText) => `<span class="game-raid-done"><button type="button" class="game-raid-check${item.done ? ' checked' : ''}" data-action="mark" data-key="${escapeHtml(item.key)}" aria-pressed="${item.done}" aria-label="${escapeHtml(label)}" data-tooltip-fixed="${item.done ? 'Unmark' : 'Mark as done'}">${item.done ? '✓' : ''}</button>${withText && item.done ? '<span class="game-raid-done-text">marked</span>' : ''}</span>`;
+    const check = (item, label) => `<span class="game-raid-done"><button type="button" class="game-raid-check${item.done ? ' checked' : ''}" data-action="mark" data-key="${escapeHtml(item.key)}" aria-pressed="${item.done}" aria-label="${escapeHtml(label)}" data-tooltip-fixed="${item.done ? 'Unmark' : 'Mark as done'}">${item.done ? '✓' : ''}</button></span>`;
     const rows = (list) => list.map((raid) => `
       <tr class="game-raid-row${raid.done ? ' done' : ''}">
         <td>${escapeHtml(raid.name)}</td>
         <td>${dash}</td>
         <td>${dash}</td>
-        <td>${check(raid, raid.name, true)}</td>
+        <td>${check(raid, raid.name)}</td>
       </tr>${raid.stages ? `
-      <tr class="game-raid-stage-checks"><td colspan="4">${raid.stages.map((stage) => `<span class="game-raid-stage-check">${escapeHtml(stage.name)}${check(stage, `${raid.name} ${stage.name}`, false)}</span>`).join('')}</td></tr>` : ''}`).join('');
+      <tr class="game-raid-stage-checks"><td colspan="4">${raid.stages.map((stage) => `<span class="game-raid-stage-check">${escapeHtml(stage.name)}${check(stage, `${raid.name} ${stage.name}`)}</span>`).join('')}</td></tr>` : ''}`).join('');
     const open = this.olderOpen.has(character.id);
     return `
       <table class="game-raid-table">
