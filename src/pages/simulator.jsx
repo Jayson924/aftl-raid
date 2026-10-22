@@ -314,8 +314,13 @@ function potentialPool(build, field, item) {
 }
 const potentialSetKey = (keys) => [...keys].sort().join(' + ');
 
-const potentialLinesHtml = (keys, note) => `<span class="sim-pot-lines">${[...keys].sort((a, b) => lineRank(a) - lineRank(b))
-  .map((k) => `<span>${esc(statLabel(k))}</span>`).join('')}<small>${esc(note)}</small></span>`;
+// "PATK 2.88%" -> name and value cells, so the values line up in a column.
+const potentialLine = (key) => {
+  const at = key.lastIndexOf(' ');
+  return `<span class="sim-pot-line"><span>${esc(statLabel(key.slice(0, at)))}</span><b>${esc(key.slice(at + 1))}</b></span>`;
+};
+const potentialLinesHtml = (keys, note) => `<span class="sim-pot-lines"><small>${esc(note)}</small>${[...keys]
+  .sort((a, b) => lineRank(a) - lineRank(b)).map(potentialLine).join('')}</span>`;
 // Lines that are not a whole set: how many of the item's sets contain them all.
 function partialNote(lines, pool) {
   const n = pool.rolls.filter((r) => lines.every((l) => r.keys.includes(l))).length;
@@ -1163,9 +1168,9 @@ export const SimulatorPage = {
       subtitle: `${item.slot}${entry?.level ? ` · ${entry.level}` : ''}`,
       body: `
         <div class="sim-editor-fields">${fields}</div>
-        ${potentials}
-        <h4>Stats</h4>
-        ${statGrid(bonus)}`,
+        ${pool
+    ? `<div class="sim-gear-lower"><div>${potentials}</div><div><h4>Stats</h4>${statGrid(bonus)}</div></div>`
+    : `${potentials}<h4>Stats</h4>${statGrid(bonus)}`}`,
     });
   },
 
