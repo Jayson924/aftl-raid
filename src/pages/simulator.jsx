@@ -328,6 +328,28 @@ function partialNote(lines, pool) {
   const n = pool.rolls.filter((r) => lines.every((l) => r.keys.includes(l))).length;
   return n ? `part of ${n} possible set${n === 1 ? '' : 's'}` : 'not a set this item rolls';
 }
+// Fellowship heraldry: the game's sets for a plate at a level, one list per focus stat (picked when crafting).
+const fellowshipVariants = (item) => rngData.fellowship.filter((f) => f.level === item.level && f.plate === item.name);
+const fellowSetMain = (set) => set.lines.slice(0, set.ranks.length).map(([stat]) => stat);
+const fellowSetKey = (attrs, ranks, extra) => [...attrs.map((a, i) => `${a}:${ranks[i]}`), `extra:${extra}`].join('|');
+const keyOfSet = (set) => fellowSetKey(fellowSetMain(set), set.ranks, set.lines[set.ranks.length]?.[0] ?? NONE);
+function keyOfGlyph(item) {
+  const slots = [1, 2, 3, 4].filter((n) => hasValue(item[`base_attr${n}`]) && hasValue(item[`rank${n}`]));
+  return slots.length ? fellowSetKey(slots.map((n) => item[`base_attr${n}`]), slots.map((n) => String(item[`rank${n}`])), item.extra ?? NONE) : NONE;
+}
+function findFellowSet(key, variants) {
+  for (const variant of variants) for (const set of variant.sets) if (keyOfSet(set) === key) return { variant, set };
+  return null;
+}
+// Writes a set into the plate the way builds store it: a stat and rank per line, plus the extra.
+function applyFellowSet(item, variant, set) {
+  const main = fellowSetMain(set);
+  for (let n = 1; n <= 4; n += 1) Object.assign(item, { [`base_attr${n}`]: main[n - 1] ?? NONE, [`rank${n}`]: set.ranks[n - 1] ?? NONE });
+  item.extra = set.lines[set.ranks.length]?.[0] ?? NONE;
+  item.focus = variant.focus;
+}
+const fellowLinesHtml = (set, note) => `<span class="sim-pot-lines"><small>${esc(note)}</small>${set.lines.map(([stat, value]) =>
+  `<span class="sim-pot-line${stat === set.bonus ? ' sim-pot-bonus' : ''}"><span>${esc(stat)}</span><b>${Number(value).toLocaleString()}</b></span>`).join('')}</span>`;
 function slotEntry(build, field, item) {
   if (item.name === NONE || field === 'fashion') return null;
   return field === 'jewelry' ? jewelryEntry(item.slot, item.name) : equipmentEntry(build, item.name);
@@ -386,7 +408,7 @@ export const SimulatorPage = {
   builds: null,
   active: 'A',
   section: 'sim',
-  rng: { tab: 'engravings', runeLevel: '70', potRarity: 'legend', potPool: 0 },
+  rng: { tab: 'engravings', runeLevel: '70', potRarity: 'legend', potPool: 0, fellowLevel: '70', fellowPlate: 0, sort: 'desc' },
   tab: 'sets',
   view: 'general',
   costumeMode: 'fashion',
@@ -565,13 +587,31 @@ export const SimulatorPage = {
 
   onChange(e, live = false) {
     const el = e.target;
-    if (el.dataset.rngPool !== undefined) { this.rng.potPool = Number(el.value); this.renderRng(); return; }
     if (el.dataset.applyAll) { this.applyAll[el.dataset.applyAll] = el.checked; return; }
     const path = el.dataset.path;
     if (!path) return;
     const build = this.build;
     let value = el.type === 'checkbox' ? el.checked : el.value;
     if (el.type === 'number') value = el.value === '' ? 0 : Number(el.value);
+    if (path.endsWith('.fellow_set') || /^glyph_s\.\d+\.focus$/.test(path)) {
+      const itemPath = path.slice(0, path.lastIndexOf('.'));
+      const item = getPath(build, itemPath);
+      const variants = fellowshipVariants(item);
+      if (path.endsWith('.focus')) {
+        // A different focus is a different plate; start it at its most likely set.
+        const variant = variants.find((v) => v.focus === value);
+        if (variant) applyFellowSet(item, variant, variant.sets[0]);
+      } else if (value === NONE) {
+        for (let n = 1; n <= 4; n += 1) Object.assign(item, { [`base_attr${n}`]: NONE, [`rank${n}`]: NONE });
+        item.extra = NONE;
+      } else {
+        const found = findFellowSet(value, variants);
+        if (found) applyFellowSet(item, found.variant, found.set);
+      }
+      this.recalculate();
+      this.renderPanel();
+      return;
+    }
     if (path.endsWith('.potential_set')) {
       const itemPath = path.slice(0, -'.potential_set'.length);
       const item = getPath(build, itemPath);
@@ -659,7 +699,7 @@ export const SimulatorPage = {
     } else if (field === 'glyph_a' && key === 'name' && glyphABlocked(value, build.glyph_a[index].extra)) {
       build.glyph_a[index].extra = NONE;
     } else if (field === 'glyph_s' && key === 'name') {
-      Object.assign(build.glyph_s[index], { base_attr1: NONE, rank1: NONE, base_attr2: NONE, rank2: NONE, base_attr3: NONE, rank3: NONE, base_attr4: NONE, rank4: NONE, extra: NONE });
+      Object.assign(build.glyph_s[index], { base_attr1: NONE, rank1: NONE, base_attr2: NONE, rank2: NONE, base_attr3: NONE, rank3: NONE, base_attr4: NONE, rank4: NONE, extra: NONE, focus: NONE });
     } else if (field === 'normal_runes' && key === 'rarity') {
       // A lower rarity has fewer lines; clear the ones it no longer has.
       const rune = build.normal_runes[index];
@@ -718,10 +758,16 @@ export const SimulatorPage = {
     if (action === 'switch') { this.active = value; this.render(this.container); return; }
     if (action === 'tab') { this.tab = value; this.renderTabs(); this.renderPanel(); return; }
     if (action === 'section') { this.section = value; this.render(this.container); return; }
-    const rngField = { 'rng-tab': 'tab', 'rng-rune-level': 'runeLevel', 'rng-pot-rarity': 'potRarity' }[action];
+    if (action === 'rng-fellow-pick') { this.rng.fellowPlate = Number(value); this.renderRng(); return; }
+    if (action === 'rng-pot-pool') {
+      const [rarity, index] = value.split('|');
+      Object.assign(this.rng, { potRarity: rarity, potPool: Number(index) });
+      this.renderRng();
+      return;
+    }
+    const rngField = { 'rng-tab': 'tab', 'rng-rune-level': 'runeLevel', 'rng-fellow-level': 'fellowLevel', 'rng-sort': 'sort' }[action];
     if (rngField) {
       this.rng[rngField] = value;
-      if (rngField === 'potRarity') this.rng.potPool = 0;
       this.renderRng();
       return;
     }
@@ -1400,6 +1446,38 @@ export const SimulatorPage = {
       <div class="sim-board-row">${a(8)}${a(9)}${a(10)}</div>`;
   },
 
+  // Fellowship plates the client has sets for: pick the focus, then one whole set, as the game rolls it.
+  fellowshipSetEditor(item, path, cell, names, variants) {
+    const current = keyOfGlyph(item);
+    const match = findFellowSet(current, variants);
+    const focus = (variants.find((v) => v.focus === item.focus) || match?.variant || variants[0]).focus;
+    const variant = variants.find((v) => v.focus === focus);
+    const sets = new Map(variant.sets.map((set) => [keyOfSet(set), set]));
+    const options = [NONE, ...(current !== NONE && !sets.has(current) ? [current] : []), ...sets.keys()];
+    const picker = this.itemPicker(`${path}.fellow_set`, options, current, (key) => {
+      const set = sets.get(key);
+      if (set) return { rarity: 'normal', level: 0, html: fellowLinesHtml(set, `${set.pct}% chance · tier ${set.tier}`) };
+      const lines = [1, 2, 3, 4].filter((n) => hasValue(item[`base_attr${n}`])).map((n) => `${item[`base_attr${n}`]} rank ${item[`rank${n}`]}`);
+      if (hasValue(item.extra)) lines.push(`${item.extra} extra`);
+      return { rarity: 'normal', level: 0, label: `${lines.join(' · ')} (not a set the ${focus} plate rolls)` };
+    }, { sort: false });
+    return this.editorShell({
+      icon: spriteIcon(cell, 'Fellowship'), rarity: 'unique',
+      title: item.name, subtitle: `Fellowship Heraldry · ${item.level}`,
+      body: `
+        <div class="sim-editor-fields">
+          <label><span>Level</span>${select(`${path}.level`, L.glyph_s.levels, item.level)}</label>
+          <label><span>Heraldry</span>${select(`${path}.name`, names, item.name)}</label>
+          <label><span>Focus</span>${select(`${path}.focus`, variants.map((v) => v.focus), focus)}</label>
+        </div>
+        <div class="sim-gear-lower">
+          <div><h4>Set <span class="sim-h4-note">${variant.sets.length} possible sets</span></h4><div class="sim-field sim-potential-set">${picker}</div></div>
+          <div><h4>Stats</h4>${statGrid(calc.glyphSAttrs(item))}</div>
+        </div>
+        ${this.boardTotals('Heraldry Stats', 'glyph')}`,
+    });
+  },
+
   heraldryEditor(kind, index) {
     const item = this.build[kind][index];
     const path = `${kind}.${index}`;
@@ -1417,6 +1495,8 @@ export const SimulatorPage = {
       };
       return `<div class="sim-field sim-pair"><span>Stat ${n}</span><span class="sim-inline">${select(`${path}.base_attr${n}`, L.glyph_s.base_options[item.name] || [NONE], base)}${this.rankPicker(`${path}.rank${n}`, options.glyph_s_ranks[item.level]?.[item.name]?.[base] || L.glyph_s.ranks, item[`rank${n}`], gives)}</span></div>`;
     };
+    const variants = fellowship ? fellowshipVariants(item) : [];
+    if (variants.length) return this.fellowshipSetEditor(item, path, cell, names, variants);
     const fields = fellowship
       ? `${[1, 2, 3, 4].map(statRow).join('')}
          <label><span>Extra</span>${select(`${path}.extra`, L.glyph_s.extra_options[item.name] || [NONE], item.extra)}</label>

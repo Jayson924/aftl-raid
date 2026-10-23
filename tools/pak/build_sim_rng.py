@@ -1,6 +1,7 @@
-"""Roll tables for the simulator's RNG Table: costume engravings and gear potentials, with their odds.
+"""Roll tables for the simulator's RNG Table: engravings, gear potentials and fellowship heraldry, with their odds.
 Usage: py -3.12 -I tools/pak/build_sim_rng.py <extraction root>
-Engravings: itemtable_imprintequip + chaoscuberesulttable_imprintequip; potentials: potentialtable_potentialjewel per item."""
+Engravings: itemtable_imprintequip + chaoscuberesulttable_imprintequip; potentials: potentialtable_potentialjewel per item;
+fellowship heraldry: itemtable_glyph (_Type 38) + potentialtable_glyph."""
 from __future__ import annotations
 
 import json
@@ -15,6 +16,7 @@ from build_gear_tables import item_name, load_uistrings, locate, parse_dnt  # no
 REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "src/data/sim-rng.json"
 POTENTIALS = REPO / "netlify/data/sim/potentials.json"
+HERALDRY = REPO / "netlify/data/sim/heraldry.json"
 
 GRADES = {1: "B", 2: "A", 3: "S", 4: "L"}
 SLOTS = {1: "Main weapon", 2: "Secondary weapon", 3: "Helmet", 4: "Upper", 5: "Lower", 6: "Gloves", 7: "Shoes",
@@ -127,9 +129,64 @@ def potentials(root: Path, ui: dict) -> list:
     return sorted(out, key=lambda p: (order[p["rarity"][-1]], ["Weapon", "Armor", "Jewelry"].index(p["kind"]), p["items"]))
 
 
+FELLOWSHIP = {30: ("Attack", ["PATK", "MATK"]), 31: ("Origin's", ["HP", "MP"]), 32: ("Elevation", ["STR", "AGI", "INT", "VIT"]),
+              33: ("Resistance", ["Crit resist", "Paralyze resist", "Stun resist"])}
+GLYPH_STATS = {**{k: v for k, v in STATS.items() if k < 30}, 4: "PATK", 5: "PATK", 6: "MATK", 7: "MATK"}
+
+
+def fellowship(root: Path) -> list:
+    """Each fellowship plate (one per focus stat) rolls one whole set: every main stat at one tier, plus at most one bonus."""
+    rolls_by_id = defaultdict(list)
+    for r in parse_dnt(locate(root, "potentialtable_glyph.dnt")):
+        rolls_by_id[r["_PotentialID"]].append(r)
+    plates = defaultdict(list)
+    for r in parse_dnt(locate(root, "itemtable_glyph.dnt")):
+        if r["_Type"] == 38 and r["_TypeParam2"] in FELLOWSHIP and r["_LevelLimit"] in (60, 70):
+            plates[(r["_LevelLimit"], r["_TypeParam2"])].append(r)
+
+    def lines(row: dict) -> dict:
+        out = {}
+        for i in range(1, 17):
+            state, value = row.get(f"_State{i}"), float(row.get(f"_State{i}Value") or 0)
+            if value and state in GLYPH_STATS:
+                out.setdefault(GLYPH_STATS[state], int(value + 1e-6))
+        return out
+
+    # The simulator stores a fellowship stat as a rank; map each rolled value to it.
+    heraldry = json.loads(HERALDRY.read_text(encoding="utf-8"))["s"]
+    rank_of = {(lv, plate, stat, int(min(v.values()))): rank for lv, by_plate in heraldry.items() for plate, by_stat in by_plate.items()
+               for stat, ranks in by_stat.items() for rank, v in ranks.items()}
+    missing = set()
+    out = []
+    for (level, kind), items in sorted(plates.items(), key=lambda kv: (-kv[0][0], kv[0][1])):
+        name, main = FELLOWSHIP[kind]
+        variants = []
+        for item in items:
+            rows = [{"lines": lines(r), "pct": r["_PotentialRatio"]} for r in rolls_by_id[item["_TypeParam1"]]]
+            # The three plain sets (no bonus) are the most likely rolls: tier 1, 2, 3 by value.
+            plain = sorted(sorted(rows, key=lambda r: -r["pct"])[:3], key=lambda r: sum(r["lines"].values()))
+            variants.append((item, rows, plain))
+        for item, rows, plain in variants:
+            # The focus stat is the one this plate rolls higher than the plate's other versions.
+            focus = next(s for s in main if plain[0]["lines"][s] > min(v[2][0]["lines"][s] for v in variants))
+            sets = []
+            for r in rows:
+                tier = max(range(3), key=lambda t: sum(r["lines"].get(s) == plain[t]["lines"][s] for s in main))
+                bonus = next(([s, v] for s, v in r["lines"].items() if s not in main), None)                     or next(([s, r["lines"][s]] for s in main if r["lines"][s] != plain[tier]["lines"][s]), None)
+                ranks = [rank_of.get((f"Lv{level}", f"{name} Fellowship Heraldry", s, r["lines"][s])) for s in main]
+                missing |= {f"Lv{level} {name} {s} {r['lines'][s]}" for s, k in zip(main, ranks) if k is None}
+                sets.append({"tier": tier + 1, "pct": round(r["pct"], 4), "bonus": bonus[0] if bonus else None, "ranks": ranks,
+                             "lines": [[s, r["lines"][s]] for s in main] + [[s, v] for s, v in r["lines"].items() if s not in main]})
+            out.append({"level": f"Lv{level}", "plate": f"{name} Fellowship Heraldry", "focus": focus,
+                        "sets": sorted(sets, key=lambda x: -x["pct"])})
+    if missing:
+        print("fellowship values with no simulator rank:", sorted(missing))
+    return out
+
+
 def main(root: Path) -> None:
     ui = load_uistrings(root)
-    data = {"engraving": engravings(root), "potentials": potentials(root, ui)}
+    data = {"engraving": engravings(root), "potentials": potentials(root, ui), "fellowship": fellowship(root)}
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"wrote {OUT} ({OUT.stat().st_size // 1024} KB): {len(data['potentials'])} potential pools")
 
