@@ -102,7 +102,18 @@ $build-tint: linear-gradient(to top left, color-mix(in srgb, var(--build-color) 
 }
 
 // RNG Table: every roll for engravings, potentials and runes.
-.rng-tabs { margin-top: 0; }
+// The RNG Table's own sections: a segmented switch like My Characters' "By raid / By member", so they read as a level below the page tabs.
+.rng-tabs {
+  display: inline-flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; margin: 0 0 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+  button {
+    flex: none; padding: 0.45rem 1rem; background: transparent; border: 0; white-space: nowrap;
+    color: rgba(255, 255, 255, 0.6); cursor: pointer; font-family: inherit; font-size: 0.9rem;
+    & + button { border-left: 1px solid rgba(255, 255, 255, 0.12); }
+    &:hover { color: rgba(255, 255, 255, 0.9); }
+    &.active { background: rgba($primary-color, 0.15); color: $primary-color; }
+  }
+}
 .rng-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2rem; align-items: start; }
 .rng-grid-odds { grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); }
 .rng-grid-pot { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }

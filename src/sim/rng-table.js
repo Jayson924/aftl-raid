@@ -225,5 +225,5 @@ export function rngTable(state) {
   const body = state.tab === 'potentials' ? potentialsView(state.potRarity, state.potPool, state.sort)
     : state.tab === 'fellowship' ? fellowshipView(state.fellowLevel, state.fellowPlate, state.sort)
       : state.tab === 'runes' ? runesView(state.runeLevel) : engravingsView();
-  return `<nav class="sim-tabs rng-tabs">${tabs}</nav><div class="rng-body">${body}</div>`;
+  return `<nav class="rng-tabs">${tabs}</nav><div class="rng-body">${body}</div>`;
 }
