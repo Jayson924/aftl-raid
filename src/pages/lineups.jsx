@@ -1000,7 +1000,7 @@ export const LineupsPage = {
 
   /**
    * Toggle "Keep for next week" on a cleared team. Flags it Next Week
-   * (is_template) so it survives the Friday reset; the cleanup then resets its
+   * (is_template) so it survives the weekly reset; the cleanup then resets its
    * cleared status so it's runnable again. Optimistic + lightweight update.
    */
   async handleKeepClick(lineupId) {

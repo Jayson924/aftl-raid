@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GAME_RAIDS, gameWeekStart, raidProgress, raidStatus, RAID_BY_TYPE, unlistedStageRaids, weeklyClearsThisWeek } from '../src/raid-clears.js';
 
-test('the game week starts Saturday 00:00 SEA time, Friday 16:00 UTC', () => {
-  assert.equal(gameWeekStart(new Date('2026-10-22T03:00:00Z')).toISOString(), '2026-10-16T16:00:00.000Z');
-  assert.equal(gameWeekStart(new Date('2026-10-23T15:59:00Z')).toISOString(), '2026-10-16T16:00:00.000Z');
-  assert.equal(gameWeekStart(new Date('2026-10-23T16:00:00Z')).toISOString(), '2026-10-23T16:00:00.000Z');
-  assert.equal(gameWeekStart(new Date('2026-10-24T00:30:00Z')).toISOString(), '2026-10-23T16:00:00.000Z');
+test('the game week starts Saturday 09:00 SEA time, Saturday 01:00 UTC', () => {
+  assert.equal(gameWeekStart(new Date('2026-10-22T03:00:00Z')).toISOString(), '2026-10-17T01:00:00.000Z');
+  assert.equal(gameWeekStart(new Date('2026-10-23T16:30:00Z')).toISOString(), '2026-10-17T01:00:00.000Z');
+  assert.equal(gameWeekStart(new Date('2026-10-24T00:59:00Z')).toISOString(), '2026-10-17T01:00:00.000Z');
+  assert.equal(gameWeekStart(new Date('2026-10-24T01:00:00Z')).toISOString(), '2026-10-24T01:00:00.000Z');
+  assert.equal(gameWeekStart(new Date('2026-10-30T23:00:00Z')).toISOString(), '2026-10-24T01:00:00.000Z');
 });
 
 test('multi-stage raids are done when every stage is cleared; alternatives when any is', () => {
@@ -30,10 +31,10 @@ test('a game clear beats the manual mark; a mark covers a raid the sync has no c
 });
 
 test('counts read before the game reset are last week\'s', () => {
-  const player = { weeklyClears: { 14501: { clears: 1 } }, weeklyClearsAt: '2026-10-23T15:00:00Z' };
-  assert.ok(weeklyClearsThisWeek(player, new Date('2026-10-23T15:30:00Z')));
-  assert.equal(weeklyClearsThisWeek(player, new Date('2026-10-23T16:30:00Z')), null);
-  assert.equal(raidStatus(player, 'BDN Classic', new Date('2026-10-23T16:30:00Z')).done, false);
+  const player = { weeklyClears: { 14501: { clears: 1 } }, weeklyClearsAt: '2026-10-24T00:00:00Z' };
+  assert.ok(weeklyClearsThisWeek(player, new Date('2026-10-24T00:30:00Z')));
+  assert.equal(weeklyClearsThisWeek(player, new Date('2026-10-24T01:30:00Z')), null);
+  assert.equal(raidStatus(player, 'BDN Classic', new Date('2026-10-24T01:30:00Z')).done, false);
 });
 
 test('stages outside the raid table come back as their own other raids', () => {

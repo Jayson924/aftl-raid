@@ -903,7 +903,7 @@ class DataService {
   /**
    * Set a lineup's "Next Week" flag (is_template) — a lightweight single-column
    * update used by the "Keep for next week" toggle on cleared cards. A kept
-   * lineup survives the Friday cleanup; its cleared status is reset then so it's
+   * lineup survives the weekly cleanup; its cleared status is reset then so it's
    * runnable again next week (see weekly-cleanup-cron.sql).
    */
   async setLineupNextWeek(lineupId, value) {
@@ -1178,7 +1178,7 @@ class DataService {
   // COMPLETION TRACKING
   // ============================================
 
-  // Marks count from the game's weekly reset (Saturday 00:00 SEA), the same week as the synced clears.
+  // Marks count from the game's weekly reset (Saturday 09:00 SEA), the same week as the synced clears.
   isCompletedThisWeek(timestamp) {
     return isThisGameWeek(timestamp);
   }

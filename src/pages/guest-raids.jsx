@@ -29,7 +29,7 @@ export const GuestRaidsPage = {
           <h1 class="page-title">My Raids</h1>
           <button class="btn btn-primary" data-action="add" id="guest-add-character">+ Add Character</button>
         </div>
-        <p class="guest-raids-intro">Mark raids as you clear them. Everything resets with the game every Saturday 00:00 SEA.</p>
+        <p class="guest-raids-intro">Mark raids as you clear them. Everything resets with the game every Saturday 9:00 AM GMT+8.</p>
         <div id="guest-raids-list"><p class="empty-state">Loading…</p></div>
       </div>`;
     const page = container.querySelector('.guest-raids-page');
