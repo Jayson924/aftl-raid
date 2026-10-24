@@ -95,7 +95,7 @@ export const LineupEditorPage = {
             ${canEdit ? `<div class="move-board" id="move-board" hidden>
               <div class="move-board-header">
                 <div class="move-board-filters">
-                  <select id="move-raid-type" aria-label="Raid type">
+                  <select id="move-raid-type" class="move-raid-select" aria-label="Raid type">
                     <option value="BDN Classic">BDN Classic</option>
                     <option value="DDN Hardcore">DDN Hardcore</option>
                     <option value="DDN Classic">DDN Classic</option>
