@@ -342,7 +342,27 @@
       max-width: none;
       cursor: default;
 
-      &:hover { transform: none; }
+      // Cards don't move here, so hovering one keeps its resting look and only the character lights up.
+      &:hover {
+        transform: none;
+        border-color: rgba(255, 255, 255, 0.1);
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+
+      &.next-week:hover {
+        background: linear-gradient(180deg, rgba(150, 184, 255, 0.15) 0%, rgba(150, 184, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+        border-color: rgba(150, 184, 255, 0.3);
+      }
+
+      &.static:hover {
+        background: linear-gradient(180deg, rgba(190, 150, 255, 0.15) 0%, rgba(190, 150, 255, 0.08) 25%, rgba(255, 255, 255, 0.05) 100%);
+        border-color: rgba(190, 150, 255, 0.3);
+      }
+
+      &.cleared:hover {
+        filter: saturate(0.4) brightness(0.8);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
 
       &.dirty {
         border-color: rgba($primary-color, 0.7);
@@ -362,9 +382,17 @@
       }
 
       .mini-player-card {
-        transition: border-color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+        transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
 
-        &[draggable="true"] { cursor: grab; }
+        &[draggable="true"] {
+          cursor: grab;
+
+          &:hover {
+            border-color: $primary-color;
+            box-shadow: 0 0 0 1px rgba($primary-color, 0.45);
+            filter: brightness(1.2);
+          }
+        }
 
         &.dragging { opacity: 0.4; }
 
