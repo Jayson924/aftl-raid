@@ -96,6 +96,8 @@ const METRIC_TIPS = {
   effective_panel: ['Site score, not in game', '(Attack + skill flat damage) × Final dmg × Crit\nAgainst the boss crit resist'],
   power_score: ['Gearscore', 'Power level as a share of a maxed character of this class\nThe badge on the Characters and Lineups pages'],
 };
+// Self and party buffs are on/off at their top level (the Lv70 cap); the rest keep a level field.
+const TOGGLE_BUFFS = new Set(['Self buff', 'Party buff']);
 const isPassiveKey = (key) => options.buffs?.[key]?.category === 'Passive';
 // The gearscore matches a synced panel: passives only, no self, party or guild buffs.
 function gearscoreBuild(build) {
@@ -608,6 +610,7 @@ export const SimulatorPage = {
     const build = this.build;
     let value = el.type === 'checkbox' ? el.checked : el.value;
     if (el.type === 'number') value = el.value === '' ? 0 : Number(el.value);
+    if (el.dataset.onLevel !== undefined) value = el.checked ? Number(el.dataset.onLevel) : 0;
     if (path.endsWith('.fellow_set') || /^glyph_s\.\d+\.focus$/.test(path)) {
       const itemPath = path.slice(0, path.lastIndexOf('.'));
       const item = getPath(build, itemPath);
@@ -1753,7 +1756,10 @@ export const SimulatorPage = {
     const order = (b.buffs || []).map((row, i) => [row, i]).sort(([x], [y]) => passive(y) - passive(x));
     const buffs = order.map(([row, i]) => {
       const facts = options.buffs?.[row.key] || {};
-      return `<tr${passive(row) ? ' class="sim-buff-passive"' : ''}><td>${esc(facts.category || '')}</td><td>${esc(row.skill)}</td><td>${number(`buffs.${i}.level`, row.level, [0, facts.max_level || 0])}</td></tr>`;
+      const control = TOGGLE_BUFFS.has(facts.category)
+        ? `<label class="toggle-switch sim-buff-toggle"><input type="checkbox" data-path="buffs.${i}.level" data-on-level="${facts.max_level || 0}" ${row.level > 0 ? 'checked' : ''}><span class="toggle-slider"></span><span class="toggle-label">Lv${row.level || facts.max_level || 0}</span></label>`
+        : number(`buffs.${i}.level`, row.level, [0, facts.max_level || 0]);
+      return `<tr${passive(row) ? ' class="sim-buff-passive"' : ''}><td>${esc(facts.category || '')}</td><td>${esc(row.skill)}</td><td>${control}</td></tr>`;
     }).join('');
     const mastery = b.mastery.map((m, i) => `
       <tr><td>${esc(m.name)}</td><td>${number(`mastery.${i}.level`, m.level, L.limits.mastery_level)}</td>
