@@ -5,7 +5,7 @@ import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, eng
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { rngTable, lineRank } from '../sim/rng-table.js';
 import rngData from '../data/sim-rng.json' with { type: 'json' };
-import { getClassSpriteStyle, POWER_REFERENCES, getPowerTier, formatPower } from '../constants.js';
+import { getClassSpriteStyle, POWER_REFERENCES, getPowerTier, formatPower, powerGaps } from '../constants.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import { dataService } from '../data.js';
@@ -23,7 +23,7 @@ const calc = createRemoteCalculator({ jobMap: options.job_map, onResult: (error)
 const openBuilders = new Set();
 
 // Tabs under the character window, for everything that is not a game window.
-const TABS = [['sets', 'Gear Sets'], ['other', 'Other'], ['stats', 'Full Stats'], ['skills', 'Skills'], ['compare', 'Compare']];
+const TABS = [['sets', 'Gear Sets'], ['other', 'Other'], ['stats', 'Full Stats'], ['skills', 'Skills'], ['gearscore', 'Gearscore'], ['compare', 'Compare']];
 // The game's character window tabs, in its order.
 const VIEWS = [['general', 'General'], ['costume', 'Costume'], ['heraldry', 'Heraldry'], ['card', 'Card'], ['rune', 'Rune']];
 const COSTUME_MODES = [['fashion', 'Costume'], ['engraving', 'Engraving']];
@@ -1040,7 +1040,7 @@ export const SimulatorPage = {
     main.innerHTML = this.renderCharacter();
     const render = {
       sets: () => this.renderSets(), other: () => this.renderOther(),
-      stats: () => this.renderStats(), skills: () => this.renderSkills(), compare: () => this.renderCompare(),
+      stats: () => this.renderStats(), skills: () => this.renderSkills(), gearscore: () => this.renderGearscore(), compare: () => this.renderCompare(),
     }[this.tab] || (() => this.renderSets());
     // A tab still calculating is short; holding its height keeps the page from scrolling up.
     const height = el.offsetHeight;
@@ -1112,6 +1112,45 @@ export const SimulatorPage = {
       <div class="sim-equip">
         <div class="sim-window-wrap">${character ? body : `<div class="sim-window sim-window-${view}">${body}</div>`}${rail}</div>
         ${this.slotEditor()}
+      </div>`;
+  },
+
+  // The site's gearscore for the build: each component against a maxed character of the class.
+  renderGearscore() {
+    const b = this.build;
+    const ref = POWER_REFERENCES.classes[b.second_job];
+    if (!ref) return `<p class="sim-delta-none">No gearscore reference for ${esc(b.second_job)}.</p>`;
+    const unbuffed = calc.calculate(gearscoreBuild(b)).summary;
+    if (!unbuffed.effective_panel) return '<p class="sim-delta-none sim-calculating-panel">Calculating…</p>';
+    const card = powerScoreCard(b);
+    const gaps = powerGaps({ role: b.second_job, build: b, panel: { summary: unbuffed } });
+    const buffed = Number(this.results[this.active]?.summary?.effective_panel) || 0;
+    const buffNote = Math.round(buffed) !== Math.round(unbuffed.effective_panel)
+      ? `<p class="sim-gs-note">With the buffs ticked on the Other tab the power level is ${fmt(buffed)}; the gearscore leaves them out, as a synced character's panel does.</p>` : '';
+    // Next multiple of ten, and the power level it takes.
+    const next = Math.min(100, Math.floor(card.score / 10) * 10 + 10);
+    const target = card.score >= 100 ? 'Maxed character'
+      : `${next - card.score} more to ${next} · about ${formatPower((next / 100) * ref.power - unbuffed.effective_panel)} power level`;
+    const rows = gaps.map((g) => `
+      <div class="sim-gs-row">
+        <span class="sim-gs-label">${esc(g.label)}</span>
+        <span class="sim-gs-you">${esc(g.text)}</span>
+        <span class="sim-gs-max">${esc(g.maxText)}</span>
+        <span class="sim-gs-share">${Math.round(g.share * 100)}%</span>
+        <span class="sim-gs-bar"><span style="width: ${Math.round(g.share * 100)}%"></span></span>
+      </div>`).join('');
+    return `
+      <div class="sim-gearscore">
+        <div class="sim-gs-head">
+          <b style="color: ${card.tier.color}">${card.score}</b>
+          <div><strong>${target}</strong><span>Power level ${card.text} for a maxed ${esc(b.second_job)}</span></div>
+        </div>
+        <div class="sim-gs-rows">
+          <div class="sim-gs-row sim-gs-headrow"><span></span><span class="sim-gs-you">This build</span><span class="sim-gs-max">Maxed</span><span class="sim-gs-share">Of max</span><span></span></div>
+          ${rows}
+        </div>
+        ${buffNote}
+        <p class="sim-gs-note">The maxed character has Lv70 Legend +15 gear with the best potentials, every card Legend, the best plates, runes and engravings, and its own passives. Element and skill flat damage are in the power level, not listed here.</p>
       </div>`;
   },
 

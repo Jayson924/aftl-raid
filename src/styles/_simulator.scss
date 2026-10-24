@@ -262,6 +262,29 @@ $roll-shades: (0: #e0605a, 1: #e39a4f, 2: #d8cf5c, 3: #8fd06a, 4: #3fc47f);
 @media (max-width: 720px) { .sim-fs-grid, .sim-fs-cols { grid-template-columns: minmax(0, 1fr); } }
 
 // Set bonus panels under the General window.
+// Gearscore tab: the build against a maxed character of its class.
+.sim-gearscore { display: flex; flex-direction: column; gap: 1rem; max-width: 640px; }
+.sim-gs-head {
+  display: flex; align-items: center; gap: 1rem;
+  > b { font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+  > div { display: flex; flex-direction: column; gap: 0.2rem; strong { font-size: 1rem; } span { color: $text-muted; font-size: 0.9rem; } }
+}
+.sim-gs-rows { display: flex; flex-direction: column; gap: 0.5rem; }
+.sim-gs-row {
+  display: grid; grid-template-columns: 7rem 5.5rem 5.5rem 3.5rem minmax(0, 1fr); gap: 0.75rem; align-items: center;
+  font-variant-numeric: tabular-nums;
+  &.sim-gs-headrow { font-size: 0.75rem; color: $text-muted; text-transform: uppercase; letter-spacing: 0.04em; }
+}
+.sim-gs-label { color: $text-muted; }
+.sim-gs-you { font-weight: 700; }
+.sim-gs-max { color: $text-muted; }
+.sim-gs-share { color: $primary-color; font-weight: 700; text-align: right; }
+.sim-gs-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; span { display: block; height: 100%; background: linear-gradient(90deg, rgba($primary-color, 0.55), $primary-color); } }
+.sim-gs-note { margin: 0; color: $text-muted; font-size: 0.85rem; }
+@media (max-width: 600px) {
+  .sim-gs-row { grid-template-columns: 5.5rem 1fr 1fr 3rem; .sim-gs-bar { grid-column: 1 / -1; } }
+}
+
 .sim-sets { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.75rem; }
 .sim-set-panel {
   background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
