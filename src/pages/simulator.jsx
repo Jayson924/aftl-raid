@@ -1127,10 +1127,6 @@ export const SimulatorPage = {
     const buffed = Number(this.results[this.active]?.summary?.effective_panel) || 0;
     const buffNote = Math.round(buffed) !== Math.round(unbuffed.effective_panel)
       ? `<p class="sim-gs-note">With the buffs ticked on the Other tab the power level is ${fmt(buffed)}; the gearscore leaves them out, as a synced character's panel does.</p>` : '';
-    // Next multiple of ten, and the power level it takes.
-    const next = Math.min(100, Math.floor(card.score / 10) * 10 + 10);
-    const target = card.score >= 100 ? 'Maxed character'
-      : `${next - card.score} more to ${next} · about ${formatPower((next / 100) * ref.power - unbuffed.effective_panel)} power level`;
     const rows = gaps.map((g) => `
       <div class="sim-gs-row">
         <span class="sim-gs-label">${esc(g.label)}</span>
@@ -1143,7 +1139,7 @@ export const SimulatorPage = {
       <div class="sim-gearscore">
         <div class="sim-gs-head">
           <b style="color: ${card.tier.color}">${card.score}</b>
-          <div><strong>${target}</strong><span>Power level ${card.text} for a maxed ${esc(b.second_job)}</span></div>
+          <div><span>Power level ${card.text} for a maxed ${esc(b.second_job)}</span></div>
         </div>
         <div class="sim-gs-rows">
           <div class="sim-gs-row sim-gs-headrow"><span></span><span class="sim-gs-you">This build</span><span class="sim-gs-max">Maxed</span><span class="sim-gs-share">Of max</span><span></span></div>
