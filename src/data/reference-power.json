@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-23T23:03:12.921Z",
+ "generatedAt": "2026-10-24T00:34:36.220Z",
  "assumptions": {
   "gear": "Lv70 Legend, max enhancement, best suffix and potential roll",
   "accessories": "Lv70 Legend, best stat variant and potential roll",
@@ -31,10 +31,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -92,10 +92,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
     "title": "Ancient ◆ Nightfall",
@@ -153,10 +153,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -214,10 +214,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -275,10 +275,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -336,10 +336,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
     "title": "Ancient ◆ Nightfall",
@@ -397,10 +397,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -458,10 +458,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -501,8 +501,8 @@
    "notes": []
   },
   "Saleana": {
-   "power": 162285,
-   "attack": 38404,
+   "power": 162957,
+   "attack": 35175,
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 23.8,
@@ -532,7 +532,7 @@
      "Ring A",
      "Ring A"
     ],
-    "engravingExtra": "MATK %",
+    "engravingExtra": "Fire Damage %",
     "plates": [
      "Premium Magic (Final damage)",
      "Premium Intellect (Final damage)",
@@ -562,10 +562,10 @@
    "notes": []
   },
   "Elestra": {
-   "power": 157589,
-   "attack": 35836,
+   "power": 159276,
+   "attack": 35175,
    "finalPercent": 53.8,
-   "critPercent": 90,
+   "critPercent": 85.4,
    "critDamagePercent": 23.8,
    "choices": {
     "gear": [
@@ -641,10 +641,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
     "title": "Ancient ◆ Nightfall",
@@ -684,8 +684,8 @@
    "notes": []
   },
   "Majesty": {
-   "power": 159041,
-   "attack": 40865,
+   "power": 164643,
+   "attack": 40105,
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24,
@@ -745,8 +745,8 @@
    "notes": []
   },
   "Guardian": {
-   "power": 131352,
-   "attack": 36872,
+   "power": 136392,
+   "attack": 36204,
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 26.5,
@@ -806,8 +806,8 @@
    "notes": []
   },
   "Crusader": {
-   "power": 105573,
-   "attack": 30790,
+   "power": 109091,
+   "attack": 30321,
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.2,
@@ -867,11 +867,11 @@
    "notes": []
   },
   "Saint": {
-   "power": 135279,
-   "attack": 36705,
+   "power": 140098,
+   "attack": 36039,
    "finalPercent": 53.8,
-   "critPercent": 90,
-   "critDamagePercent": 23.9,
+   "critPercent": 89.3,
+   "critDamagePercent": 23.8,
    "choices": {
     "gear": [
      "Black Dragon Savior Galero +15 Iron Wall II",
@@ -928,11 +928,11 @@
    "notes": []
   },
   "Inquisitor": {
-   "power": 135626,
-   "attack": 36705,
+   "power": 140464,
+   "attack": 36039,
    "finalPercent": 53.8,
-   "critPercent": 90,
-   "critDamagePercent": 23.9,
+   "critPercent": 89.3,
+   "critDamagePercent": 23.8,
    "choices": {
     "gear": [
      "Black Dragon Savior Galero +15 Iron Wall II",
@@ -1007,10 +1007,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -1068,10 +1068,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -1111,11 +1111,11 @@
    "notes": []
   },
   "Adept": {
-   "power": 133915,
-   "attack": 33011,
+   "power": 138638,
+   "attack": 32405,
    "finalPercent": 53.8,
    "critPercent": 90,
-   "critDamagePercent": 24.1,
+   "critDamagePercent": 24,
    "choices": {
     "gear": [
      "Black Dragon Transformer Beret +15 Iron Wall II",
@@ -1172,11 +1172,11 @@
    "notes": []
   },
   "Physician": {
-   "power": 138806,
-   "attack": 33011,
+   "power": 143474,
+   "attack": 32405,
    "finalPercent": 53.8,
    "critPercent": 90,
-   "critDamagePercent": 24.1,
+   "critDamagePercent": 24,
    "choices": {
     "gear": [
      "Black Dragon Transformer Beret +15 Iron Wall II",
@@ -1233,11 +1233,11 @@
    "notes": []
   },
   "Dark Summoner": {
-   "power": 128691,
-   "attack": 33685,
+   "power": 133686,
+   "attack": 33078,
    "finalPercent": 55.9,
-   "critPercent": 90,
-   "critDamagePercent": 23.7,
+   "critPercent": 89.9,
+   "critDamagePercent": 23.6,
    "choices": {
     "gear": [
      "Black Dragon Spiritualist Orni +15 Iron Wall II",
@@ -1294,11 +1294,11 @@
    "notes": []
   },
   "Soul Eater": {
-   "power": 128652,
-   "attack": 33685,
+   "power": 133645,
+   "attack": 33078,
    "finalPercent": 55.9,
-   "critPercent": 90,
-   "critDamagePercent": 23.7,
+   "critPercent": 89.9,
+   "critDamagePercent": 23.6,
    "choices": {
     "gear": [
      "Black Dragon Spiritualist Orni +15 Iron Wall II",
@@ -1373,10 +1373,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -1434,10 +1434,10 @@
     "potentials": [
      "PATK 5.75%",
      "MATK 5.75%",
-     "Crit 17%",
      "STR 4.5%",
      "AGI 4.5%",
-     "INT 3.5%"
+     "INT 3.5%",
+     "VIT 3.25%"
     ],
     "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
     "title": "Radiant ◆ Nightmare",
@@ -1477,8 +1477,8 @@
    "notes": []
   },
   "Ripper": {
-   "power": 163923,
-   "attack": 37092,
+   "power": 169210,
+   "attack": 36382,
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.7,
@@ -1538,8 +1538,8 @@
    "notes": []
   },
   "Raven": {
-   "power": 164312,
-   "attack": 37092,
+   "power": 169619,
+   "attack": 36382,
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.7,
@@ -1599,8 +1599,8 @@
    "notes": []
   },
   "Light Fury": {
-   "power": 161345,
-   "attack": 36853,
+   "power": 166529,
+   "attack": 36149,
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.5,
@@ -1660,8 +1660,8 @@
    "notes": []
   },
   "Abyss Walker": {
-   "power": 161934,
-   "attack": 36853,
+   "power": 167148,
+   "attack": 36149,
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.5,
@@ -1721,11 +1721,11 @@
    "notes": []
   },
   "Dark Avenger": {
-   "power": 143136,
-   "attack": 36249,
+   "power": 149355,
+   "attack": 34934,
    "finalPercent": 53.8,
-   "critPercent": 90,
-   "critDamagePercent": 26.9,
+   "critPercent": 83.7,
+   "critDamagePercent": 26.8,
    "choices": {
     "gear": [
      "Black Dragon Annihilator Helmet +15 Iron Wall II",
@@ -1782,8 +1782,8 @@
    "notes": []
   },
   "Silver Hunter": {
-   "power": 135380,
-   "attack": 37294,
+   "power": 140414,
+   "attack": 36665,
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.3,
@@ -1798,10 +1798,10 @@
      "Black Dragon Tracker Quiver +15 Iron Wall II"
     ],
     "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "Crit 17%",
-     "STR 4.5%",
+     "Fire attack 8%",
+     "Light attack 8%",
+     "PATK 2.88%",
+     "MATK 2.88%",
      "AGI 4.5%",
      "INT 3.5%"
     ],

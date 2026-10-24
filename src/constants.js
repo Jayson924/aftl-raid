@@ -135,11 +135,11 @@ export const CLASSES = [
   'Abyss Walker'
 ];
 
-// Damage amplification sources - each source only counts once even if multiple classes provide it
+// Damage-taken debuffs at max level, from the 2026-10-14 client skill tables; each source counts once
 // This prevents stacking (e.g., Gladiator + Moon Lord don't stack Swordmaster amp)
 export const DAMAGE_AMP_SOURCES = {
   paladin: {
-    name: 'Armor Break',
+    name: 'Armour Break',
     physical: 20,
     magic: 20,
     classes: ['Guardian', 'Crusader']
@@ -181,16 +181,10 @@ export const DAMAGE_AMP_SOURCES = {
     classes: ['Tempest']
   },
   windwalker: {
-    name: 'Blooming Kick',
+    name: 'Blooming Kick EX',
     physical: 30,
     magic: 0,
     classes: ['Wind Walker']
-  },
-  moonlord: {
-    name: 'Cyclone Slash EX',
-    physical: 0,
-    magic: 30,
-    classes: ['Moon Lord']
   },
   physicianBoth: {
     name: 'Disease EX',
@@ -205,13 +199,13 @@ export const DAMAGE_AMP_SOURCES = {
     classes: ['Dark Summoner', 'Soul Eater']
   },
   destroyer: {
-    name: 'Flying Swing',
+    name: 'Flying Swing EX',
     physical: 20,
     magic: 20,
     classes: ['Destroyer']
   },
   avenger: {
-    name: 'Dark Stinger',
+    name: '[Nightmare] Dark Stinger',
     physical: 20,
     magic: 20,
     classes: ['Dark Avenger']
@@ -229,7 +223,7 @@ export const DAMAGE_AMP_SOURCES = {
     classes: ['Light Fury']
   },
   elestra: {
-    name: 'Icy Shards',
+    name: 'Icy Shards EX',
     physical: 20,
     magic: 20,
     classes: ['Elestra']

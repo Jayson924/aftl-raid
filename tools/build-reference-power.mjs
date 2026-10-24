@@ -267,13 +267,21 @@ export function referenceBuild(secondJob) {
   chooseEnhancementPlates(build);
   chooseFellowshipPlates(build);
   chooseRunes(build);
-  // Earlier picks were made before the plates and runes existed; one more pass settles them.
-  for (const item of build.equipment) {
-    const found = equipmentEntry(jobs, item.name);
-    if (found) pickBest(build, Object.keys(found.entry.suffix || {}), (b, suffix) => { b.equipment.find((e) => e.slot === item.slot).suffix = suffix; });
+  // Earlier picks were made before the plates and runes existed; two more passes settle them.
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const item of build.equipment) {
+      const found = equipmentEntry(jobs, item.name);
+      if (!found) continue;
+      pickBest(build, Object.keys(found.entry.suffix || {}), (b, suffix) => { b.equipment.find((e) => e.slot === item.slot).suffix = suffix; });
+      pickBest(build, potentialRolls('legend', item.name.split(' ').at(-1)), (b, keys) => { b.equipment.find((e) => e.slot === item.slot).enchants = [...keys]; });
+    }
+    for (const item of build.jewelry) {
+      pickBest(build, Object.values(tables.jewelry.variant_labels), (b, variant) => { b.jewelry.find((j) => j.slot === item.slot).variant = variant; });
+      pickBest(build, potentialRolls('legend', JEWELRY_NOUN[item.slot]), (b, keys) => { b.jewelry.find((j) => j.slot === item.slot).enchants = [...keys]; });
+    }
+    pickBest(build, L.titles, (b, title) => { b.title = title; });
+    chooseEngravings(build);
   }
-  for (const item of build.jewelry) pickBest(build, Object.values(tables.jewelry.variant_labels), (b, variant) => { b.jewelry.find((j) => j.slot === item.slot).variant = variant; });
-  pickBest(build, L.titles, (b, title) => { b.title = title; });
   const result = calc.calculate(build, { summaryOnly: true }).summary;
   return { build, log, power: result.effective_panel, summary: result, choices: summarize(build) };
 }
