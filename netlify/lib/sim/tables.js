@@ -8,7 +8,7 @@ export const TABLE_NAMES = ['equipment', 'jewelry', 'sets', 'potentials', 'heral
   'attribute_order', 'conversion', 'lists', 'defaults', 'buffs'];
 
 // Deployed functions are bundled, so the data dir is found rather than assumed.
-function dataDir() {
+export function dataDir() {
   const candidates = [];
   try { candidates.push(fileURLToPath(new URL('../../data/sim/', import.meta.url))); } catch (e) { /* no module url */ }
   for (const root of [process.env.LAMBDA_TASK_ROOT, process.cwd()]) if (root) candidates.push(path.join(root, 'netlify', 'data', 'sim'));

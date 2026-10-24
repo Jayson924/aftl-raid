@@ -521,8 +521,7 @@ export const LineupsPage = {
               `;
             }
 
-            // Check pilot status for this player (only for non-guest)
-            const pilotName = !isPub && lineup.pilotPlayers && lineup.pilotPlayers[idx] ? lineup.pilotPlayers[idx] : '';
+            const pilotName = lineup.pilotPlayers?.[idx] || '';
             const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
 
             return `

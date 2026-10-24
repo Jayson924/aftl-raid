@@ -45,6 +45,11 @@ export const LineupEditorPage = {
   pendingDeleteId: null, // Track lineup being deleted by current user to skip self-notification
   pendingUpdateIds: new Set(), // Track lineup IDs being updated by current user (or bot at user's request) to skip self-notification
   flatpickrInstance: null, // Flatpickr date/time picker instance
+  moveMode: false,
+  moveRaidType: 'BDN Classic',
+  moveWeek: 'current',
+  moveDrafts: new Map(), // lineup id → { players, ticketPlayers, pilotPlayers } not yet saved
+  moveDrag: null, // { lineupId, idx } while a board character is being dragged
 
   async render(container) {
     const isAdmin = dataService.isAdmin();
@@ -74,15 +79,42 @@ export const LineupEditorPage = {
     this.timeFilterFrom = null;
     this.timeFilterTo = null;
     this.viewingUsers = [];
+    this.moveMode = false;
+    this.moveDrafts = new Map();
+    this.moveDrag = null;
 
     container.innerHTML = `
       <div class="lineup-editor-page">
         <div class="page-header">
           <h1>Lineup Editor</h1>
+          ${canEdit ? `<button id="move-mode-btn" class="btn btn-secondary move-mode-btn" data-tooltip-fixed="Move characters between saved lineups">Move Mode</button>` : ''}
         </div>
 
         <div class="editor-container">
           <div class="editor-main">
+            ${canEdit ? `<div class="move-board" id="move-board" hidden>
+              <div class="move-board-header">
+                <div class="move-board-filters">
+                  <select id="move-raid-type" aria-label="Raid type">
+                    <option value="BDN Classic">BDN Classic</option>
+                    <option value="DDN Hardcore">DDN Hardcore</option>
+                    <option value="DDN Classic">DDN Classic</option>
+                    <option value="Unspecified">Unspecified</option>
+                  </select>
+                  <div class="move-week-switch" role="group" aria-label="Week">
+                    <button type="button" class="move-week-btn active" data-week="current">This Week</button>
+                    <button type="button" class="move-week-btn" data-week="next">Next Week</button>
+                  </div>
+                </div>
+                <div class="move-board-actions">
+                  <button id="move-discard-btn" class="btn btn-danger-ghost" disabled>Discard</button>
+                  <button id="move-save-btn" class="btn btn-primary" disabled>Save Changes</button>
+                </div>
+              </div>
+              <p class="move-board-hint">Drag characters between lineups, or drag from the list to add. Drop a character outside the lineups to take them out. Cleared lineups are locked.</p>
+              <div class="move-board-grid" id="move-board-grid"></div>
+              <div class="move-drop-hint" aria-hidden="true">Drop outside a lineup to remove</div>
+            </div>` : ''}
             <div class="lineup-slots">
               <div class="lineup-info">
                 <div class="lineup-info-row">
@@ -482,6 +514,8 @@ Raid clear status still resets weekly.">
       this.showScanLineupModal();
     });
 
+    this.setupMoveMode();
+
     // Mobile tap-to-toggle for damage amp tooltips
     document.querySelectorAll('.damage-amp-value-wrapper').forEach(wrapper => {
       wrapper.addEventListener('click', (e) => {
@@ -542,6 +576,7 @@ Raid clear status still resets weekly.">
     try {
       // Refresh lineups from the server
       this.allLineups = await dataService.getLineups();
+      if (this.moveMode) this.refreshMoveView();
 
       // Filter lineups by current raid type and selected tabs
       const lineups = this.allLineups.filter(lineup => {
@@ -838,14 +873,14 @@ Raid clear status still resets weekly.">
       </div>
     `;
 
-    const showAvailability = shouldShowAvailabilityForRaid(this.currentLineup.raidType);
+    const showAvailability = shouldShowAvailabilityForRaid(this.activeRaidType());
     const viewerTz = getBrowserTimezone();
 
     const playerCards = filteredPlayers.map(player => {
-      const isInLineup = this.currentLineup.players.includes(player.name);
+      const isInLineup = !this.moveMode && this.currentLineup.players.includes(player.name);
       // Check completion status based on CURRENT lineup's raid type
       // In Next Week mode, treat all players as needing the raid (ignore current completion status)
-      const needsThisRaid = this.currentLineup.isNextWeek ? true : dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+      const needsThisRaid = this.activeIsNextWeek() ? true : dataService.playerNeedsRaid(player, this.activeRaidType());
 
       // Owner's availability — only when the raid type calls for it.
       const owner = showAvailability && player.discordId ? this._userMap?.[player.discordId] : null;
@@ -858,24 +893,13 @@ Raid clear status still resets weekly.">
       const availBadge = availText ? `<span class="player-card-availability" data-tooltip-fixed="When this player is typically online (your timezone)">🕒 ${availText}</span>` : '';
 
       // Check if player has already used their ticket this week
-      const ticketUsed = this.currentLineup.isNextWeek ? false : dataService.playerTicketUsed(player, this.currentLineup.raidType);
+      const ticketUsed = this.activeIsNextWeek() ? false : dataService.playerTicketUsed(player, this.activeRaidType());
 
       // Check if player is in another lineup (not the current one)
       // Don't show this in Next Week mode since current week assignments aren't relevant
       let presentInLineup = null;
-      if (!this.currentLineup.isNextWeek && this.allLineups && this.allLineups.length > 0) {
-        const otherLineup = this.allLineups.find(lineup => {
-          // Skip the current lineup being edited (by ID if available, otherwise skip none)
-          if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
-          // Only check lineups of the same raid type
-          const lineupRaidType = lineup.raidType || 'Unspecified';
-          if (lineupRaidType !== this.currentLineup.raidType) return false;
-          // Check if player is in this lineup
-          return lineup.players && lineup.players.includes(player.name);
-        });
-        if (otherLineup) {
-          presentInLineup = otherLineup.name;
-        }
+      if (this.moveMode || !this.activeIsNextWeek()) {
+        presentInLineup = this.findOtherLineupWith(player.name)?.name || null;
       }
 
       // Ticket used badge
@@ -901,7 +925,7 @@ Raid clear status still resets weekly.">
              draggable="true">
           ${altBadge}
           ${ticketBadge}
-          ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
+          ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.activeRaidType()} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
             <div class="player-name-row">
@@ -948,7 +972,7 @@ Raid clear status still resets weekly.">
 
   getTimeFilterStatus(player) {
     const active = this.timeFilterFrom != null && this.timeFilterTo != null
-      && shouldShowAvailabilityForRaid(this.currentLineup.raidType);
+      && shouldShowAvailabilityForRaid(this.activeRaidType());
     if (!active) return { active: false, hasPref: false, match: true };
 
     const owner = player.discordId && this._userMap ? this._userMap[player.discordId] : null;
@@ -991,24 +1015,15 @@ Raid clear status still resets weekly.">
         // Hide cleared filter - only hide if checkbox is checked
         // In Next Week mode, don't hide anyone regardless of cleared status
         let matchesCompletion = true;
-        if (hideCleared && !this.currentLineup.isNextWeek) {
+        if (hideCleared && !this.activeIsNextWeek()) {
           // Only show players who need this raid (hide those who already completed)
-          matchesCompletion = dataService.playerNeedsRaid(player, this.currentLineup.raidType);
+          matchesCompletion = dataService.playerNeedsRaid(player, this.activeRaidType());
         }
 
         // Hide in lineup filter - hide players who are in another lineup of the same raid type
         let matchesNotInLineup = true;
-        if (hideInLineup && !this.currentLineup.isNextWeek && this.allLineups && this.allLineups.length > 0) {
-          const inOtherLineup = this.allLineups.some(lineup => {
-            // Skip the current lineup being edited (by ID if available)
-            if (this.currentLineup.id && lineup.id === this.currentLineup.id) return false;
-            // Only check lineups of the same raid type
-            const lineupRaidType = lineup.raidType || 'Unspecified';
-            if (lineupRaidType !== this.currentLineup.raidType) return false;
-            // Check if player is in this lineup
-            return lineup.players && lineup.players.includes(player.name);
-          });
-          matchesNotInLineup = !inOtherLineup;
+        if (hideInLineup && (this.moveMode || !this.activeIsNextWeek())) {
+          matchesNotInLineup = !this.findOtherLineupWith(player.name);
         }
 
         // Time-of-day filter: hide players whose saved preference is out of range.
@@ -1038,6 +1053,29 @@ Raid clear status still resets weekly.">
 
         return a.name.localeCompare(b.name);
       });
+  },
+
+  activeRaidType() {
+    return this.moveMode ? this.moveRaidType : this.currentLineup.raidType;
+  },
+
+  activeIsNextWeek() {
+    return this.moveMode ? this.moveWeek === 'next' : this.currentLineup.isNextWeek;
+  },
+
+  // allLineups with unsaved move-mode edits applied.
+  effectiveLineups() {
+    return (this.allLineups || []).map(l => this.moveDrafts.has(l.id) ? { ...l, ...this.moveDrafts.get(l.id) } : l);
+  },
+
+  // Same-raid lineup, other than the one open in the editor, that already has this character.
+  findOtherLineupWith(name) {
+    const raidType = this.activeRaidType();
+    return this.effectiveLineups().find(l => {
+      if (!this.moveMode && this.currentLineup.id && l.id === this.currentLineup.id) return false;
+      if (this.moveMode && !!l.isNextWeek !== this.activeIsNextWeek()) return false;
+      return (l.raidType || 'Unspecified') === raidType && l.players?.includes(name);
+    });
   },
 
   isPlayerExcluded(player) {
@@ -2062,6 +2100,9 @@ Raid clear status still resets weekly.">
   showPilotModal(slotIndex) {
     const playerName = this.currentLineup.players[slotIndex];
     const currentPilot = this.currentLineup.pilotSlots[slotIndex] || '';
+    const isGuest = playerName.startsWith('[PUB]');
+    const [guestName, guestRole] = isGuest ? playerName.substring(5).split('|') : [];
+    const characterLabel = isGuest ? (guestName || guestRole || 'Guest') : playerName;
 
     const escapeHtml = (str) => String(str)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -2098,8 +2139,8 @@ Raid clear status still resets weekly.">
 
     modalElement.innerHTML = `
       <div class="modal-content pilot-modal">
-        <h2>Set Pilot for ${escapeHtml(playerName)}</h2>
-        <p class="pilot-modal-desc">Who will use this character?</p>
+        <h2>Set Pilot for ${escapeHtml(characterLabel)}</h2>
+        <p class="pilot-modal-desc">${isGuest ? 'Which guildmate is playing this guest character? They get pinged and count for gold shares.' : 'Who will use this character?'}</p>
         <form id="pilot-form">
           <div class="form-group">
             <input type="text" id="pilot-name-input" placeholder="Search or type a name..." value="${escapeHtml(currentPilot)}" autocomplete="off">
@@ -2175,13 +2216,26 @@ Raid clear status still resets weekly.">
 
     // If no name provided, display the class name as the name
     const displayName = name || role || 'Guest';
+    const pilotName = this.currentLineup.pilotSlots[slotIndex] || '';
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
     slotContent.innerHTML = `
       <div class="assigned-player pub-player">
         <div class="player-name"><span class="pub-name-edit" title="Click to rename">${displayName}</span> <span class="pub-badge">GUEST</span></div>
+        ${pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${esc(pilotName)}</span>` : ''}
         ${role ? `<div class="player-role">${role}</div>` : `<div class="player-role no-class">Click to set class</div>`}
       </div>
+      <div class="slot-toggles">
+        <button class="pilot-btn ${pilotName ? 'active' : ''}" data-slot="${slotIndex}" title="${pilotName ? `Piloted by: ${esc(pilotName)}` : 'Tag the guildmate playing this character'}">
+          <img src="/icons/headphones.svg" alt="Pilot" class="pilot-icon">
+        </button>
+      </div>
     `;
+
+    slotContent.querySelector('.pilot-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showPilotModal(slotIndex);
+    });
 
     // Click on guest name to edit it
     const nameEl = slotContent.querySelector('.pub-name-edit');
@@ -2196,7 +2250,7 @@ Raid clear status still resets weekly.">
     // If no class set, clicking the slot opens class picker instead of player selector
     if (!role) {
       const classClickHandler = (e) => {
-        if (e.target.closest('.slot-remove-btn')) return;
+        if (e.target.closest('.slot-remove-btn, .pilot-btn')) return;
         e.stopImmediatePropagation();
         this.showGuestClassPicker(slotIndex, name);
       };
@@ -2931,6 +2985,7 @@ Raid clear status still resets weekly.">
 
     playerCards.forEach(card => {
       card.addEventListener('dragstart', (e) => {
+        this.moveDrag = null;
         e.dataTransfer.effectAllowed = 'copy';
         e.dataTransfer.setData('text/plain', card.dataset.playerName);
         card.classList.add('dragging');
@@ -2941,6 +2996,7 @@ Raid clear status still resets weekly.">
       });
 
       card.addEventListener('dblclick', (e) => {
+        if (this.moveMode) return;
         const playerName = card.dataset.playerName;
 
         // Check if player is already in a slot
@@ -3074,6 +3130,263 @@ Raid clear status still resets weekly.">
         }
       });
     });
+  },
+
+  setupMoveMode() {
+    const toggleBtn = document.getElementById('move-mode-btn');
+    if (!toggleBtn) return;
+    toggleBtn.addEventListener('click', () => this.toggleMoveMode());
+
+    document.getElementById('move-raid-type').addEventListener('change', (e) => {
+      this.moveRaidType = e.target.value;
+      this.refreshMoveView();
+    });
+    document.querySelectorAll('.move-week-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.moveWeek = btn.dataset.week;
+        this.syncMoveWeekButtons();
+        this.refreshMoveView();
+      });
+    });
+    document.getElementById('move-save-btn').addEventListener('click', () => this.saveMoveChanges());
+    document.getElementById('move-discard-btn').addEventListener('click', () => {
+      this.moveDrafts.clear();
+      this.refreshMoveView();
+    });
+
+    // Dropping a board character anywhere outside a lineup card takes it out; Escape still cancels.
+    document.removeEventListener('dragover', this._moveDocDragover);
+    document.removeEventListener('drop', this._moveDocDrop);
+    this._moveDocDragover = (e) => {
+      if (!this.moveMode || !this.moveDrag || e.target.closest?.('.mini-lineup-card')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    };
+    this._moveDocDrop = (e) => {
+      if (!this.moveMode || !this.moveDrag || e.target.closest?.('.mini-lineup-card')) return;
+      e.preventDefault();
+      const { lineupId, idx } = this.moveDrag;
+      this.moveDrag = null;
+      this.setMoveSlot(lineupId, idx, null);
+      this.refreshMoveView();
+    };
+    document.addEventListener('dragover', this._moveDocDragover);
+    document.addEventListener('drop', this._moveDocDrop);
+  },
+
+  setMoveDragging(active) {
+    document.querySelector('.lineup-editor-page')?.classList.toggle('move-dragging', active);
+  },
+
+  async toggleMoveMode() {
+    if (this.moveMode && this.moveDrafts.size) {
+      const discard = await modal.confirm(
+        `You have unsaved moves in ${this.moveDrafts.size} lineup${this.moveDrafts.size > 1 ? 's' : ''}. Discard them?`,
+        { title: 'Leave Move Mode', confirmText: 'Discard', cancelText: 'Keep Editing', danger: true }
+      );
+      if (!discard) return;
+    }
+    this.moveMode = !this.moveMode;
+    this.moveDrafts.clear();
+    if (this.moveMode) {
+      this.moveRaidType = this.currentLineup.raidType;
+      this.moveWeek = this.currentLineup.isNextWeek ? 'next' : 'current';
+      document.getElementById('move-raid-type').value = this.moveRaidType;
+      this.syncMoveWeekButtons();
+    }
+    document.querySelector('.lineup-editor-page').classList.toggle('is-moving', this.moveMode);
+    document.getElementById('move-board').hidden = !this.moveMode;
+    const toggleBtn = document.getElementById('move-mode-btn');
+    toggleBtn.textContent = this.moveMode ? 'Exit Move Mode' : 'Move Mode';
+    toggleBtn.classList.toggle('active', this.moveMode);
+    this.refreshMoveView();
+  },
+
+  syncMoveWeekButtons() {
+    document.querySelectorAll('.move-week-btn').forEach(b => b.classList.toggle('active', b.dataset.week === this.moveWeek));
+  },
+
+  refreshMoveView() {
+    // A re-render removes the dragged card before its dragend can fire.
+    this.setMoveDragging(false);
+    if (this.moveMode) {
+      this.pruneMoveDrafts();
+      this.renderMoveBoard();
+    }
+    this.renderAvailablePlayers();
+  },
+
+  getMoveBoardLineups() {
+    const nextWeek = this.moveWeek === 'next';
+    return this.effectiveLineups()
+      .filter(l => (l.raidType || 'Unspecified') === this.moveRaidType && !!l.isNextWeek === nextWeek)
+      .sort((a, b) => a.completed === b.completed ? a.name.localeCompare(b.name) : (a.completed ? 1 : -1));
+  },
+
+  renderMoveBoard() {
+    const grid = document.getElementById('move-board-grid');
+    if (!grid) return;
+
+    const dirtyCount = this.moveDrafts.size;
+    const saveBtn = document.getElementById('move-save-btn');
+    saveBtn.disabled = !dirtyCount;
+    saveBtn.textContent = dirtyCount ? `Save Changes (${dirtyCount})` : 'Save Changes';
+    document.getElementById('move-discard-btn').disabled = !dirtyCount;
+
+    const lineups = this.getMoveBoardLineups();
+    if (!lineups.length) {
+      grid.innerHTML = `<div class="empty-state">No ${this.moveRaidType} lineups ${this.moveWeek === 'next' ? 'for next week' : 'this week'}</div>`;
+      return;
+    }
+
+    const playerMap = new Map(this.players.map(p => [p.name, p]));
+    grid.innerHTML = lineups.map(l => renderMiniLineupCard(l, playerMap)).join('');
+
+    grid.querySelectorAll('.mini-lineup-card').forEach(card => {
+      const lineup = lineups.find(l => l.id === card.dataset.lineupId);
+      const locked = !!lineup.completed;
+      const size = getLineupSize(lineup.raidType);
+      const filled = lineup.players.slice(0, size).filter(Boolean).length;
+      card.classList.toggle('locked', locked);
+      card.classList.toggle('dirty', this.moveDrafts.has(lineup.id));
+      card.querySelector('.mini-lineup-header-actions')
+        ?.insertAdjacentHTML('afterbegin', `<span class="move-count ${filled === size ? 'full' : ''}">${filled}/${size}</span>`);
+      if (locked) return;
+      card.querySelectorAll('.mini-player-card').forEach((slot, idx) => {
+        if (lineup.players[idx]) slot.draggable = true;
+        this.bindMoveSlot(slot, lineup.id, idx);
+      });
+    });
+  },
+
+  bindMoveSlot(slot, lineupId, idx) {
+    slot.addEventListener('dragstart', (e) => {
+      this.moveDrag = { lineupId, idx };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.moveEntry(lineupId, idx)?.name || '');
+      slot.classList.add('dragging');
+      this.setMoveDragging(true);
+    });
+    slot.addEventListener('dragend', () => {
+      this.moveDrag = null;
+      slot.classList.remove('dragging');
+      this.setMoveDragging(false);
+    });
+    slot.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = this.moveDrag ? 'move' : 'copy';
+      slot.classList.add('drag-over');
+    });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', (e) => {
+      e.preventDefault();
+      slot.classList.remove('drag-over');
+      // The source card is re-rendered away before its dragend fires, so clear the drag here.
+      const from = this.moveDrag;
+      this.moveDrag = null;
+      const name = e.dataTransfer.getData('text/plain');
+
+      if (from) {
+        this.moveCharacter(from, { lineupId, idx });
+      } else if (name === '[ADD_PUB]') {
+        toast.warning('Add guests from the normal editor.');
+        return;
+      } else if (name) {
+        const existing = this.findOnMoveBoard(name);
+        if (existing?.locked) {
+          toast.warning(`${name} is in ${existing.lineupName}, which is already cleared.`);
+          return;
+        }
+        if (existing) this.moveCharacter(existing, { lineupId, idx });
+        else this.setMoveSlot(lineupId, idx, { name, ticket: false, pilot: '' });
+      }
+      this.refreshMoveView();
+    });
+  },
+
+  findOnMoveBoard(name) {
+    for (const l of this.getMoveBoardLineups()) {
+      const idx = l.players.slice(0, getLineupSize(l.raidType)).indexOf(name);
+      if (idx !== -1) return { lineupId: l.id, idx, locked: !!l.completed, lineupName: l.name };
+    }
+    return null;
+  },
+
+  moveEntry(lineupId, idx) {
+    const lineup = this.effectiveLineups().find(l => l.id === lineupId);
+    const name = lineup?.players[idx];
+    return name ? { name, ticket: !!lineup.ticketPlayers?.[idx], pilot: lineup.pilotPlayers?.[idx] || '' } : null;
+  },
+
+  // Ticket and pilot travel with the character.
+  setMoveSlot(lineupId, idx, entry) {
+    if (!this.moveDrafts.has(lineupId)) {
+      const l = this.allLineups.find(x => x.id === lineupId);
+      this.moveDrafts.set(lineupId, { players: [...l.players], ticketPlayers: [...l.ticketPlayers], pilotPlayers: [...l.pilotPlayers] });
+    }
+    const draft = this.moveDrafts.get(lineupId);
+    draft.players[idx] = entry?.name || '';
+    draft.ticketPlayers[idx] = entry?.ticket || false;
+    draft.pilotPlayers[idx] = entry?.pilot || '';
+  },
+
+  // Swaps when the target slot is taken.
+  moveCharacter(from, to) {
+    if (from.lineupId === to.lineupId && from.idx === to.idx) return;
+    const moving = this.moveEntry(from.lineupId, from.idx);
+    const displaced = this.moveEntry(to.lineupId, to.idx);
+    this.setMoveSlot(to.lineupId, to.idx, moving);
+    this.setMoveSlot(from.lineupId, from.idx, displaced);
+  },
+
+  // Drops drafts that ended up back where they started.
+  pruneMoveDrafts() {
+    for (const [id, draft] of this.moveDrafts) {
+      const l = this.allLineups.find(x => x.id === id);
+      const same = l && ['players', 'ticketPlayers', 'pilotPlayers'].every(k => JSON.stringify(draft[k]) === JSON.stringify(l[k]));
+      if (!l || same) this.moveDrafts.delete(id);
+    }
+  },
+
+  async saveMoveChanges() {
+    if (!dataService.canEditLineups()) {
+      toast.error('You do not have permission to save lineups.');
+      return;
+    }
+    const ids = [...this.moveDrafts.keys()];
+    if (!ids.length) return;
+
+    const saveBtn = document.getElementById('move-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    const results = await Promise.allSettled(ids.map(async (id) => {
+      const lineup = { ...this.allLineups.find(l => l.id === id), ...this.moveDrafts.get(id) };
+      this._markPendingUpdate(id);
+      await dataService.updateLineup({ ...lineup, status: lineup.status || 'ready' });
+      if (lineup.threadId) {
+        dataService.requestDiscordThreadUpdate(id)
+          .catch(err => console.error('[DiscordThread] Update request failed:', err));
+      }
+    }));
+
+    const saved = ids.filter((_, i) => results[i].status === 'fulfilled');
+    const failed = results.filter(r => r.status === 'rejected');
+    saved.forEach(id => this.moveDrafts.delete(id));
+    if (failed.length) {
+      toast.error(`${failed.length} lineup${failed.length > 1 ? 's' : ''} failed to save: ${failed[0].reason?.message || 'unknown error'}`);
+    } else {
+      toast.success(`Saved ${saved.length} lineup${saved.length > 1 ? 's' : ''}!`);
+    }
+
+    await this.loadExistingLineups();
+    // Reload the lineup open in the editor so a later Save there doesn't undo the move.
+    const openId = this.currentLineup.id;
+    if (openId && saved.includes(openId)) {
+      const fresh = this.allLineups.find(l => l.id === openId);
+      if (fresh) this.loadLineup(fresh);
+    }
+    this.refreshMoveView();
   },
 
   /**
@@ -3322,5 +3635,7 @@ Raid clear status still resets weekly.">
       this.lineupSubscription = null;
     }
     this.leaveLineupPresence();
+    document.removeEventListener('dragover', this._moveDocDragover);
+    document.removeEventListener('drop', this._moveDocDrop);
   }
 };

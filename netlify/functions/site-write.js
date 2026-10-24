@@ -110,6 +110,13 @@ async function context(discordId) {
   return ctx;
 }
 
+// Guests are stored as "[PUB]Name|Class" but listed under their name (or class when unnamed).
+function partyMemberName(raw) {
+  if (!String(raw || '').startsWith('[PUB]')) return raw;
+  const [name, role] = raw.slice(5).split('|');
+  return name || role || 'Guest';
+}
+
 // Who may mark a member's gold share: editors, the character's owner, or its pilot
 // (the slot's pilot name matches the caller's display name or username).
 async function shareTarget(ctx, a) {
@@ -125,7 +132,8 @@ async function shareTarget(ctx, a) {
     const rec = await one('loot_records', `id=eq.${enc(parentId)}&select=pilots`);
     pilot = String((rec?.pilots || {})[member] || '');
   } else {
-    const slot = await one('lineup_players', `lineup_id=eq.${enc(parentId)}&player_name=eq.${enc(member)}&select=pilot_name&limit=1`);
+    const slots = await sbGet('lineup_players', `lineup_id=eq.${enc(parentId)}&select=player_name,pilot_name`);
+    const slot = (slots || []).find((s) => partyMemberName(s.player_name) === member);
     pilot = String(slot?.pilot_name || '');
   }
   pilot = pilot.trim().toLowerCase();

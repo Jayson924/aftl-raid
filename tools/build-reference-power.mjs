@@ -1,5 +1,5 @@
 // Per-class maxed reference builds and their power level, for the site's power score.
-// Usage: node tools/build-reference-power.mjs [--verbose]   -> src/data/reference-power.json + reference-builds.json
+// Usage: node tools/build-reference-power.mjs [--verbose]   -> public numbers in src/data, builds for admins in netlify/data
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import { createCalculator, NONE } from '../netlify/lib/sim/calc.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'src/data/reference-power.json');
-const BUILDS_OUT = path.join(ROOT, 'src/data/reference-builds.json');
+const BUILDS_OUT = path.join(ROOT, 'netlify/data/sim/reference-builds.json');
 const VERBOSE = process.argv.includes('--verbose');
 
 const tables = loadTables();
@@ -288,26 +288,25 @@ export function referenceBuild(secondJob) {
 
 function main() {
   const classes = Object.keys(tables.effective_panel).filter((job) => tables.job_map[job]);
-  const out = { generatedAt: new Date().toISOString(), assumptions: ASSUMPTIONS, classes: {} };
-  const builds = {};
+  const out = { generatedAt: new Date().toISOString(), classes: {} };
+  const admin = { assumptions: ASSUMPTIONS, classes: {} };
   for (const job of classes) {
     const started = Date.now();
     const { build, power: p, log, summary, choices } = referenceBuild(job);
-    builds[job] = build;
+    admin.classes[job] = { build, choices };
     out.classes[job] = {
       power: Math.round(p),
       attack: Math.round(Math.max(summary.physical_average, summary.magic_average)),
       finalPercent: Number(summary.final_percent.toFixed(1)),
       critPercent: Number(summary.crit_percent.toFixed(1)),
       critDamagePercent: Number(summary.crit_damage_percent.toFixed(1)),
-      choices,
       notes: log,
     };
     console.log(`${job.padEnd(16)} ${String(Math.round(p)).padStart(7)}  ${((Date.now() - started) / 1000).toFixed(1)}s${log.length ? `  ${log.join('; ')}` : ''}`);
     if (VERBOSE) console.log(JSON.stringify(choices, null, 1));
   }
   fs.writeFileSync(OUT, `${JSON.stringify(out, null, 1)}\n`);
-  fs.writeFileSync(BUILDS_OUT, `${JSON.stringify(builds)}\n`);
+  fs.writeFileSync(BUILDS_OUT, `${JSON.stringify(admin)}\n`);
   console.log(`wrote ${path.relative(ROOT, OUT)} and ${path.relative(ROOT, BUILDS_OUT)}`);
 }
 

@@ -1,16 +1,5 @@
 {
- "generatedAt": "2026-10-24T00:34:36.220Z",
- "assumptions": {
-  "gear": "Lv70 Legend, max enhancement, best suffix and potential roll",
-  "accessories": "Lv70 Legend, best stat variant and potential roll",
-  "cards": "every card Legend, card mastery level 25",
-  "mastery": "Power of Mastery level 10, collection level 42",
-  "costumes": "Lv70 costume tiers, best costume accessories, Legend engravings at the top roll",
-  "heraldry": "11 Lv70 enhancement plates with the best extra, 4 Lv70 fellowship plates at the best tier 3 roll",
-  "runes": "two Lv70 Legend attack runes at rank 5, Lv60 Smelted Rune at the top ratio and coefficient, +10",
-  "buffs": "own passives at max level; no self, party or guild buffs, as in a synced panel",
-  "boss": "crit resist 19000"
- },
+ "generatedAt": "2026-10-24T13:33:06.156Z",
  "classes": {
   "Gladiator": {
    "power": 108718,
@@ -18,59 +7,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 25,
-   "choices": {
-    "gear": [
-     "Black Dragon Destroyer Helmet +15 Iron Wall II",
-     "Black Dragon Destroyer Shirt +15 Iron Wall II",
-     "Black Dragon Destroyer Pants +15 Iron Wall II",
-     "Black Dragon Destroyer Gloves +15 Iron Wall II",
-     "Black Dragon Destroyer Boots +15 Iron Wall II",
-     "Black Dragon Destroyer Sword +15 Destruction II",
-     "Black Dragon Destroyer Gauntlet +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Moonlord": {
@@ -79,59 +15,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.7,
-   "choices": {
-    "gear": [
-     "Black Dragon Destroyer Helmet +15 Iron Wall II",
-     "Black Dragon Destroyer Shirt +15 Iron Wall II",
-     "Black Dragon Destroyer Pants +15 Iron Wall II",
-     "Black Dragon Destroyer Gloves +15 Iron Wall II",
-     "Black Dragon Destroyer Boots +15 Iron Wall II",
-     "Black Dragon Destroyer Sword +15 Destruction II",
-     "Black Dragon Destroyer Gauntlet +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "MATK %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Bear's (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Barbarian": {
@@ -140,59 +23,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.5,
-   "choices": {
-    "gear": [
-     "Black Dragon Crusher Helmet +15 Iron Wall II",
-     "Black Dragon Crusher Shirt +15 Iron Wall II",
-     "Black Dragon Crusher Pants +15 Iron Wall II",
-     "Black Dragon Crusher Gloves +15 Iron Wall II",
-     "Black Dragon Crusher Boots +15 Iron Wall II",
-     "Black Dragon Crusher Axe +15 Destruction II",
-     "Black Dragon Crusher Gauntlet +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "DEF → PATK"
-   },
    "notes": []
   },
   "Destroyer": {
@@ -201,59 +31,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.5,
-   "choices": {
-    "gear": [
-     "Black Dragon Crusher Helmet +15 Iron Wall II",
-     "Black Dragon Crusher Shirt +15 Iron Wall II",
-     "Black Dragon Crusher Pants +15 Iron Wall II",
-     "Black Dragon Crusher Gloves +15 Iron Wall II",
-     "Black Dragon Crusher Boots +15 Iron Wall II",
-     "Black Dragon Crusher Axe +15 Destruction II",
-     "Black Dragon Crusher Gauntlet +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "DEF → PATK"
-   },
    "notes": []
   },
   "Sniper": {
@@ -262,59 +39,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Tracker Headband +15 Iron Wall II",
-     "Black Dragon Tracker One Piece +15 Iron Wall II",
-     "Black Dragon Tracker Leggings +15 Iron Wall II",
-     "Black Dragon Tracker Mittens +15 Iron Wall II",
-     "Black Dragon Tracker Booties +15 Iron Wall II",
-     "Black Dragon Tracker Crossbow +15 Destruction II",
-     "Black Dragon Tracker Quiver +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Bear's (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "AGI",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Artillery": {
@@ -323,59 +47,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.5,
-   "choices": {
-    "gear": [
-     "Black Dragon Tracker Headband +15 Iron Wall II",
-     "Black Dragon Tracker One Piece +15 Iron Wall II",
-     "Black Dragon Tracker Leggings +15 Iron Wall II",
-     "Black Dragon Tracker Mittens +15 Iron Wall II",
-     "Black Dragon Tracker Booties +15 Iron Wall II",
-     "Black Dragon Tracker Crossbow +15 Destruction II",
-     "Black Dragon Tracker Quiver +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "MATK %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Tempest": {
@@ -384,59 +55,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Agitator Headband +15 Iron Wall II",
-     "Black Dragon Agitator One Piece +15 Iron Wall II",
-     "Black Dragon Agitator Leggings +15 Iron Wall II",
-     "Black Dragon Agitator Mittens +15 Iron Wall II",
-     "Black Dragon Agitator Booties +15 Iron Wall II",
-     "Black Dragon Agitator Shortbow +15 Destruction II",
-     "Black Dragon Agitator Quiver +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Bear's (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "AGI",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Wind Walker": {
@@ -445,59 +63,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Agitator Headband +15 Iron Wall II",
-     "Black Dragon Agitator One Piece +15 Iron Wall II",
-     "Black Dragon Agitator Leggings +15 Iron Wall II",
-     "Black Dragon Agitator Mittens +15 Iron Wall II",
-     "Black Dragon Agitator Booties +15 Iron Wall II",
-     "Black Dragon Agitator Shortbow +15 Destruction II",
-     "Black Dragon Agitator Quiver +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Bear's (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "AGI",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Saleana": {
@@ -506,59 +71,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 23.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Terminator Tiara +15 Iron Wall II",
-     "Black Dragon Terminator Robe +15 Iron Wall II",
-     "Black Dragon Terminator Tights +15 Iron Wall II",
-     "Black Dragon Terminator Muffs +15 Iron Wall II",
-     "Black Dragon Terminator Heels +15 Iron Wall II",
-     "Black Dragon Terminator Crystal Ball +15 Destruction II",
-     "Black Dragon Terminator Staff +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Water attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Fire Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "MDEF → MATK"
-   },
    "notes": []
   },
   "Elestra": {
@@ -567,59 +79,6 @@
    "finalPercent": 53.8,
    "critPercent": 85.4,
    "critDamagePercent": 23.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Terminator Tiara +15 Iron Wall II",
-     "Black Dragon Terminator Robe +15 Iron Wall II",
-     "Black Dragon Terminator Tights +15 Iron Wall II",
-     "Black Dragon Terminator Muffs +15 Iron Wall II",
-     "Black Dragon Terminator Heels +15 Iron Wall II",
-     "Black Dragon Terminator Crystal Ball +15 Destruction II",
-     "Black Dragon Terminator Staff +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Water attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Ice Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "MDEF → MATK"
-   },
    "notes": []
   },
   "Smasher": {
@@ -628,59 +87,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.2,
-   "choices": {
-    "gear": [
-     "Black Dragon Contractor Tiara +15 Iron Wall II",
-     "Black Dragon Contractor Robe +15 Iron Wall II",
-     "Black Dragon Contractor Tights +15 Iron Wall II",
-     "Black Dragon Contractor Muffs +15 Iron Wall II",
-     "Black Dragon Contractor Heels +15 Iron Wall II",
-     "Black Dragon Contractor Crystal Ball +15 Destruction II",
-     "Black Dragon Contractor Staff +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "MATK %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Majesty": {
@@ -689,59 +95,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24,
-   "choices": {
-    "gear": [
-     "Black Dragon Contractor Tiara +15 Iron Wall II",
-     "Black Dragon Contractor Robe +15 Iron Wall II",
-     "Black Dragon Contractor Tights +15 Iron Wall II",
-     "Black Dragon Contractor Muffs +15 Iron Wall II",
-     "Black Dragon Contractor Heels +15 Iron Wall II",
-     "Black Dragon Contractor Crystal Ball +15 Destruction II",
-     "Black Dragon Contractor Staff +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Dark attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Dark Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "MDEF → MATK"
-   },
    "notes": []
   },
   "Guardian": {
@@ -750,59 +103,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 26.5,
-   "choices": {
-    "gear": [
-     "Black Dragon Guardian Knight Galero +15 Iron Wall II",
-     "Black Dragon Guardian Knight Armor +15 Iron Wall II",
-     "Black Dragon Guardian Knight Trousers +15 Iron Wall II",
-     "Black Dragon Guardian Knight Cuffs +15 Iron Wall II",
-     "Black Dragon Guardian Knight Shoes +15 Iron Wall II",
-     "Black Dragon Guardian Knight Flail +15 Destruction II",
-     "Black Dragon Guardian Knight Shield +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Light attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Light Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 12, AGI 4, INT 4, VIT 4",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "DEF → PATK"
-   },
    "notes": []
   },
   "Crusader": {
@@ -811,59 +111,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.2,
-   "choices": {
-    "gear": [
-     "Black Dragon Guardian Knight Galero +15 Iron Wall II",
-     "Black Dragon Guardian Knight Armor +15 Iron Wall II",
-     "Black Dragon Guardian Knight Trousers +15 Iron Wall II",
-     "Black Dragon Guardian Knight Cuffs +15 Iron Wall II",
-     "Black Dragon Guardian Knight Shoes +15 Iron Wall II",
-     "Black Dragon Guardian Knight Flail +15 Destruction II",
-     "Black Dragon Guardian Knight Shield +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Light attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Light Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Magic (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Intellect (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 8, MATK 8",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "PATK",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "MDEF → MATK"
-   },
    "notes": []
   },
   "Saint": {
@@ -872,59 +119,6 @@
    "finalPercent": 53.8,
    "critPercent": 89.3,
    "critDamagePercent": 23.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Savior Galero +15 Iron Wall II",
-     "Black Dragon Savior Armor +15 Iron Wall II",
-     "Black Dragon Savior Trousers +15 Iron Wall II",
-     "Black Dragon Savior Cuffs +15 Iron Wall II",
-     "Black Dragon Savior Shoes +15 Iron Wall II",
-     "Black Dragon Savior Wand +15 Destruction II",
-     "Black Dragon Savior Shield +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Light attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Light Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "MDEF → MATK"
-   },
    "notes": []
   },
   "Inquisitor": {
@@ -933,59 +127,6 @@
    "finalPercent": 53.8,
    "critPercent": 89.3,
    "critDamagePercent": 23.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Savior Galero +15 Iron Wall II",
-     "Black Dragon Savior Armor +15 Iron Wall II",
-     "Black Dragon Savior Trousers +15 Iron Wall II",
-     "Black Dragon Savior Cuffs +15 Iron Wall II",
-     "Black Dragon Savior Shoes +15 Iron Wall II",
-     "Black Dragon Savior Wand +15 Destruction II",
-     "Black Dragon Savior Shield +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Light attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Light Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "MDEF → MATK"
-   },
    "notes": []
   },
   "Shooting Star": {
@@ -994,59 +135,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.4,
-   "choices": {
-    "gear": [
-     "Black Dragon Controller Beret +15 Iron Wall II",
-     "Black Dragon Controller Tunic +15 Iron Wall II",
-     "Black Dragon Controller Slacks +15 Iron Wall II",
-     "Black Dragon Controller Cloak +15 Iron Wall II",
-     "Black Dragon Controller Round-toed Shoes +15 Iron Wall II",
-     "Black Dragon Controller Cannon +15 Destruction II",
-     "Black Dragon Controller Threaded loop +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Bear's (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "AGI",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "DEF → PATK"
-   },
    "notes": []
   },
   "Gear Master": {
@@ -1055,59 +143,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.4,
-   "choices": {
-    "gear": [
-     "Black Dragon Controller Beret +15 Iron Wall II",
-     "Black Dragon Controller Tunic +15 Iron Wall II",
-     "Black Dragon Controller Slacks +15 Iron Wall II",
-     "Black Dragon Controller Cloak +15 Iron Wall II",
-     "Black Dragon Controller Round-toed Shoes +15 Iron Wall II",
-     "Black Dragon Controller Cannon +15 Destruction II",
-     "Black Dragon Controller Threaded loop +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Bear's (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "AGI",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "DEF → PATK"
-   },
    "notes": []
   },
   "Adept": {
@@ -1116,59 +151,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24,
-   "choices": {
-    "gear": [
-     "Black Dragon Transformer Beret +15 Iron Wall II",
-     "Black Dragon Transformer Tunic +15 Iron Wall II",
-     "Black Dragon Transformer Slacks +15 Iron Wall II",
-     "Black Dragon Transformer Cloak +15 Iron Wall II",
-     "Black Dragon Transformer Round-toed Shoes +15 Iron Wall II",
-     "Black Dragon Transformer Kabala +15 Destruction II",
-     "Black Dragon Transformer Threaded loop +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Water attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Fire Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Physician": {
@@ -1177,59 +159,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24,
-   "choices": {
-    "gear": [
-     "Black Dragon Transformer Beret +15 Iron Wall II",
-     "Black Dragon Transformer Tunic +15 Iron Wall II",
-     "Black Dragon Transformer Slacks +15 Iron Wall II",
-     "Black Dragon Transformer Cloak +15 Iron Wall II",
-     "Black Dragon Transformer Round-toed Shoes +15 Iron Wall II",
-     "Black Dragon Transformer Kabala +15 Destruction II",
-     "Black Dragon Transformer Threaded loop +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Dark attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Dark Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Dark Summoner": {
@@ -1238,59 +167,6 @@
    "finalPercent": 55.9,
    "critPercent": 89.9,
    "critDamagePercent": 23.6,
-   "choices": {
-    "gear": [
-     "Black Dragon Spiritualist Orni +15 Iron Wall II",
-     "Black Dragon Spiritualist Chori +15 Iron Wall II",
-     "Black Dragon Spiritualist Salwar +15 Iron Wall II",
-     "Black Dragon Spiritualist Rakki +15 Iron Wall II",
-     "Black Dragon Spiritualist Jutti +15 Iron Wall II",
-     "Black Dragon Spiritualist Fan +15 Destruction II",
-     "Black Dragon Spiritualist Charm +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Dark attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Dark Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "MATK",
-     "Final damage",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Soul Eater": {
@@ -1299,59 +175,6 @@
    "finalPercent": 55.9,
    "critPercent": 89.9,
    "critDamagePercent": 23.6,
-   "choices": {
-    "gear": [
-     "Black Dragon Spiritualist Orni +15 Iron Wall II",
-     "Black Dragon Spiritualist Chori +15 Iron Wall II",
-     "Black Dragon Spiritualist Salwar +15 Iron Wall II",
-     "Black Dragon Spiritualist Rakki +15 Iron Wall II",
-     "Black Dragon Spiritualist Jutti +15 Iron Wall II",
-     "Black Dragon Spiritualist Fan +15 Destruction II",
-     "Black Dragon Spiritualist Charm +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Dark attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Dark Damage %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "MATK",
-     "Final damage",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   },
   "Blade Dancer": {
@@ -1360,59 +183,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.3,
-   "choices": {
-    "gear": [
-     "Black Dragon Martial Orni +15 Iron Wall II",
-     "Black Dragon Martial Chori +15 Iron Wall II",
-     "Black Dragon Martial Salwar +15 Iron Wall II",
-     "Black Dragon Martial Rakki +15 Iron Wall II",
-     "Black Dragon Martial Jutti +15 Iron Wall II",
-     "Black Dragon Martial Chakram +15 Destruction II",
-     "Black Dragon Martial Charm +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Spirit Dancer": {
@@ -1421,59 +191,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.3,
-   "choices": {
-    "gear": [
-     "Black Dragon Martial Orni +15 Iron Wall II",
-     "Black Dragon Martial Chori +15 Iron Wall II",
-     "Black Dragon Martial Salwar +15 Iron Wall II",
-     "Black Dragon Martial Rakki +15 Iron Wall II",
-     "Black Dragon Martial Jutti +15 Iron Wall II",
-     "Black Dragon Martial Chakram +15 Destruction II",
-     "Black Dragon Martial Charm +15 Iron Wall II"
-    ],
-    "potentials": [
-     "PATK 5.75%",
-     "MATK 5.75%",
-     "STR 4.5%",
-     "AGI 4.5%",
-     "INT 3.5%",
-     "VIT 3.25%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "PATK %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Ripper": {
@@ -1482,59 +199,6 @@
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.7,
-   "choices": {
-    "gear": [
-     "Black Dragon Soldier of Fortune Mask +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Vest +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Greave +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Grip +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Walker +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Scimitar +15 Destruction II",
-     "Black Dragon Soldier of Fortune Crook +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Water attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Fire Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "PATK",
-     "Final damage",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Raven": {
@@ -1543,59 +207,6 @@
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.7,
-   "choices": {
-    "gear": [
-     "Black Dragon Soldier of Fortune Mask +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Vest +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Greave +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Grip +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Walker +15 Iron Wall II",
-     "Black Dragon Soldier of Fortune Scimitar +15 Destruction II",
-     "Black Dragon Soldier of Fortune Crook +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Dark attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Dark Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "PATK",
-     "Final damage",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Light Fury": {
@@ -1604,59 +215,6 @@
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.5,
-   "choices": {
-    "gear": [
-     "Black Dragon Ying-Yang Master Mask +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Vest +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Greave +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Grip +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Walker +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Dagger +15 Destruction II",
-     "Black Dragon Ying-Yang Master Crook +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Light attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Light Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "PATK",
-     "Final damage",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Abyss Walker": {
@@ -1665,59 +223,6 @@
    "finalPercent": 55.9,
    "critPercent": 90,
    "critDamagePercent": 24.5,
-   "choices": {
-    "gear": [
-     "Black Dragon Ying-Yang Master Mask +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Vest +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Greave +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Grip +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Walker +15 Iron Wall II",
-     "Black Dragon Ying-Yang Master Dagger +15 Destruction II",
-     "Black Dragon Ying-Yang Master Crook +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Dark attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Dark Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 4, AGI 7, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "PATK",
-     "Final damage",
-     "Crit damage"
-    ],
-    "coreRune": "MATK → PATK"
-   },
    "notes": []
   },
   "Dark Avenger": {
@@ -1726,59 +231,6 @@
    "finalPercent": 53.8,
    "critPercent": 83.7,
    "critDamagePercent": 26.8,
-   "choices": {
-    "gear": [
-     "Black Dragon Annihilator Helmet +15 Iron Wall II",
-     "Black Dragon Annihilator Shirt +15 Iron Wall II",
-     "Black Dragon Annihilator Pants +15 Iron Wall II",
-     "Black Dragon Annihilator Gloves +15 Iron Wall II",
-     "Black Dragon Annihilator Boots +15 Iron Wall II",
-     "Black Dragon Annihilator Sword +15 Destruction II",
-     "Black Dragon Annihilator Gauntlet +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Water attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "STR 4.5%",
-     "AGI 4.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (STR/AGI)",
-    "title": "Radiant ◆ Nightmare",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "Fire Damage %",
-    "plates": [
-     "Premium Destruction (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (PATK)",
-     "Premium Wind (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Magic (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 11, MATK 3",
-     "Origin's: HP 4, MP 1 + PATK",
-     "Elevation: STR 7, AGI 4, INT 4, VIT 4 + PATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + PATK"
-    ],
-    "attackRune": [
-     "STR",
-     "PATK",
-     "Crit damage"
-    ],
-    "coreRune": "DEF → PATK"
-   },
    "notes": []
   },
   "Silver Hunter": {
@@ -1787,59 +239,6 @@
    "finalPercent": 53.8,
    "critPercent": 90,
    "critDamagePercent": 24.3,
-   "choices": {
-    "gear": [
-     "Black Dragon Tracker Headband +15 Iron Wall II",
-     "Black Dragon Tracker One Piece +15 Iron Wall II",
-     "Black Dragon Tracker Leggings +15 Iron Wall II",
-     "Black Dragon Tracker Mittens +15 Iron Wall II",
-     "Black Dragon Tracker Booties +15 Iron Wall II",
-     "Black Dragon Tracker Crossbow +15 Destruction II",
-     "Black Dragon Tracker Quiver +15 Iron Wall II"
-    ],
-    "potentials": [
-     "Fire attack 8%",
-     "Light attack 8%",
-     "PATK 2.88%",
-     "MATK 2.88%",
-     "AGI 4.5%",
-     "INT 3.5%"
-    ],
-    "accessories": "Black Dragon Hunter Necklace (AGI/INT)",
-    "title": "Ancient ◆ Nightfall",
-    "costumeAccessories": [
-     "Lucid Hero's Necklace",
-     "Earring A",
-     "Ring A",
-     "Ring A"
-    ],
-    "engravingExtra": "MATK %",
-    "plates": [
-     "Premium Magic (Final damage)",
-     "Premium Intellect (Final damage)",
-     "Premium Limitation (Final damage)",
-     "Premium Ultimate (MATK)",
-     "Premium Wind (Final damage)",
-     "Premium Bear's (Final damage)",
-     "Premium Health (Final damage)",
-     "Premium Restraint (Final damage)",
-     "Premium Dauntless (Final damage)",
-     "Premium Conviction (Final damage)",
-     "Premium Tent of (Final damage)"
-    ],
-    "fellowship": [
-     "Attack: PATK 3, MATK 11",
-     "Origin's: HP 4, MP 4 + MATK",
-     "Elevation: STR 4, AGI 4, INT 7, VIT 4 + MATK",
-     "Resistance: Crit resist 2, Paralyze resist 1, Stun resist 1 + MATK"
-    ],
-    "attackRune": [
-     "INT",
-     "MATK",
-     "Crit damage"
-    ],
-    "coreRune": "PATK → MATK"
-   },
    "notes": []
   }
  }

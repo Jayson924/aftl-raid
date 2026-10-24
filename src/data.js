@@ -638,6 +638,16 @@ class DataService {
     return result;
   }
 
+  // Gearscore reference builds, choices and assumptions (admin only, server-side).
+  async getAdminReferences() {
+    const response = await fetch('/.netlify/functions/admin-reference', {
+      headers: { 'X-Session': this.getSessionToken() || '' },
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not load the references');
+    return result;
+  }
+
   // Delete a user with their characters, cards, raids, lists and lineup slots (admin only, server-side).
   async deleteAppUser(discordId) {
     if (!this.isAdmin()) throw new Error('Only admins can delete users');

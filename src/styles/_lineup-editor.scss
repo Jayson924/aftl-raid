@@ -227,6 +227,151 @@
     }
   }
 
+  .page-header .move-mode-btn.active {
+    background: rgba($primary-color, 0.15);
+    border-color: rgba($primary-color, 0.5);
+    color: $primary-color;
+  }
+
+  &.is-moving {
+    .lineup-slots,
+    .existing-lineups-section {
+      display: none;
+    }
+  }
+
+  .move-board {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    &[hidden] { display: none; }
+
+    .move-board-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .move-board-filters,
+    .move-board-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .move-week-switch {
+      display: inline-flex;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: $border-radius;
+      overflow: hidden;
+    }
+
+    .move-week-btn {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+
+      & + .move-week-btn { border-left: 1px solid rgba(255, 255, 255, 0.12); }
+
+      &.active {
+        background: rgba($primary-color, 0.15);
+        color: $text-light;
+        font-weight: 500;
+      }
+    }
+
+    .move-board-hint {
+      margin: 0.6rem 0 0.75rem;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .move-board-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      // Cards hide overflow, so auto rows would squash them inside the scroll box.
+      grid-auto-rows: max-content;
+      gap: 0.75rem;
+      align-content: start;
+      max-height: calc(100vh - 220px);
+      min-height: 320px;
+      overflow-y: auto;
+      padding: 0.25rem 0.4rem 0.5rem 0.25rem;
+
+      @media (max-width: 700px) { grid-template-columns: minmax(0, 1fr); }
+
+      > .empty-state { grid-column: 1 / -1; }
+    }
+
+    .move-board-grid .mini-lineup-card {
+      min-width: 0;
+      max-width: none;
+      cursor: default;
+
+      &:hover { transform: none; }
+
+      &.dirty {
+        border-color: rgba($primary-color, 0.7);
+        box-shadow: 0 0 0 1px rgba($primary-color, 0.25);
+      }
+
+      &.locked .mini-player-card { cursor: not-allowed; }
+
+      .mini-lineup-raid-type { display: none; }
+
+      .move-count {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.55);
+
+        &.full { color: #4cd16a; }
+      }
+
+      .mini-player-card {
+        transition: border-color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+
+        &[draggable="true"] { cursor: grab; }
+
+        &.dragging { opacity: 0.4; }
+
+        &.drag-over {
+          border-color: $primary-color;
+          background-color: rgba($primary-color, 0.12);
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  .move-drop-hint {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translate(-50%, 0.5rem);
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ffb3b3;
+    background: rgba(30, 12, 12, 0.92);
+    border: 1px dashed rgba($danger-color, 0.8);
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 1000;
+  }
+
+  &.move-dragging .move-drop-hint {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
   .editor-main {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -1653,7 +1798,10 @@
         cursor: grabbing;
       }
     }
+  }
 
+  .existing-lineups-section,
+  .move-board {
     .mini-lineup-card {
       min-width: 280px;
       max-width: 280px;
