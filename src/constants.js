@@ -1,4 +1,5 @@
-import { computeGearScore, fdToPercent as gameFdToPercent, fdForPercent, CRIT_CAP } from './gear-calc.js';
+import { fdToPercent as gameFdToPercent } from './gear-calc.js';
+import referencePower from './data/reference-power.json' with { type: 'json' };
 
 // ─── Class Icon Sprite Sheet ───
 // Sprite: /icons/classes.png (512×1024)
@@ -426,118 +427,103 @@ export const WEAPON_SUFFIXES = [
   { value: 'health', label: 'Health' }
 ];
 
-// Gearscore 0-100: 60% table-derived gear score (gear-calc.js), 40% FD toward the 60% cap.
+// Gearscore 0-100: the simulator power level as a share of a maxed character of the same class
+// (src/data/reference-power.json, from tools/build-reference-power.mjs). Without a panel, attack and FD
+// from the character sheet against the reference's, which ignores crit and element.
 
-const GEAR_WEIGHT = 60;
-const FD_WEIGHT = 40;
-const FD_CAP_PERCENT = 60;
+const SIM_JOB_NAMES = { 'Moon Lord': 'Moonlord' };
+export const POWER_REFERENCES = referencePower;
+// The reference sits at 90% crit; a typical character's crit and element leave it this share of the attack x FD ratio
+// (median real / estimate over the synced roster, 2026-10-23).
+const STATS_ESTIMATE_FACTOR = 0.8;
 
-// Raw FD that reaches the 60% cap at Lv70.
-export const MAX_FD = Math.round(fdForPercent(FD_CAP_PERCENT));
+export function simJobOf(player) {
+  return player.build?.second_job || SIM_JOB_NAMES[player.role] || player.role;
+}
 
-// Game FD curve at Lv70; the old admin breakpoint table was this curve at Lv60.
+export function referencePowerFor(player) {
+  return referencePower.classes[simJobOf(player)]?.power || 0;
+}
+
 export function fdToPercent(rawFd) {
   return gameFdToPercent(rawFd);
 }
 
-// FD as a fraction of the cap, 0–1.
-export function fdToScorePercent(rawFd) {
-  return Math.min(1, fdToPercent(rawFd) / FD_CAP_PERCENT);
-}
-
-export function calculateGearscore(player) {
-  const fd = player.characterStats?.finalDamage || 0;
-  const gear = computeGearScore(player);
-  if (!gear && !fd) return calculateGearscoreLegacy(player);
-
-  const gearScore = GEAR_WEIGHT * Math.min(1, (gear?.score ?? 0) / 100);
-  return Math.round(gearScore + FD_WEIGHT * fdToScorePercent(fd));
-}
-
-// Legacy formula for characters that haven't been updated yet
-function calculateGearscoreLegacy(player) {
-  const weaponRarityPoints = { '': 0, 'epic': 5, 'unique': 15, 'legend': 22 };
-  const armorRarityPoints = { '': 0, 'epic': 4, 'unique': 12, 'legend': 18 };
-  const weaponEnhancePoints = { '': 5, '9': 5, '10': 9, '11': 13, '12': 18, '13': 22, '14': 26, '15': 30 };
-  const armorEnhancePoints = { '': 3, '9': 3, '10': 6, '11': 8, '12': 11, '13': 14, '14': 17, '15': 20 };
-
-  const wr = weaponRarityPoints[player.weapon || ''] || 0;
-  const ar = armorRarityPoints[player.armor || ''] || 0;
-  const we = player.weapon ? (weaponEnhancePoints[player.weaponEnhance || ''] || 5) : 0;
-  const ae = player.armor ? (armorEnhancePoints[player.armorEnhance || ''] || 3) : 0;
-  const suffixCount = [player.suffix1, player.suffix2].filter(s => s && s !== '').length;
-
-  return wr + ar + we + ae + (suffixCount * 5);
-}
-
-export const POWER_CRIT_RATE_CAP = CRIT_CAP;
-// Crit damage multiplier assumed when the sheet doesn't show one (200%).
-const POWER_DEFAULT_CRIT_MULT = 2.0;
-// Raw index that maps to 100 when normalising. Overridden by app_config
-// `power_index_max` (admin page) via setPowerIndexMax().
-export const POWER_INDEX_MAX_DEFAULT = 100000;
-
-let _powerIndexMax = POWER_INDEX_MAX_DEFAULT;
-
-export function setPowerIndexMax(value) {
-  const n = Number(value);
-  if (Number.isFinite(n) && n > 0) _powerIndexMax = n;
-}
-
-export function getPowerIndexMax() {
-  return _powerIndexMax;
-}
-
-// Damage proxy from sheet stats: { raw, score 0–100 }, or null without an attack value.
-// Missing crit/element stats count as no bonus.
-export function calculatePowerIndex(player) {
-  const s = player.characterStats || {};
-  const atk = Math.max(Number(s.attackPower) || 0, Number(s.magicAttack) || 0);
-  if (!atk) return null;
-
-  const fdPct = fdToPercent(Number(s.finalDamage) || 0) / 100;
-
-  let critTerm = 1;
-  const critRate = Number(s.criticalRate);
-  if (critRate > 0) {
-    const rate = Math.min(critRate / 100, POWER_CRIT_RATE_CAP);
-    const critDmg = Number(s.criticalDamage);
-    const mult = critDmg > 0 ? critDmg / 100 : POWER_DEFAULT_CRIT_MULT;
-    critTerm = 1 + rate * (mult - 1);
+export function calculatePowerScore(player) {
+  const ref = referencePower.classes[simJobOf(player)];
+  const reference = ref?.power || 0;
+  const power = Number(player.panel?.summary?.effective_panel) || 0;
+  if (power > 0 && reference > 0) return { score: Math.min(100, Math.round((power / reference) * 100)), source: 'power', power, reference };
+  const stats = player.characterStats || {};
+  const attack = Math.max(Number(stats.attackPower) || 0, Number(stats.magicAttack) || 0);
+  const fdPercent = fdToPercent(Number(stats.finalDamage) || 0);
+  if (attack > 0 && ref?.attack) {
+    const share = (attack * (1 + fdPercent / 100)) / (ref.attack * (1 + ref.finalPercent / 100));
+    return { score: Math.min(100, Math.round(share * STATS_ESTIMATE_FACTOR * 100)), source: 'stats', power: 0, reference, attack, fdPercent };
   }
-
-  const bestElement = Math.max(0, ...['fireAttack', 'iceAttack', 'lightAttack', 'darkAttack'].map(k => Number(s[k]) || 0));
-  const elementTerm = 1 + bestElement / 100;
-
-  const raw = Math.round(atk * (1 + fdPct) * critTerm * elementTerm);
-  const score = Math.min(100, Math.round((raw / _powerIndexMax) * 100));
-  return { raw, score };
+  return { score: 0, source: 'none', power: 0, reference };
 }
 
-// Compact display for raw power values, e.g. 73400 → "73.4k".
-export function formatPowerIndex(raw) {
+export function powerScore(player) {
+  return calculatePowerScore(player).score;
+}
+
+// 73400 -> "73.4k".
+export function formatPower(raw) {
   if (raw >= 1e6) return `${(raw / 1e6).toFixed(2)}M`;
   if (raw >= 1e3) return `${(raw / 1e3).toFixed(1)}k`;
-  return String(raw);
+  return String(Math.round(raw));
 }
 
-// Plain-text tooltip for GS badges: "Gearscore · Power 73.4k (73)".
-export function gearscoreTooltipText(player) {
-  const power = calculatePowerIndex(player);
-  return power ? `Gearscore · Power ${formatPowerIndex(power.raw)} (${power.score})` : 'Gearscore';
+// Each component of the score next to the class reference's: [{ label, value, max, share, text }].
+export function powerGaps(player) {
+  const ref = referencePower.classes[simJobOf(player)];
+  if (!ref) return [];
+  const { source, attack, fdPercent } = calculatePowerScore(player);
+  const pct = (v) => `${Number(v).toFixed(1)}%`;
+  const rows = [];
+  const add = (label, value, max, text, maxText) => rows.push({ label, value, max, share: max > 0 ? Math.min(1, value / max) : 0, text, maxText });
+  if (source === 'power') {
+    const s = player.panel.summary;
+    const atk = Math.max(Number(s.physical_average) || 0, Number(s.magic_average) || 0);
+    add('Attack', atk, ref.attack, formatPower(atk), formatPower(ref.attack));
+    add('Final damage', Number(s.final_percent) || 0, ref.finalPercent, pct(s.final_percent || 0), pct(ref.finalPercent));
+    add('Crit', Number(s.crit_percent) || 0, ref.critPercent, pct(s.crit_percent || 0), pct(ref.critPercent));
+    add('Crit damage', Number(s.crit_damage_percent) || 0, ref.critDamagePercent, pct(s.crit_damage_percent || 0), pct(ref.critDamagePercent));
+  } else if (source === 'stats') {
+    add('Attack', attack, ref.attack, formatPower(attack), formatPower(ref.attack));
+    add('Final damage', fdPercent, ref.finalPercent, pct(fdPercent), pct(ref.finalPercent));
+  }
+  return rows;
 }
 
-// Gearscore tier thresholds and colors
-export const GEARSCORE_TIERS = [
-  { min: 60, label: 'S', color: '#d62d49', bg: 'rgba(214, 45, 73, 0.15)' },
-  { min: 45, label: 'A', color: '#8f5ce0', bg: 'rgba(143, 92, 224, 0.15)' },
+export function powerTooltipText(player) {
+  const { source, power, reference, attack, fdPercent } = calculatePowerScore(player);
+  const gaps = powerGaps(player).map((g) => `${g.label} ${Math.round(g.share * 100)}%`).join(' · ');
+  if (source === 'power') return `Gearscore · power ${formatPower(power)} of ${formatPower(reference)} for a maxed ${simJobOf(player)} · ${gaps} of max`;
+  if (source === 'stats') return `Gearscore estimate from ${attack.toLocaleString()} attack and ${fdPercent.toFixed(1)}% FD, assuming typical crit · ${gaps} of max · sync for the full score`;
+  return 'No gearscore yet · sync the character or add a screenshot';
+}
+
+// Badge for the power score; an estimate is dimmed and prefixed "~", no stats shows a dash.
+export function renderPowerPill(player, className = 'gs-value') {
+  const { score, source } = calculatePowerScore(player);
+  const tier = getPowerTier(score);
+  const est = source !== 'power';
+  const text = source === 'power' ? score : source === 'stats' ? `~${score}` : '–';
+  return `<span class="${className}${est ? ' gs-est' : ''}" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${powerTooltipText(player)}">${text}</span>`;
+}
+
+export const POWER_TIERS = [
+  { min: 50, label: 'S', color: '#d62d49', bg: 'rgba(214, 45, 73, 0.15)' },
+  { min: 40, label: 'A', color: '#8f5ce0', bg: 'rgba(143, 92, 224, 0.15)' },
   { min: 30, label: 'B', color: '#ff9800', bg: 'rgba(255, 152, 0, 0.15)' },
-  { min: 15, label: 'C', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' },
+  { min: 20, label: 'C', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' },
   { min: 0,  label: 'D', color: '#6c757d', bg: 'rgba(108, 117, 125, 0.15)' }
 ];
 
-export function getGearscoreTier(score) {
-  return GEARSCORE_TIERS.find(t => score >= t.min) || GEARSCORE_TIERS[GEARSCORE_TIERS.length - 1];
+export function getPowerTier(score) {
+  return POWER_TIERS.find(t => score >= t.min) || POWER_TIERS[POWER_TIERS.length - 1];
 }
 
 // Format equipment text for display

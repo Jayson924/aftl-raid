@@ -23,7 +23,6 @@ import { ArenaTiebreakerPage } from './arena/arena-tiebreaker.jsx'
 import { ArenaResultsPage } from './arena/arena-results.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
-import { setPowerIndexMax } from './constants.js'
 
 // Initialize the app
 async function initApp() {
@@ -68,12 +67,6 @@ async function initApp() {
     }
   });
 
-  try {
-    const powerMax = await dataService.getAppConfig('power_index_max');
-    if (powerMax) setPowerIndexMax(powerMax);
-  } catch (e) {
-    console.error('Failed to load power index max:', e);
-  }
 
   // Create navigation
   renderNavigation();
@@ -134,7 +127,7 @@ function renderNavigation() {
 
   nav.innerHTML = `
     <div class="nav-container">
-      <h1 class="app-title">AFTL Raid Manager <span class="app-version">v3.0.05</span></h1>
+      <h1 class="app-title">AFTL Raid Manager <span class="app-version">v3.0.06</span></h1>
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>

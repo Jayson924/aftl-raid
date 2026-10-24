@@ -2,7 +2,8 @@
 const ENDPOINT = '/.netlify/functions/simulate';
 const DEBOUNCE_MS = 120;
 const CACHE_MAX = 40;
-const KEEP_BUILDS = 4;
+// Both builds, their party views and their unbuffed gearscore builds.
+const KEEP_BUILDS = 8;
 const EMPTY = Object.freeze({ rows: [], summary: {} });
 const ITEM_FIELDS = ['equipment', 'jewelry', 'engravings', 'glyph_a', 'glyph_s', 'normal_runes', 'talismans'];
 

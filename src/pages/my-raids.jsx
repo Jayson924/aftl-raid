@@ -5,10 +5,8 @@ import {
   getClassSpriteStyle,
   CARDS_PER_PAGE,
   EQUIPMENT_RARITIES,
-  calculateGearscore,
-  getGearscoreTier,
-  gearscoreTooltipText
 } from '../constants.js';
+import { renderPowerBadge, initChipTooltip } from '../chip-tooltip.js';
 import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
 import { syncedLabel } from '../sim/panel.js';
@@ -85,6 +83,7 @@ export const MyRaidsPage = {
 
   async render(container) {
     initFixedTooltip();
+    initChipTooltip();
     this._olderRaidsOpen = new Set();
     if (!dataService.isAuthenticated()) {
       container.innerHTML = '<p>Please log in to view your characters.</p>';
@@ -463,9 +462,7 @@ export const MyRaidsPage = {
   },
 
   renderGearscorePill(player) {
-    const gs = calculateGearscore(player);
-    const tier = getGearscoreTier(gs);
-    return `<span class="mc-gs" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>`;
+    return renderPowerBadge(player, { className: 'mc-gs', gear: false });
   },
 
   canUseCards(player) {

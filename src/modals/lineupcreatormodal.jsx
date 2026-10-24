@@ -9,7 +9,7 @@
 
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { CLASSES, DAMAGE_AMP_SOURCES, calculateGearscore, getGearscoreTier, getLineupSize } from '../constants.js';
+import { CLASSES, DAMAGE_AMP_SOURCES, powerScore, getPowerTier, getLineupSize } from '../constants.js';
 
 // Essential roles that a lineup should always contain
 const TANK_CLASSES = ['Guardian', 'Crusader', 'Destroyer'];
@@ -140,8 +140,8 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
 
     const cards = result.map((entry, idx) => {
       const player = entry.isGuest ? null : playerMap.get(entry.name);
-      const gs = player ? calculateGearscore(player) : 0;
-      const tier = player ? getGearscoreTier(gs) : null;
+      const gs = player ? powerScore(player) : 0;
+      const tier = player ? getPowerTier(gs) : null;
 
       return `
         <div class="preview-slot ${entry.isGuest ? 'preview-guest' : ''}">
@@ -363,7 +363,7 @@ function fillGuestSlotsWithPlayers(result, players, currentLineup, { includeClea
 
       const testRoles = [...currentRoles, candidate.role];
       const ampGain = scoreRoles(testRoles) - currentAmp;
-      const gsBonus = calculateGearscore(candidate) * 0.1;
+      const gsBonus = powerScore(candidate) * 0.1;
       const score = ampGain + gsBonus;
 
       if (score > bestScore) {
@@ -549,7 +549,7 @@ function scoreLineup(lineup, currentLineup) {
   let gearscoreBonus = 0;
   let unclearedBonus = 0;
   for (const player of lineup) {
-    gearscoreBonus += calculateGearscore(player) * 0.1;
+    gearscoreBonus += powerScore(player) * 0.1;
     if (player.discordId && dataService.playerNeedsRaid(player, currentLineup.raidType)) {
       unclearedBonus += 0.5;
     }

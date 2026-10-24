@@ -33,7 +33,10 @@
   color: $text-muted;
 }
 
-// Inline gearscore badge (used across lineup editor, lineups, players)
+// Gear-only power estimate (no synced panel)
+.gs-est { opacity: 0.65; font-style: italic; }
+
+// Inline power badge (used across lineup editor, lineups, players)
 .gs-inline {
   font-size: 0.7em;
   font-weight: 700;

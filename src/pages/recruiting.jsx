@@ -1,5 +1,5 @@
 import { dataService } from '../data.js';
-import { calculateGearscore, getGearscoreTier, getClassSpriteStyle, EQUIPMENT_ICONS, CLASS_FAMILIES, CLASSES } from '../constants.js';
+import { powerScore, getPowerTier, getClassSpriteStyle, EQUIPMENT_ICONS, CLASS_FAMILIES, CLASSES } from '../constants.js';
 import { renderChipTipBody } from '../chip-tooltip.js';
 import { toast } from '../toast.js';
 import { PlayersPage } from './players.jsx';
@@ -128,7 +128,7 @@ export const RecruitingPage = {
         dataService.getLineups().catch(() => []),
       ]);
       const playersWithGs = players.map(p => {
-        p._gearscore = calculateGearscore(p);
+        p._gearscore = powerScore(p);
         return p;
       });
       this._fullPlayers = playersWithGs;
@@ -288,7 +288,7 @@ export const RecruitingPage = {
     }
 
     const gs = player._gearscore || 0;
-    const tier = getGearscoreTier(gs);
+    const tier = getPowerTier(gs);
     const spriteStyle = getClassSpriteStyle(player.role);
     const tipHtml = renderChipTip(player);
     const nameHtml = this.showPlayerNames

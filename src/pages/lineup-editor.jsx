@@ -1,11 +1,11 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, usesTickets } from '../constants.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, ENHANCEMENT_LEVELS, WEAPON_SUFFIXES, CLASS_FAMILIES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, powerScore, getPowerTier, getClassSpriteStyle, getLineupSize, isFourManRaid, usesTickets } from '../constants.js';
 import { renderMiniLineupCard, getEquipmentBackground } from '../mini-carousel.js';
 import { showLineupCreatorModal } from '../modals/lineupcreatormodal.jsx';
 import { modal } from '../modal.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
-import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
+import { renderPowerBadge, initChipTooltip } from '../chip-tooltip.js';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/themes/dark.css';
@@ -420,7 +420,7 @@ Raid clear status still resets weekly.">
     gsSlider.addEventListener('input', () => {
       const v = Number(gsSlider.value);
       this.gearscoreMin = v;
-      const tier = getGearscoreTier(v);
+      const tier = getPowerTier(v);
       gsValue.textContent = `${v}+`;
       gsValue.style.color = tier.color;
       gsSlider.style.setProperty('--gs-fill', `${v}%`);
@@ -905,7 +905,7 @@ Raid clear status still resets weekly.">
           ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
             <div class="player-name-row">
-              <div class="player-name">${nameHtml} ${renderGearscoreBadge(player)}</div>
+              <div class="player-name">${nameHtml} ${renderPowerBadge(player)}</div>
               ${availBadge || noTimePrefBadge}
               ${player.notes ? `<span class="note-icon tooltip-wrap tooltip-below tooltip-right" data-tooltip="${player.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
             </div>
@@ -973,7 +973,7 @@ Raid clear status still resets weekly.">
       .filter(player => {
         const matchesSearch = this.matchesPlayerSearch(player, searchTerm);
 
-        const matchesGearscore = minGs === 0 || calculateGearscore(player) >= minGs;
+        const matchesGearscore = minGs === 0 || powerScore(player) >= minGs;
 
         // Class family, specialization, or final class filter
         let matchesClassFamily = true;
@@ -1545,7 +1545,7 @@ Raid clear status still resets weekly.">
           <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
             ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
             <div class="player-info">
-              <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+              <div class="player-name">${player.name} ${renderPowerBadge(player)}</div>
               <div class="player-role">${player.role}</div>
               ${formatPlayerEquipmentHtml(player)}
             </div>
@@ -2275,7 +2275,7 @@ Raid clear status still resets weekly.">
       ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
       <div class="assigned-player">
         <div class="player-name-row">
-          <div class="player-name">${player.name} ${renderGearscoreBadge(player)}</div>
+          <div class="player-name">${player.name} ${renderPowerBadge(player)}</div>
           ${availDisplay}
         </div>
         ${pilotDisplay}

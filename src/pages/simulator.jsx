@@ -5,7 +5,7 @@ import { optionNumber, emptyEngravings, engravingKind, engravingMainOptions, eng
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { rngTable, lineRank } from '../sim/rng-table.js';
 import rngData from '../data/sim-rng.json' with { type: 'json' };
-import { getClassSpriteStyle } from '../constants.js';
+import { getClassSpriteStyle, POWER_REFERENCES, getPowerTier, formatPower } from '../constants.js';
 import { toast } from '../toast.js';
 import { modal } from '../modal.js';
 import { dataService } from '../data.js';
@@ -18,9 +18,9 @@ const STORAGE_KEY = 'aftl.simulator.builds';
 const PARTY_KEY = 'aftl.simulator.party';
 const L = options.lists;
 // Answers come from the simulate function; the page re-renders when one arrives.
-const calc = createRemoteCalculator({ jobMap: options.job_map, onResult: (error) => { SimulatorPage.onResult(error); openBuilder?.onResult(error); } });
-// The Add/Edit Character builder while its modal is open.
-let openBuilder = null;
+const calc = createRemoteCalculator({ jobMap: options.job_map, onResult: (error) => { SimulatorPage.onResult(error); for (const b of openBuilders) b.onResult(error); } });
+// Builders embedded in other pages: the Add/Edit Character modal, the admin reference viewers.
+const openBuilders = new Set();
 
 // Tabs under the character window, for everything that is not a game window.
 const TABS = [['sets', 'Gear Sets'], ['other', 'Other'], ['stats', 'Full Stats'], ['skills', 'Skills'], ['compare', 'Compare']];
@@ -94,7 +94,22 @@ const PARTY_BUFFS = [
 const ELEMENTS_SHOWN = [['Fire', 'Fire'], ['Water', 'Ice'], ['Light', 'Light'], ['Dark', 'Dark']];
 const METRIC_TIPS = {
   effective_panel: ['Site score, not in game', '(Attack + skill flat damage) × Final dmg × Crit\nAgainst the boss crit resist'],
+  power_score: ['Gearscore', 'Power level as a share of a maxed character of this class\nThe badge on the Characters and Lineups pages'],
 };
+const isPassiveKey = (key) => options.buffs?.[key]?.category === 'Passive';
+// The gearscore matches a synced panel: passives only, no self, party or guild buffs.
+function gearscoreBuild(build) {
+  const active = (build.buffs || []).some((b) => b && Number(b.level) > 0 && !isPassiveKey(b.key));
+  return active ? { ...build, buffs: build.buffs.filter((b) => !b || isPassiveKey(b.key)) } : build;
+}
+// The site's 0-100 badge for a build: unbuffed power level over the class reference's.
+function powerScoreCard(build) {
+  const ref = POWER_REFERENCES.classes[build.second_job];
+  const power = Number(calc.calculate(gearscoreBuild(build)).summary.effective_panel) || 0;
+  if (!ref || !power) return null;
+  const score = Math.min(100, Math.round((power / ref.power) * 100));
+  return { score, tier: getPowerTier(score), text: `${formatPower(power)} of ${formatPower(ref.power)}` };
+}
 const metricLabel = (key, label) => {
   const tip = METRIC_TIPS[key];
   return tip ? `<span data-tooltip-head="${esc(tip[0])}" data-tooltip-fixed="${esc(tip[1])}">${esc(label)}</span>` : `<span>${esc(label)}</span>`;
@@ -997,7 +1012,9 @@ export const SimulatorPage = {
     if (!el) return;
     const { summary, rows } = this.results[this.active];
     const row = (attr) => rows.find((r) => r.attr === attr);
+    const power = powerScoreCard(this.build);
     const cards = [
+      [metricLabel('power_score', 'Gearscore'), power ? `<b style="color: ${power.tier.color}">${power.score}</b><small>${power.text}</small>` : '—'],
       ...SUMMARY_METRICS.map(([key, label]) => [metricLabel(key, label), fmt(summary[key], key.endsWith('percent') ? 1 : 0)]),
       [metricLabel('', 'HP'), fmt(row('HP')?.buffed)],
       [metricLabel('', 'DEF rate %'), fmt(row('DEF rate %')?.buffed, 1)],
@@ -1858,7 +1875,9 @@ Crit ${dmg(sk.crit)}`)}"` : '');
 
   renderCompare() {
     const a = this.partyView('A').result; const b = this.partyView('B').result;
-    const metrics = SUMMARY_METRICS.map(([key, label]) => {
+    const pa = powerScoreCard(this.builds.A); const pb = powerScoreCard(this.builds.B);
+    const powerMetric = pa && pb ? `<article>${metricLabel('power_score', 'Gearscore')}<strong><b style="color: ${pa.tier.color}">${pa.score}</b> → <b style="color: ${pb.tier.color}">${pb.score}</b></strong><em class="${pb.score - pa.score >= 0 ? 'up' : 'down'}">${signed(pb.score - pa.score, 0)}</em></article>` : '';
+    const metrics = powerMetric + SUMMARY_METRICS.map(([key, label]) => {
       const x = Number(a.summary[key] || 0); const y = Number(b.summary[key] || 0);
       const digits = key.endsWith('percent') ? 1 : 0;
       return `<article>${metricLabel(key, label)}<strong>${fmt(x, digits)} → ${fmt(y, digits)}</strong><em class="${y - x >= 0 ? 'up' : 'down'}">${signed(y - x, digits)} · ${x ? ((y - x) / Math.abs(x) * 100).toFixed(2) : '0.00'}%</em></article>`;
@@ -1983,14 +2002,60 @@ export function createCharacterBuilder(container, raw, { onUpdate } = {}) {
       this.listeners?.abort();
       this.listeners = null;
       this.container = null;
-      if (openBuilder === this) openBuilder = null;
+      openBuilders.delete(this);
     },
   });
   initFixedTooltip();
   container.innerHTML = '<div class="simulator-page sim-builder"><section class="sim-main"></section></div>';
-  openBuilder = builder;
+  openBuilders.add(builder);
   builder.bind();
   builder.recalculate();
   builder.renderPanel();
   return builder;
+}
+
+// The game's windows for a fixed build, with the tab rail and the slot details but no editing.
+export function createReferenceViewer(container, raw) {
+  const viewer = Object.assign(Object.create(SimulatorPage), {
+    container, builds: { A: normalizeBuild(raw) }, active: 'A', view: 'general', costumeMode: 'fashion', cardPage: 0, cardTier: null,
+    results: { A: { rows: [], summary: {} } }, slots: { ...SimulatorPage.slots }, applyAll: { heraldry: false, engraving: false }, listeners: null,
+    get result() { return this.results.A; },
+    save() {},
+    recalculate() { this.results.A = calc.calculate(this.build); },
+    onResult(error) {
+      if (!this.container || error) return;
+      this.results.A = calc.calculate(this.build);
+      this.renderPanel();
+    },
+    renderSummary() {},
+    renderPanel() {
+      const main = this.container?.querySelector('.sim-main');
+      if (main) main.innerHTML = this.renderCharacter();
+    },
+    renderCharacter() {
+      const view = this.view;
+      const character = view === 'general' || view === 'costume';
+      const body = {
+        general: () => this.generalWindow(), costume: () => this.costumeWindow(),
+        heraldry: () => this.renderHeraldry(), card: () => this.renderCards(), rune: () => this.renderRunes(),
+      }[view]();
+      const rail = `<nav class="sim-rail">${VIEWS.map(([id, label]) => `<button class="${id === view ? 'active' : ''}" data-action="view" data-value="${id}">${label}</button>`).join('')}</nav>`;
+      return `<div class="sim-equip"><div class="sim-window-wrap">${character ? body : `<div class="sim-window sim-window-${view}">${body}</div>`}${rail}</div>${this.slotEditor()}</div>`;
+    },
+    onChange() {},
+    apply() {},
+    destroy() {
+      this.listeners?.abort();
+      this.listeners = null;
+      this.container = null;
+      openBuilders.delete(this);
+    },
+  });
+  initFixedTooltip();
+  container.innerHTML = '<div class="simulator-page sim-builder sim-readonly"><section class="sim-main"></section></div>';
+  openBuilders.add(viewer);
+  viewer.bind();
+  viewer.recalculate();
+  viewer.renderPanel();
+  return viewer;
 }

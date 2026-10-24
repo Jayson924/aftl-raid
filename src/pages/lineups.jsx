@@ -2,8 +2,8 @@ import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { authService } from '../auth.js';
 import { modal } from '../modal.js';
-import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, calculateGearscore, getGearscoreTier, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel, usesTickets } from '../constants.js';
-import { renderGearscoreBadge, initChipTooltip } from '../chip-tooltip.js';
+import { EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, DAMAGE_AMP_SOURCES, formatEquipmentText, formatPlayerEquipmentHtml, powerScore, getPowerTier, getClassSpriteStyle, getLineupSize, isFourManRaid, formatRaidTypeLabel, usesTickets } from '../constants.js';
+import { renderPowerBadge, initChipTooltip } from '../chip-tooltip.js';
 import { renderMiniLineupCard, renderMiniPlayerCards, getEquipmentBackground } from '../mini-carousel.js';
 import moment from 'moment';
 import { formatAvailabilityRange, getBrowserTimezone, shouldShowAvailabilityForRaid } from '../availability.js';
@@ -531,7 +531,7 @@ export const LineupsPage = {
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
                 <div class="player-name-row">
-                  <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : renderGearscoreBadge(player)}</span>
+                  <span class="player-name">${player.name} ${isPub ? '<span class="pub-badge">GUEST</span>' : renderPowerBadge(player)}</span>
                   ${!isPub ? ownerAvailHtml(player) : ''}
                 </div>
                 ${pilotDisplay}

@@ -1,7 +1,7 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
 import { inputValidator } from '../input-validator.js';
-import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, CLASS_FAMILIES, calculateGearscore, getGearscoreTier, gearscoreTooltipText, MAX_FD, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
+import { CLASSES, EQUIPMENT_RARITIES, EQUIPMENT_ICONS, WEAPON_SUFFIXES, CLASS_FAMILIES, powerScore, getPowerTier, fdToPercent, formatPlayerEquipmentHtml, getClassSpriteStyle } from '../constants.js';
 import { modal } from '../modal.js';
 import { panelStats, syncedLabel, syncedAge } from '../sim/panel.js';
 import simOptions from '../data/sim/options.json' with { type: 'json' };
@@ -13,6 +13,7 @@ import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import itemIcons from '../data/sim-icons.json' with { type: 'json' };
 import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
 import { createCharacterBuilder, emptyBuildFor, siteClassName } from './simulator.jsx';
+import { renderPowerBadge, initChipTooltip } from '../chip-tooltip.js';
 import { deriveStats } from '../sim/derive-stats.js';
 import { GAME_RAIDS, raidProgress, raidStatus, weeklyClearsThisWeek } from '../raid-clears.js';
 import { uploadHtml, setupUpload, renderGearReview } from '../sim/screenshot-import.js';
@@ -57,7 +58,7 @@ export const PlayersPage = {
   // Chart instance reference
   _chartInstance: null,
 
-  // Gearscore filter for roster view (0 = show all)
+  // Power filter for roster view (0 = show all)
   _gsFilter: 0,
 
   // Cached data for roster re-renders
@@ -301,6 +302,7 @@ export const PlayersPage = {
 
   async render(container) {
     initFixedTooltip();
+    initChipTooltip();
     const canViewFull = dataService.isFriend();
 
     // Guests can only see roster view
@@ -615,10 +617,10 @@ export const PlayersPage = {
         if (!aNeeds && bNeeds) return 1;
       }
 
-      // Gearscore sort
+      // Power sort
       if (this._equipmentSort === 'gs') {
-        const aGs = calculateGearscore(a);
-        const bGs = calculateGearscore(b);
+        const aGs = powerScore(a);
+        const bGs = powerScore(b);
         if (aGs !== bGs) return bGs - aGs;
       }
 
@@ -812,7 +814,7 @@ export const PlayersPage = {
 
     return [...players].sort((a, b) => {
       if (sort === 'gs') {
-        const d = calculateGearscore(b) - calculateGearscore(a);
+        const d = powerScore(b) - powerScore(a);
         if (d !== 0) return d;
       } else if (sort === 'class') {
         const d = (a.role || '').localeCompare(b.role || '');
@@ -874,8 +876,8 @@ export const PlayersPage = {
     return `
       <div class="character-card-grid browse-grid">
         ${list.map(player => {
-          const gs = calculateGearscore(player);
-          const tier = getGearscoreTier(gs);
+          const gs = powerScore(player);
+          const tier = getPowerTier(gs);
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
           const iconStyle = getClassSpriteStyle(player.role);
@@ -891,7 +893,7 @@ export const PlayersPage = {
                   <span class="cc-name">${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}</span>` : player.name}</span>
                   <span class="cc-class">${player.role || ''}${age ? ` <span class="synced-tag${age.stale ? ' stale' : ''}" data-tooltip-fixed="${syncedLabel(player.syncedAt)}">Synced <span class="synced-age">${age.text}</span></span>` : ''}</span>
                 </div>
-                <span class="cc-gs" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>
+                ${renderPowerBadge(player, { className: 'cc-gs', gear: false })}
               </div>
               <div class="cc-raids"><div class="char-card-badges">${this.renderRaidBadgesHTML(player, canToggleRaid)}</div></div>
               <div class="cc-foot">
@@ -929,8 +931,8 @@ export const PlayersPage = {
             const canEdit = this.canEditCharacter(player);
             const canToggleRaid = canEdit || dataService.isAdmin();
             const owner = player.discordId ? this._browseUserMap[player.discordId] : null;
-            const gs = calculateGearscore(player);
-            const tier = getGearscoreTier(gs);
+            const gs = powerScore(player);
+            const tier = getPowerTier(gs);
             const n = player.accountNumber || 1;
             const size = player.discordId ? (this._browseAccountSizes[player.discordId] || 1) : 1;
 
@@ -949,7 +951,7 @@ export const PlayersPage = {
               </td>
               <td class="browse-acc-cell" data-label="Acc">${size > 1 ? `<span class="acct-badge" data-account="${n}">A${n}</span>` : '<span class="acct-dash">—</span>'}${this._accountNameHtml(player.accountName)}</td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role || ''}</td>
-              <td class="gs-cell" data-label="GS"><span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span></td>
+              <td class="gs-cell" data-label="GS">${renderPowerBadge(player, { className: 'gs-value', gear: false })}</td>
               <td class="raids-needed" data-label="Raids Needed">${this.renderRaidBadgesHTML(player, canToggleRaid)}</td>
             </tr>`;
           }).join('')}
@@ -1065,9 +1067,9 @@ export const PlayersPage = {
       this._chartInstance = null;
     }
 
-    // Filter by gearscore threshold
+    // Filter by power threshold
     const players = minGs > 0
-      ? allPlayers.filter(p => calculateGearscore(p) >= minGs)
+      ? allPlayers.filter(p => powerScore(p) >= minGs)
       : allPlayers;
 
     const totalPlayers = players.length;
@@ -1090,12 +1092,12 @@ export const PlayersPage = {
     const hideNames = !dataService.isFriend();
     const buildTooltipHtml = (clsPlayers) => {
       if (hideNames) {
-        // Guests only see gearscore and equipment, no names
+        // Guests only see power and equipment, no names
         return clsPlayers
-          .sort((a, b) => calculateGearscore(b) - calculateGearscore(a))
+          .sort((a, b) => powerScore(b) - powerScore(a))
           .map(p => {
-            const gs = calculateGearscore(p);
-            const tier = getGearscoreTier(gs);
+            const gs = powerScore(p);
+            const tier = getPowerTier(gs);
             return `<div class="roster-tooltip-row"><span class="roster-tooltip-gs" style="color: ${tier.color}">${gs}</span> <span class="roster-tooltip-gear">${EQUIPMENT_ICONS.weapon} ${formatEquipText(p, 'weapon')} ${EQUIPMENT_ICONS.armor} ${formatEquipText(p, 'armor')}</span></div>`;
           })
           .join('');
@@ -1115,8 +1117,8 @@ export const PlayersPage = {
         const playerRows = ownerPlayers
           .sort((a, b) => a.name.localeCompare(b.name))
           .map(p => {
-            const gs = calculateGearscore(p);
-            const tier = getGearscoreTier(gs);
+            const gs = powerScore(p);
+            const tier = getPowerTier(gs);
             return `<div class="roster-tooltip-row"><span class="roster-tooltip-name">${p.name}</span> <span class="roster-tooltip-gs" style="color: ${tier.color}">${gs}</span> <span class="roster-tooltip-gear">${EQUIPMENT_ICONS.weapon} ${formatEquipText(p, 'weapon')} ${EQUIPMENT_ICONS.armor} ${formatEquipText(p, 'armor')}</span></div>`;
           })
           .join('');
@@ -1153,11 +1155,11 @@ export const PlayersPage = {
     const presentClassSet = new Set(players.map(p => p.role));
     const missingClasses = allClasses.filter(cls => !presentClassSet.has(cls));
 
-    // Calculate average gearscore
+    // Average power
     const avgGearscore = players.length > 0
-      ? Math.round(players.reduce((sum, p) => sum + calculateGearscore(p), 0) / players.length)
+      ? Math.round(players.reduce((sum, p) => sum + powerScore(p), 0) / players.length)
       : 0;
-    const avgTier = getGearscoreTier(avgGearscore);
+    const avgTier = getPowerTier(avgGearscore);
 
     listElement.innerHTML = `
       <div class="roster-view">
@@ -1172,7 +1174,7 @@ export const PlayersPage = {
             <span class="roster-stat-label">Avg Gearscore</span>
           </div>
           <div class="roster-gs-slider roster-tile">
-            <label>Min Gearscore <span id="gs-slider-value" style="color: ${getGearscoreTier(minGs).color}">${minGs}</span></label>
+            <label>Min Gearscore <span id="gs-slider-value" style="color: ${getPowerTier(minGs).color}">${minGs}</span></label>
             <input type="range" id="gs-slider" min="0" max="100" value="${minGs}" />
           </div>
         </div>
@@ -1185,7 +1187,7 @@ export const PlayersPage = {
                 <span class="roster-chart-center-label">total</span>
               </div>
             </div>
-            <div class="roster-chart-note">Gearscore is unofficial and is used to help balance our raid teams. Highest value is 100 and would need ${MAX_FD.toLocaleString()} FD and full Lv70 Legend gear at +15.</div>
+            <div class="roster-chart-note">Gearscore is the simulator's power level as a share of a maxed character of the same class: Lv70 Legend +15 gear, Legend cards, the best plates, runes and engravings. A character that has not synced shows a gear-only estimate (~).</div>
           </div>
           <div class="roster-breakdown">
             <h3>Class Breakdown</h3>
@@ -1206,9 +1208,9 @@ export const PlayersPage = {
                       ${Object.entries(classes).map(([cls, cnt]) => {
                         const clsPlayers = familyPlayersList[key][cls] || [];
                         const clsAvgGs = clsPlayers.length > 0
-                          ? Math.round(clsPlayers.reduce((sum, p) => sum + calculateGearscore(p), 0) / clsPlayers.length)
+                          ? Math.round(clsPlayers.reduce((sum, p) => sum + powerScore(p), 0) / clsPlayers.length)
                           : 0;
-                        const clsTier = getGearscoreTier(clsAvgGs);
+                        const clsTier = getPowerTier(clsAvgGs);
                         return `<div class="roster-class-item roster-class-row"><span class="rc-name">${cls}</span><span class="rc-count">${cnt}</span><span class="roster-gs-badge" style="color: ${clsTier.color}; background: ${clsTier.bg};">${clsAvgGs}</span><div class="roster-tooltip">${buildTooltipHtml(clsPlayers)}</div></div>`;
                       }).join('')}
                     </div>
@@ -1296,12 +1298,12 @@ export const PlayersPage = {
     // Close tooltips when tapping outside
     document.addEventListener('click', closeAllTooltips);
 
-    // Gearscore slider
+    // Power slider
     const gsSlider = document.getElementById('gs-slider');
     if (gsSlider) {
       gsSlider.addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
-        const tier = getGearscoreTier(val);
+        const tier = getPowerTier(val);
         const label = document.getElementById('gs-slider-value');
         if (label) {
           label.textContent = val;
@@ -1436,7 +1438,7 @@ export const PlayersPage = {
               </td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>`; })()}
+                ${renderPowerBadge(player, { className: 'gs-value', gear: false })}
               </td>
               <td data-label="Equipment">
                 ${this._buildEquipSummaryHtml(player)}
@@ -1453,8 +1455,8 @@ export const PlayersPage = {
       </table>
       <div class="flat-mobile-cards">
         ${sortedPlayers.map(player => {
-          const gs = calculateGearscore(player);
-          const tier = getGearscoreTier(gs);
+          const gs = powerScore(player);
+          const tier = getPowerTier(gs);
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
           const iconStyle = getClassSpriteStyle(player.role);
@@ -1564,7 +1566,7 @@ export const PlayersPage = {
           ${ownerAvatar}
           <span class="owner-group-name">${ownerName}</span>
           <span class="owner-group-count">${players.length} character${players.length !== 1 ? 's' : ''}</span>
-          <span class="owner-group-best">Best GS ${Math.max(0, ...players.map((p) => calculateGearscore(p)))}</span>
+          <span class="owner-group-best">Best GS ${Math.max(0, ...players.map((p) => powerScore(p)))}</span>
         </div>
     `;
 
@@ -1764,7 +1766,7 @@ export const PlayersPage = {
               </td>
               <td class="class-cell" data-label="Class">${player.role ? `<div class="class-sprite table-class-icon" style="${getClassSpriteStyle(player.role)}"></div>` : ''}${player.role}</td>
               <td class="gs-cell" data-label="GS">
-                ${(() => { const gs = calculateGearscore(player); const tier = getGearscoreTier(gs); return `<span class="gs-value" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>`; })()}
+                ${renderPowerBadge(player, { className: 'gs-value', gear: false })}
               </td>
               <td data-label="Equipment">
                 ${formatPlayerEquipmentHtml(player)}
@@ -1852,8 +1854,8 @@ export const PlayersPage = {
     return `
       <div class="character-card-grid">
         ${sortedPlayers.map(player => {
-          const gs = calculateGearscore(player);
-          const tier = getGearscoreTier(gs);
+          const gs = powerScore(player);
+          const tier = getPowerTier(gs);
           const canEdit = this.canEditCharacter(player);
           const canToggleRaid = canEdit || dataService.isAdmin();
           const iconStyle = getClassSpriteStyle(player.role);
@@ -1870,7 +1872,7 @@ export const PlayersPage = {
                   <span class="cc-name">${canEdit ? `<span class="player-name-link" data-action="edit" data-player-id="${player.id}">${player.name}</span>` : player.name}</span>
                   <span class="cc-class">${player.role}${age ? ` <span class="synced-tag${age.stale ? ' stale' : ''}" data-tooltip-fixed="${syncedTip.replace(/"/g, '&quot;')}">Synced <span class="synced-age">${age.text}</span></span>` : ''}</span>
                 </div>
-                <span class="cc-gs" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${gearscoreTooltipText(player)}">${gs}</span>
+                ${renderPowerBadge(player, { className: 'cc-gs', gear: false })}
               </div>
               <div class="cc-raids">
                 <div class="char-card-badges">${this.renderRaidBadgesHTML(player, canToggleRaid)}</div>

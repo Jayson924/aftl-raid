@@ -77,7 +77,7 @@ $build-tint: linear-gradient(to top left, color-mix(in srgb, var(--build-color) 
     padding: 0.6rem 0.75rem;
     display: flex; flex-direction: column; gap: 0.2rem;
     span { font-size: 0.75rem; color: $text-muted; text-transform: uppercase; letter-spacing: 0.04em; }
-    strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+    strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; small { display: block; font-size: 0.7rem; font-weight: 400; color: $text-muted; } }
     em { font-style: normal; font-size: 0.85rem; &.up { color: $success-color; } &.down { color: $danger-color; } }
   }
 }
@@ -740,4 +740,11 @@ p.link-code { margin: 0.5rem 0 1rem; }
   &:hover { border-color: rgba($primary-color, 0.5); .class-sprite, img { opacity: 0.85; filter: none; } }
   &.active { background: rgba($primary-color, 0.12); border-color: $primary-color; box-shadow: 0 0 0 1px rgba($primary-color, 0.35);
     .class-sprite, img { opacity: 1; filter: none; } }
+}
+
+// Reference viewer on the admin page: the windows and slot details, with nothing editable.
+.sim-readonly {
+  .sim-editor-fields, .sim-enchant-list, input, select, [data-enchant], .sim-picker { pointer-events: none; }
+  [data-action]:not([data-action="view"]):not([data-action="slot"]):not([data-action="costume-mode"]):not([data-action="card-tier"]):not([data-action="card-tab"]):not([data-action="card-page"]) { pointer-events: none; }
+  .sim-picker-toggle::after, .sim-apply-all { display: none; }
 }

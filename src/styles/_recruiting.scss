@@ -897,6 +897,26 @@
     font-weight: 400;
   }
 
+  // Gear as one compact row of slot chips.
+  &__chips {
+    display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 0.74rem; line-height: 1.4;
+    & + & { margin-top: 2px; }
+  }
+  &__chip { display: inline-flex; gap: 4px; align-items: baseline; > span:first-child { color: #888; } }
+
+  // Score component against the class reference, with a fill bar.
+  &__gap { display: flex; flex-direction: column; gap: 3px; }
+  &__gap-vals {
+    display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums;
+    b { color: #fff; font-weight: 800; }
+    i { color: #666; font-style: normal; font-size: 0.72rem; }
+    em { color: rgba(244, 196, 48, 0.95); font-style: normal; font-weight: 700; min-width: 2.6em; text-align: right; }
+  }
+  &__bar {
+    height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden;
+    span { display: block; height: 100%; background: linear-gradient(90deg, rgba(244, 196, 48, 0.55), rgba(244, 196, 48, 0.95)); }
+  }
+
   &__fd {
     display: flex;
     align-items: center;
@@ -905,6 +925,9 @@
     padding-top: 10px;
     border-top: 1px solid rgba(244, 196, 48, 0.18);
   }
+
+  &__fd:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  &__fd + &__section { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.08); }
 
   &__fd-label {
     color: rgba(244, 196, 48, 0.9);

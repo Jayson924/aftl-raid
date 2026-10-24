@@ -1,11 +1,10 @@
 // Rich gearscore tooltip used on recruiting cards, lineups, and lineup editor.
 // Provides:
 //   renderChipTipBody(player) → inner sections HTML (no wrapper)
-//   renderGearscoreBadge(player) → <span> badge with rich-tip data attached
+//   renderPowerBadge(player) → <span> badge with rich-tip data attached
 //   initChipTooltip() → floating tooltip handler (position: fixed, escapes overflow)
 
-import { calculateGearscore, getGearscoreTier, calculatePowerIndex, formatPowerIndex, EQUIPMENT_ICONS } from './constants.js';
-import { slotContributions } from './gear-calc.js';
+import { calculatePowerScore, getPowerTier, formatPower, powerTooltipText, powerGaps, simJobOf, EQUIPMENT_ICONS } from './constants.js';
 
 const RARITY_CLASSES = new Set(['legend', 'unique', 'epic', 'rare']);
 
@@ -20,7 +19,8 @@ function fmtEnh(n, rarity) {
   return `<span class="chip-tip__val chip-tip__val--${cls}">+${n}</span>`;
 }
 
-export function renderChipTipBody(player) {
+// gear: false keeps only the power line and the breakdown against the class reference.
+export function renderChipTipBody(player, { gear = true } = {}) {
   const equip = player.equipment || {};
   const enhVal = (slot, fallback) => {
     const e = equip[slot]?.enhancement;
@@ -45,67 +45,59 @@ export function renderChipTipBody(player) {
     ['Gloves', enhVal('gloves', player.armorEnhance), rarityFor('gloves', player.armor)],
     ['Boots',  enhVal('boots',  player.armorEnhance), rarityFor('boots',  player.armor)],
   ];
-  const fd = player.characterStats?.finalDamage;
-
-  const power = calculatePowerIndex(player);
+  const power = calculatePowerScore(player);
+  const synced = power.source === 'power';
 
   const hasWeapon = mw != null || sw != null;
   const hasArmor = armor.some(([, v]) => v != null);
-  if (!hasWeapon && !hasArmor && !fd && !power) return '';
+  if (!hasWeapon && !hasArmor && !synced) return '';
 
-  const weaponSection = hasWeapon ? `
+  const chip = (label, v, r) => `<span class="chip-tip__chip"><span>${label}</span>${fmtEnh(v, r)}</span>`;
+  const gearSection = hasWeapon || hasArmor ? `
     <div class="chip-tip__section">
-      <div class="chip-tip__heading">${EQUIPMENT_ICONS.weapon}<span>Weapons</span></div>
-      <div class="chip-tip__rows">
-        <div class="chip-tip__row"><span class="chip-tip__label">Main</span>${fmtEnh(mw, mwR)}</div>
-        <div class="chip-tip__row"><span class="chip-tip__label">Sub</span>${fmtEnh(sw, swR)}</div>
-      </div>
+      <div class="chip-tip__heading">${EQUIPMENT_ICONS.weapon}<span>Gear</span></div>
+      <div class="chip-tip__chips">${chip('Main', mw, mwR)}${chip('Sub', sw, swR)}</div>
+      <div class="chip-tip__chips">${armor.map(([label, v, r]) => chip(label, v, r)).join('')}</div>
     </div>` : '';
 
-  const armorRows = armor
-    .map(([label, v, r]) => `<div class="chip-tip__row"><span class="chip-tip__label">${label}</span>${fmtEnh(v, r)}</div>`)
-    .join('');
-  const armorSection = hasArmor ? `
-    <div class="chip-tip__section">
-      <div class="chip-tip__heading">${EQUIPMENT_ICONS.armor}<span>Armor</span></div>
-      <div class="chip-tip__rows">${armorRows}</div>
-    </div>` : '';
-
-  const fdSection = fd ? `
+  const powerSection = synced ? `
     <div class="chip-tip__fd">
-      <span class="chip-tip__fd-label">Final Damage</span>
-      <span class="chip-tip__fd-val">${Number(fd).toLocaleString()}</span>
-    </div>` : '';
-
-  const powerSection = power ? `
+      <span class="chip-tip__fd-label">Power level</span>
+      <span class="chip-tip__fd-val">${formatPower(power.power)} of ${formatPower(power.reference)}</span>
+    </div>` : power.source === 'stats' ? `
     <div class="chip-tip__fd">
-      <span class="chip-tip__fd-label">Power Index</span>
-      <span class="chip-tip__fd-val">${formatPowerIndex(power.raw)} · ${power.score}</span>
+      <span class="chip-tip__fd-label">Gearscore</span>
+      <span class="chip-tip__fd-val">~${power.score} estimate</span>
     </div>` : '';
 
-  const shares = slotContributions(player)
-    .filter(c => c.share >= 0.005)
-    .sort((a, b) => b.share - a.share);
-  const shareSection = shares.length ? `
+  const gaps = powerGaps(player);
+  const gapSection = gaps.length ? `
     <div class="chip-tip__section">
-      <div class="chip-tip__heading"><span>Gear power by slot</span></div>
-      <div class="chip-tip__rows">${shares.map(c => `<div class="chip-tip__row"><span class="chip-tip__label">${SLOT_LABELS[c.slot]}</span><span class="chip-tip__val chip-tip__val--low">${Math.round(c.share * 100)}%</span></div>`).join('')}</div>
+      <div class="chip-tip__heading"><span>Vs maxed ${simJobOf(player)}</span></div>
+      <div class="chip-tip__rows">${gaps.map(g => `
+        <div class="chip-tip__gap">
+          <div class="chip-tip__row"><span class="chip-tip__label">${g.label}</span><span class="chip-tip__gap-vals"><b>${g.text}</b><i>/ ${g.maxText}</i><em>${Math.round(g.share * 100)}%</em></span></div>
+          <div class="chip-tip__bar"><span style="width: ${Math.round(g.share * 100)}%"></span></div>
+        </div>`).join('')}</div>
     </div>` : '';
 
-  return `${weaponSection}${armorSection}${shareSection}${fdSection}${powerSection}`;
+  if (!gear) return `${powerSection}${gapSection}`;
+  return `${gearSection}${powerSection}${gapSection}`;
 }
 
 // Convenience for places that previously rendered a plain gs-inline span inline.
 // Returns the badge with the rich-tip body embedded as an attribute payload.
-export function renderGearscoreBadge(player) {
-  const gs = calculateGearscore(player);
-  const tier = getGearscoreTier(gs);
-  const tipBody = renderChipTipBody(player);
+export function renderPowerBadge(player, { className = 'gs-inline', gear = true } = {}) {
+  const { score, source } = calculatePowerScore(player);
+  const tier = getPowerTier(score);
+  const cls = `${className}${source === 'power' ? '' : ' gs-est'}`;
+  const text = source === 'power' ? String(score) : source === 'stats' ? `~${score}` : '–';
+  const tipBody = renderChipTipBody(player, { gear });
   if (!tipBody) {
-    return `<span class="gs-inline" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="Gearscore">${gs}</span>`;
+    return `<span class="${cls}" style="color: ${tier.color}; background: ${tier.bg};" data-tooltip="${powerTooltipText(player)}">${text}</span>`;
   }
   const escaped = tipBody.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  return `<span class="gs-inline has-chip-tip" data-chip-tip-html="${escaped}" style="color: ${tier.color}; background: ${tier.bg};">${gs}</span>`;
+  return `<span class="${cls} has-chip-tip" data-chip-tip-html="${escaped}" style="color: ${tier.color}; background: ${tier.bg};">${text}</span>`;
 }
 
 let initialized = false;
