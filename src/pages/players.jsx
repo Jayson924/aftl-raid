@@ -12,7 +12,7 @@ import { initFixedTooltip } from '../fixed-tooltip.js';
 import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import itemIcons from '../data/sim-icons.json' with { type: 'json' };
 import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
-import { createCharacterBuilder, emptyBuildFor, siteClassName } from './simulator.jsx';
+import { createCharacterBuilder, createReferenceViewer, emptyBuildFor, siteClassName } from './simulator.jsx';
 import { renderPowerBadge, initChipTooltip } from '../chip-tooltip.js';
 import { deriveStats } from '../sim/derive-stats.js';
 import { GAME_RAIDS, raidProgress, raidStatus, weeklyClearsThisWeek } from '../raid-clears.js';
@@ -2388,8 +2388,8 @@ export const PlayersPage = {
 
     return `
       <section class="modal-overrides">
-        <header class="ov-title"><h3>Set by hand</h3>
-          <label class="toggle-switch"><input type="checkbox" id="override-hand-set-wins" ${player.handSetWins ? 'checked' : ''}><span class="toggle-slider"></span><span class="toggle-label">Hand-set beats game</span></label>
+        <header class="ov-title"><div><h3>Set by hand</h3><span class="ov-sync-state"></span></div>
+          <label class="toggle-switch" data-tooltip-fixed="On: your title, card mastery, collection level and engravings stay as set here when the game syncs. Off: the game's values win, from the next sync."><input type="checkbox" id="override-hand-set-wins" ${player.handSetWins ? 'checked' : ''}><span class="toggle-slider"></span><span class="toggle-label">Block sync</span></label>
         </header>
         <nav class="ov-tabs" role="tablist">${tabs.map(([key, label], i) => `<button type="button" role="tab" class="ov-tab${i ? '' : ' active'}" data-ov-tab="${key}">${label}</button>`).join('')}</nav>
         ${tabs.map(([key, , body], i) => `<div class="ov-panel ov-panel-${key}" data-ov-panel="${key}" ${i ? 'hidden' : ''}>${body}</div>`).join('')}
@@ -2409,7 +2409,25 @@ export const PlayersPage = {
     return emptyEngravings().map((empty) => ({ ...empty, ...(build.engravings || []).find((e) => e.slot === empty.slot) }));
   },
 
-  _setupOverrides(modalElement) {
+  // Fields the game sends can only be edited with Block sync on; otherwise the next save or sync drops them.
+  _setupOverrides(modalElement, player) {
+    const fromGame = new Set(player.build?.game_fields || []);
+    const blockSync = modalElement.querySelector('#override-hand-set-wins');
+    const controls = {
+      title: '#override-title', collection_level: '#override-collection', card_bonus_levels: '[data-mastery]', engravings: '[data-engraving-grade], [data-engraving-rank]',
+    };
+    const lock = () => {
+      const locked = !blockSync.checked;
+      modalElement.querySelector('.ov-sync-state').textContent = locked && fromGame.size ? 'Synced fields follow the game' : 'Kept across syncs';
+      for (const [field, selector] of Object.entries(controls)) {
+        modalElement.querySelectorAll(selector).forEach((control) => {
+          const empty = control.matches('[data-engraving-rank]') && control.closest('[data-engraving]').querySelector('[data-engraving-grade]').value === NONE;
+          control.disabled = (locked && fromGame.has(field)) || empty;
+        });
+      }
+    };
+    blockSync.addEventListener('change', lock);
+    lock();
     modalElement.querySelectorAll('[data-ov-tab]').forEach((tab) => tab.addEventListener('click', () => {
       modalElement.querySelectorAll('[data-ov-tab]').forEach((t) => t.classList.toggle('active', t === tab));
       modalElement.querySelectorAll('[data-ov-panel]').forEach((panel) => { panel.hidden = panel.dataset.ovPanel !== tab.dataset.ovTab; });
@@ -2471,7 +2489,7 @@ export const PlayersPage = {
     const modalElement = document.createElement('div');
     modalElement.className = 'modal';
     modalElement.innerHTML = `
-      <div class="modal-content modal-equipment${synced ? '' : ' modal-builder'}">
+      <div class="modal-content modal-equipment modal-builder${synced ? ' modal-builder-synced' : ''}">
         <h2>Edit Character</h2>
         <form id="edit-player-form">
           <div class="modal-builder-head">
@@ -2498,17 +2516,13 @@ export const PlayersPage = {
             </div>
           </div>
           ${synced ? `
-          <div class="modal-synced-note">
-            Synced from the meter on ${new Date(player.syncedAt).toLocaleDateString()}
-            <span>Re-sync from the toolbox to change gear or stats</span>
-          </div>
-          ` : uploadHtml('edit-player')}
-          ${synced ? `${this._overridesHtml(player)}
           <div class="form-group">
-            <label>Class:</label>
-            <input type="hidden" id="edit-player-class" value="${player.role || ''}">
-            <div class="class-picker locked" id="edit-class-picker" inert></div>
-          </div>` : this._builderHtml('edit-player')}
+            <label>Gear: <span class="modal-synced-note">${syncedLabel(player.syncedAt)} · re-sync from the toolbox to change gear or stats</span></label>
+            <div class="modal-synced-body">
+              <div id="edit-player-viewer"></div>
+              ${this._overridesHtml(player)}
+            </div>
+          </div>` : `${uploadHtml('edit-player')}${this._builderHtml('edit-player')}`}
           <div class="form-group">
             <label for="edit-player-notes">Notes:</label>
             <textarea id="edit-player-notes" rows="3" maxlength="140">${player.notes}</textarea>
@@ -2540,7 +2554,7 @@ export const PlayersPage = {
     // A character from before the builder keeps its typed gear and stats until the window is touched.
     const builder = synced ? null : this._mountBuilder('edit-player', modalElement,
       player.build || emptyBuildFor(player.role), player.handStats || (player.build ? {} : player.characterStats));
-    if (synced) this.renderClassPicker('edit-class-picker', 'edit-player-class', player.role || '');
+    if (synced) this._builders['edit-player'] = createReferenceViewer(modalElement.querySelector('#edit-player-viewer'), player.build, { editor: false });
 
     // Toggle exclude-fields visibility
     const editExcludeCb = document.getElementById('edit-player-exclude');
@@ -2558,7 +2572,7 @@ export const PlayersPage = {
     if (!synced) {
       this._setupScreenshotUpload('edit-player', modalElement);
     } else {
-      this._setupOverrides(modalElement);
+      this._setupOverrides(modalElement, player);
       document.getElementById('override-clear-cards')?.addEventListener('click', async (e) => {
         const confirmed = await modal.confirm(
           `Clear ${player.name}'s cards? Use this after removing every card in game. The same cards coming back from the toolbox are ignored; new cards replace them.`,

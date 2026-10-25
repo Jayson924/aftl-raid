@@ -2185,3 +2185,25 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
 @media (max-width: 768px) {
   .my-raids-page .mc-char-view { height: 28.5rem; }
 }
+
+// Character view: the simulator's game window for synced characters; slot details are hover tips.
+.my-raids-page .mc-char-view:has(.mc-sim-view) { height: auto; overflow: visible; }
+.my-raids-page .mc-sim-view {
+  container-type: inline-size;
+  padding: 0.6rem 1rem 0.25rem;
+  .simulator-page { padding: 0; max-width: none; }
+  .sim-equip { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; margin-bottom: 0.5rem; }
+  // Board windows keep the frame height at every width, so long stat totals scroll instead of growing the card.
+  .sim-window { height: 680px; }
+  .sim-board-totals { overflow-y: auto; }
+  .sim-rail { align-self: stretch; }
+}
+// A card too narrow for the window and rail side by side gets the simulator's phone layout.
+@container (max-width: 545px) {
+  .my-raids-page .mc-sim-view {
+    .sim-window-wrap { flex-direction: column-reverse; align-items: stretch; }
+    .sim-rail { flex-direction: row; flex-wrap: wrap; padding-top: 0; button { min-width: 0; flex: 1 1 auto; padding: 0.4rem 0.5rem; } }
+    .sim-window, .sim-char { width: 100%; max-width: 432px; }
+    .sim-char { height: auto; }
+  }
+}

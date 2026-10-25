@@ -356,6 +356,8 @@ $window-h: 680px;
     &:hover { background: rgba(255, 255, 255, 0.1); }
     &.active { background: $primary-color; color: #1a1a1a; font-weight: 600; }
   }
+  // Sits at the foot of the rail, across from General.
+  .sim-rail-take { margin-top: auto; color: $primary-color; border-color: rgba($primary-color, 0.45); }
 }
 
 .sim-window, .sim-char { width: $window-w; height: $window-h; box-sizing: border-box; flex: none; }
@@ -735,6 +737,7 @@ p.link-code { margin: 0.5rem 0 1rem; }
   font-size: 0.8rem; padding: 0.5rem 0.75rem; line-height: 1.5;
   .tooltip-fixed-head { font-size: 0.9rem; }
   @each $name, $color in $rarity { &[data-rarity="#{$name}"] .tooltip-fixed-head { color: $color; } }
+  @each $name, $color in $rarity { .tooltip-fixed-rarity.#{$name} { color: $color; } }
   &[data-rarity="normal"] .tooltip-fixed-head { color: $text-light; }
   // Party buff tooltips: class name on top, each buff name bright with its stats beneath.
   &[data-rarity="party"] { color: $text-light; .tooltip-fixed-head { font-size: 0.95rem; } }
@@ -768,6 +771,8 @@ p.link-code { margin: 0.5rem 0 1rem; }
 // Reference viewer on the admin page: the windows and slot details, with nothing editable.
 .sim-readonly {
   .sim-editor-fields, .sim-enchant-list, input, select, [data-enchant], .sim-picker { pointer-events: none; }
-  [data-action]:not([data-action="view"]):not([data-action="slot"]):not([data-action="costume-mode"]):not([data-action="card-tier"]):not([data-action="card-tab"]):not([data-action="card-page"]) { pointer-events: none; }
+  [data-action]:not([data-action="view"]):not([data-action="slot"]):not([data-action="costume-mode"]):not([data-action="card-tier"]):not([data-action="card-tab"]):not([data-action="card-page"]):not([data-action="take"]) { pointer-events: none; }
   .sim-picker-toggle::after, .sim-apply-all { display: none; }
 }
+// Slots only show their tooltip, so they don't look clickable.
+.sim-no-editor :is([data-action="slot"], .sim-window-btn) { cursor: default; }

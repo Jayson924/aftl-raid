@@ -197,8 +197,8 @@ function statPairs(stats) {
 }
 
 // Hover tooltip for a slot: name in its rarity color, then what it is and the stats it gives.
-function slotTip(head, rarity, sub, stats) {
-  const lines = [sub, ...statPairs(stats || {}).map(([k, v]) => `${k} ${v}`)].filter(Boolean);
+function slotTip(head, rarity, sub, stats, extra = []) {
+  const lines = [sub, ...statPairs(stats || {}).map(([k, v]) => `${k} ${v}`), ...extra].filter(Boolean);
   return ` data-tooltip-head="${esc(head)}" data-tooltip-rarity="${esc(rarity)}" data-tooltip-fixed="${esc(lines.join('\n'))}"`;
 }
 
@@ -268,6 +268,20 @@ function normalizeBuild(raw) {
   return build;
 }
 
+// A character sent from My Characters, loaded into the simulator's current build when it opens.
+const HANDOFF_KEY = 'aftl.simulator.handoff';
+export function sendToSimulator(player) {
+  try { sessionStorage.setItem(HANDOFF_KEY, JSON.stringify({ id: player.id, name: player.name, build: player.build })); } catch (e) { /* storage may be unavailable */ }
+}
+
+function takeHandoff() {
+  try {
+    const sent = JSON.parse(sessionStorage.getItem(HANDOFF_KEY) || 'null');
+    sessionStorage.removeItem(HANDOFF_KEY);
+    return sent?.build ? sent : null;
+  } catch (e) { return null; }
+}
+
 function loadBuilds() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -331,6 +345,11 @@ function potentialPool(build, field, item) {
   const noun = field === 'jewelry' ? JEWELRY_NOUN[item.slot] : String(item.name).split(' ').at(-1);
   return rngData.potentials.find((p) => p.rarity.includes(rarity) && p.items.some((i) => i.toLowerCase() === noun?.toLowerCase())) || null;
 }
+// "Potential" with each line indented, which the tooltip draws as muted detail lines.
+const potentialTipLines = (keys) => (keys?.length ? ['Potential', ...keys.map((key) => {
+  const at = key.lastIndexOf(' ');
+  return `  ${statLabel(key.slice(0, at))} ${key.slice(at + 1)}`;
+})] : []);
 const potentialSetKey = (keys) => [...keys].sort().join(' + ');
 
 // "PATK 2.88%" -> name and value cells, so the values line up in a column.
@@ -461,6 +480,16 @@ export const SimulatorPage = {
       this.characterSyncs = this.builds.characterSyncs || { A: null, B: null };
       delete this.builds.characterIds;
       delete this.builds.characterSyncs;
+    }
+    const sent = takeHandoff();
+    if (sent) {
+      this.section = 'sim';
+      this.builds[this.active] = normalizeBuild(sent.build);
+      this.savedIds[this.active] = null;
+      this.characterIds[this.active] = sent.id;
+      this.characterSyncs[this.active] = null;  // loadGuild records the sync once the character list arrives
+      this.save();
+      toast.success(`${sent.name} loaded into ${intoBuild(this.active)}`);
     }
     if (!this.party) {
       try { this.party = new Set(JSON.parse(localStorage.getItem(PARTY_KEY) || '[]')); } catch (e) { this.party = new Set(); }
@@ -1162,7 +1191,8 @@ export const SimulatorPage = {
   },
 
   characterWindow({ top = '', column, side = '', bottom }) {
-    const title = `<button class="sim-window-btn ${this.slots[this.slotKey] === 'title' ? 'active' : ''}" data-action="slot" data-value="title">Title</button>`;
+    const worn = hasValue(this.build.title) ? slotTip(this.build.title, '', 'Title', calc.titleAttrs(this.build.title)) : '';
+    const title = `<button class="sim-window-btn ${this.slots[this.slotKey] === 'title' ? 'active' : ''}" data-action="slot" data-value="title"${worn}>Title</button>`;
     return `
       <div class="sim-char ${side ? 'has-side' : ''}">
         <div class="sim-char-head">
@@ -1214,6 +1244,16 @@ export const SimulatorPage = {
     return `<button class="sim-slot ${rarity} ${selected ? 'selected' : ''}" data-action="slot" data-value="${ref}" aria-label="${esc(label)}"${tip}>${icon}${badge ? `<b>${esc(badge)}</b>` : ''}</button>`;
   },
 
+  // Like the game's tooltip: the item's own stats, then its potential lines on their own.
+  gearTip(field, item, rarity, sub) {
+    const attrs = field === 'equipment' ? calc.equipmentAttrs(item) : calc.jewelryAttrs(item);
+    const roll = item.enchants?.length ? potentialPool(this.build, field, item)?.rolls.find((r) => potentialSetKey(r.keys) === potentialSetKey(item.enchants)) : null;
+    if (!roll || !Object.keys(attrs).length) return slotTip(item.name, rarity, sub, attrs);
+    const own = { ...attrs };
+    for (const [attr, value] of roll.lines) own[attr] = Math.abs((own[attr] || 0) - value) < 1e-6 ? 0 : (own[attr] || 0) - value;
+    return slotTip(item.name, rarity, sub, own, potentialTipLines(item.enchants));
+  },
+
   gearSlot(field, i) {
     const b = this.build;
     const item = b[field][i];
@@ -1224,7 +1264,7 @@ export const SimulatorPage = {
     return this.slotButton(`${field}.${i}`, {
       icon: slotIcon(b, field, item),
       rarity: rarityOf(entry),
-      tip: item.name === NONE ? '' : slotTip(item.name, rarityOf(entry), sub, gear ? calc.equipmentAttrs(item) : calc.jewelryAttrs(item)),
+      tip: item.name === NONE ? '' : this.gearTip(field, item, rarityOf(entry), sub),
       badge: field === 'equipment' && item.enhance && item.name !== NONE ? `+${item.enhance}` : '',
       label: item.name === NONE ? item.slot : `${item.slot}: ${item.name}`,
     });
@@ -1350,7 +1390,8 @@ export const SimulatorPage = {
          <label><span>Variant</span>${select(`${path}.variant`, variantOptions(item.slot, item.name), item.variant)}</label>`;
     const bonus = gear ? calc.equipmentAttrs(item, b.first_job, b.second_job) : calc.jewelryAttrs(item);
     const pool = item.name === NONE ? null : potentialPool(b, field, item);
-    const potentials = pool
+    // No item, no potentials; items without a roll table keep the per-line list.
+    const potentials = item.name === NONE ? '' : pool
       ? `<h4>Potential <span class="sim-h4-note">${pool.rolls.length} possible sets</span></h4><div class="sim-field sim-potential-set">${this.potentialPicker(path, item, pool)}</div>`
       : `<h4>Potentials (max ${MAX_ENCHANTS})</h4>${this.enchantList(path, item, item.slot)}`;
     return this.editorShell({
@@ -1581,16 +1622,36 @@ export const SimulatorPage = {
       icon: spriteIcon(rank ? icons.items.Rune?.[`${rune.type}|${rank}`] : undefined, rune.type), rarity: RANK_RARITY[rank] || 'normal',
       badge: hasValue(rune.level) ? `Lv${rune.level}` : '',
       tip: rank ? slotTip(`${rune.type} rune`, RANK_RARITY[rank], [hasValue(rune.level) ? `Lv${rune.level}` : '', RUNE_RARITIES[rank - 2]].filter(Boolean).join(' · '),
-        calc.runeAttrsForItem(rune)) : '',
+        {}, this.runeTipLines(rune)) : '',
       label: `${rune.type} rune ${i + 1}${rank ? ` (${RANK_RARITY[rank]})` : ''}`,
     });
   },
 
+  // One tooltip line per rune line, each in its rank's rarity color (rank 1 Magic .. 5 Legend), before the Smelted Rune's boost.
+  runeTipLines(rune) {
+    const lines = rune.entries.map((entry, j) => {
+      if (!hasValue(entry.attr) || !entry.attr || !hasValue(entry.rank)) return '';
+      const value = calc.runeRankValue(rune, j, entry.rank);
+      return `{${RANK_RARITY[entry.rank] || 'normal'}}${statLabel(entry.attr)}${value ? ` +${fmt(value)}` : ''}`;
+    }).filter(Boolean);
+    const boost = Number(this.build.core_rune?.enhance) || 0;
+    return boost && hasValue(this.build.core_rune.level) ? [...lines, `  Smelted Rune boost +${boost}%`] : lines;
+  },
+
   smeltedSlot() {
     const core = this.build.core_rune;
+    const preview = calc.coreRunePreview(this.build);
+    const lines = !hasValue(core.level) ? [] : [
+      hasValue(core.conversion) ? String(core.conversion) : '',
+      hasValue(core.ratio_rank) ? `Ratio ${core.ratio_rank}% of ${String(core.conversion).split(' → ')[0]}` : '',
+      hasValue(core.coeff_rank) ? `Coefficient ×${core.coeff_rank}` : '',
+      core.enhance ? `Normal rune boost ${core.enhance}%` : '',
+      ...(preview.source_attr ? [`${statLabel(preview.source_attr)} -${fmt(Math.round(preview.deduct))}`, `${statLabel(preview.target_attr)} +${fmt(Math.round(preview.gain))}`] : []),
+    ];
     return this.slotButton('core_rune', {
       icon: spriteIcon(!hasValue(core.level) ? undefined : icons.items.Smelted?.[core.level], 'Smelted'),
       rarity: 'unique', badge: '', label: 'Smelted Rune',
+      tip: hasValue(core.level) ? slotTip('Smelted Rune', 'unique', `Lv${core.level} · Unique`, {}, lines) : '',
     });
   },
 
@@ -2056,7 +2117,8 @@ export function createCharacterBuilder(container, raw, { onUpdate } = {}) {
 }
 
 // The game's windows for a fixed build, with the tab rail and the slot details but no editing.
-export function createReferenceViewer(container, raw) {
+// Without the editor, slots show their details on hover and the stat totals scroll inside the window.
+export function createReferenceViewer(container, raw, { editor = true, onTake = null } = {}) {
   const viewer = Object.assign(Object.create(SimulatorPage), {
     container, builds: { A: normalizeBuild(raw) }, active: 'A', view: 'general', costumeMode: 'fashion', cardPage: 0, cardTier: null,
     results: { A: { rows: [], summary: {} } }, slots: { ...SimulatorPage.slots }, applyAll: { heraldry: false, engraving: false }, listeners: null,
@@ -2080,8 +2142,18 @@ export function createReferenceViewer(container, raw) {
         general: () => this.generalWindow(), costume: () => this.costumeWindow(),
         heraldry: () => this.renderHeraldry(), card: () => this.renderCards(), rune: () => this.renderRunes(),
       }[view]();
-      const rail = `<nav class="sim-rail">${VIEWS.map(([id, label]) => `<button class="${id === view ? 'active' : ''}" data-action="view" data-value="${id}">${label}</button>`).join('')}</nav>`;
-      return `<div class="sim-equip"><div class="sim-window-wrap">${character ? body : `<div class="sim-window sim-window-${view}">${body}</div>`}${rail}</div>${this.slotEditor()}</div>`;
+      const take = onTake ? '<button class="sim-rail-take" data-action="take">Take to Simulator</button>' : '';
+      const rail = `<nav class="sim-rail">${VIEWS.map(([id, label]) => `<button class="${id === view ? 'active' : ''}" data-action="view" data-value="${id}">${label}</button>`).join('')}${take}</nav>`;
+      return `<div class="sim-equip"><div class="sim-window-wrap">${character ? body : `<div class="sim-window sim-window-${view}">${body}${editor ? '' : this.viewTotals()}</div>`}${rail}</div>${editor ? this.slotEditor() : ''}</div>`;
+    },
+    viewTotals() {
+      const totals = { heraldry: ['Heraldry Stats', 'glyph'], card: ['Card Stats', 'card'] }[this.view];
+      return totals ? this.boardTotals(...totals) : '';
+    },
+    onAction(action, ...args) {
+      if (action === 'slot' && !editor) return;
+      if (action === 'take') { onTake?.(); return; }
+      SimulatorPage.onAction.call(this, action, ...args);
     },
     onChange() {},
     apply() {},
@@ -2093,7 +2165,8 @@ export function createReferenceViewer(container, raw) {
     },
   });
   initFixedTooltip();
-  container.innerHTML = '<div class="simulator-page sim-builder sim-readonly"><section class="sim-main"></section></div>';
+  if (!editor) viewer.slots = {};
+  container.innerHTML = `<div class="simulator-page sim-builder sim-readonly${editor ? '' : ' sim-no-editor'}"><section class="sim-main"></section></div>`;
   openBuilders.add(viewer);
   viewer.bind();
   viewer.recalculate();

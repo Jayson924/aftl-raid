@@ -620,38 +620,48 @@
   }
 }
 
-.modal-synced-note {
-  margin-bottom: 1rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: $border-radius;
-  font-size: 0.9rem;
+.modal-synced-note { margin-left: 0.4rem; font-weight: 400; font-size: 0.8rem; color: $text-muted; }
 
-  span {
-    display: block;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.85rem;
+// Edit Character for a synced character: the read-only game window, the hand-set fields beside it.
+.modal .modal-content.modal-builder.modal-builder-synced { max-width: 1040px; }
+.modal-synced-body {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: start;
+  .simulator-page { padding: 0; max-width: none; }
+  .sim-equip { grid-template-columns: auto; margin-bottom: 0; }
+  .modal-overrides {
+    height: 680px; margin-bottom: 0;
+    .ov-panel-general { grid-template-columns: 1fr; }
+    .ov-tabs { justify-content: space-between; padding: 0 0.5rem; }
+    .ov-tab { padding: 0.55rem 0.3rem; font-size: 0.8rem; }
+    .ov-long { display: none; }
+    .ov-short { display: inline; }
   }
 }
+// Below this the panel beside the window is too narrow for its tabs.
+@media (max-width: 1100px) {
+  .modal-synced-body { grid-template-columns: minmax(0, 1fr); .modal-overrides { height: auto; } }
+}
 
+// Same panel look as the simulator's slot editor.
 .modal-overrides {
+  display: flex; flex-direction: column; box-sizing: border-box;
   margin-bottom: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: $border-radius;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.04);
   overflow: hidden;
 
   .ov-title {
     display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-    padding: 0.65rem 0.85rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(244, 196, 48, 0.05);
-    h3 { margin: 0; font-size: 0.95rem; color: $primary-color; }
+    padding: 1rem 1rem 0.75rem;
+    div { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+    h3 { margin: 0; font-size: 1.05rem; color: $text-light; }
+    div > span { color: $text-muted; font-size: 0.85rem; }
     .toggle-label { color: $text-muted; font-size: 0.75rem; }
   }
 
   .ov-tabs {
-    display: flex; gap: 0.25rem; padding: 0 0.6rem; overflow-x: auto; scrollbar-width: none;
+    flex: none; display: flex; gap: 0.25rem; padding: 0 0.6rem; overflow-x: auto; scrollbar-width: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
   .ov-tab {
@@ -664,7 +674,7 @@
   .ov-short { display: none; }
   .ov-count { margin-left: 0.2rem; font-size: 0.7rem; color: $text-muted; font-variant-numeric: tabular-nums; }
 
-  .ov-panel { padding: 0.85rem; }
+  .ov-panel { padding: 0.85rem 1rem 1rem; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   .ov-panel[hidden] { display: none; }
   .ov-meta { color: $text-muted; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
   .ov-note { margin: 0.6rem 0 0; color: $text-muted; font-size: 0.75rem; }
@@ -684,7 +694,7 @@
     option { background-color: #2a2a2a; }
   }
 
-  .ov-panel-general { display: grid; grid-template-columns: 1fr 7.5rem; gap: 0.85rem 0.75rem; }
+  .ov-panel-general { display: grid; grid-template-columns: 1fr 7.5rem; gap: 0.85rem 0.75rem; align-content: start; }
   .ov-field {
     display: flex; flex-direction: column; gap: 0.3rem; margin: 0; min-width: 0;
     span { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
@@ -692,8 +702,8 @@
   }
 
   .ov-grid { display: grid; gap: 0.4rem; }
-  .ov-mastery { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .ov-pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ov-mastery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ov-pairs { grid-template-columns: 1fr; }
 
   .ov-tile {
     display: flex; flex-direction: column; gap: 0.2rem; margin: 0; padding: 0.35rem 0.45rem;

@@ -1,5 +1,6 @@
 import { dataService } from '../data.js';
 import { toast } from '../toast.js';
+import { router } from '../router.js';
 import { modal } from '../modal.js';
 import {
   getClassSpriteStyle,
@@ -66,6 +67,7 @@ export const MyRaidsPage = {
   _lastAddedRaid: null,
   _activeTab: 'raids', // 'raids' | 'tracked' | 'shopping' | 'profile'
   _viewByPlayer: {}, // playerId -> 'stats' | 'cards' | 'shopping' on the Raids tab
+  _simViewers: {}, // playerId -> read-only simulator window on the Character view
   _allPlayers: [],
   _showStats: loadPref(SHOW_STATS_KEY, true),
   _trackedPrefs: { groupBy: 'raid', hideDone: false, ...loadPref(TRACKED_PREFS_KEY, {}), search: '' },
@@ -180,6 +182,7 @@ export const MyRaidsPage = {
   },
 
   destroy() {
+    this.closeAllSimViewers();
     this._myPlayers = [];
     this._personalRaids = [];
     this._characterGroups = [];
@@ -416,6 +419,7 @@ export const MyRaidsPage = {
       raidsByPlayer[raid.playerId].push(raid);
     });
 
+    this.closeAllSimViewers();
     const structure = this.buildAccountStructure(this._myPlayers);
     listEl.innerHTML = this.renderAccountStructure(structure, {
       editable: true,
@@ -496,14 +500,15 @@ export const MyRaidsPage = {
     const synced = syncedLabel(player.syncedAt);
     return `
       <div class="mc-view-tabs">
-        ${tab('stats', 'Gear &amp; Stats')}${tab('cards', 'Cards')}${tab('shopping', 'Shopping')}
+        ${tab('stats', 'Character')}${tab('cards', 'Cards')}${tab('shopping', 'Shopping')}
         ${synced ? `<span class="mc-synced-note" data-tooltip-fixed="Re-sync from the toolbox to update gear, stats and cards">${synced}</span>` : ''}
       </div>
       <div class="mc-char-view" data-player-id="${player.id}">${this.renderCharViewBody(player, view)}</div>`;
   },
 
-  // Gear tiles and stat grid match the Characters page cards; cards and shopping reuse their editors.
+  // Synced builds open in the simulator's windows; typed characters keep the Characters page tiles.
   renderCharViewBody(player, view) {
+    if (view === 'stats' && player.build) return `<div class="mc-sim-view" data-player-id="${player.id}"><p class="empty-state mc-view-loading">Loading…</p></div>`;
     if (view === 'stats') return `<div class="cc-embed mc-char-stats">${PlayersPage._cardSlotsHtml(player)}${PlayersPage._cardStatsHtml(player)}</div>`;
     if (!this.viewLoaded(view)) return '<p class="empty-state mc-view-loading">Loading…</p>';
     if (view === 'cards') return this.renderCardCharacterBlockHTML(player);
@@ -512,12 +517,38 @@ export const MyRaidsPage = {
 
   bindCharView(player) {
     const view = this.charView(player);
+    if (view !== 'stats') this.closeSimViewer(player.id);
     if (!this.viewLoaded(view)) return;
+    if (view === 'stats') this.mountSimViewer(player);
     if (view === 'cards') this.bindCardHandlersFor(player.id);
     if (view === 'shopping') {
       const el = document.querySelector(`.character-shopping[data-player-id="${player.id}"]`);
       if (el) this.bindShoppingHandlersFor(el, player.id);
     }
+  },
+
+  async mountSimViewer(player) {
+    this.closeSimViewer(player.id);
+    const el = document.querySelector(`.mc-sim-view[data-player-id="${player.id}"]`);
+    if (!el) return;
+    try {
+      const { createReferenceViewer, sendToSimulator } = await import('./simulator.jsx');
+      if (!el.isConnected) return;
+      const onTake = () => { sendToSimulator(player); router.navigate('simulator'); window.scrollTo(0, 0); };
+      this._simViewers[player.id] = createReferenceViewer(el, player.build, { editor: false, onTake });
+    } catch (err) {
+      console.error('Error loading the character window:', err);
+      el.innerHTML = '<p class="empty-state">Failed to load.</p>';
+    }
+  },
+
+  closeSimViewer(playerId) {
+    this._simViewers[playerId]?.destroy();
+    delete this._simViewers[playerId];
+  },
+
+  closeAllSimViewers() {
+    Object.keys(this._simViewers).forEach(id => this.closeSimViewer(id));
   },
 
   setupCharViewHandlers(root) {
@@ -535,6 +566,7 @@ export const MyRaidsPage = {
     });
     const body = document.querySelector(`.mc-char-view[data-player-id="${playerId}"]`);
     if (!body) return;
+    this.closeSimViewer(playerId);
     body.innerHTML = this.renderCharViewBody(player, view);
     if (this.viewLoaded(view)) {
       this.bindCharView(player);

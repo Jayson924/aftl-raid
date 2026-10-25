@@ -1,9 +1,11 @@
 // The page's calculator, answered by the simulate function; helpers read the last answer by build identity.
 const ENDPOINT = '/.netlify/functions/simulate';
 const DEBOUNCE_MS = 120;
-const CACHE_MAX = 40;
-// Both builds, their party views and their unbuffed gearscore builds.
-const KEEP_BUILDS = 8;
+const CACHE_MAX = 64;
+// Both builds with their party and gearscore views, or one window per character on My Characters.
+const KEEP_BUILDS = 32;
+// The simulate function's per-request limit.
+const BATCH = 4;
 const EMPTY = Object.freeze({ rows: [], summary: {} });
 const ITEM_FIELDS = ['equipment', 'jewelry', 'engravings', 'glyph_a', 'glyph_s', 'normal_runes', 'talismans'];
 
@@ -50,8 +52,9 @@ export function createRemoteCalculator({ onResult, jobMap }) {
   }
   async function flush() {
     timer = null;
-    const sigs = [...new Set(wanted())];
+    const sigs = [...new Set(wanted())].slice(0, BATCH);
     if (!sigs.length) return;
+    let answered = false;
     for (const sig of sigs) pending.add(sig);
     // Sent verbatim so the answer matches the cached signature.
     const body = `{"builds":{${sigs.map((sig, i) => `"b${i}":${sig}`).join(',')}}}`;
@@ -60,12 +63,14 @@ export function createRemoteCalculator({ onResult, jobMap }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `The calculator did not answer (${res.status})`);
       sigs.forEach((sig, i) => { if (data.results?.[`b${i}`]) remember(sig, data.results[`b${i}`]); });
+      answered = true;
       onResult?.(null);
     } catch (err) {
       onResult?.(err);
     } finally {
       for (const sig of sigs) pending.delete(sig);
-      if (wanted().length) schedule();
+      // A failed request is not retried on its own; the next change asks again.
+      if (answered && wanted().length) schedule();
     }
   }
 

@@ -27,9 +27,17 @@ export function initFixedTooltip() {
       strong.textContent = head;
       tip.append(strong, '\n');
     }
-    // Indented lines read as details of the line above: muted and nudged right.
+    // Indented lines read as details of the line above: muted and nudged right. A "{rarity}" prefix colors the line.
     text.split('\n').forEach((line, i) => {
       if (i) tip.append('\n');
+      const tagged = line.match(/^\{(\w+)\}(.*)$/);
+      if (tagged) {
+        const span = document.createElement('span');
+        span.className = `tooltip-fixed-rarity ${tagged[1]}`;
+        span.textContent = tagged[2];
+        tip.append(span);
+        return;
+      }
       const detail = line.match(/^\s{2,}(.*)$/);
       if (!detail) { tip.append(line); return; }
       const span = document.createElement('span');
