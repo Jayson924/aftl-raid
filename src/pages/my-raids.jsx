@@ -62,8 +62,6 @@ export const MyRaidsPage = {
   _characterGroups: [], // [{ id, accountNumber, name, sortOrder }]
   _draggingPlayerId: null, // character drag-and-drop (Raids tab)
   _playerCards: [], // [{ id, playerId, slotIndex, rarity }]
-  _editingRaidId: null,
-  _editingRaidPlayerId: null,
   _lastAddedRaid: null,
   _activeTab: 'raids', // 'raids' | 'tracked' | 'shopping' | 'profile'
   _viewByPlayer: {}, // playerId -> 'stats' | 'cards' | 'shopping' on the Raids tab
@@ -107,8 +105,6 @@ export const MyRaidsPage = {
           <div class="section-header">
             <div class="section-header-actions">
               <button class="btn btn-secondary mc-stats-toggle" id="toggle-stats-btn">${this._showStats ? 'Hide details' : 'Show details'}</button>
-              <button class="btn btn-danger-ghost" id="delete-raid-all-btn">Delete All Raids</button>
-              <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
               <button class="btn btn-primary" id="add-character-btn">+ Add Character</button>
             </div>
           </div>
@@ -116,7 +112,13 @@ export const MyRaidsPage = {
         </div>
 
         <div class="section my-tracked-section" data-tab-panel="tracked" style="display:none">
-          <h2 class="tracked-heading">This week</h2>
+          <div class="tracked-heading-row">
+            <h2 class="tracked-heading">This week</h2>
+            <div class="section-header-actions">
+              <button class="btn btn-danger-ghost" id="delete-raid-all-btn">Delete All Raids</button>
+              <button class="btn btn-secondary" id="add-raid-all-btn">+ Add Raid to All</button>
+            </div>
+          </div>
           <div id="my-game-raids"></div>
           <h2 class="tracked-heading">Personal raids</h2>
           <div class="tracked-toolbar">
@@ -189,8 +191,6 @@ export const MyRaidsPage = {
     this._draggingPlayerId = null;
     this._playerCards = [];
     this._cardsLoaded = false;
-    this._editingRaidId = null;
-    this._editingRaidPlayerId = null;
     this._lastAddedRaid = null;
     this._activeTab = 'raids';
     this._viewByPlayer = {};
@@ -412,13 +412,6 @@ export const MyRaidsPage = {
       return;
     }
 
-    // Group personal raids by player ID
-    const raidsByPlayer = {};
-    this._personalRaids.forEach(raid => {
-      if (!raidsByPlayer[raid.playerId]) raidsByPlayer[raid.playerId] = [];
-      raidsByPlayer[raid.playerId].push(raid);
-    });
-
     this.closeAllSimViewers();
     const structure = this.buildAccountStructure(this._myPlayers);
     listEl.innerHTML = this.renderAccountStructure(structure, {
@@ -426,7 +419,6 @@ export const MyRaidsPage = {
       containerClass: 'character-cards',
       renderCharacter: (player) => {
         const iconStyle = getClassSpriteStyle(player.role);
-        const playerRaids = raidsByPlayer[player.id] || [];
         return `
           <div class="character-block" data-player-id="${player.id}" data-group-id="${player.groupId || ''}" data-account="${player.accountNumber || 1}">
             <div class="character-card">
@@ -445,10 +437,6 @@ export const MyRaidsPage = {
             </div>
             ${this._showStats ? this.renderCharDetailsHTML(player) : ''}
             ${this.renderCharMoveControls(player)}
-            <div class="character-personal-raids">
-              ${this.renderPlayerRaidsHTML(player.id, playerRaids)}
-              <div class="add-raid-form-container" data-player-id="${player.id}"></div>
-            </div>
           </div>
         `;
       }
@@ -456,8 +444,6 @@ export const MyRaidsPage = {
 
     this.setupRaidBadgeHandlers();
     this.setupEditCharacterHandlers();
-    this.setupPersonalRaidHandlers(listEl);
-    this.setupAddRaidHandlers(listEl);
     this.setupGroupHandlers(listEl);
     this.setupCharacterDnD(listEl);
     this.setupCharacterMoveHandlers(listEl);
@@ -1131,17 +1117,17 @@ export const MyRaidsPage = {
 
     html += `<div class="${containerClass}" data-group-id="${groupId}" data-account="${accountNumber}">`;
     players.forEach(p => { html += renderCharacter(p); });
-    html += `</div>`;
-
-    // Move-to-group drop band. Sits outside .character-cards so it never gets
-    // treated as a swap target. Hidden until a drag starts, except for empty
-    // groups where it doubles as the "this group is empty" placeholder.
+    // Move-to-group slot: the next card in the grid while dragging; swaps only target .character-block.
+    // Empty groups always show it as their placeholder.
     if (showDropZone) {
       const label = isUngrouped ? 'Ungrouped' : (name || 'Ungrouped');
       html += `<div class="character-drop-zone${players.length === 0 ? ' is-empty' : ''}" data-group-id="${groupId}" data-account="${accountNumber}">
         <span>${players.length === 0 ? 'Drop a character here' : `Move to ${escapeHtml(label)}`}</span>
       </div>`;
-    } else if (editable && players.length === 0) {
+    }
+    html += `</div>`;
+
+    if (!showDropZone && editable && players.length === 0) {
       html += `<div class="character-group-empty">Drop a character here</div>`;
     }
 
@@ -1700,6 +1686,7 @@ export const MyRaidsPage = {
     this._myPlayers.forEach(player => {
       this.refreshPlayerRaids(player.id);
     });
+    if (this._activeTab === 'tracked') this.loadTrackedTab();
   },
 
   // ============================================
@@ -1759,464 +1746,8 @@ export const MyRaidsPage = {
     }
   },
 
-  renderPlayerRaidsHTML(playerId, raids) {
-    let html = '';
-    if (raids.length > 0) {
-      html += '<div class="personal-raid-cards">';
-      raids.forEach(raid => {
-        const isComplete = raid.currentClears >= raid.maxClears;
-        const progressPct = Math.min((raid.currentClears / raid.maxClears) * 100, 100);
-
-        html += `
-          <div class="personal-raid-card ${isComplete ? 'completed' : ''}" data-raid-id="${raid.id}">
-            <div class="raid-card-body">
-              <div class="raid-card-top">
-                <span class="raid-name-link" data-raid-id="${raid.id}">${raid.name}<span class="edit-icon">✎</span></span>
-                <span class="progress-text">${raid.currentClears}/${raid.maxClears}</span>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-fill ${isComplete ? 'complete' : ''}" style="width: ${progressPct}%"></div>
-              </div>
-            </div>
-            <div class="raid-counter-btns">
-              <button class="btn-counter btn-decrement" data-raid-id="${raid.id}" ${raid.currentClears <= 0 ? 'disabled' : ''}>-</button>
-              <button class="btn-counter btn-increment" data-raid-id="${raid.id}" ${isComplete ? 'disabled' : ''}>+</button>
-            </div>
-            <button class="btn-icon raid-delete-btn" data-raid-id="${raid.id}" data-tooltip-fixed="Delete">&times;</button>
-          </div>
-        `;
-      });
-      html += '</div>';
-    }
-    html += `<button class="btn btn-add-raid" data-player-id="${playerId}">+ Add Raid</button>`;
-    return html;
-  },
-
-  // Scoped to the Characters list; the Raids tab cards handle their own personal raids.
-  setupPersonalRaidHandlers(root) {
-    // Increment
-    root.querySelectorAll('.btn-increment').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const raidId = btn.dataset.raidId;
-        btn.disabled = true;
-        try {
-          await dataService.incrementPersonalRaid(raidId);
-          const raid = this._personalRaids.find(r => r.id === raidId);
-          if (raid) raid.currentClears++;
-          this.refreshPlayerRaids(raid.playerId);
-        } catch (error) {
-          toast.error(error.message);
-          btn.disabled = false;
-        }
-      });
-    });
-
-    // Decrement
-    root.querySelectorAll('.btn-decrement').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const raidId = btn.dataset.raidId;
-        btn.disabled = true;
-        try {
-          await dataService.decrementPersonalRaid(raidId);
-          const raid = this._personalRaids.find(r => r.id === raidId);
-          if (raid) raid.currentClears--;
-          this.refreshPlayerRaids(raid.playerId);
-        } catch (error) {
-          toast.error(error.message);
-          btn.disabled = false;
-        }
-      });
-    });
-
-    // Edit (clickable raid name)
-    root.querySelectorAll('.raid-name-link').forEach(link => {
-      link.addEventListener('click', () => {
-        const raidId = link.dataset.raidId;
-        const raid = this._personalRaids.find(r => r.id === raidId);
-        if (raid) this.showEditRaidForm(raid);
-      });
-    });
-
-    // Delete
-    root.querySelectorAll('.raid-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const raidId = btn.dataset.raidId;
-        const raid = this._personalRaids.find(r => r.id === raidId);
-        if (!raid) return;
-
-        const confirmed = await modal.confirm(`Delete "${raid.name}"?`, {
-          title: 'Delete Personal Raid',
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
-          danger: true
-        });
-
-        if (confirmed) {
-          try {
-            await dataService.deletePersonalRaid(raidId);
-            const playerId = raid.playerId;
-            this._personalRaids = this._personalRaids.filter(r => r.id !== raidId);
-            this.refreshPlayerRaids(playerId);
-            toast.success('Raid deleted');
-          } catch (error) {
-            toast.error(`Failed to delete: ${error.message}`);
-          }
-        }
-      });
-    });
-  },
-
-  setupAddRaidHandlers(root) {
-    root.querySelectorAll('.btn-add-raid').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const playerId = btn.dataset.playerId;
-        this.showAddRaidForm(playerId);
-      });
-    });
-  },
-
   refreshPlayerRaids(playerId) {
     this.refreshGameCardRaids(playerId);
-    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
-    if (!block) return;
-
-    const raidsContainer = block.querySelector('.character-personal-raids');
-    if (!raidsContainer) return;
-
-    const playerRaids = this._personalRaids.filter(r => r.playerId === playerId);
-    raidsContainer.innerHTML = this.renderPlayerRaidsHTML(playerId, playerRaids)
-      + `<div class="add-raid-form-container" data-player-id="${playerId}"></div>`;
-
-    // Re-bind handlers for this character's raids
-    raidsContainer.querySelectorAll('.btn-increment').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const raidId = btn.dataset.raidId;
-        btn.disabled = true;
-        try {
-          await dataService.incrementPersonalRaid(raidId);
-          const raid = this._personalRaids.find(r => r.id === raidId);
-          if (raid) raid.currentClears++;
-          this.refreshPlayerRaids(playerId);
-        } catch (error) {
-          toast.error(error.message);
-          btn.disabled = false;
-        }
-      });
-    });
-
-    raidsContainer.querySelectorAll('.btn-decrement').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const raidId = btn.dataset.raidId;
-        btn.disabled = true;
-        try {
-          await dataService.decrementPersonalRaid(raidId);
-          const raid = this._personalRaids.find(r => r.id === raidId);
-          if (raid) raid.currentClears--;
-          this.refreshPlayerRaids(playerId);
-        } catch (error) {
-          toast.error(error.message);
-          btn.disabled = false;
-        }
-      });
-    });
-
-    raidsContainer.querySelectorAll('.raid-name-link').forEach(link => {
-      link.addEventListener('click', () => {
-        const raidId = link.dataset.raidId;
-        const raid = this._personalRaids.find(r => r.id === raidId);
-        if (raid) this.showEditRaidForm(raid);
-      });
-    });
-
-    raidsContainer.querySelectorAll('.raid-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const raidId = btn.dataset.raidId;
-        const raid = this._personalRaids.find(r => r.id === raidId);
-        if (!raid) return;
-
-        const confirmed = await modal.confirm(`Delete "${raid.name}"?`, {
-          title: 'Delete Personal Raid',
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
-          danger: true
-        });
-
-        if (confirmed) {
-          try {
-            await dataService.deletePersonalRaid(raidId);
-            this._personalRaids = this._personalRaids.filter(r => r.id !== raidId);
-            this.refreshPlayerRaids(playerId);
-            toast.success('Raid deleted');
-          } catch (error) {
-            toast.error(`Failed to delete: ${error.message}`);
-          }
-        }
-      });
-    });
-
-    raidsContainer.querySelectorAll('.btn-add-raid').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.showAddRaidForm(playerId);
-      });
-    });
-  },
-
-  showAddRaidForm(playerId) {
-    this._editingRaidId = null;
-    this._editingRaidPlayerId = playerId;
-
-    // Hide any other open forms first
-    document.querySelectorAll('.personal-raid-card.adding').forEach(c => c.remove());
-    document.querySelectorAll('.btn-add-raid').forEach(b => { b.style.display = ''; });
-
-    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
-    if (!block) return;
-
-    // Hide the add button
-    const addBtn = block.querySelector('.btn-add-raid');
-    if (addBtn) addBtn.style.display = 'none';
-
-    // Get unique raid names for autocomplete (excluding raids already on this character)
-    const existingRaidsForPlayer = this._personalRaids
-      .filter(r => r.playerId === playerId)
-      .map(r => r.name);
-    const uniqueRaidNames = [...new Set(this._personalRaids.map(r => r.name))]
-      .filter(name => !existingRaidsForPlayer.includes(name))
-      .sort();
-
-    // Pre-fill values from last added raid
-    const prefillName = this._lastAddedRaid?.name || '';
-    const prefillMax = this._lastAddedRaid?.maxClears || 1;
-
-    // Build datalist options
-    const datalistOptions = uniqueRaidNames.map(name => `<option value="${name}">`).join('');
-
-    // Insert the inline add form as a card
-    const raidCards = block.querySelector('.personal-raid-cards');
-    const addFormHTML = `
-      <div class="personal-raid-card adding">
-        <input type="text" class="raid-edit-name-input" placeholder="Raid name" maxlength="50"
-               value="${prefillName}" list="raid-name-suggestions">
-        <datalist id="raid-name-suggestions">${datalistOptions}</datalist>
-        <div class="raid-edit-max">
-          <span>Max</span>
-          <input type="number" class="raid-edit-max-input" min="1" max="99" value="${prefillMax}">
-        </div>
-        <div class="raid-edit-actions">
-          <button class="btn btn-small btn-secondary raid-add-cancel">Cancel</button>
-          <button class="btn btn-small btn-primary raid-add-save">Add</button>
-        </div>
-      </div>
-    `;
-
-    if (raidCards) {
-      raidCards.insertAdjacentHTML('beforeend', addFormHTML);
-    } else {
-      // No raids yet, create the container
-      const raidsContainer = block.querySelector('.character-personal-raids');
-      raidsContainer.insertAdjacentHTML('afterbegin', `<div class="personal-raid-cards">${addFormHTML}</div>`);
-    }
-
-    const addCard = block.querySelector('.personal-raid-card.adding');
-    const nameInput = addCard.querySelector('.raid-edit-name-input');
-    const maxInput = addCard.querySelector('.raid-edit-max-input');
-
-    nameInput.focus();
-    nameInput.select(); // Select pre-filled text for easy replacement
-
-    addCard.querySelector('.raid-add-cancel').addEventListener('click', () => {
-      this.hideAddForm(playerId);
-    });
-
-    addCard.querySelector('.raid-add-save').addEventListener('click', () => {
-      this.saveNewRaid();
-    });
-
-    // When user picks from autocomplete, also fill in max clears from that raid
-    nameInput.addEventListener('input', () => {
-      const selectedName = nameInput.value;
-      const existingRaid = this._personalRaids.find(r => r.name === selectedName);
-      if (existingRaid) {
-        maxInput.value = existingRaid.maxClears;
-      }
-    });
-
-    nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.saveNewRaid();
-      if (e.key === 'Escape') this.hideAddForm(playerId);
-    });
-
-    maxInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.saveNewRaid();
-      if (e.key === 'Escape') this.hideAddForm(playerId);
-    });
-  },
-
-  hideAddForm(playerId) {
-    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
-    if (block) {
-      const addCard = block.querySelector('.personal-raid-card.adding');
-      if (addCard) addCard.remove();
-
-      const addBtn = block.querySelector('.btn-add-raid');
-      if (addBtn) addBtn.style.display = '';
-    }
-    this._editingRaidId = null;
-    this._editingRaidPlayerId = null;
-  },
-
-  showEditRaidForm(raid) {
-    this._editingRaidId = raid.id;
-    this._editingRaidPlayerId = raid.playerId;
-
-    // Find the raid card and replace it with inline edit form
-    const raidCard = document.querySelector(`.personal-raid-card[data-raid-id="${raid.id}"]`);
-    if (!raidCard) return;
-
-    // Store original HTML to restore on cancel
-    this._originalRaidCardHTML = raidCard.outerHTML;
-
-    raidCard.outerHTML = `
-      <div class="personal-raid-card editing" data-raid-id="${raid.id}">
-        <input type="text" class="raid-edit-name-input" value="${raid.name}" maxlength="50" placeholder="Raid name">
-        <div class="raid-edit-max">
-          <span>Max:</span>
-          <input type="number" class="raid-edit-max-input" min="1" max="99" value="${raid.maxClears}">
-        </div>
-        <div class="raid-edit-actions">
-          <button class="btn btn-small btn-secondary raid-edit-cancel">Cancel</button>
-          <button class="btn btn-small btn-primary raid-edit-save">Save</button>
-        </div>
-      </div>
-    `;
-
-    const editCard = document.querySelector(`.personal-raid-card[data-raid-id="${raid.id}"]`);
-    const nameInput = editCard.querySelector('.raid-edit-name-input');
-    const maxInput = editCard.querySelector('.raid-edit-max-input');
-
-    nameInput.focus();
-    nameInput.select();
-
-    editCard.querySelector('.raid-edit-cancel').addEventListener('click', () => {
-      this.cancelInlineEdit(raid);
-    });
-
-    editCard.querySelector('.raid-edit-save').addEventListener('click', () => {
-      this.saveEditedRaid();
-    });
-
-    nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.saveEditedRaid();
-      if (e.key === 'Escape') this.cancelInlineEdit(raid);
-    });
-
-    maxInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.saveEditedRaid();
-      if (e.key === 'Escape') this.cancelInlineEdit(raid);
-    });
-  },
-
-  cancelInlineEdit(raid) {
-    this._editingRaidId = null;
-    this._editingRaidPlayerId = null;
-    this.refreshPlayerRaids(raid.playerId);
-  },
-
-  hideRaidForm(playerId) {
-    const pid = playerId || this._editingRaidPlayerId;
-    if (pid) {
-      const container = document.querySelector(`.add-raid-form-container[data-player-id="${pid}"]`);
-      if (container) container.innerHTML = '';
-      const block = document.querySelector(`.character-block[data-player-id="${pid}"]`);
-      if (block) {
-        const addBtn = block.querySelector('.btn-add-raid');
-        if (addBtn) addBtn.style.display = '';
-      }
-    }
-    this._editingRaidId = null;
-    this._editingRaidPlayerId = null;
-  },
-
-  async saveNewRaid() {
-    const playerId = this._editingRaidPlayerId;
-    const block = document.querySelector(`.character-block[data-player-id="${playerId}"]`);
-    if (!block) return;
-
-    const addCard = block.querySelector('.personal-raid-card.adding');
-    if (!addCard) return;
-
-    const nameInput = addCard.querySelector('.raid-edit-name-input');
-    const maxInput = addCard.querySelector('.raid-edit-max-input');
-    const name = nameInput.value.trim();
-    const maxClears = parseInt(maxInput.value, 10);
-
-    if (!name) {
-      toast.error('Raid name cannot be empty');
-      return;
-    }
-    if (!maxClears || maxClears < 1) {
-      toast.error('Max clears must be at least 1');
-      return;
-    }
-    if (!playerId) {
-      toast.error('No character selected');
-      return;
-    }
-
-    try {
-      await dataService.addPersonalRaid(playerId, name, maxClears);
-      // Remember for pre-filling next add form
-      this._lastAddedRaid = { name, maxClears };
-      this.hideAddForm(playerId);
-      await this.loadPersonalRaids();
-      this.refreshPlayerRaids(playerId);
-      toast.success('Raid added!');
-    } catch (error) {
-      if (error.message?.includes('duplicate') || error.code === '23505') {
-        toast.error('A raid with that name already exists for this character');
-      } else {
-        toast.error(`Failed to add raid: ${error.message}`);
-      }
-    }
-  },
-
-  async saveEditedRaid() {
-    const editCard = document.querySelector(`.personal-raid-card[data-raid-id="${this._editingRaidId}"]`);
-    if (!editCard) return;
-
-    const nameInput = editCard.querySelector('.raid-edit-name-input');
-    const maxInput = editCard.querySelector('.raid-edit-max-input');
-    const name = nameInput.value.trim();
-    const maxClears = parseInt(maxInput.value, 10);
-    const playerId = this._editingRaidPlayerId;
-
-    if (!name) {
-      toast.error('Raid name cannot be empty');
-      return;
-    }
-    if (!maxClears || maxClears < 1) {
-      toast.error('Max clears must be at least 1');
-      return;
-    }
-
-    try {
-      await dataService.updatePersonalRaid(this._editingRaidId, { name, maxClears });
-      const raid = this._personalRaids.find(r => r.id === this._editingRaidId);
-      if (raid) {
-        raid.name = name;
-        raid.maxClears = maxClears;
-      }
-      this._editingRaidId = null;
-      this._editingRaidPlayerId = null;
-      this.refreshPlayerRaids(playerId);
-      toast.success('Raid updated!');
-    } catch (error) {
-      if (error.message?.includes('duplicate') || error.code === '23505') {
-        toast.error('A raid with that name already exists for this character');
-      } else {
-        toast.error(`Failed to update raid: ${error.message}`);
-      }
-    }
   },
 
   // ============================================

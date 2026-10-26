@@ -1182,26 +1182,31 @@
   border-radius: 6px;
 }
 
-// Move-to-group band under each group's cards. Dropping a character here pulls
-// it out of its current group instead of swapping with a card. Hidden until a
-// drag starts, except on empty groups where it doubles as the placeholder.
+// Move-to-group slot after each group's cards: a card-sized cell in the grid while dragging.
+// Dropping here pulls the character out of its group instead of swapping. Empty groups show it as a full-width band.
 .my-raids-page .character-drop-zone {
   display: none;
   align-items: center;
   justify-content: center;
-  margin-top: 0.5rem;
+  min-height: 8rem;
   padding: 0.55rem;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   font-style: italic;
   color: $text-muted;
   border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+  border-radius: $border-radius;
   transition: all 0.15s ease;
 
   &.is-empty,
   &.active {
     display: flex;
+  }
+
+  &.is-empty:not(.active) {
+    grid-column: 1 / -1;
+    min-height: 0;
+    font-size: 0.78rem;
   }
 
   &.active {
@@ -2046,6 +2051,10 @@ body .raid-badge-group .raid-badge.from-game .raid-badge-check { color: #7fd8ff;
 
 .my-raids-page .tracked-heading { font-size: 1rem; color: $text-muted; margin: 0 0 0.75rem; }
 .my-raids-page .tracked-heading:not(:first-child) { margin-top: 1.75rem; }
+.my-raids-page .tracked-heading-row {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 1rem; margin-bottom: 0.75rem;
+  .tracked-heading { margin: 0; }
+}
 .my-raids-page .game-raid-cards {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; align-items: start;
 }
