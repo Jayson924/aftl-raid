@@ -2770,6 +2770,11 @@ Raid clear status still resets weekly.">
       // Track this delete to skip self-notification
       this.pendingDeleteId = lineupId;
       await dataService.deleteLineup(lineupId);
+      // The realtime echo is skipped above, so detach the editor from the deleted row here.
+      if (this.currentLineup.id === lineupId) {
+        this.currentLineup.id = null;
+        this.leaveLineupPresence();
+      }
       toast.success(`GG wala nang ${lineupName}!`);
       this.loadExistingLineups(); // Refresh the lineup list
     } catch (error) {
@@ -3238,13 +3243,22 @@ Raid clear status still resets weekly.">
     document.getElementById('move-discard-btn').disabled = !dirtyCount;
 
     const lineups = this.getMoveBoardLineups();
+    const newCard = `<button type="button" class="move-new-lineup" id="move-new-lineup">+ New Lineup</button>`;
     if (!lineups.length) {
-      grid.innerHTML = `<div class="empty-state">No ${this.moveRaidType} lineups ${this.moveWeek === 'next' ? 'for next week' : 'this week'}</div>`;
+      grid.innerHTML = `<div class="empty-state">No ${this.moveRaidType} lineups ${this.moveWeek === 'next' ? 'for next week' : 'this week'}</div>${newCard}`;
+      document.getElementById('move-new-lineup').addEventListener('click', () => this.createMoveLineup());
       return;
     }
 
     const playerMap = new Map(this.players.map(p => [p.name, p]));
-    grid.innerHTML = lineups.map(l => renderMiniLineupCard(l, playerMap)).join('');
+    grid.innerHTML = lineups.map(l => renderMiniLineupCard(l, playerMap, { showDeleteButton: true })).join('') + newCard;
+    document.getElementById('move-new-lineup').addEventListener('click', () => this.createMoveLineup());
+    grid.querySelectorAll('.mini-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.deleteLineup(btn.dataset.lineupId);
+      });
+    });
 
     grid.querySelectorAll('.mini-lineup-card').forEach(card => {
       const lineup = lineups.find(l => l.id === card.dataset.lineupId);
@@ -3279,6 +3293,41 @@ Raid clear status still resets weekly.">
         </div>`;
     };
     return `<div class="move-amp">${bar('physical', amp.physical, amp.physicalSources)}${bar('magic', amp.magic, amp.magicSources)}</div>`;
+  },
+
+  // Saved right away, empty, in the raid type and week the board shows; unsaved moves elsewhere stay as drafts.
+  async createMoveLineup() {
+    if (!dataService.canEditLineups()) {
+      toast.error('You do not have permission to create lineups.');
+      return;
+    }
+    const taken = new Set(this.allLineups.map(l => l.name.trim().toLowerCase()));
+    let n = this.getMoveBoardLineups().length + 1;
+    while (taken.has(`lineup ${n}`)) n++;
+    const name = (await modal.prompt(`New ${this.moveRaidType} lineup ${this.moveWeek === 'next' ? 'for next week' : 'for this week'}.`, {
+      title: 'New Lineup', okText: 'Create', placeholder: 'Lineup name', defaultValue: `Lineup ${n}`
+    }))?.trim();
+    if (!name) return;
+    if (taken.has(name.toLowerCase())) {
+      toast.error(`A lineup named ${name} already exists.`);
+      return;
+    }
+    try {
+      const result = await dataService.addLineup({
+        name,
+        raidType: this.moveRaidType,
+        status: 'ready',
+        players: Array(8).fill(''),
+        ticketPlayers: Array(8).fill(false),
+        pilotPlayers: Array(8).fill(''),
+        isNextWeek: this.moveWeek === 'next'
+      });
+      this._markPendingUpdate(result.data?.id);
+      toast.success(`Created ${name}`);
+      await this.loadExistingLineups();
+    } catch (error) {
+      toast.error(`Could not create the lineup: ${error.message}`);
+    }
   },
 
   bindMoveSlot(slot, lineupId, idx) {
