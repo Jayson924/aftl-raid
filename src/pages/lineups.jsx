@@ -23,7 +23,7 @@ export const LineupsPage = {
     }
   },
   activeSection: 'lineups', // 'lineups' | 'loot-log'
-  currentRaidType: 'BDN Classic',
+  currentRaidType: 'BDN Hardcore',
   currentShowcaseLineup: null,
   allLineups: [],
   cachedPlayerMap: null,

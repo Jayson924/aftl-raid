@@ -17,7 +17,7 @@ export const LineupEditorPage = {
   currentLineup: {
     id: null, // UUID from database (null for new unsaved lineups)
     name: '',
-    raidType: 'BDN Classic',
+    raidType: 'BDN Hardcore',
     status: 'ready',
     players: [],
     ticketSlots: Array(8).fill(false), // Track ticket usage per slot
@@ -46,7 +46,7 @@ export const LineupEditorPage = {
   pendingUpdateIds: new Set(), // Track lineup IDs being updated by current user (or bot at user's request) to skip self-notification
   flatpickrInstance: null, // Flatpickr date/time picker instance
   moveMode: false,
-  moveRaidType: 'BDN Classic',
+  moveRaidType: 'BDN Hardcore',
   moveWeek: 'current',
   moveDrafts: new Map(), // lineup id → { players, ticketPlayers, pilotPlayers } not yet saved
   moveDrag: null, // { lineupId, idx } while a board character is being dragged
@@ -59,7 +59,7 @@ export const LineupEditorPage = {
     this.currentLineup = {
       id: null,
       name: '',
-      raidType: 'BDN Classic',
+      raidType: 'BDN Hardcore',
       status: 'ready',
       players: [],
       ticketSlots: Array(8).fill(false),

@@ -41,7 +41,7 @@ export async function showLineupCreatorModal({ onLoadInEditor }) {
   let includeCleared = false;
   let includeInExisting = false;
   let selectedUsersOnly = false;
-  let raidType = 'BDN Classic';
+  let raidType = 'BDN Hardcore';
   const selectedUsers = new Set();
   let generatedResult = null;
 
