@@ -23,9 +23,11 @@ import { ArenaTiebreakerPage } from './arena/arena-tiebreaker.jsx'
 import { ArenaResultsPage } from './arena/arena-results.jsx'
 import { dataService } from './data.js'
 import { toast } from './toast.js'
+import { initFixedTooltip } from './fixed-tooltip.js'
 
 // Initialize the app
 async function initApp() {
+  initFixedTooltip();
   // Handle Discord OAuth callback
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
@@ -160,7 +162,7 @@ function renderNavigation() {
       <div class="nav-actions">
         ${isAuthenticated ? `
           <div class="user-dropdown" id="user-dropdown">
-            <button class="user-dropdown-toggle" id="user-dropdown-toggle" title="${displayName} (${dataService.getUserRole()})">
+            <button class="user-dropdown-toggle" id="user-dropdown-toggle" data-tooltip-fixed="${displayName} (${dataService.getUserRole()})">
               <img src="${avatarUrl || '/icons/avatar.svg'}" alt="${displayName}" class="user-avatar" onerror="this.src='/icons/avatar.svg'">
               <span class="user-name">${displayName}</span>
               <span class="dropdown-arrow">▼</span>
@@ -176,7 +178,7 @@ function renderNavigation() {
             </div>
           </div>
         ` : `
-          <button id="login-btn" class="btn-discord" title="Login with Discord">
+          <button id="login-btn" class="btn-discord" data-tooltip-fixed="Login with Discord">
             <svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
               <path d="M60.1 4.9C55.6 2.8 50.7 1.3 45.7.4c-.1 0-.2 0-.2.1-.6 1.1-1.3 2.6-1.8 3.7-5.5-.8-10.9-.8-16.3 0-.5-1.2-1.2-2.6-1.8-3.7 0-.1-.1-.1-.2-.1-5.1.9-9.9 2.4-14.5 4.5 0 0-.1 0-.1.1C1.6 18.7-.9 32.1.3 45.4c0 .1 0 .1.1.2 6.1 4.5 12 7.2 17.7 9 .1 0 .2 0 .2-.1 1.4-1.9 2.6-3.8 3.6-5.9.1-.1 0-.3-.1-.3-2-.8-3.8-1.7-5.6-2.7-.1-.1-.1-.3 0-.4.4-.3.8-.6 1.1-.9.1-.1.2-.1.2 0 11.6 5.3 24.2 5.3 35.7 0 .1 0 .2 0 .2 0 .4.3.7.6 1.1.9.1.1.1.3 0 .4-1.8 1-3.6 1.9-5.6 2.7-.1 0-.2.2-.1.3 1.1 2.1 2.3 4.1 3.6 5.9 0 .1.1.1.2.1 5.7-1.8 11.6-4.5 17.7-9 0 0 .1-.1.1-.2 1.4-14.5-2.4-27.1-10-38.3 0 0 0-.1-.1-.1zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.4 3.2 6.4 7.2 0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.2 6.4 7.2 0 4-2.8 7.2-6.4 7.2z"/>
             </svg>

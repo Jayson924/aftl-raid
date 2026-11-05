@@ -1095,7 +1095,7 @@ export const SimulatorPage = {
             <button class="btn btn-secondary" data-action="screenshot">Read screenshot</button>
           </div>
           <div class="sim-picker sim-more">
-            <button type="button" class="sim-more-btn" data-action="picker-toggle" aria-haspopup="menu" aria-label="More build actions" title="More">&#8943;</button>
+            <button type="button" class="sim-more-btn" data-action="picker-toggle" aria-haspopup="menu" aria-label="More build actions" data-tooltip-fixed="More">&#8943;</button>
             <ul class="sim-picker-list" role="menu">
               <li><button type="button" role="menuitem" data-action="export">Copy build JSON</button></li>
               <li><button type="button" role="menuitem" data-action="import">Paste build JSON</button></li>

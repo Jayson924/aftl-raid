@@ -171,7 +171,7 @@ export const AdminPage = {
       <li class="admin-guest-item">
         <span class="admin-guest-item-name">${escapeHtml(b.name)}</span>
         <span class="admin-guest-item-meta">${escapeHtml(b.build?.second_job || '')} · ${this._formatDate(b.updated_at)}</span>
-        <button class="btn btn-secondary btn-sm" data-guest-action="copy-build" data-id="${escapeHtml(b.id)}" title="Copy the build JSON; use Paste JSON on the simulator to open it">Copy JSON</button>
+        <button class="btn btn-secondary btn-sm" data-guest-action="copy-build" data-id="${escapeHtml(b.id)}" data-tooltip-fixed="Copy the build JSON; use Paste JSON on the simulator to open it">Copy JSON</button>
         <button class="btn btn-danger-ghost btn-sm" data-guest-action="delete-build" data-id="${escapeHtml(b.id)}">Delete</button>
       </li>`).join('');
     const characterRows = characters.map(c => {
@@ -181,7 +181,7 @@ export const AdminPage = {
       return `
       <li class="admin-guest-item">
         <span class="admin-guest-item-name">${escapeHtml(c.name)}</span>
-        <span class="admin-guest-item-meta" title="${escapeHtml(tip)}">${tally.done}/${tally.total} this week${own ? ` · ${own} own raid${own === 1 ? '' : 's'}` : ''}</span>
+        <span class="admin-guest-item-meta" data-tooltip-fixed="${escapeHtml(tip)}">${tally.done}/${tally.total} this week${own ? ` · ${own} own raid${own === 1 ? '' : 's'}` : ''}</span>
         <button class="btn btn-danger-ghost btn-sm" data-guest-action="delete-character" data-id="${escapeHtml(c.id)}">Delete</button>
       </li>`;
     }).join('');
@@ -580,7 +580,7 @@ export const AdminPage = {
           <img src="${escapeHtml(user.avatarUrl || '/icons/avatar.svg')}" alt="" class="admin-user-avatar" onerror="this.src='/icons/avatar.svg'">
           <div class="admin-user-details">
             <div class="admin-user-name-row">
-              <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${discordId}" ${isOtherAdmin(user) ? '' : 'title="Click to edit name"'}>${escapeHtml(user.displayName)}</span>
+              <span class="admin-user-name ${isOtherAdmin(user) ? 'not-editable' : ''}" data-discord-id="${discordId}" ${isOtherAdmin(user) ? '' : 'data-tooltip-fixed="Click to edit name"'}>${escapeHtml(user.displayName)}</span>
               ${this._isNewUser(user) ? '<span class="admin-user-new-badge">NEW</span>' : ''}
             </div>
             <span class="admin-user-username">${escapeHtml(user.username)}</span>
@@ -594,7 +594,7 @@ export const AdminPage = {
             <span class="toggle-slider"></span>
             <span class="toggle-label">Exclude</span>
           </label>
-          <select class="admin-role-select" data-discord-id="${discordId}" ${user.discordId === currentUserId || user.role === 'admin' ? 'disabled' : ''} title="${user.role === 'admin' ? 'Admin follows Vice Members on Discord' : 'Synced with Discord roles'}">
+          <select class="admin-role-select" data-discord-id="${discordId}" ${user.discordId === currentUserId || user.role === 'admin' ? 'disabled' : ''} data-tooltip-fixed="${user.role === 'admin' ? 'Admin follows Vice Members on Discord' : 'Synced with Discord roles'}">
             <option value="guest" ${user.role === 'guest' ? 'selected' : ''}>Guest</option>
             <option value="friend" ${user.role === 'friend' ? 'selected' : ''}>Friend (part-time)</option>
             <option value="guildmate" ${user.role === 'guildmate' ? 'selected' : ''}>Guildmate</option>

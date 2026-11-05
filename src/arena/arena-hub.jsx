@@ -928,7 +928,7 @@ export const ArenaHubPage = {
         <div class="upcoming-match-card">
           ${canForfeit ? `
             <div class="upcoming-admin-menu">
-              <button class="upcoming-admin-toggle" title="Admin actions">&#9881;</button>
+              <button class="upcoming-admin-toggle" data-tooltip-fixed="Admin actions" aria-label="Admin actions">&#9881;</button>
               <div class="upcoming-admin-dropdown">
                 <button class="admin-force-start-btn" data-match-id="${match.id}">Force Start</button>
                 <button class="arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player1_id}" data-winner-name="${p1Name}">
@@ -999,7 +999,7 @@ export const ArenaHubPage = {
       <div class="live-match-card ${isLive ? 'live-match-active' : ''} ${isComplete ? 'live-match-complete' : ''}">
         ${canForfeit ? `
           <div class="upcoming-admin-menu">
-            <button class="upcoming-admin-toggle" title="Admin actions">&#9881;</button>
+            <button class="upcoming-admin-toggle" data-tooltip-fixed="Admin actions" aria-label="Admin actions">&#9881;</button>
             <div class="upcoming-admin-dropdown">
               <button class="arena-forfeit-btn" data-match-id="${match.id}" data-winner-id="${match.player1_id}" data-winner-name="${p1Name}">
                 ${p1Name} wins

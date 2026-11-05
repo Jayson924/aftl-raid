@@ -267,7 +267,7 @@ export const RecruitingPage = {
         ? `<span class="class-sprite" style="${getClassSpriteStyle(guest.role)}"></span>`
         : `<div class="slot-chip__icon-placeholder">?</div>`;
       const preference = guest.preference
-        ? `<div class="slot-chip__preference" title="${guest.preference}">${guest.preference}</div>`
+        ? `<div class="slot-chip__preference" data-tooltip-fixed="${guest.preference}">${guest.preference}</div>`
         : '';
       return `<div class="slot-chip slot-chip--empty slot-chip--guest ${slotTypeClass}">
         <div class="slot-chip__icon slot-chip__icon--ghost">${iconHtml}</div>
@@ -292,7 +292,7 @@ export const RecruitingPage = {
     const spriteStyle = getClassSpriteStyle(player.role);
     const tipHtml = renderChipTip(player);
     const nameHtml = this.showPlayerNames
-      ? `<div class="slot-chip__name" title="${player.name}">${player.name}</div>`
+      ? `<div class="slot-chip__name" data-tooltip-fixed="${player.name}">${player.name}</div>`
       : '';
 
     return `<div class="slot-chip slot-chip--filled ${slotTypeClass}" data-player-name="${player.name}"

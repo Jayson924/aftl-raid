@@ -856,7 +856,7 @@ export const MyRaidsPage = {
             <button class="btn-counter btn-decrement" data-gr-action="step" data-delta="-1" ${raid.currentClears <= 0 ? 'disabled' : ''}>-</button>
             <button class="btn-counter btn-increment" data-gr-action="step" data-delta="1" ${done ? 'disabled' : ''}>+</button>
           </div>
-          <button class="btn-icon raid-delete-btn" data-gr-action="delete" data-tooltip-fixed="Delete">&times;</button>
+          <button class="btn-icon raid-delete-btn" data-gr-action="delete" data-tooltip-fixed="Delete" aria-label="Delete">&times;</button>
         </div>`;
     });
     if (form && !form.raidId) cards.push(this.renderGameCardRaidForm(null));
@@ -1108,8 +1108,8 @@ export const MyRaidsPage = {
         html += `<span class="character-group-controls">
           <button class="group-move-up" data-group-id="${groupId}" data-tooltip-fixed="Move group up">↑</button>
           <button class="group-move-down" data-group-id="${groupId}" data-tooltip-fixed="Move group down">↓</button>
-          <button class="group-rename" data-group-id="${groupId}" data-tooltip-fixed="Rename group">✎</button>
-          <button class="group-delete" data-group-id="${groupId}" data-tooltip-fixed="Delete group">×</button>
+          <button class="group-rename" data-group-id="${groupId}" data-tooltip-fixed="Rename group" aria-label="Rename group">✎</button>
+          <button class="group-delete" data-group-id="${groupId}" data-tooltip-fixed="Delete group" aria-label="Delete group">×</button>
         </span>`;
       }
       html += `</div>`;
@@ -1772,7 +1772,7 @@ export const MyRaidsPage = {
             <button class="shopping-check" data-item-id="${item.id}" data-tooltip-fixed="${item.bought ? 'Mark as not bought' : 'Mark as bought'}">${item.bought ? '✓' : ''}</button>
             <span class="shopping-item-text">${escapeHtml(item.item)}</span>
             <input type="number" class="shopping-price-input" data-item-id="${item.id}" value="${item.price || ''}" min="0" step="any" placeholder="0" data-tooltip-fixed="Price">
-            <button class="shopping-delete-btn" data-item-id="${item.id}" data-tooltip-fixed="Delete">&times;</button>
+            <button class="shopping-delete-btn" data-item-id="${item.id}" data-tooltip-fixed="Delete" aria-label="Delete">&times;</button>
           </div>
         `;
       });
@@ -2091,7 +2091,7 @@ export const MyRaidsPage = {
               <span class="extra-amount">×${e.amount}</span>
               <button class="extra-amount-btn" data-action="extra-inc" data-extra-id="${e.id}">+</button>
             </span>
-            <button class="extra-delete-btn" data-action="extra-delete" data-extra-id="${e.id}" data-tooltip-fixed="Remove">×</button>
+            <button class="extra-delete-btn" data-action="extra-delete" data-extra-id="${e.id}" data-tooltip-fixed="Remove" aria-label="Remove">×</button>
           </div>
         `;
       }).join('')}</div>`;

@@ -301,7 +301,7 @@ export const ArenaSetupPage = {
               <div class="setup-player-card in-bracket">
                 <img src="${this._getAvatarUrl(s.discord_id) || '/icons/avatar.svg'}" alt="" class="setup-player-avatar" onerror="this.src='/icons/avatar.svg'">
                 <span class="setup-player-name">${this._getDisplayName(s.discord_id)}</span>
-                <button class="setup-remove-btn registration-remove-btn" data-signup-id="${s.id}" data-discord-id="${s.discord_id}" title="Remove">&times;</button>
+                <button class="setup-remove-btn registration-remove-btn" data-signup-id="${s.id}" data-discord-id="${s.discord_id}" data-tooltip-fixed="Remove" aria-label="Remove">&times;</button>
               </div>
             `).join('')}
         </div>
@@ -509,7 +509,7 @@ export const ArenaSetupPage = {
       <div class="setup-player-card in-bracket" draggable="true" data-participant-id="${participant.id}" data-discord-id="${participant.discord_id}" data-source="bracket">
         <img src="${avatar || '/icons/avatar.svg'}" alt="" class="setup-player-avatar" onerror="this.src='/icons/avatar.svg'">
         <span class="setup-player-name">${name}</span>
-        <button class="setup-remove-btn" data-participant-id="${participant.id}" title="Remove">&times;</button>
+        <button class="setup-remove-btn" data-participant-id="${participant.id}" data-tooltip-fixed="Remove" aria-label="Remove">&times;</button>
       </div>
     `;
   },

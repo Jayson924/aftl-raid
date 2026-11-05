@@ -72,7 +72,7 @@ function renderMiniPlayerCard(playerName, playerMap, lineup, idx) {
   const backgroundStyle = isPub ? PUB_BACKGROUND : getEquipmentBackground(player);
 
   const ticketHtml = showTicketFlag && !isPub
-    ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" title="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>`
+    ? `<div class="ticket-flag-mini ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'}" data-tooltip-fixed="${hasTicket ? 'Using ticket' : 'No ticket'}"><img src="/icons/ticket.svg" alt="T"></div>`
     : '';
 
   const pilotName = lineup.pilotPlayers?.[idx] || '';
@@ -119,7 +119,7 @@ export function renderMiniLineupCard(lineup, playerMap, options = {}) {
   const playerCards = renderMiniPlayerCards(lineup, playerMap);
 
   const deleteBtn = showDeleteButton && dataService.canEditLineups()
-    ? `<button class="mini-delete-btn" data-lineup-id="${lineup.id}" title="Delete lineup">×</button>`
+    ? `<button class="mini-delete-btn" data-lineup-id="${lineup.id}" data-tooltip-fixed="Delete lineup" aria-label="Delete lineup">×</button>`
     : '';
 
   return `
@@ -127,7 +127,7 @@ export function renderMiniLineupCard(lineup, playerMap, options = {}) {
       <div class="mini-lineup-header">
         <span class="mini-lineup-name">
           ${lineup.isNextWeek ? '<span class="next-week-badge-mini">NW</span>' : ''}
-          ${lineup.isStatic ? '<img src="/icons/group.svg" class="static-icon-mini" title="Permanent lineup" alt="Permanent">' : ''}
+          ${lineup.isStatic ? '<img src="/icons/group.svg" class="static-icon-mini" data-tooltip-fixed="Permanent lineup" alt="Permanent">' : ''}
           ${lineup.name}
         </span>
         <div class="mini-lineup-header-actions">

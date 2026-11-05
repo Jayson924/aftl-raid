@@ -423,8 +423,8 @@ export const ArenaMatchPage = {
                 </button>
               </div>
               <div class="action-triangle-arrows">
-                <span class="triangle-arrow arrow-left" title="Strong Attack beats Defend">↑ <span class="beats-label">beats</span></span>
-                <span class="triangle-arrow arrow-right" title="Defend beats Attack"><span class="beats-label">beats</span> ↓</span>
+                <span class="triangle-arrow arrow-left" data-tooltip-fixed="Strong Attack beats Defend">↑ <span class="beats-label">beats</span></span>
+                <span class="triangle-arrow arrow-right" data-tooltip-fixed="Defend beats Attack"><span class="beats-label">beats</span> ↓</span>
               </div>
               <div class="action-triangle-bottom">
                 <button class="arena-btn action-btn ${this._myAction === 'strong_attack' ? 'selected' : ''}" data-action="strong_attack">

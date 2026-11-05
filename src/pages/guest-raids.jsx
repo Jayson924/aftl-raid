@@ -123,7 +123,7 @@ export const GuestRaidsPage = {
             <button class="btn-counter btn-decrement" data-action="step" data-delta="-1" ${raid.clears <= 0 ? 'disabled' : ''}>-</button>
             <button class="btn-counter btn-increment" data-action="step" data-delta="1" ${raid.done ? 'disabled' : ''}>+</button>
           </div>
-          <button class="btn-icon raid-delete-btn" data-action="remove-raid" data-tooltip-fixed="Delete">&times;</button>
+          <button class="btn-icon raid-delete-btn" data-action="remove-raid" data-tooltip-fixed="Delete" aria-label="Delete">&times;</button>
         </div>`;
     });
     if (form && !form.raidId) cards.push(this.renderRaidForm(null));

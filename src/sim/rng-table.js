@@ -111,7 +111,7 @@ function potentialPools(rarity) {
 
 // Sets sorted by chance, most likely first unless the sort says otherwise.
 const sortByChance = (list, order) => [...list].sort((a, b) => (order === 'asc' ? a.pct - b.pct : b.pct - a.pct));
-const possibilityHead = (order) => `<div class="rng-head"><h2>Every possibility</h2><button class="btn btn-secondary rng-sort" data-action="rng-sort" data-value="${order === 'asc' ? 'desc' : 'asc'}" title="${order === 'asc' ? 'Least likely first' : 'Most likely first'}" aria-label="Sort by chance">${order === 'asc' ? '↑' : '↓'}</button></div>`;
+const possibilityHead = (order) => `<div class="rng-head"><h2>Every possibility</h2><button class="btn btn-secondary rng-sort" data-action="rng-sort" data-value="${order === 'asc' ? 'desc' : 'asc'}" data-tooltip-fixed="${order === 'asc' ? 'Least likely first' : 'Most likely first'}" aria-label="Sort by chance">${order === 'asc' ? '↑' : '↓'}</button></div>`;
 
 function potentialsView(rarity, poolIndex, order) {
   const pools = potentialPools(rarity);
@@ -133,7 +133,7 @@ function potentialsView(rarity, poolIndex, order) {
     .sort(([a], [b]) => attackFirst(a) - attackFirst(b)).map(([s, v]) => line(s, v)).join('')}</ul></article>`).join('');
 
   const at = pools[poolIndex] ? poolIndex : 0;
-  const tile = (action, value, active, cells, r, label, title = label) => `<button class="rng-pool ${active ? 'active' : ''}" data-action="${action}" data-value="${value}" title="${esc(title)}"><span class="rng-pool-icons${cells.length > 1 ? ' rng-pool-pair' : ''}">${cells
+  const tile = (action, value, active, cells, r, label, title = label) => `<button class="rng-pool ${active ? 'active' : ''}" data-action="${action}" data-value="${value}" data-tooltip-fixed="${esc(title)}"><span class="rng-pool-icons${cells.length > 1 ? ' rng-pool-pair' : ''}">${cells
     .map((c) => `<span class="sim-slot ${r}">${spriteIcon(c)}</span>`).join('')}</span><small>${esc(label)}</small></button>`;
   // Rarity tiles show that rarity's every-weapon or sword pool; item tiles group the per-type weapon pools into one.
   const rarityTiles = POTENTIAL_RARITIES.map((r) => {
@@ -147,7 +147,7 @@ function potentialsView(rarity, poolIndex, order) {
   const icon = (c, r) => `<span class="sim-slot ${r}">${spriteIcon(c)}</span>`;
   // With one pool per weapon type, the Weapons tile opens a menu of the types; otherwise it selects its one pool.
   const weaponTile = weaponIdx.length > 1
-    ? `<div class="sim-picker rng-weapon-picker"><button class="rng-pool ${onWeapon ? 'active' : ''}" data-action="picker-toggle" aria-haspopup="listbox" title="${esc(weaponPool.items.join(', '))}"><span class="rng-pool-icons">${poolCells(weaponPool, rarity).slice(0, 1).map((c) => icon(c, rarity)).join('')}</span><small>${esc(onWeapon ? weaponPool.items.join(', ') : 'Weapons')} ▾</small></button>
+    ? `<div class="sim-picker rng-weapon-picker"><button class="rng-pool ${onWeapon ? 'active' : ''}" data-action="picker-toggle" aria-haspopup="listbox" data-tooltip-fixed="${esc(weaponPool.items.join(', '))}"><span class="rng-pool-icons">${poolCells(weaponPool, rarity).slice(0, 1).map((c) => icon(c, rarity)).join('')}</span><small>${esc(onWeapon ? weaponPool.items.join(', ') : 'Weapons')} ▾</small></button>
       <ul class="sim-picker-list" role="listbox">${weaponIdx.map((i) => `<li><button type="button" class="${onWeapon && i === at ? 'selected' : ''}" data-action="rng-pot-pool" data-value="${rarity}|${i}" role="option">${poolCells(pools[i], rarity).slice(0, 1).map((c) => icon(c, rarity)).join('')}<span>${esc(pools[i].items.join(', '))}</span></button></li>`).join('')}</ul></div>`
     : weaponIdx.length ? tile('rng-pot-pool', `${rarity}|${weaponIdx[0]}`, onWeapon, poolCells(weaponPool, rarity).slice(0, 2), rarity, weaponPool.label, weaponPool.items.join(', ')) : '';
   const itemTiles = [weaponTile, ...others.map(([p, i]) => tile('rng-pot-pool', `${rarity}|${i}`, i === at, poolCells(p, rarity), rarity, p.label, p.items.join(', ')))].join('');
@@ -211,7 +211,7 @@ function fellowshipView(level, plateIndex, order) {
     const cell = icons.items.Heraldry?.[`${name}|Lv${level}`];
     const iconHtml = cell === undefined ? '' : `<span class="sim-slot unique">${spriteIcon(cell)}</span>`;
     const short = name.replace(' Fellowship Heraldry', '');
-    return `<div class="sim-picker rng-weapon-picker"><button class="rng-pool ${current ? 'active' : ''}" data-action="picker-toggle" aria-haspopup="listbox" title="${esc(name)}"><span class="rng-pool-icons">${iconHtml}</span><small>${esc(short)}${current ? ` · ${esc(current[0].focus)}` : ''} ▾</small></button>
+    return `<div class="sim-picker rng-weapon-picker"><button class="rng-pool ${current ? 'active' : ''}" data-action="picker-toggle" aria-haspopup="listbox" data-tooltip-fixed="${esc(name)}"><span class="rng-pool-icons">${iconHtml}</span><small>${esc(short)}${current ? ` · ${esc(current[0].focus)}` : ''} ▾</small></button>
       <ul class="sim-picker-list" role="listbox">${options.map(([p, i]) => `<li><button type="button" class="${i === at ? 'selected' : ''}" data-action="rng-fellow-pick" data-value="${i}" role="option">${iconHtml}<span>${esc(p.focus)} focus</span></button></li>`).join('')}</ul></div>`;
   }).join('');
   return `<div class="rng-pool-bar"><div class="rng-level-col">${levelButtons}</div><span class="rng-pool-sep"></span><div class="rng-pools">${plateTiles}</div></div>

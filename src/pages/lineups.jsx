@@ -430,7 +430,7 @@ export const LineupsPage = {
           <div class="lineup-card-title">
             <h3>
               ${lineup.isNextWeek ? '<span class="next-week-badge">Next Week</span>' : ''}
-              ${lineup.isStatic ? '<img src="/icons/group.svg" class="static-icon" title="Permanent lineup — same members every week" alt="Permanent">' : ''}
+              ${lineup.isStatic ? '<img src="/icons/group.svg" class="static-icon" data-tooltip-fixed="Permanent lineup — same members every week" alt="Permanent">' : ''}
               ${lineup.name}
             </h3>
             ${raidTimeDisplay ? `<span class="raid-time-display"><img src="/icons/calendarclock.svg" alt="" class="raid-time-icon">${raidTimeDisplay}</span>` : ''}
@@ -526,7 +526,7 @@ export const LineupsPage = {
             const pilotDisplay = pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${pilotName}</span>` : '';
 
             return `
-            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${canManage ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" title="${hasTicket ? 'Using ticket' : 'No ticket'}${canManage ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
+            <div class="player-slot ${isPub ? 'pub-player' : ''}" style="${backgroundStyle}">${showTicketFlag && !isPub ? `<div class="ticket-flag ${hasTicket ? 'ticket-flag--active' : 'ticket-flag--inactive'} ${canManage ? 'ticket-flag--clickable' : ''}" data-slot-index="${idx}" data-tooltip-fixed="${hasTicket ? 'Using ticket' : 'No ticket'}${canManage ? ' (click to toggle)' : ''}"><img src="/icons/ticket.svg" alt="Ticket"></div>` : ''}
               ${player.role ? `<div class="class-sprite slot-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
               <span class="slot-number">${idx + 1}</span>
               <div class="player-slot-info">
@@ -1494,14 +1494,14 @@ export const LineupsPage = {
     const cleared = record.clearedAt ? moment(record.clearedAt) : null;
     return `
       <div class="loot-record-head">
-        <span class="loot-record-name" title="${this.escapeHtml(record.name || 'Lineup')}">${this.escapeHtml(record.name || 'Lineup')}</span>
+        <span class="loot-record-name" data-tooltip-fixed="${this.escapeHtml(record.name || 'Lineup')}">${this.escapeHtml(record.name || 'Lineup')}</span>
         ${resolved ? '<span class="loot-record-badge">Settled</span>' : ''}
         ${record.raidType ? `<span class="loot-record-raid">${this.escapeHtml(formatRaidTypeLabel(record.raidType))}</span>` : ''}
       </div>
       ${cleared || (canManage && record.isRecord) ? `
       <div class="loot-record-subhead">
-        ${cleared ? `<span class="loot-record-date" title="${cleared.format('ddd, MMM D, YYYY h:mm A')}">cleared ${cleared.fromNow()}</span>` : ''}
-        ${canManage && record.isRecord ? `<button class="loot-icon-btn loot-record-delete" title="Delete this record">🗑</button>` : ''}
+        ${cleared ? `<span class="loot-record-date" data-tooltip-fixed="${cleared.format('ddd, MMM D, YYYY h:mm A')}">cleared ${cleared.fromNow()}</span>` : ''}
+        ${canManage && record.isRecord ? `<button class="loot-icon-btn loot-record-delete" data-tooltip-fixed="Delete this record" aria-label="Delete this record">🗑</button>` : ''}
       </div>` : ''}
       ${roster.length ? `<div class="loot-record-roster">${roster.map(n => `<span class="loot-record-member">${this.escapeHtml(n)}</span>`).join('')}</div>` : ''}
       ${this.renderLootSection(record, canManage)}

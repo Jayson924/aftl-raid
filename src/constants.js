@@ -565,7 +565,7 @@ function weaponPieceChip(piece, title, abbreviate = false) {
   const label = info?.label || piece.rarity;
   const shown = abbreviate ? label.charAt(0).toUpperCase() : label;
   const tip = abbreviate ? `${title} — ${label}` : title;
-  return `<span class="equip-piece" style="color: ${info?.color || 'inherit'}" title="${tip}">${shown}${enh}</span>`;
+  return `<span class="equip-piece" style="color: ${info?.color || 'inherit'}" data-tooltip-fixed="${tip}">${shown}${enh}</span>`;
 }
 
 // Generate compact equipment + suffix summary HTML for a player.
@@ -608,7 +608,7 @@ export function formatPlayerEquipmentHtml(player, cssClass = 'player-equipment',
       color = info?.color || 'inherit';
     }
     const title = `Avg of ${armorPieces.length} armor piece${armorPieces.length === 1 ? '' : 's'}`;
-    armorChip = `<span class="equip-piece" style="color: ${color}" title="${title}">${label} ${avgStr}<span class="equip-avg-tag"> (avg)</span></span>`;
+    armorChip = `<span class="equip-piece" style="color: ${color}" data-tooltip-fixed="${title}">${label} ${avgStr}<span class="equip-avg-tag"> (avg)</span></span>`;
   } else if (player.armor) {
     const info = rarityInfo(player.armor);
     const full = info?.label || player.armor;

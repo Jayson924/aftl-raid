@@ -383,7 +383,7 @@ export const PlayersPage = {
       const attrs = clickable ? `data-player-id="${player.id}" data-raid-type="${raidType}" data-completed="${done}"` : '';
       const title = fromGame ? 'From game' : source === 'marked' ? 'Marked' : '';
       return `<span class="raid-badge ${cls}${done ? ' completed' : ''}${fromGame ? ' from-game' : ''}${clickable ? ' clickable' : ''}"
-                ${attrs} title="${title}"><span class="raid-badge-label">${label}</span>${done ? check : ''}</span>`;
+                ${attrs} data-tooltip-fixed="${title}"><span class="raid-badge-label">${label}</span>${done ? check : ''}</span>`;
     };
     return `
       <div class="raid-badge-group">
@@ -492,7 +492,7 @@ export const PlayersPage = {
           const count = this.getClassFamilyCount(key);
           return `
           <button class="class-family-btn ${this._selectedClassFamily === key ? 'active' : ''} ${this._expandedClassFamily === key ? 'expanded' : ''}"
-                  data-family="${key}" title="${family.name} (${count})">
+                  data-family="${key}" data-tooltip-fixed="${family.name} (${count})">
             <span class="class-icon-wrapper">
               <div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div>
             </span>
@@ -521,7 +521,7 @@ export const PlayersPage = {
       const count = this.getSpecializationCount(this._expandedClassFamily, key);
       return `
       <button class="specialization-btn ${this._selectedSpecialization === key ? 'active' : ''}"
-              data-spec="${key}" title="${spec.name} (${count})">
+              data-spec="${key}" data-tooltip-fixed="${spec.name} (${count})">
         <div class="spec-icon-wrapper">
           <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
         </div>
@@ -871,7 +871,7 @@ export const PlayersPage = {
     const size = player.discordId ? (this._browseAccountSizes[player.discordId] || 1) : 1;
     if (size <= 1) return '';
     const n = player.accountNumber || 1;
-    return `<span class="acct-badge" data-account="${n}" title="Account ${n}">A${n}</span>${this._accountNameHtml(player.accountName)}`;
+    return `<span class="acct-badge" data-account="${n}" data-tooltip-fixed="Account ${n}">A${n}</span>${this._accountNameHtml(player.accountName)}`;
   },
 
   _renderBrowseGrid(list) {
@@ -948,7 +948,7 @@ export const PlayersPage = {
               </td>
               <td class="player-owner" data-label="Owner">
                 ${owner
-                  ? `<div class="owner-badge" title="${owner.displayName}"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="owner-avatar" onerror="this.src='/icons/avatar.svg'"><span class="owner-name">${owner.displayName}</span></div>`
+                  ? `<div class="owner-badge" data-tooltip-fixed="${owner.displayName}"><img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="" class="owner-avatar" onerror="this.src='/icons/avatar.svg'"><span class="owner-name">${owner.displayName}</span></div>`
                   : '<span class="no-owner">—</span>'}
               </td>
               <td class="browse-acc-cell" data-label="Acc">${size > 1 ? `<span class="acct-badge" data-account="${n}">A${n}</span>` : '<span class="acct-dash">—</span>'}${this._accountNameHtml(player.accountName)}</td>
@@ -1434,7 +1434,7 @@ export const PlayersPage = {
               </td>
               <td class="player-owner" data-label="Owner">
                 ${owner ? `
-                  <div class="owner-badge" title="${owner.displayName}">
+                  <div class="owner-badge" data-tooltip-fixed="${owner.displayName}">
                     <img src="${owner.avatarUrl || '/icons/avatar.svg'}" alt="${owner.displayName}" class="owner-avatar" onerror="this.src='/icons/avatar.svg'">
                     <span class="owner-name">${owner.displayName}</span>
                   </div>
@@ -1921,7 +1921,7 @@ export const PlayersPage = {
       const isSelected = selectedAccount === i;
       html += `<button type="button" class="account-btn ${isSelected ? 'selected' : ''}" data-account="${i}">Acc ${i}</button>`;
     }
-    html += `<button type="button" class="account-btn add-account-btn" title="Add account">+</button>`;
+    html += `<button type="button" class="account-btn add-account-btn" data-tooltip-fixed="Add account" aria-label="Add account">+</button>`;
     html += '</div>';
 
     container.innerHTML = html;
@@ -2033,7 +2033,7 @@ export const PlayersPage = {
       let html = `<div class="modal-class-family-filter">
         ${Object.entries(CLASS_FAMILIES).map(([key, fam]) => `
           <button type="button" class="class-family-btn ${expandedFamily === key ? 'expanded' : ''}"
-                  data-family="${key}" title="${fam.name}">
+                  data-family="${key}" data-tooltip-fixed="${fam.name}">
             <span class="class-icon-wrapper">
               <div class="class-sprite" style="${getClassSpriteStyle(fam.name)}"></div>
             </span>
@@ -2046,7 +2046,7 @@ export const PlayersPage = {
         html += `<div class="modal-specialization-filter">
           ${Object.entries(family.specializations).map(([key, spec]) => `
             <button type="button" class="specialization-btn ${activeSpec === key ? 'active' : ''}"
-                    data-spec="${key}" title="${spec.name}">
+                    data-spec="${key}" data-tooltip-fixed="${spec.name}">
               <div class="spec-icon-wrapper">
                 <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
               </div>

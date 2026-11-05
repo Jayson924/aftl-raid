@@ -907,7 +907,7 @@ Raid clear status still resets weekly.">
       }
 
       // Ticket used badge
-      const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" title="Ticket already used this week"><img src="/icons/ticket.svg" alt="T"></span>` : '';
+      const ticketBadge = ticketUsed ? `<span class="ticket-used-badge" data-tooltip-fixed="Ticket already used this week"><img src="/icons/ticket.svg" alt="T"></span>` : '';
       const isExcluded = this.isPlayerExcluded(player);
       const exclusion = isExcluded ? this.getExclusionInfo(player) : null;
       const escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -929,7 +929,7 @@ Raid clear status still resets weekly.">
              draggable="true">
           ${altBadge}
           ${ticketBadge}
-          ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.activeRaidType()} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
+          ${!needsThisRaid ? `<span class="completion-badge" data-tooltip-fixed="Already completed ${this.activeRaidType()} this week">✓</span>` : (presentInLineup ? `<span class="present-in-badge">${presentInLineup}</span>` : '')}
           ${player.role ? `<div class="class-sprite player-card-class-bg" style="${getClassSpriteStyle(player.role)}"></div>` : ''}
           <div class="player-info">
             <div class="player-name-row">
@@ -1148,7 +1148,7 @@ Raid clear status still resets weekly.">
       <button class="specialization-btn ${this.selectedSpecialization === key ? 'active' : ''}"
               data-specialization="${key}"
               data-family="${this.expandedClassFamily}"
-              title="${spec.name}">
+              data-tooltip-fixed="${spec.name}">
         <div class="spec-icon-wrapper">
           <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
         </div>
@@ -1239,7 +1239,7 @@ Raid clear status still resets weekly.">
       let html = `<div class="modal-class-family-filter">
         ${Object.entries(CLASS_FAMILIES).map(([key, fam]) => `
           <button type="button" class="class-family-btn ${expandedFamily === key ? 'expanded' : ''}"
-                  data-family="${key}" title="${fam.name}">
+                  data-family="${key}" data-tooltip-fixed="${fam.name}">
             <span class="class-icon-wrapper">
               <div class="class-sprite" style="${getClassSpriteStyle(fam.name)}"></div>
             </span>
@@ -1251,7 +1251,7 @@ Raid clear status still resets weekly.">
         html += `<div class="modal-specialization-filter">
           ${Object.entries(family.specializations).map(([key, spec]) => `
             <button type="button" class="specialization-btn ${activeSpec === key ? 'active' : ''}"
-                    data-spec="${key}" title="${spec.name}">
+                    data-spec="${key}" data-tooltip-fixed="${spec.name}">
               <div class="spec-icon-wrapper">
                 <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
               </div>
@@ -1438,10 +1438,10 @@ Raid clear status still resets weekly.">
           const warning = document.createElement('div');
           warning.className = 'account-conflict-warning';
           warning.innerHTML = `<span class="conflict-badge">!</span>`;
-          warning.title = `Same account as slot ${conflict.conflictingSlots.map(s => s + 1).join(', ')}`;
+          warning.dataset.tooltipFixed = `Same account as slot ${conflict.conflictingSlots.map(s => s + 1).join(', ')}`;
           slotElement.appendChild(warning);
         } else {
-          existingWarning.title = `Same account as slot ${conflict.conflictingSlots.map(s => s + 1).join(', ')}`;
+          existingWarning.dataset.tooltipFixed = `Same account as slot ${conflict.conflictingSlots.map(s => s + 1).join(', ')}`;
         }
       } else {
         slotElement.classList.remove('has-account-conflict');
@@ -1503,7 +1503,7 @@ Raid clear status still resets weekly.">
 
         <div class="modal-class-family-filter">
           ${Object.entries(CLASS_FAMILIES).map(([key, family]) => `
-            <button class="class-family-btn" data-family="${key}" title="${family.name}">
+            <button class="class-family-btn" data-family="${key}" data-tooltip-fixed="${family.name}">
               <div class="class-sprite" style="${getClassSpriteStyle(family.name)}"></div>
             </button>
           `).join('')}
@@ -1585,7 +1585,7 @@ Raid clear status still resets weekly.">
 
         return `
           <div class="player-option ${!needsThisRaid ? 'completed' : ''}" data-player-name="${player.name}">
-            ${!needsThisRaid ? `<span class="completion-badge" title="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
+            ${!needsThisRaid ? `<span class="completion-badge" data-tooltip-fixed="Already completed ${this.currentLineup.raidType} this week">✓</span>` : ''}
             <div class="player-info">
               <div class="player-name">${player.name} ${renderPowerBadge(player)}</div>
               <div class="player-role">${player.role}</div>
@@ -1650,7 +1650,7 @@ Raid clear status still resets weekly.">
         <button class="specialization-btn ${modalSelectedSpecialization === key ? 'active' : ''}"
                 data-specialization="${key}"
                 data-family="${modalExpandedFamily}"
-                title="${spec.name}">
+                data-tooltip-fixed="${spec.name}">
           <div class="spec-icon-wrapper">
             <div class="class-sprite" style="${getClassSpriteStyle(spec.name)}"></div>
           </div>
@@ -2225,12 +2225,12 @@ Raid clear status still resets weekly.">
 
     slotContent.innerHTML = `
       <div class="assigned-player pub-player">
-        <div class="player-name"><span class="pub-name-edit" title="Click to rename">${displayName}</span> <span class="pub-badge">GUEST</span></div>
+        <div class="player-name"><span class="pub-name-edit" data-tooltip-fixed="Click to rename">${displayName}</span> <span class="pub-badge">GUEST</span></div>
         ${pilotName ? `<span class="pilot-info"><img src="/icons/headphones.svg" alt="Pilot" class="pilot-info-icon">${esc(pilotName)}</span>` : ''}
         ${role ? `<div class="player-role">${role}</div>` : `<div class="player-role no-class">Click to set class</div>`}
       </div>
       <div class="slot-toggles">
-        <button class="pilot-btn ${pilotName ? 'active' : ''}" data-slot="${slotIndex}" title="${pilotName ? `Piloted by: ${esc(pilotName)}` : 'Tag the guildmate playing this character'}">
+        <button class="pilot-btn ${pilotName ? 'active' : ''}" data-slot="${slotIndex}" data-tooltip-fixed="${pilotName ? `Piloted by: ${esc(pilotName)}` : 'Tag the guildmate playing this character'}">
           <img src="/icons/headphones.svg" alt="Pilot" class="pilot-icon">
         </button>
       </div>
@@ -2273,7 +2273,7 @@ Raid clear status still resets weekly.">
     if (!removeBtn) {
       removeBtn = document.createElement('button');
       removeBtn.className = 'slot-remove-btn';
-      removeBtn.title = 'Remove player';
+      removeBtn.dataset.tooltipFixed = 'Remove player';
       removeBtn.innerHTML = '×';
       removeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -2342,12 +2342,12 @@ Raid clear status still resets weekly.">
       </div>
       <div class="slot-toggles">
         ${showTicketToggle ? `
-          <label class="ticket-toggle" title="Using ticket run">
+          <label class="ticket-toggle" data-tooltip-fixed="Using ticket run">
             <input type="checkbox" class="ticket-checkbox" data-slot="${slotIndex}" ${hasTicket ? 'checked' : ''}>
             <img src="/icons/ticket.svg" alt="Ticket" class="ticket-toggle-icon ${hasTicket ? 'active' : ''}">
           </label>
         ` : ''}
-        <button class="pilot-btn ${pilotName ? 'active' : ''}" data-slot="${slotIndex}" title="${pilotName ? `Piloted by: ${pilotName}` : 'Set pilot'}">
+        <button class="pilot-btn ${pilotName ? 'active' : ''}" data-slot="${slotIndex}" data-tooltip-fixed="${pilotName ? `Piloted by: ${pilotName}` : 'Set pilot'}">
           <img src="/icons/headphones.svg" alt="Pilot" class="pilot-icon">
         </button>
       </div>
@@ -2390,7 +2390,7 @@ Raid clear status still resets weekly.">
     if (!removeBtn) {
       removeBtn = document.createElement('button');
       removeBtn.className = 'slot-remove-btn';
-      removeBtn.title = 'Remove player';
+      removeBtn.dataset.tooltipFixed = 'Remove player';
       removeBtn.innerHTML = '×';
       slotElement.appendChild(removeBtn);
     }
@@ -3268,9 +3268,12 @@ Raid clear status still resets weekly.">
     const amp = this.calculateDamageAmp(playerNames);
     const bar = (type, value, sources) => {
       const state = value > 100 ? 'overcapped' : value === 100 ? 'capped' : '';
-      const title = sources.map(s => `${s.class} – ${s.skill} ${s.value}%`).join('\n') || 'No sources';
+      const rows = sources.length
+        ? sources.map(s => `<div class="chip-tip__row"><span class="chip-tip__label">${s.class} · ${s.skill}</span><span class="chip-tip__val">${s.value}%</span></div>`).join('')
+        : '<div class="chip-tip__row"><span class="chip-tip__dash">No sources</span></div>';
+      const tip = `<div class="chip-tip__section"><div class="chip-tip__heading"><span>${type === 'physical' ? 'Physical' : 'Magic'} ${value}%</span></div><div class="chip-tip__rows">${rows}</div></div>`;
       return `
-        <div class="move-amp-bar ${type}" title="${title}">
+        <div class="move-amp-bar ${type} has-chip-tip" data-chip-tip-html="${tip.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">
           <div class="move-amp-track"><div class="move-amp-fill ${state}" style="width: ${Math.min(value, 100)}%"></div></div>
           <span class="move-amp-value ${state}">${value}%</span>
         </div>`;
@@ -3528,7 +3531,7 @@ Raid clear status still resets weekly.">
     const extraCount = this.viewingUsers.length - maxAvatars;
 
     const avatarsHtml = displayUsers.map(user => {
-      return `<img src="${user.avatar || '/icons/avatar.svg'}" alt="${user.name}" title="${user.name}" class="presence-avatar" onerror="this.src='/icons/avatar.svg'">`;
+      return `<img src="${user.avatar || '/icons/avatar.svg'}" alt="${user.name}" data-tooltip-fixed="${user.name}" class="presence-avatar" onerror="this.src='/icons/avatar.svg'">`;
     }).join('');
 
     const countHtml = extraCount > 0 ? `<span class="presence-extra">+${extraCount}</span>` : '';

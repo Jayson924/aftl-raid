@@ -169,17 +169,17 @@ export const lootUiMixin = {
         <form class="loot-item loot-item--editing" data-loot-id="${l.id}">
           <input type="text" class="loot-edit-item" value="${this.escapeHtml(l.item)}" required>
           ${this.renderHolderSelect(ctx, l.heldBy, 'loot-edit-holder')}
-          <label class="loot-sold-toggle" title="Mark as sold">
+          <label class="loot-sold-toggle" data-tooltip-fixed="Mark as sold">
             <input type="checkbox" class="loot-edit-sold" ${sold ? 'checked' : ''}> Sold
           </label>
           <input type="number" class="loot-edit-price" value="${l.price || ''}" min="0" step="1" placeholder="Gold" ${sold ? '' : 'disabled'}>
-          <button type="submit" class="loot-icon-btn loot-save-btn" title="Save">✓</button>
-          <button type="button" class="loot-icon-btn loot-cancel-btn" title="Cancel">×</button>
+          <button type="submit" class="loot-icon-btn loot-save-btn" data-tooltip-fixed="Save" aria-label="Save">✓</button>
+          <button type="button" class="loot-icon-btn loot-cancel-btn" data-tooltip-fixed="Cancel" aria-label="Cancel">×</button>
         </form>
       `;
     }
     const sourceBadge = l.source === 'discord'
-      ? `<span class="loot-source" title="Logged from Discord">D</span>`
+      ? `<span class="loot-source" data-tooltip-fixed="Logged from Discord">D</span>`
       : '';
     const statusHtml = l.sold
       ? `<span class="loot-item-price">🪙 ${this.formatGold(l.price)}</span>`
@@ -189,9 +189,9 @@ export const lootUiMixin = {
         <span class="loot-item-name">${sourceBadge}${this.escapeHtml(l.item)}</span>
         ${statusHtml}
         ${canManage ? `
-          ${!l.sold ? `<button class="loot-icon-btn loot-sell-btn" data-loot-id="${l.id}" title="Mark sold">💰</button>` : ''}
-          <button class="loot-icon-btn loot-edit-btn" data-loot-id="${l.id}" title="Edit">✎</button>
-          <button class="loot-icon-btn loot-delete-btn" data-loot-id="${l.id}" title="Delete">×</button>
+          ${!l.sold ? `<button class="loot-icon-btn loot-sell-btn" data-loot-id="${l.id}" data-tooltip-fixed="Mark sold" aria-label="Mark sold">💰</button>` : ''}
+          <button class="loot-icon-btn loot-edit-btn" data-loot-id="${l.id}" data-tooltip-fixed="Edit" aria-label="Edit">✎</button>
+          <button class="loot-icon-btn loot-delete-btn" data-loot-id="${l.id}" data-tooltip-fixed="Delete" aria-label="Delete">×</button>
         ` : ''}
       </div>
     `;
@@ -245,8 +245,8 @@ export const lootUiMixin = {
     }, 0);
     const myClaimed = myNames.length > 0 && myNames.every(n => stateOf(n).settled);
     const claimBtn = myNames.length === 0 ? '' : myClaimed
-      ? `<button type="button" class="loot-claim-btn claimed" title="You've claimed your ${myNames.length > 1 ? 'shares' : 'share'} — click to un-claim">✓ Claimed</button>`
-      : `<button type="button" class="loot-claim-btn" title="Mark ${myNames.length > 1 ? `all ${myNames.length} of your characters'` : 'your'} share as received — 🪙 ${this.formatGold(myOwed)}">🪙 Claim</button>`;
+      ? `<button type="button" class="loot-claim-btn claimed" data-tooltip-fixed="You've claimed your ${myNames.length > 1 ? 'shares' : 'share'} — click to un-claim">✓ Claimed</button>`
+      : `<button type="button" class="loot-claim-btn" data-tooltip-fixed="Mark ${myNames.length > 1 ? `all ${myNames.length} of your characters'` : 'your'} share as received — 🪙 ${this.formatGold(myOwed)}">🪙 Claim</button>`;
 
     const chips = members.map(name => {
       const owner = playerMap?.get(name)?.discordId || null;
@@ -272,12 +272,12 @@ export const lootUiMixin = {
       const cls = `${st.settled ? 'received' : st.partial ? 'partial' : ''} ${st.auto ? 'auto' : ''}`;
       return `
         <button type="button" class="loot-payout-chip ${cls} ${canToggle ? '' : 'locked'}"
-          data-member="${this.escapeHtml(name)}" ${canToggle ? '' : 'disabled'} title="${title}">
+          data-member="${this.escapeHtml(name)}" ${canToggle ? '' : 'disabled'} data-tooltip-fixed="${title}">
           <span class="loot-payout-check">${st.settled ? '✓' : st.partial ? '½' : ''}</span>
           <span class="loot-payout-name">${this.escapeHtml(name)}</span>
           ${st.partial ? `<span class="loot-payout-owed">+${this.formatGold(owed)}</span>` : ''}
           ${isYou ? `<span class="loot-payout-you">you${iAmPilot ? pilotIcon : ''}</span>` : ''}
-          ${pilotName && !iAmPilot ? `<span class="loot-payout-pilot" title="Piloted by ${this.escapeHtml(pilotName)}">${pilotIcon}</span>` : ''}
+          ${pilotName && !iAmPilot ? `<span class="loot-payout-pilot" data-tooltip-fixed="Piloted by ${this.escapeHtml(pilotName)}">${pilotIcon}</span>` : ''}
         </button>`;
     }).join('');
 
@@ -340,8 +340,8 @@ export const lootUiMixin = {
         <div class="lineup-loot-header">
           <span class="loot-title">Loot</span>
           <span class="loot-count">${loot.length}</span>
-          ${total > 0 && partySize > 0 ? `<span class="loot-payout" title="Your share — ${this.formatGold(total)} total ÷ ${partySize} in party">🪙 ${this.formatGold(payout)} each</span>` : ''}
-          ${total > 0 ? `<span class="loot-total" title="Total sold gold">🪙 ${this.formatGold(total)} total</span>` : ''}
+          ${total > 0 && partySize > 0 ? `<span class="loot-payout" data-tooltip-fixed="Your share — ${this.formatGold(total)} total ÷ ${partySize} in party">🪙 ${this.formatGold(payout)} each</span>` : ''}
+          ${total > 0 ? `<span class="loot-total" data-tooltip-fixed="Total sold gold">🪙 ${this.formatGold(total)} total</span>` : ''}
         </div>
         <div class="lineup-loot-body">
           ${addFormHtml}
