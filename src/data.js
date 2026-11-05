@@ -700,6 +700,7 @@ class DataService {
       ddn_classic_completed: player.ddnClassicCompleted || null,
       ddn_normal_completed: player.ddnNormalCompleted || null,
       bdn_classic_completed: player.bdnClassicCompleted || null,
+      bdn_hardcore_completed: player.bdnHardcoreCompleted || null,
       account_number: player.accountNumber || null,
       exclude: player.exclude === true,
       exclude_label: player.excludeLabel?.trim() || null,

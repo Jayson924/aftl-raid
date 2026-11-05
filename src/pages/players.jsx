@@ -370,8 +370,8 @@ export const PlayersPage = {
   // Store expanded state for owner groups (collapsed by default)
   _expandedOwners: new Set(),
 
-  // Uncleared-raid filter: bcl = BDN Classic, dhc/dcl/dn = DDN Hardcore/Classic/Normal.
-  _raidPriorityFilter: { bcl: false, dhc: false, dcl: false, dn: false },
+  // Uncleared-raid filter: bhc/bcl = BDN Hardcore/Classic, dhc/dcl/dn = DDN Hardcore/Classic/Normal.
+  _raidPriorityFilter: { bhc: false, bcl: false, dhc: false, dcl: false, dn: false },
 
   // Render the BDN/DDN raid badge group for a player; a clear the game reported can't be toggled off.
   renderRaidBadgesHTML(player, canToggleRaid) {
@@ -389,6 +389,7 @@ export const PlayersPage = {
       <div class="raid-badge-group">
         <div class="raid-row bdn-row">
           <span class="raid-row-label">BDN</span>
+          ${badge('BDN Hardcore', 'raid-bdn-hardcore', 'HC')}
           ${badge('BDN Classic', 'raid-bdn-classic', 'CL')}
         </div>
         <div class="raid-row ddn-row">
@@ -603,6 +604,7 @@ export const PlayersPage = {
   sortPlayersByRaidPriority(players) {
     const filter = this._raidPriorityFilter;
     const activeRaidTypes = [];
+    if (filter.bhc) activeRaidTypes.push('BDN Hardcore');
     if (filter.bcl) activeRaidTypes.push('BDN Classic');
     if (filter.dhc) activeRaidTypes.push('DDN Hardcore');
     if (filter.dcl) activeRaidTypes.push('DDN Classic');
@@ -1378,6 +1380,7 @@ export const PlayersPage = {
     listElement.innerHTML = `
       ${this.renderClassFamilyFilter()}
       <div class="raid-priority-filter mobile-filter">
+        <button class="filter-btn bdn ${this._raidPriorityFilter.bhc ? 'active' : ''}" data-filter="bhc">B HC</button>
         <button class="filter-btn bdn ${this._raidPriorityFilter.bcl ? 'active' : ''}" data-filter="bcl">B CL</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
         <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>
@@ -1404,6 +1407,7 @@ export const PlayersPage = {
             <td></td>
             <td>
               <div class="raid-priority-filter">
+                <button class="filter-btn bdn ${this._raidPriorityFilter.bhc ? 'active' : ''}" data-filter="bhc">B HC</button>
                 <button class="filter-btn bdn ${this._raidPriorityFilter.bcl ? 'active' : ''}" data-filter="bcl">B CL</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dhc ? 'active' : ''}" data-filter="dhc">D HC</button>
                 <button class="filter-btn ddn ${this._raidPriorityFilter.dcl ? 'active' : ''}" data-filter="dcl">D CL</button>

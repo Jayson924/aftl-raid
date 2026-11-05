@@ -81,7 +81,7 @@ export const LineupsPage = {
       <div class="lineups-page">
         <h1 class="lineups-title">Lineups</h1>
         <div class="raid-tabs">
-          ${['BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Unspecified'].map(type =>
+          ${['BDN Hardcore', 'BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Unspecified'].map(type =>
             `<button class="tab-button" data-raid-type="${type}">${type}</button>`).join('')}
           <button class="tab-button tab-loot-log" data-section="loot-log">Loot Log</button>
         </div>
@@ -438,6 +438,7 @@ export const LineupsPage = {
           ${canManage && this.currentRaidType === 'Unspecified' ? `
             <select class="raid-type-reassign" data-lineup-id="${lineup.id}">
               <option value="Unspecified" selected>Unspecified</option>
+              <option value="BDN Hardcore">BDN Hardcore</option>
               <option value="BDN Classic">BDN Classic</option>
               <option value="DDN Hardcore">DDN Hardcore</option>
               <option value="DDN Classic">DDN Classic</option>
@@ -1347,7 +1348,7 @@ export const LineupsPage = {
   populateRaidFilterOptions() {
     const sel = this.getPageEl()?.querySelector('.loot-raid-select');
     if (!sel) return;
-    const order = ['BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Unspecified'];
+    const order = ['BDN Hardcore', 'BDN Classic', 'DDN Hardcore', 'DDN Classic', 'Unspecified'];
     const types = [...new Set([...this.lootRecords, ...this.lootWeekLineups].map(r => r.raidType).filter(Boolean))]
       .sort((a, b) => {
         const ia = order.indexOf(a), ib = order.indexOf(b);

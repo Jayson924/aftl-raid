@@ -35,13 +35,13 @@ const customRaidFields = (a) => {
   return { name, max_clears: Math.min(MAX_CUSTOM_CLEARS, Math.max(1, Math.floor(Number(a.max_clears)) || 1)) };
 };
 const rank = (role) => ROLES.indexOf(role);
-const COMPLETION_COLUMNS = new Set(['bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
+const COMPLETION_COLUMNS = new Set(['bdn_hardcore_completed', 'bdn_classic_completed', 'ddn_hardcore_completed', 'ddn_classic_completed', 'ddn_normal_completed']);
 // Raids only marked by hand (no lineup raid type); supabase/add-raid-marks.sql adds them.
-const MARK_ONLY_COLUMNS = new Set(['bdn_memoria_completed', 'bdn_hardcore_completed', 'abyssal_mire_completed', 'dragon_fellowship_completed']);
+const MARK_ONLY_COLUMNS = new Set(['bdn_memoria_completed', 'abyssal_mire_completed', 'dragon_fellowship_completed']);
 const RARITIES = new Set(['magic', 'rare', 'epic', 'unique', 'legend']);
 const COMPLETION_BY_RAID = {
   'DDN Hardcore': 'ddn_hardcore_completed', 'DDN Classic': 'ddn_classic_completed',
-  'DDN Normal': 'ddn_normal_completed', 'BDN Classic': 'bdn_classic_completed',
+  'DDN Normal': 'ddn_normal_completed', 'BDN Classic': 'bdn_classic_completed', 'BDN Hardcore': 'bdn_hardcore_completed',
 };
 
 // Character fields a form may set; the gear set only while the character is not synced.

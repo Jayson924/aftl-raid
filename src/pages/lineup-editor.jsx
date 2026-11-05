@@ -96,6 +96,7 @@ export const LineupEditorPage = {
               <div class="move-board-header">
                 <div class="move-board-filters">
                   <select id="move-raid-type" class="move-raid-select" aria-label="Raid type">
+                    <option value="BDN Hardcore">BDN Hardcore</option>
                     <option value="BDN Classic">BDN Classic</option>
                     <option value="DDN Hardcore">DDN Hardcore</option>
                     <option value="DDN Classic">DDN Classic</option>
@@ -121,6 +122,7 @@ export const LineupEditorPage = {
                   <div class="form-group raid-type-group">
                     <label for="raid-type">Raid Type</label>
                     <select id="raid-type">
+                      <option value="BDN Hardcore">BDN Hardcore</option>
                       <option value="BDN Classic">BDN Classic</option>
                       <option value="DDN Hardcore">DDN Hardcore</option>
                       <option value="DDN Classic">DDN Classic</option>
