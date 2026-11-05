@@ -301,6 +301,8 @@ Raid clear status still resets weekly.">
       this.currentLineup.name = e.target.value;
     });
 
+    // The select shows its first option until told otherwise, which isn't the default raid type.
+    document.getElementById('raid-type').value = this.currentLineup.raidType;
     document.getElementById('raid-type').addEventListener('change', (e) => {
       const newRaidType = e.target.value;
       this.currentLineup.raidType = newRaidType;
