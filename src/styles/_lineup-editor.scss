@@ -400,6 +400,18 @@
           background-color: rgba(255, 255, 255, 0.1);
           border-radius: 3px;
           overflow: hidden;
+          position: relative;
+
+          // 100% marker line
+          &::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(255, 255, 255, 0.3);
+          }
         }
 
         .move-amp-fill {
@@ -416,19 +428,48 @@
         }
 
         &.physical {
-          .move-amp-fill { background: linear-gradient(90deg, #c75555 0%, #e87474 100%); }
-          .move-amp-fill.capped { background: linear-gradient(90deg, #e87474 0%, #ffd700 100%); }
+          .move-amp-fill {
+            background: linear-gradient(90deg, #c75555 0%, #e87474 100%);
+            box-shadow: 0 0 8px rgba(232, 116, 116, 0.4);
+
+            &.capped {
+              background: linear-gradient(90deg, #e87474 0%, #ffd700 100%);
+              box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+            }
+
+            &.overcapped {
+              background: linear-gradient(90deg, #e87474 0%, #ff4444 100%);
+              box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+            }
+          }
+
           .move-amp-value { color: #e87474; }
         }
 
         &.magic {
-          .move-amp-fill { background: linear-gradient(90deg, #5a9bc7 0%, #73bbe6 100%); }
-          .move-amp-fill.capped { background: linear-gradient(90deg, #73bbe6 0%, #00ffff 100%); }
-          .move-amp-fill.overcapped { background: linear-gradient(90deg, #73bbe6 0%, #ff4444 100%); }
+          .move-amp-fill {
+            background: linear-gradient(90deg, #5a9bc7 0%, #73bbe6 100%);
+            box-shadow: 0 0 8px rgba(115, 187, 230, 0.4);
+
+            &.capped {
+              background: linear-gradient(90deg, #73bbe6 0%, #00ffff 100%);
+              box-shadow: 0 0 12px rgba(0, 255, 255, 0.6);
+            }
+
+            &.overcapped {
+              background: linear-gradient(90deg, #73bbe6 0%, #ff4444 100%);
+              box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+            }
+          }
+
           .move-amp-value { color: #73bbe6; }
         }
 
-        &.physical .move-amp-fill.overcapped { background: linear-gradient(90deg, #e87474 0%, #ff4444 100%); }
+        .move-amp-value.overcapped {
+          color: #ff4444;
+          font-weight: 800;
+          text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+        }
       }
 
       .mini-player-card {
