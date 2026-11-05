@@ -1319,10 +1319,10 @@ Raid clear status still resets weekly.">
     return getEquipmentBackground(player);
   },
 
-  calculateDamageAmp() {
+  calculateDamageAmp(playerNames = this.currentLineup.players) {
     // Collect all roles from the lineup
     const roles = [];
-    this.currentLineup.players.forEach(playerName => {
+    playerNames.forEach(playerName => {
       if (!playerName) return;
 
       let role = null;
@@ -3253,12 +3253,27 @@ Raid clear status still resets weekly.">
       card.classList.toggle('dirty', this.moveDrafts.has(lineup.id));
       card.querySelector('.mini-lineup-header-actions')
         ?.insertAdjacentHTML('afterbegin', `<span class="move-count ${filled === size ? 'full' : ''}">${filled}/${size}</span>`);
+      card.querySelector('.mini-lineup-header')?.insertAdjacentHTML('afterend', this.renderMoveAmpBars(lineup.players.slice(0, size)));
       if (locked) return;
       card.querySelectorAll('.mini-player-card').forEach((slot, idx) => {
         if (lineup.players[idx]) slot.draggable = true;
         this.bindMoveSlot(slot, lineup.id, idx);
       });
     });
+  },
+
+  renderMoveAmpBars(playerNames) {
+    const amp = this.calculateDamageAmp(playerNames);
+    const bar = (type, value, sources) => {
+      const state = value > 100 ? 'overcapped' : value === 100 ? 'capped' : '';
+      const title = sources.map(s => `${s.class} – ${s.skill} ${s.value}%`).join('\n') || 'No sources';
+      return `
+        <div class="move-amp-bar ${type}" title="${title}">
+          <div class="move-amp-track"><div class="move-amp-fill ${state}" style="width: ${Math.min(value, 100)}%"></div></div>
+          <span class="move-amp-value ${state}">${value}%</span>
+        </div>`;
+    };
+    return `<div class="move-amp">${bar('physical', amp.physical, amp.physicalSources)}${bar('magic', amp.magic, amp.magicSources)}</div>`;
   },
 
   bindMoveSlot(slot, lineupId, idx) {

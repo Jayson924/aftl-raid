@@ -381,6 +381,56 @@
         &.full { color: #4cd16a; }
       }
 
+      .move-amp {
+        display: flex;
+        gap: 0.75rem;
+        margin: 0 0 0.5rem;
+      }
+
+      .move-amp-bar {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        cursor: help;
+
+        .move-amp-track {
+          flex: 1;
+          height: 6px;
+          background-color: rgba(255, 255, 255, 0.1);
+          border-radius: 3px;
+          overflow: hidden;
+        }
+
+        .move-amp-fill {
+          height: 100%;
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        }
+
+        .move-amp-value {
+          min-width: 34px;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-align: right;
+        }
+
+        &.physical {
+          .move-amp-fill { background: linear-gradient(90deg, #c75555 0%, #e87474 100%); }
+          .move-amp-fill.capped { background: linear-gradient(90deg, #e87474 0%, #ffd700 100%); }
+          .move-amp-value { color: #e87474; }
+        }
+
+        &.magic {
+          .move-amp-fill { background: linear-gradient(90deg, #5a9bc7 0%, #73bbe6 100%); }
+          .move-amp-fill.capped { background: linear-gradient(90deg, #73bbe6 0%, #00ffff 100%); }
+          .move-amp-fill.overcapped { background: linear-gradient(90deg, #73bbe6 0%, #ff4444 100%); }
+          .move-amp-value { color: #73bbe6; }
+        }
+
+        &.physical .move-amp-fill.overcapped { background: linear-gradient(90deg, #e87474 0%, #ff4444 100%); }
+      }
+
       .mini-player-card {
         transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
 
