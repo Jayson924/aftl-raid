@@ -1690,19 +1690,6 @@ class DataService {
     return (await this._write('threads.request', { lineup_id: lineupId, kind: 'update' })).data;
   }
 
-  /**
-   * Request the Discord bot to mark a lineup's thread as cleared: apply the
-   * Cleared forum tag and create the loot thread. The web app has already set
-   * lineups.completed + player completions, so the bot only does the Discord side.
-   * Fire-and-forget; no-op on the bot if the lineup has no thread.
-   * @param {string} lineupId
-   * @returns {Promise<{ id: string }>} the inserted request row
-   */
-  async requestDiscordThreadClear(lineupId) {
-    if (!this.canEditLineups()) throw new Error('You do not have permission to clear Discord threads');
-    if (!lineupId) throw new Error('lineupId is required');
-    return (await this._write('threads.request', { lineup_id: lineupId, kind: 'clear' })).data;
-  }
 
   /**
    * Subscribe to status updates for a specific thread request.

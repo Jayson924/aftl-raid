@@ -209,6 +209,20 @@ test('clearing a lineup marks its members and ticket runs', async () => {
   assert.ok(db.players.find((p) => p.name === 'Keeper').bdn_classic_completed);
 });
 
+test('clearing a lineup that has a Discord thread asks the bot for its loot thread, once', async () => {
+  const db = lineupFixture(); stubDb(db);
+  db.lineups.push({ id: 'L2', name: 'No thread', raid_type: 'BDN Classic', completed: false });
+  db.lineups[0].thread_id = 'T1';
+  await parse(call('editor', 'lineups.toggleCompleted', { id: 'L1' }));
+  await parse(call('editor', 'lineups.toggleCompleted', { id: 'L2' }));
+  assert.deepEqual(db.thread_requests.map((r) => [r.lineup_id, r.action, r.status]), [['L1', 'clear', 'pending']]);
+  // Un-clearing sends nothing; clearing again through a save sends one more, and saving it while cleared sends none.
+  await parse(call('editor', 'lineups.toggleCompleted', { id: 'L1' }));
+  await parse(call('editor', 'lineups.save', { id: 'L1', fields: { completed: true }, slots: [] }));
+  await parse(call('editor', 'lineups.save', { id: 'L1', fields: { completed: true }, slots: [] }));
+  assert.equal(db.thread_requests.length, 2);
+});
+
 test('a gold share is marked by its owner, its pilot or an editor, nobody else', async () => {
   const db = lineupFixture(); stubDb(db);
   db.app_users.push({ discord_id: 'stranger', role: 'guildmate', display_name: 'Nobody' });

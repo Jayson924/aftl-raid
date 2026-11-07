@@ -2704,15 +2704,8 @@ Raid clear status still resets weekly.">
         await dataService.unmarkPlayersCompleted(playerNames, this.currentLineup.raidType, null, originalTicketPlayerNames);
       } else if (isNowCleared) {
         // Newly cleared or still cleared with possible player changes — mark all
+        // The server asks the bot for the Cleared tag and loot thread when the save clears the lineup.
         await dataService.markPlayersCompleted(playerNames, this.currentLineup.raidType, ticketPlayerNames);
-
-        // On the not-cleared -> cleared transition, ask the bot to mark the
-        // Discord thread cleared (Cleared tag + loot thread). Only if a thread
-        // exists. Fire-and-forget — bot processes via thread_requests.
-        if (!wasCleared && this.currentLineup.threadId) {
-          dataService.requestDiscordThreadClear(this.currentLineup.id)
-            .catch(err => console.error('[DiscordThread] Clear request failed:', err));
-        }
       }
     } catch (error) {
       console.error('Error updating completion status:', error);

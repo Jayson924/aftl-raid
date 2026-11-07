@@ -44,6 +44,12 @@ const COMPLETION_BY_RAID = {
   'DDN Normal': 'ddn_normal_completed', 'BDN Classic': 'bdn_classic_completed', 'BDN Hardcore': 'bdn_hardcore_completed',
 };
 
+// Asks the bot for the Cleared tag and loot thread; reads thread_id from the row since a page can be older than its thread.
+async function requestBotClear(lineup, requestedBy) {
+  if (!lineup.thread_id) return;
+  await sbPost('thread_requests', { lineup_id: lineup.id, channel_id: '', requested_by: requestedBy, status: 'pending', action: 'clear' });
+}
+
 // Character fields a form may set; the gear set only while the character is not synced.
 const PLAYER_FIELDS = ['name', 'notes', 'account_number', 'exclude', 'exclude_label', 'exclude_reason'];
 const PLAYER_GEAR_FIELDS = ['role', 'weapon', 'weapon_enhance', 'suffix1', 'suffix2', 'armor', 'armor_enhance', 'equipment', 'character_stats'];
@@ -375,8 +381,10 @@ const ACTIONS = {
     const fields = pick(a.fields, ['name', 'raid_type', 'status', 'completed', 'is_template', 'is_static', 'notes', 'raid_time']);
     let saved;
     if (a.id) {
+      const before = await one('lineups', `id=eq.${enc(a.id)}&select=completed`);
       [saved] = await sbPatch('lineups', `id=eq.${enc(a.id)}`, fields);
       if (!saved) deny('No such lineup');
+      if (!before?.completed && saved.completed) await requestBotClear(saved, ctx.id);
     } else {
       [saved] = await sbPost('lineups', fields);
     }
@@ -404,10 +412,11 @@ const ACTIONS = {
   // Clear or un-clear a lineup, marking its members (and ticket runs) to match.
   async 'lineups.toggleCompleted'(ctx, a) {
     ctx.requireEditor();
-    const lineup = await one('lineups', `id=eq.${enc(a.id)}&select=id,completed,raid_type`);
+    const lineup = await one('lineups', `id=eq.${enc(a.id)}&select=id,completed,raid_type,thread_id`);
     if (!lineup) deny('No such lineup');
     const completed = !lineup.completed;
     await sbPatch('lineups', `id=eq.${enc(lineup.id)}`, { completed });
+    if (completed) await requestBotClear(lineup, ctx.id);
     const column = COMPLETION_BY_RAID[lineup.raid_type];
     if (column) {
       const slots = (await sbGet('lineup_players', `lineup_id=eq.${enc(lineup.id)}&select=player_name,uses_ticket`))

@@ -927,20 +927,13 @@ export const LineupsPage = {
 
       // Mark as pending to skip self-notification from realtime
       this.pendingToggleId = lineup.id;
-      const toggleResult = await dataService.toggleLineupCompleted(lineup.id);
+      await dataService.toggleLineupCompleted(lineup.id);
       // Delay clearing pendingToggleId to give realtime event time to arrive
       setTimeout(() => {
         if (this.pendingToggleId === lineup.id) {
           this.pendingToggleId = null;
         }
       }, 2000);
-
-      // When newly cleared, ask the bot to mark the Discord thread cleared
-      // (Cleared tag + loot thread). Only if a thread exists. Fire-and-forget.
-      if (toggleResult?.completed && lineup.threadId) {
-        dataService.requestDiscordThreadClear(lineup.id)
-          .catch(err => console.error('[DiscordThread] Clear request failed:', err));
-      }
 
       toast.success(`Updated cleared status for ${lineup.name}!`);
       // Reload the lineups to show updated cleared status
