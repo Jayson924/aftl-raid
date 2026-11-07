@@ -13,6 +13,7 @@ import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import icons from '../data/sim-icons.json' with { type: 'json' };
 import costumeList from '../data/sim-costumes.json' with { type: 'json' };
 import { uploadHtml, setupUpload, renderGearReview } from '../sim/screenshot-import.js';
+import { cardMatches, cardFilterHtml } from '../card-collection.js';
 
 const STORAGE_KEY = 'aftl.simulator.builds';
 const PARTY_KEY = 'aftl.simulator.party';
@@ -432,7 +433,6 @@ const hasValue = (value) => value !== null && value !== undefined && value !== N
 // The game never gives an enhancement heraldry its own stat as the extra (Magic has no MATK extra).
 const glyphABlocked = (plate, extra) => (options.glyph_a_blocked?.[plate] || []).includes(extra);
 const rarityOf = (entry) => RARITIES.find((r) => entry?.level?.endsWith(r))?.toLowerCase() || 'normal';
-const CARD_TIERS = [...new Set(Object.values(options.cards.levels))].sort((a, b) => a - b);
 
 // ---- page -----------------------------------------------------------------------------
 
@@ -457,6 +457,7 @@ export const SimulatorPage = {
   // Slot open in the editor, per window (data path of the clicked slot, or 'title').
   slots: { general: 'equipment.0', fashion: 'fashion.0', engraving: 'engravings.0', heraldry: 'glyph_a.0', rune: 'core_rune', card: 'card_grades.0' },
   cardTier: null,
+  cardStat: null,
   cardTab: 'cards',
   cardPage: 0,
   container: null,
@@ -634,6 +635,11 @@ export const SimulatorPage = {
   onChange(e, live = false) {
     const el = e.target;
     if (el.dataset.applyAll) { this.applyAll[el.dataset.applyAll] = el.checked; return; }
+    if (el.dataset.cardTier !== undefined || el.dataset.cardStat !== undefined) {
+      if (el.dataset.cardTier !== undefined) this.cardTier = el.value === 'all' ? null : Number(el.value);
+      else this.cardStat = el.value || null;
+      this.cardPage = 0; this.renderPanel(); return;
+    }
     const path = el.dataset.path;
     if (!path) return;
     const build = this.build;
@@ -846,12 +852,10 @@ export const SimulatorPage = {
     }
     if (action === 'compare-all') { this.compareAll = !this.compareAll; this.renderPanel(); return; }
     if (action === 'stats-breakdown') { this.statsBreakdown = !this.statsBreakdown; this.renderPanel(); return; }
-    if (action === 'card-tier') { this.cardTier = value === 'all' ? null : Number(value); this.cardPage = 0; this.renderPanel(); return; }
     if (action === 'card-tab') { this.cardTab = value; this.renderPanel(); return; }
     if (action === 'card-page') { this.cardPage = Number(value); this.renderPanel(); return; }
     if (action === 'cards-set') {
-      const tier = this.cardTier;
-      for (const card of this.build.card_grades) if (tier === null || options.cards.levels[card.name] === tier) card.grade = value;
+      for (const card of this.build.card_grades) if (cardMatches(card.name, this.cardTier, this.cardStat)) card.grade = value;
       this.recalculate(); this.renderPanel(); return;
     }
     if (action === 'copy') {
@@ -1741,13 +1745,11 @@ export const SimulatorPage = {
 
   cardGrid() {
     const b = this.build;
-    const tier = this.cardTier;
     const cards = b.card_grades.map((card, index) => ({ card, index }))
-      .filter(({ card }) => tier === null || options.cards.levels[card.name] === tier);
+      .filter(({ card }) => cardMatches(card.name, this.cardTier, this.cardStat));
     const pages = Math.max(1, Math.ceil(cards.length / CARDS_PER_PAGE));
     const page = Math.min(this.cardPage, pages - 1);
     const shown = cards.slice(page * CARDS_PER_PAGE, (page + 1) * CARDS_PER_PAGE);
-    const tiers = [['all', 'All'], ...CARD_TIERS.map((t) => [String(t), `Lv${t}`])];
     const grid = shown.map(({ card, index }) => {
       const ref = `card_grades.${index}`;
       const selected = ref === this.slots.card ? 'selected' : '';
@@ -1761,7 +1763,7 @@ export const SimulatorPage = {
     }).join('');
     const pager = Array.from({ length: pages }, (_, n) => `<button class="${n === page ? 'active' : ''}" data-action="card-page" data-value="${n}">${n + 1}</button>`).join('');
     return `
-      <div class="sim-card-tabs">${tiers.map(([v, label]) => `<button class="${String(tier ?? 'all') === v ? 'active' : ''}" data-action="card-tier" data-value="${v}">${label}</button>`).join('')}</div>
+      ${cardFilterHtml(this.cardTier, this.cardStat)}
       <div class="sim-card-grid">${grid}</div>
       <div class="sim-pager">${pager}</div>`;
   },
@@ -1787,7 +1789,7 @@ export const SimulatorPage = {
         <div class="sim-editor-fields"><div class="sim-field"><span>Rarity</span>${this.itemPicker(`card_grades.${index}.grade`, L.card_grades, card.grade, cardRarity, { sort: false })}</div></div>
         <h4>Stats</h4>
         ${statGrid(calc.cardAttrs(card.name, card.grade))}
-        <h4>Set all shown cards (${this.cardTier === null ? 'all tiers' : `Lv${this.cardTier}`}) to</h4>
+        <h4>Set all shown cards (${[this.cardTier === null ? 'all levels' : `Lv${this.cardTier}`, this.cardStat].filter(Boolean).join(' · ')}) to</h4>
         <div class="sim-card-bulk">${L.card_grades.map((g) => `<button class="btn btn-secondary" data-action="cards-set" data-value="${g}"><span class="sim-rarity-text ${cardRarity(g).rarity}">${esc(cardRarity(g).label)}</span></button>`).join('')}</div>
         ${this.boardTotals('Card Stats', 'card')}`,
     });
@@ -2120,7 +2122,7 @@ export function createCharacterBuilder(container, raw, { onUpdate } = {}) {
 // Without the editor, slots show their details on hover and the stat totals scroll inside the window.
 export function createReferenceViewer(container, raw, { editor = true, onTake = null } = {}) {
   const viewer = Object.assign(Object.create(SimulatorPage), {
-    container, builds: { A: normalizeBuild(raw) }, active: 'A', view: 'general', costumeMode: 'fashion', cardPage: 0, cardTier: null,
+    container, builds: { A: normalizeBuild(raw) }, active: 'A', view: 'general', costumeMode: 'fashion', cardPage: 0, cardTier: null, cardStat: null,
     results: { A: { rows: [], summary: {} } }, slots: { ...SimulatorPage.slots }, applyAll: { heraldry: false, engraving: false }, listeners: null,
     get result() { return this.results.A; },
     save() {},
@@ -2155,7 +2157,9 @@ export function createReferenceViewer(container, raw, { editor = true, onTake = 
       if (action === 'take') { onTake?.(); return; }
       SimulatorPage.onAction.call(this, action, ...args);
     },
-    onChange() {},
+    onChange(e) {
+      if (e.target.matches?.('.sim-card-filter-select')) SimulatorPage.onChange.call(this, e);
+    },
     apply() {},
     destroy() {
       this.listeners?.abort();

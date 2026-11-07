@@ -12,9 +12,32 @@ const RARITY_LABEL = { magic: 'Magic', rare: 'Rare', epic: 'Epic', unique: 'Uniq
 const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (v) => (Number.isInteger(v) ? v.toLocaleString('en-US') : Number(v.toFixed(2)).toLocaleString('en-US'));
 
-// Cards in game order with their slot index, limited to one level tier (null = all).
-export function cardsForTier(tier) {
-  return GAME_CARDS.map((name, index) => ({ name, index })).filter(({ name }) => tier == null || cardTable.levels[name] === tier);
+const STAT_ORDER = ['PATK', 'MATK', 'STR', 'AGI', 'INT', 'VIT', 'Final damage', 'Crit damage', 'Crit', 'HP', 'MP', 'DEF', 'MDEF', 'Crit resist', 'Stun', 'Stun resist', 'Paralyze', 'Paralyze resist', 'MP regen'];
+const STAT_LABEL = { PATK: 'Physical Attack', MATK: 'Magic Attack', 'Final damage': 'Final Damage', 'Crit damage': 'Crit Damage' };
+const statsOf = (name) => new Set(Object.values(cardTable.lookup[name] || {}).flatMap((grade) => Object.keys(grade)));
+export const CARD_STATS = [...new Set(GAME_CARDS.flatMap((name) => [...statsOf(name)]))]
+  .sort((a, b) => (STAT_ORDER.indexOf(a) + 1 || 99) - (STAT_ORDER.indexOf(b) + 1 || 99));
+
+export function cardMatches(name, tier, stat) {
+  return (tier == null || cardTable.levels[name] === tier) && (!stat || statsOf(name).has(stat));
+}
+
+// Cards in game order with their slot index, limited to one level tier and one stat (null = all).
+export function cardsForTier(tier, stat = null) {
+  return GAME_CARDS.map((name, index) => ({ name, index })).filter(({ name }) => cardMatches(name, tier, stat));
+}
+
+// Level and stat dropdowns; the selects carry data-card-tier / data-card-stat plus the caller's attrs.
+export function cardFilterHtml(tier, stat, attrs = '') {
+  const option = (value, label, current) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${esc(label)}</option>`;
+  const tiers = [['all', 'All'], ...CARD_TIERS.map((t) => [String(t), `Lv${t}`])];
+  const stats = [['', 'All'], ...CARD_STATS.map((s) => [s, STAT_LABEL[s] || s])];
+  const field = (label, isSet, data, list, current) => `<label class="sim-card-filter${isSet ? ' is-set' : ''}"><span>${label}</span>
+    <select class="sim-card-filter-select" ${data} ${attrs}>${list.map(([v, l]) => option(v, l, current)).join('')}</select></label>`;
+  return `<div class="sim-card-filters">
+    ${field('Level', tier != null, 'data-card-tier', tiers, String(tier ?? 'all'))}
+    ${field('Stat', !!stat, 'data-card-stat', stats, stat || '')}
+  </div>`;
 }
 
 // rarity by card name: from a synced build's grades, else from hand-kept slot rows.
@@ -37,11 +60,6 @@ export function cardTooltip(name, rarity) {
 // One cell; the caller picks the element, extra classes and data attributes.
 export function cardCellHtml({ tag = 'span', name, index, rarity, className = '', attrs = '' }) {
   return `<${tag}${tag === 'button' ? ' type="button"' : ''} class="sim-card-cell ${className} ${rarity ? 'has-card' : 'no-card'}" data-card-name="${esc(name)}" data-slot-index="${index}" data-rarity="${rarity || ''}" data-tooltip-fixed="${esc(cardTooltip(name, rarity))}" ${attrs}>${cardCellInner(name, rarity)}</${tag}>`;
-}
-
-export function tierTabsHtml(tier, attrs = '') {
-  const tabs = [['all', 'All'], ...CARD_TIERS.map((t) => [String(t), `Lv${t}`])];
-  return `<div class="sim-card-tabs">${tabs.map(([v, label]) => `<button type="button" class="${String(tier ?? 'all') === v ? 'active' : ''}" data-card-tier="${v}" ${attrs}>${label}</button>`).join('')}</div>`;
 }
 
 // Card stats as the simulator adds them: each stat grows 5% per mastery level (none for crit damage).

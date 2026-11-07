@@ -12,7 +12,7 @@ import { renderPagination, bindPagination } from '../pagination.js';
 import { PlayersPage } from './players.jsx';
 import { syncedLabel } from '../sim/panel.js';
 import { cardCellInner } from '../card-cells.js';
-import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, tierTabsHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
+import { GAME_CARDS, cardsForTier, cardCellHtml, cardTooltip, cardFilterHtml, cardTotalsHtml, raritiesFromGrades, raritiesFromSlots } from '../card-collection.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { GAME_RAIDS, raidProgress, unlistedStageRaids, weeklyClearsThisWeek, playerRaidMarks, raidMarkKey, stageMarkKey, isStagedRaid, isMarked, raidMarked, keepCardScroll } from '../raid-clears.js';
 import { getBrowserTimezone, getTimezoneShortLabel } from '../availability.js';
@@ -1993,7 +1993,7 @@ export const MyRaidsPage = {
             <button class="card-section-tab ${showSlots ? 'active' : ''}" data-section="slots" data-player-id="${player.id}">Equipped</button>
             <button class="card-section-tab ${!showSlots ? 'active' : ''}" data-section="extras" data-player-id="${player.id}">Extras</button>
           </div>
-          <div class="card-tier-tabs" data-player-id="${player.id}" data-section-active="${showSlots}">${tierTabsHtml(this._cardsTierByPlayer[player.id], `data-player-id="${player.id}"`)}</div>
+          <div class="card-tier-tabs" data-player-id="${player.id}" data-section-active="${showSlots}">${cardFilterHtml(this._cardsTierByPlayer[player.id], this._cardsStatByPlayer?.[player.id], `data-player-id="${player.id}"`)}</div>
         </div>
         <div class="card-section-stack" data-player-id="${player.id}">
           <div class="card-section card-section-slots" data-player-id="${player.id}" data-section-active="${showSlots}">
@@ -2023,7 +2023,7 @@ export const MyRaidsPage = {
   },
 
   cardPageCount(playerId) {
-    return Math.max(1, Math.ceil(cardsForTier(this._cardsTierByPlayer[playerId] ?? null).length / CARDS_PER_PAGE));
+    return Math.max(1, Math.ceil(cardsForTier(this._cardsTierByPlayer[playerId] ?? null, this._cardsStatByPlayer?.[playerId]).length / CARDS_PER_PAGE));
   },
 
   cardTotalsFor(player) {
@@ -2032,7 +2032,7 @@ export const MyRaidsPage = {
 
   renderCardGridHTML(playerId, page) {
     const rarities = this.cardRarities(playerId);
-    return cardsForTier(this._cardsTierByPlayer[playerId] ?? null)
+    return cardsForTier(this._cardsTierByPlayer[playerId] ?? null, this._cardsStatByPlayer?.[playerId])
       .slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE)
       .map(({ name, index }) => cardCellHtml({ tag: 'button', name, index, rarity: rarities.get(name) || '', className: 'card-slot', attrs: `data-player-id="${playerId}"` }))
       .join('');
@@ -2047,13 +2047,13 @@ export const MyRaidsPage = {
     const page = Math.min(this._cardsPageByPlayer[playerId] || 1, pages);
     this._cardsPageByPlayer[playerId] = page;
     const set = (sel, html) => { const el = document.querySelector(`${sel}[data-player-id="${playerId}"]`); if (el) el.innerHTML = html; };
-    set('.card-tier-tabs', tierTabsHtml(tier, `data-player-id="${playerId}"`));
+    set('.card-tier-tabs', cardFilterHtml(tier, this._cardsStatByPlayer?.[playerId], `data-player-id="${playerId}"`));
     set('.card-grid', this.renderCardGridHTML(playerId, page));
     set('.card-pagination-wrap', renderPagination(page, pages));
     set('.card-totals', this.cardTotalsFor(player));
     // The screenshot reader works on the game's pages, so paste only shows under All.
     document.querySelectorAll(`.card-paste-btn[data-player-id="${playerId}"]`).forEach(b => {
-      b.classList.toggle('tier-hidden', tier !== null);
+      b.classList.toggle('tier-hidden', tier !== null || !!this._cardsStatByPlayer?.[playerId]);
       const label = b.querySelector('span');
       if (label) label.textContent = `Upload/Paste page ${page}`;
     });
@@ -2063,10 +2063,10 @@ export const MyRaidsPage = {
   },
 
   bindTierTabs(playerId) {
-    document.querySelectorAll(`.card-tier-tabs[data-player-id="${playerId}"] [data-card-tier]`).forEach(btn => {
-      btn.addEventListener('click', () => {
-        const v = btn.dataset.cardTier;
-        this._cardsTierByPlayer[playerId] = v === 'all' ? null : Number(v);
+    document.querySelectorAll(`.card-tier-tabs[data-player-id="${playerId}"] select`).forEach(sel => {
+      sel.addEventListener('change', () => {
+        if (sel.dataset.cardTier !== undefined) this._cardsTierByPlayer[playerId] = sel.value === 'all' ? null : Number(sel.value);
+        else (this._cardsStatByPlayer ||= {})[playerId] = sel.value || null;
         this._cardsPageByPlayer[playerId] = 1;
         this.refreshCardSlots(playerId);
       });

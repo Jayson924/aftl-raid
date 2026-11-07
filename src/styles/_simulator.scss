@@ -403,15 +403,31 @@ $rune-board: 320px;
   > * { flex: none; }
   > .sim-board-totals { flex: 1 1 auto; min-height: 6rem; overflow-y: auto; }
 }
-// Card tier filter: the site's underline tabs, sized for the window.
-.sim-card-tabs {
-  display: flex; justify-content: center; margin-bottom: 0.6rem; border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-  button {
-    padding: 0.45rem 0.8rem; background: transparent; border: none; border-bottom: 3px solid transparent;
-    color: $text-light; cursor: pointer; font-family: inherit; font-size: 0.9rem; font-weight: 500;
-    &:hover { background-color: rgba(255, 255, 255, 0.05); }
-    &.active { color: $primary-color; border-bottom-color: $primary-color; background-color: rgba(244, 196, 48, 0.1); }
+// Card level and stat filters: recessed bars like the card cells, gold once a filter is set.
+.sim-card-filters { display: flex; gap: 0.4rem; margin-bottom: 0.6rem; }
+.sim-card-filter {
+  position: relative; display: flex; align-items: center; gap: 0.45rem; min-width: 0; flex: 1 1 0;
+  padding: 0 0.6rem; height: 2rem; box-sizing: border-box; cursor: pointer;
+  background: rgba(0, 0, 0, 0.35); border: 1px solid rgba($primary-color, 0.2); border-radius: 6px;
+  transition: border-color 0.15s;
+  &:first-child { flex: 0 0 8.5rem; }
+  &:hover, &:focus-within { border-color: rgba($primary-color, 0.6); }
+  > span { flex: none; color: $text-muted; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  &::after {
+    content: ''; position: absolute; right: 0.65rem; top: 50%; width: 0.4rem; height: 0.4rem; pointer-events: none;
+    border-right: 2px solid rgba($primary-color, 0.7); border-bottom: 2px solid rgba($primary-color, 0.7);
+    transform: translateY(-70%) rotate(45deg);
   }
+  &.is-set { border-color: rgba($primary-color, 0.7); background: rgba($primary-color, 0.08); }
+  &.is-set .sim-card-filter-select.sim-card-filter-select { color: $primary-color; }
+}
+// Doubled class beats the simulator's generic select field styles.
+.sim-card-filter-select.sim-card-filter-select {
+  flex: 1 1 auto; min-width: 0; max-width: none; height: 100%; margin: 0; padding: 0 1.1rem 0 0; cursor: pointer;
+  appearance: none; -webkit-appearance: none; background: transparent; border: none; border-radius: 0; outline: none; box-shadow: none;
+  color: $text-light; font-family: inherit; font-size: 0.85rem; font-weight: 500; color-scheme: dark;
+  text-overflow: ellipsis;
+  option { background-color: #23261a; color: $text-light; }
 }
 .sim-card-bulk {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.6rem;
@@ -770,8 +786,8 @@ p.link-code { margin: 0.5rem 0 1rem; }
 
 // Reference viewer on the admin page: the windows and slot details, with nothing editable.
 .sim-readonly {
-  .sim-editor-fields, .sim-enchant-list, input, select, [data-enchant], .sim-picker { pointer-events: none; }
-  [data-action]:not([data-action="view"]):not([data-action="slot"]):not([data-action="costume-mode"]):not([data-action="card-tier"]):not([data-action="card-tab"]):not([data-action="card-page"]):not([data-action="take"]) { pointer-events: none; }
+  .sim-editor-fields, .sim-enchant-list, input, select:not(.sim-card-filter-select), [data-enchant], .sim-picker { pointer-events: none; }
+  [data-action]:not([data-action="view"]):not([data-action="slot"]):not([data-action="costume-mode"]):not([data-action="card-tab"]):not([data-action="card-page"]):not([data-action="take"]) { pointer-events: none; }
   .sim-picker-toggle::after, .sim-apply-all { display: none; }
 }
 // Slots only show their tooltip, so they don't look clickable.

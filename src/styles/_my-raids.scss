@@ -1464,15 +1464,14 @@
   gap: 0.4rem;
 }
 
-// Level tabs, the paste button (All only) and the Card Stats total.
-.my-raids-page .card-tier-tabs .sim-card-tabs { justify-content: flex-start; margin-bottom: 0; }
-// Level tabs and Equipped/Extras share one row; the toggle wraps below on narrow cards.
+// Level/stat filters, the paste button (unfiltered only) and the Card Stats total.
+.my-raids-page .card-tier-tabs .sim-card-filters { margin-bottom: 0; }
+// Filters and Equipped/Extras share one row; the toggle wraps below on narrow cards.
 .my-raids-page .card-controls-row {
   display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-bottom: 0.6rem;
   .card-section-tabs { order: 1; margin: 0 0 0 auto; }
   .card-section-tab { padding: 0.3rem 0.6rem; }
-  .card-tier-tabs { flex: 1 1 0; min-width: max-content; }
-  .card-tier-tabs .sim-card-tabs button { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+  .card-tier-tabs { flex: 1 1 16rem; max-width: 22rem; }
   .card-tier-tabs[data-section-active="false"] { visibility: hidden; }
 }
 .my-raids-page .card-paste-btn.tier-hidden { display: none; }

@@ -11,7 +11,7 @@ import { renderPagination, bindPagination } from '../pagination.js';
 import { initFixedTooltip } from '../fixed-tooltip.js';
 import { GUILD_ONLY_TAG } from '../guild-lock.js';
 import itemIcons from '../data/sim-icons.json' with { type: 'json' };
-import { cardsForTier, cardCellHtml, tierTabsHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
+import { cardsForTier, cardCellHtml, cardFilterHtml, raritiesFromGrades, raritiesFromSlots, CARDS_PER_PAGE as GAME_CARDS_PER_PAGE } from '../card-collection.js';
 import { createCharacterBuilder, createReferenceViewer, emptyBuildFor, siteClassName } from './simulator.jsx';
 import { renderPowerBadge, initChipTooltip } from '../chip-tooltip.js';
 import { deriveStats } from '../sim/derive-stats.js';
@@ -164,9 +164,13 @@ export const PlayersPage = {
     return this._charCardTierByPlayer?.[playerId] ?? null;
   },
 
+  _charCardStat(playerId) {
+    return this._charCardStatByPlayer?.[playerId] ?? null;
+  },
+
   _buildMiniCardGridHtml(player, page) {
     const rarities = this._cardRarities(player);
-    return cardsForTier(this._charCardTier(player.id))
+    return cardsForTier(this._charCardTier(player.id), this._charCardStat(player.id))
       .slice((page - 1) * GAME_CARDS_PER_PAGE, page * GAME_CARDS_PER_PAGE)
       .map(({ name, index }) => cardCellHtml({ name, index, rarity: rarities.get(name) || '', className: 'char-card-mini-slot' }))
       .join('');
@@ -176,11 +180,11 @@ export const PlayersPage = {
     if (!this._cardCollection.loaded) {
       return `<div class="char-card-collection"><p class="char-card-collection-loading">Loading cards…</p></div>`;
     }
-    const pageCount = Math.max(1, Math.ceil(cardsForTier(this._charCardTier(player.id)).length / GAME_CARDS_PER_PAGE));
+    const pageCount = Math.max(1, Math.ceil(cardsForTier(this._charCardTier(player.id), this._charCardStat(player.id)).length / GAME_CARDS_PER_PAGE));
     const page = Math.min(this._charCardPageByPlayer[player.id] || 1, pageCount);
     return `
       <div class="char-card-collection" data-player-id="${player.id}">
-        ${tierTabsHtml(this._charCardTier(player.id), `data-player-id="${player.id}"`)}
+        ${cardFilterHtml(this._charCardTier(player.id), this._charCardStat(player.id), `data-player-id="${player.id}"`)}
         <div class="char-card-mini-grid">${this._buildMiniCardGridHtml(player, page)}</div>
         <div class="char-card-mini-pagination">${renderPagination(page, pageCount)}</div>
       </div>
@@ -270,11 +274,12 @@ export const PlayersPage = {
   },
 
   _bindCharCardCollectionPagination(rootEl, playerId) {
-    rootEl.querySelectorAll('.char-card-collection [data-card-tier]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    rootEl.querySelectorAll('.char-card-collection .sim-card-filter-select').forEach(sel => {
+      sel.addEventListener('click', (e) => e.stopPropagation());
+      sel.addEventListener('change', (e) => {
         e.stopPropagation();
-        this._charCardTierByPlayer = this._charCardTierByPlayer || {};
-        this._charCardTierByPlayer[playerId] = btn.dataset.cardTier === 'all' ? null : Number(btn.dataset.cardTier);
+        if (sel.dataset.cardTier !== undefined) (this._charCardTierByPlayer ||= {})[playerId] = sel.value === 'all' ? null : Number(sel.value);
+        else (this._charCardStatByPlayer ||= {})[playerId] = sel.value || null;
         this._charCardPageByPlayer[playerId] = 1;
         this._refreshCharCardBody(playerId);
       });
@@ -282,7 +287,7 @@ export const PlayersPage = {
     const wrap = rootEl.querySelector('.char-card-mini-pagination .pagination');
     if (!wrap) return;
     const currentPage = this._charCardPageByPlayer[playerId] || 1;
-    const pageCount = Math.max(1, Math.ceil(cardsForTier(this._charCardTier(playerId)).length / GAME_CARDS_PER_PAGE));
+    const pageCount = Math.max(1, Math.ceil(cardsForTier(this._charCardTier(playerId), this._charCardStat(playerId)).length / GAME_CARDS_PER_PAGE));
     bindPagination(wrap, currentPage, pageCount, (newPage) => {
       this._charCardPageByPlayer[playerId] = newPage;
       this._refreshCharCardBody(playerId);
